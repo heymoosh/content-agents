@@ -7,6 +7,7 @@ import { buildContentRequest } from "./content-request.js";
 import { approveExperimentPlan, buildExperimentPlan } from "../grow/experiment-content-handoff.js";
 import { signalsExperimentRecommendation } from "../grow/experiment-test-fixtures.js";
 import { markExperimentContentHandoff, readExperimentPlans, recordExperimentPlan, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
+import * as planStoreSubject from "./signals-experiment-plan-store.js";
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -45,6 +46,15 @@ describe("Signals experiment plan store", () => {
     assert.equal(row.status, "drafts-pending-content-review");
     assert.deepEqual(row.generatedIds, ["control", "treated"]);
     assert.equal(row.planDecision?.authorizesCopyApproval, false);
+    assert.deepEqual((planStoreSubject as any).readExperimentPlansForPerformance(path).map((item: any) => item.recommendation.id), [plan.recommendation.id]);
     assert.throws(() => reviewExperimentPlan(plan.recommendation.id, decision, path), /already reviewed/i);
+  });
+
+  test("does not measure a proposal before its canonical Content handoff exists", async () => {
+    const root = await mkdtemp(join(tmpdir(), "signals-experiment-store-")); roots.push(root); const path = join(root, "plans.jsonl");
+    const plan = proposal("approved-only"); recordExperimentPlan(plan, path);
+    const decision = approveExperimentPlan(plan, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" });
+    reviewExperimentPlan(plan.recommendation.id, decision, path);
+    assert.deepEqual((planStoreSubject as any).readExperimentPlansForPerformance(path), []);
   });
 });

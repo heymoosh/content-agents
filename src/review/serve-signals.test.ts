@@ -31,7 +31,7 @@ test("decline is durably recorded and returned by a later Signals read", async (
     assert.equal(h.response()?.code, 200);
     assert.equal(readSignalsDecisions(ledger)["TEST:Try the audit hook"].decision, "decline");
     const read = harness("GET", "/api/signals");
-    assert.equal(await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: ledger }), true);
+    assert.equal(await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: ledger, proposalsPath: join(root, "proposals"), experimentPlansPath: join(root, "plans") }), true);
     assert.deepEqual((read.response()?.value as any).decisions["TEST:Try the audit hook"].decision, "decline");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -101,5 +101,49 @@ test("Signals experiment approval triggers canonical Content generation but leav
     const read = harness("GET", "/api/signals");
     await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), proposalsPath: join(root, "changes"), experimentPlansPath: plansPath });
     assert.equal((read.response()?.value as any).experimentPlans[0].generatedCopyIncluded, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals read exposes collecting and ready experiment evidence from the measurement loop", async () => {
+  const read = harness("GET", "/api/signals");
+  const experimentPerformance = {
+    kind: "signals_experiment_performance", version: "signals-experiment-performance-v1",
+    experiments: [{ experimentId: "ready", analysisStatus: "ready", blockers: [], autoWinner: false }],
+    autoWinner: false, sideEffects: "none",
+  };
+  await handleSignalsRoute({
+    ...read, res: {} as any,
+    decisionsPath: join(tmpdir(), "missing-signals-decisions"),
+    proposalsPath: join(tmpdir(), "missing-signals-proposals"),
+    experimentPlansPath: join(tmpdir(), "missing-signals-plans"),
+    readExperimentPerformance: () => experimentPerformance,
+  } as any);
+  assert.deepEqual((read.response()?.value as any).experimentPerformance, experimentPerformance);
+});
+
+test("Signals interpretation stays reviewable, persists the human decision, and never selects a winner", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-interpretation-"));
+  const resultsPath = join(root, "results.jsonl");
+  try {
+    const interpret = harness("POST", "/api/signals/experiments/experiment-one/interpret", { engine: "codex" });
+    const proposal = {
+      experimentId: "experiment-one", recommendation: "keep", rationale: "The primary metric improved and the guardrail held.",
+      evidenceRefs: ["analytics:one"], confidence: "medium", caveats: ["Small sample."], autoWinner: false,
+    };
+    assert.equal(await handleSignalsRoute({
+      ...interpret, res: {} as any, experimentResultsPath: resultsPath,
+      interpretExperiment: async (id: string, engine: string) => ({ ...proposal, experimentId: id, engine }),
+    } as any), true);
+    assert.equal(interpret.response()?.code, 200);
+    assert.equal((interpret.response()?.value as any).interpretation.recommendation, "keep");
+    assert.equal((interpret.response()?.value as any).interpretation.autoWinner, false);
+    assert.equal((interpret.response()?.value as any).interpretation.reviewStatus, "pending");
+
+    const review = harness("POST", "/api/signals/experiments/experiment-one/interpretation/accept", { rationale: "I reviewed the evidence and caveats." });
+    assert.equal(await handleSignalsRoute({ ...review, res: {} as any, experimentResultsPath: resultsPath } as any), true);
+    assert.equal((review.response()?.value as any).interpretation.reviewStatus, "accepted");
+    assert.equal((review.response()?.value as any).interpretation.recommendation, "keep");
+    assert.equal((review.response()?.value as any).interpretation.winner, null);
+    assert.equal((review.response()?.value as any).interpretation.autoWinner, false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

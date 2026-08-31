@@ -3421,3 +3421,18 @@ test("Signals experiment plans approve generation into the ordinary Content revi
   assert.match(html, /Open pending drafts in Content/);
   assert.match(html, /reviewRequestFilter/);
 });
+
+test("Signals experiments expose collecting or ready evidence and keep interpretation review separate", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.match(html, /SIGNALS\.experimentPerformance/);
+  assert.match(html, /analysisStatus/);
+  assert.match(html, /Interpret measured result/);
+  assert.match(html, /signalsAnalysisEngine/);
+  assert.match(html, /\/interpretation\/"\+action/);
+  assert.match(html, /data-action="accept"/);
+  assert.match(html, /data-action="reject"/);
+  assert.match(html, /Accept interpretation/);
+  assert.match(html, /This never selects a winner/);
+  assert.match(html, /displayLabel\(analysisStatus\)/);
+  assert.match(html, /displayLabel\(interpretation\.confidence\)/);
+});

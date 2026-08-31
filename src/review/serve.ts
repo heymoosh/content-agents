@@ -91,7 +91,8 @@ import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
 import { providerForKind, publishingRetryBlock, resolvePublishingAttempt, scheduleApprovedOnce, type PublishingResolution } from "./publishing-status.js";
 import { handleFictionRoute } from "./serve-fiction.js";
 import { handleCharlesRoute } from "./serve-charles.js";
-import { handleSignalsRoute } from "./serve-signals.js";
+import { handleSignalsRoute, prepareLiveExperimentInterpretation } from "./serve-signals.js";
+import { parseExperimentInterpretationResult, type ExperimentInterpretationInput } from "./signals-experiment-result-store.js";
 import { createApprovedVentureHandoff, findExistingVentureContentFolder } from "./venture-content-handoff-store.js";
 import { toContentRequestInput as ventureToContentRequestInput } from "./venture-content-handoff.js";
 import { isOutreachEngine, type OutreachEngine } from "./page-outreach.js";
@@ -132,6 +133,25 @@ export function requestAnalysisEngine(value: unknown): Engine {
 export function requestInteractiveAnalysisEngine(value: unknown): Engine {
   if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is limited to the self-contained initial analysis; choose another engine for report-reading follow-up questions");
   return requestEngine(value);
+}
+
+async function interpretSignalsExperiment(id: string, engine: Engine): Promise<ExperimentInterpretationInput> {
+  const { row, prompt } = prepareLiveExperimentInterpretation(id);
+  const output = await runQueued("insights", `Interpret experiment ${id} with ${ENGINE_LABELS[engine]}`, async (job) => {
+    const result = await runAgentSpawn(job, engine, prompt, {
+      timeoutMs: 180_000,
+      permissionMode: null,
+      tools: engine === "codex" || engine === "ollama-gpt-oss" ? undefined : "",
+      sandbox: "read-only",
+    });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: `${ENGINE_LABELS[engine]} experiment interpretation`, timeoutLabel: "180s",
+      exitVerb: `${ENGINE_LABELS[engine]} experiment interpretation`, command: ENGINE_COMMANDS[engine],
+    });
+    if (failure) throw new Error(failure);
+    return result.stdout.trim();
+  }, engine);
+  return parseExperimentInterpretationResult(output, row, engine);
 }
 
 type SyncEngineProbe = (file: string, args: readonly string[], options: { encoding?: BufferEncoding; stdio?: "ignore" | "pipe"; timeout: number }) => string | Buffer;
@@ -1116,7 +1136,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       return;
     }
     if (await handleCharlesRoute({ req, res, url, readBody, json, requestEngine })) return;
-    if (await handleSignalsRoute({ req, res, url, readBody, json })) return;
+    if (await handleSignalsRoute({ req, res, url, readBody, json, interpretExperiment: interpretSignalsExperiment })) return;
     // Approved Venture primary copy enters the ordinary Content configuration cycle. This keeps
     // its Venture provenance and does not generate or deliver anything. A retry recovers the
     // same Content folder; entering configuration is not falsely recorded as Venture delivery.

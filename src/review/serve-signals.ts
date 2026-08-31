@@ -1,12 +1,19 @@
 import { type IncomingMessage, type ServerResponse } from "node:http";
-import { openDb } from "../db/db.js";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { openDb, repoRoot } from "../db/db.js";
 import { readSignals, readOutcomeFamilies, readResearchReport } from "./signals.js";
 import { buildSignalsRecommendationRead } from "./signals-recommendations.js";
 import { appendSignalsDecision, readSignalsDecisions, recommendationKey, type SignalsDecisionKind, type SignalsRecommendationType } from "./signals-decisions.js";
 import { applySignalsProposal, proposeSignalsChange, readSignalsProposals, reconcileSignalsApplyIntents, reviewSignalsProposal, rollbackSignalsProposal } from "./signals-change-proposals.js";
 import { applyApprovedExperimentToContent, approveExperimentPlan, type AppliedExperimentContentHandoff, type ExperimentPlan, type ExperimentPlanDecision } from "../grow/experiment-content-handoff.js";
-import { loadExperimentPlan, loadExperimentPlanDecision, markExperimentContentHandoff, readExperimentPlans, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
+import { buildLiveSignalsExperimentPerformance, buildSignalsExperimentInterpretationPrompt, type ExperimentAnalyticsObservation, type SignalsExperimentPerformanceRow } from "../grow/signals-experiment-performance.js";
+import { loadExperimentPlan, loadExperimentPlanDecision, markExperimentContentHandoff, readExperimentPlans, readExperimentPlansForPerformance, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
+import { readExperimentInterpretations, recordExperimentInterpretation, reviewExperimentInterpretation, type ExperimentInterpretationInput } from "./signals-experiment-result-store.js";
+import { isEngine, type Engine } from "./engines.js";
 import { safeFolder } from "./rows.js";
+import { readPublishingStatuses } from "./publishing-status.js";
+import { buildOutcomeLedger, readOutcomeLedger } from "../grow/outcome-ledger.js";
 
 type SignalsRouteContext = {
   req: IncomingMessage;
@@ -19,12 +26,46 @@ type SignalsRouteContext = {
   proposalsPath?: string;
   configRoot?: string;
   experimentPlansPath?: string;
+  experimentResultsPath?: string;
+  readExperimentPerformance?: () => unknown;
+  interpretExperiment?: (id: string, engine: Engine) => Promise<ExperimentInterpretationInput & { readonly autoWinner?: false }>;
   applyExperimentPlan?: (plan: ExperimentPlan, decision: ExperimentPlanDecision) => Promise<AppliedExperimentContentHandoff>;
 };
 
+function readLiveExperimentPerformance(experimentPlansPath?: string) {
+  const plans = readExperimentPlansForPerformance(experimentPlansPath);
+  if (plans.length === 0) return {
+    kind: "signals_experiment_performance" as const, version: "signals-experiment-performance-v1" as const,
+    experiments: [], autoWinner: false as const, sideEffects: "none" as const,
+  };
+  const publications = Object.values(readPublishingStatuses()).map((status) => ({
+    slug: status.slug, rowId: status.rowId, state: status.state, providerObjectId: status.providerObjectId ?? status.ref ?? null,
+    canonicalUrl: status.canonicalUrl ?? null, providerPublishedAt: status.providerPublishedAt ?? null,
+    at: status.at, eventId: status.eventId ?? `legacy:${status.slug}/${status.rowId}:${status.at}`,
+  }));
+  const db = openDb();
+  try {
+    const analytics = db.prepare(`
+      SELECT m.id, p.platform_post_id AS platformPostId, p.url, m.captured_at AS capturedAt,
+             m.impressions, m.replies, m.clicks, m.new_follows AS newFollows
+      FROM metrics m JOIN posts p ON p.id = m.post_id
+    `).all() as ExperimentAnalyticsObservation[];
+    const outcomePath = join(repoRoot, "data", "outcomes.jsonl");
+    const outcomeLedger = existsSync(outcomePath) ? buildOutcomeLedger(readOutcomeLedger(outcomePath)) : null;
+    return buildLiveSignalsExperimentPerformance({ plans, publications, analytics, outcomeLedger, now: new Date().toISOString() });
+  } finally { db.close(); }
+}
+
+export function prepareLiveExperimentInterpretation(id: string, experimentPlansPath?: string): { row: SignalsExperimentPerformanceRow; prompt: string } {
+  const row = readLiveExperimentPerformance(experimentPlansPath).experiments.find((item) => item.experimentId === id);
+  if (!row) throw new Error(`unknown measurable experiment ${id}`);
+  if (row.analysisStatus !== "ready") throw new Error(`experiment ${id} is not ready: ${row.blockers.join("; ")}`);
+  return { row: row as SignalsExperimentPerformanceRow, prompt: buildSignalsExperimentInterpretationPrompt(row as SignalsExperimentPerformanceRow) };
+}
+
 // Signals stays split by its existing response contracts: signal summary, outcome families, and
 // redacted research report remain separate reads; decisions are explicit append-only writes.
-export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, applyExperimentPlan }: SignalsRouteContext): Promise<boolean> {
+export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, experimentResultsPath, readExperimentPerformance, interpretExperiment, applyExperimentPlan }: SignalsRouteContext): Promise<boolean> {
   // Signals room (design 3e): deterministic brief + durable user decisions. Muxin decides;
   // adoption records intent only and never mutates configuration or the repository backlog.
   if (req.method === "GET" && url.pathname === "/api/signals") {
@@ -41,7 +82,37 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
       })),
       changeProposals: readSignalsProposals(proposalsPath),
       experimentPlans: readExperimentPlans(experimentPlansPath),
+      experimentPerformance: readExperimentPerformance?.() ?? readLiveExperimentPerformance(experimentPlansPath),
+      experimentInterpretations: readExperimentInterpretations(experimentResultsPath),
     });
+    return true;
+  }
+  if (req.method === "POST" && /^\/api\/signals\/experiments\/[^/]+\/interpret$/.test(url.pathname)) {
+    const [, , , , encodedId] = url.pathname.split("/");
+    const id = decodeURIComponent(encodedId);
+    const body = await readBody(req);
+    try {
+      const engine = isEngine(body.engine) ? body.engine : "codex";
+      if (!interpretExperiment) throw new Error("Signals experiment interpretation runner is unavailable");
+      const result = await interpretExperiment(id, engine);
+      if (result.experimentId !== id) throw new Error("Signals interpretation returned a different experiment id");
+      const interpretation = recordExperimentInterpretation({ ...result, engine }, experimentResultsPath);
+      json(res, 200, { ok: true, interpretation });
+    } catch (e) {
+      json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e) });
+    }
+    return true;
+  }
+  if (req.method === "POST" && /^\/api\/signals\/experiments\/[^/]+\/interpretation\/(accept|reject)$/.test(url.pathname)) {
+    const [, , , , encodedId, , action] = url.pathname.split("/");
+    const id = decodeURIComponent(encodedId);
+    const body = await readBody(req);
+    try {
+      const interpretation = reviewExperimentInterpretation(id, action === "accept" ? "accepted" : "rejected", String(body.rationale ?? ""), experimentResultsPath);
+      json(res, 200, { ok: true, interpretation });
+    } catch (e) {
+      json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e) });
+    }
     return true;
   }
   if (req.method === "POST" && /^\/api\/signals\/experiments\/[^/]+\/(approve|decline|start)$/.test(url.pathname)) {

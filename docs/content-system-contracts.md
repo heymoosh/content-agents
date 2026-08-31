@@ -1328,6 +1328,23 @@ business families remain separate; lineage/evidence blockers and a supplied
 winner remain visible. The adapter never infers demand or a winner, composes
 copy, closes an experiment, sends, publishes, or writes.
 
+### `signals_experiment_performance` (implemented; reviewed interpretation loop exists)
+
+`src/grow/signals-experiment-performance.ts` joins only experiment plans that completed the
+canonical Content handoff. Live or delivered provider objects must match an analytics
+`platform_post_id` or canonical URL exactly; the latest matching snapshot supplies only metrics
+the analytics schema actually contains. Explicit funnel and business facts come from the canonical
+runtime ledger at `data/outcomes.jsonl` and require one ready row, an exact declared metric, and one
+unambiguous content-item attribution to one experiment arm. Signals remains `collecting` until both
+controlled arms, every guardrail, the declared sample, and the declared duration are present.
+
+When a row becomes `ready`, `src/review/serve.ts` sends the body-free performance packet to the
+selected signed-in analysis CLI, GPT/Codex by default. The strict parser rejects unknown fields,
+invented evidence references, wrong experiment identity, and any run before readiness.
+`src/review/signals-experiment-result-store.ts` then records the keep/revise/reject recommendation
+append-only. Muxin accepts or rejects that analysis in a separate event. Acceptance records learning
+only: winner stays null, copy approval stays in Content, and routing/configuration do not change.
+
 ### Increment acceptance predicates and current status
 
 The account metadata and pool-evidence increment is accepted only when all of

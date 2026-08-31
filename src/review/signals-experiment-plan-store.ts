@@ -156,3 +156,12 @@ export function readExperimentPlans(path: string = SIGNALS_EXPERIMENT_PLANS_PATH
     return priority[left.priority] - priority[right.priority] || left.experimentId.localeCompare(right.experimentId);
   }));
 }
+
+/** Full body-bearing plans are server-internal and become measurable only after Content handoff. */
+export function readExperimentPlansForPerformance(path: string = SIGNALS_EXPERIMENT_PLANS_PATH): ExperimentPlan[] {
+  if (!existsSync(path)) return [];
+  return withFileLock(`${path}.lock`, () => [...fold(path).values()]
+    .filter((row) => row.decision?.status === "approved" && row.handoff !== null)
+    .map((row) => row.plan)
+    .sort((left, right) => left.recommendation.id.localeCompare(right.recommendation.id)));
+}

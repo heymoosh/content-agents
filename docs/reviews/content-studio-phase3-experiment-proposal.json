@@ -71,7 +71,7 @@
       "mechanism": "signals-science-agent-v1",
       "engine": "codex",
       "evidenceDigest": "sha256:74682d099526a6d9608e440f851d249c2220d8cffff00e9201430d972e126425",
-      "promptDigest": "sha256:e40ebe9a53e156a5c4dbc8a687709e59cf6a18844668cbf5da1ecb327f904137",
+      "promptDigest": "sha256:1984731c73a346b6b7782aae883af8dc4feacd77e34b02ce9ded6d9a85050edb",
       "responseDigest": "sha256:422f18f25a090b92ef582873b9b53d3d978bc31c77cf3c9a8b538e85628f49ab"
     }
   },
@@ -541,5 +541,5 @@
   "autoApproval": false,
   "autoScheduling": false,
   "autoPublishing": false,
-  "digest": "sha256:3297e9d9effb94337a98f182d67053bb54615978de9aedb4b48eb6202b2bfe8c"
+  "digest": "sha256:a5d7efbac3ddb88995b471dfcb109d6cd7684d62bee5a38e3160d54d3c677159"
 }
