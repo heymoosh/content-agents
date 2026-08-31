@@ -1,9 +1,10 @@
 name: CI
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  # Ordinary lint/typecheck/unit verification is the local merge gate. Keep a
+  # manual escape hatch for an independent hosted run without spending an
+  # Actions runner on every PR and push.
+  workflow_dispatch:
 
 jobs:
   check:

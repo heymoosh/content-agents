@@ -6,7 +6,7 @@
   "delivery": { "mode": "merge" },
   "merge_policy": {
     "schema_version": 1,
-    "merge_mechanics": "auto-when-green",
+    "merge_mechanics": "immediate-after-selfvet",
     "reviewer_model": true,
     "auto_merge_categories": [
       "content",
