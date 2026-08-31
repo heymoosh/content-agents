@@ -108,8 +108,9 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    temporary exception for Kling video generation while local Wan 2.2 is evaluated; every paid
    call remains opt-in and logged to `data/cost-log.csv`. Attended Codex image generation is a
    reviewed-file workflow, not a callable repository API. New builds inherit this.
-7. **PR auto-merge: hold only for changes to content-generation LOGIC, never for generated
-   content itself.** The conductor auto-merges any green-CI PR by default. The ONLY reason to hold
+7. **PR merge: prove routine changes locally; hold only for changes to content-generation LOGIC,
+   never for generated content itself.** The conductor merges a clean, locally verified PR
+   immediately after self-vet; routine hosted CI is manual/advisory. The ONLY reason to hold
    a PR open for Muxin's explicit review is a change to the *code/prompts that decide what content
    says* — `src/atomize/` extraction or spin logic, quote-card copy/image-prompt generation logic,
    video script/storyboard drafting logic, `src/strategy/` brief-synthesis logic, Build 2 fiction
@@ -117,7 +118,7 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    runtime rubric input (`venture/rules.yaml`), and its skill prompts (`.claude/skills/venture/**`),
    Build 4 Charles's persona/voice config (`charles/config/persona.yaml`) and its skill prompts
    (`.claude/skills/charles/**`). That is judgment-affecting and needs her eyes every time. Everything
-   else auto-merges on green CI, full stop — including: the generated content itself committed to
+   else merges after the local check, full stop — including: the generated content itself committed to
    git (derivatives, quote-card text, drafted chapters), review-queue/publish-log/ledger state,
    backlog bookkeeping, docs, scripts, infra, config. Committing already-generated or
    already-decided content to git is not "publishing" (rule 2 still gates actual publish via

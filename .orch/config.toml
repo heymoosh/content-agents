@@ -1,0 +1,6 @@
+# orch configuration for content-agents.
+schema_version = 1
+
+[check]
+# Single argv command; the package script owns the typecheck + unit-test sequence.
+command = "npm run check"
