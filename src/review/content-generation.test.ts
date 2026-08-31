@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildContentRequest } from "./content-request.js";
-import { assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredColdFeedEditorPrompt, configuredContentPrompt, configuredDerivativeText, configuredSourceCtaLabel, configuredSourceSupportsCta, configuredSourceSegments, parseConfiguredEditorBodies, parseConfiguredVariantBodies, parseVentureConfiguredBodies, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
+import { assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredColdFeedEditorPrompt, configuredContentPrompt, configuredDerivativeText, configuredExperimentFrontmatter, configuredQueueNote, configuredSourceCtaLabel, configuredSourceSupportsCta, configuredSourceSegments, parseConfiguredEditorBodies, parseConfiguredVariantBodies, parseVentureConfiguredBodies, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
 
 const request = buildContentRequest({
   id: "request-1", origin: "studio", descriptor: "A useful idea", originalInput: "The exact source.",
@@ -61,6 +61,35 @@ test("untreated control serialization preserves the complete author body byte fo
   const original = "# Heading\n\n  Deliberate spacing stays.  \nLast line without newline";
   const serialized = configuredDerivativeText("---\nvariant_kind: control\n---\n\n", original, true);
   assert.equal(serialized.slice(serialized.indexOf("\n\n") + 2), original);
+});
+
+test("experiment drafts carry lineage into the ordinary pending Content review presentation", () => {
+  const base = buildContentRequest({
+    id: "experiment-content", origin: "human-inference", descriptor: "experiment", originalInput: "Source.",
+    treatments: ["summary"], media: ["none"], platforms: ["linkedin"], includeUntreatedControl: true,
+    sourceProvenance: { kind: "source", sourceLines: [1] },
+  });
+  const variablesByVariant = Object.fromEntries(base.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }]));
+  const experiment = buildContentRequest({
+    id: base.id, origin: base.origin, descriptor: base.descriptor, originalInput: base.originalInput,
+    treatments: base.selections.treatments, media: base.selections.media, platforms: base.selections.platforms,
+    sourceProvenance: base.sourceProvenance,
+    experiment: {
+      id: "experiment:opening", recommendationId: "signals:opening",
+      planProposalDigest: `sha256:${"a".repeat(64)}`, planDecisionDigest: `sha256:${"b".repeat(64)}`,
+      planApprovedAt: "2026-08-31T18:00:00.000Z", hypothesis: "A grounded opening will improve replies.",
+      controlledVariable: "opening", variablesByVariant,
+    },
+  });
+  const treatedVariant = experiment.variants.find((variant) => variant.identity.kind === "treated")!;
+  assert.deepEqual(configuredExperimentFrontmatter(experiment, treatedVariant.identity.id), [
+    'experiment_id: "experiment:opening"',
+    'experiment_recommendation_id: "signals:opening"',
+    `experiment_plan_decision_digest: "sha256:${"b".repeat(64)}"`,
+    'experiment_variables: {"opening":"treated"}',
+  ]);
+  assert.equal(configuredQueueNote(experiment, "treated", "summary"), "Experiment: experiment:opening; Treatment: summary");
+  assert.equal(configuredQueueNote(experiment, "control", ""), "Experiment: experiment:opening; Untreated control");
 });
 
 test("configured drafting accepts grounded rewrites and rejects footnotes, duplicates, and forged provenance", () => {

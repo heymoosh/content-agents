@@ -11,6 +11,55 @@ export type GrowExperimentSourceKind = "raw-thought" | "long-form" | "substack-n
 export type GrowExperimentEvidenceStatus = "supported" | "hypothesis";
 export type GrowExperimentOutcomeFamily = "attention" | "conversation" | "audience" | "business";
 export type GrowExperimentVariantDecisionStatus = "approved" | "edited" | "rejected" | "needs-another-pass";
+export type ExperimentDirection = "increase" | "decrease" | "maintain";
+export type ExperimentConfidence = "low" | "medium" | "high";
+
+export interface SignalsExperimentRecommendationInput {
+  version: "signals-experiment-recommendation-v1";
+  id: string;
+  owner: "signals";
+  createdAt: string;
+  evidenceRefs: readonly string[];
+  observation: string;
+  interpretation: string;
+  hypothesis: string;
+  expectedOutcome: {
+    variantId: string;
+    comparisonRef: string;
+    family: GrowExperimentOutcomeFamily;
+    metric: string;
+    direction: ExperimentDirection;
+  };
+  whyThisInput: string;
+  controlledVariable: string;
+  constants: readonly string[];
+  primaryMetric: { family: GrowExperimentOutcomeFamily; metric: string };
+  guardrails: readonly { family: GrowExperimentOutcomeFamily; metric: string; rule: string }[];
+  minimumSample: number;
+  minimumDays: number;
+  decisionRule: { keep: string; revise: string; reject: string };
+  confidence: ExperimentConfidence;
+  caveats: readonly string[];
+  capacityRationale: string;
+  provenance: {
+    mechanism: "signals-science-agent-v1";
+    engine: "claude" | "grok" | "codex";
+    evidenceDigest: string;
+    promptDigest: string;
+    responseDigest: string;
+  };
+}
+
+export interface ExperimentGenerationEvidenceInput {
+  pipeline: "content-studio-configured-v1";
+  editor: {
+    version: "cold-feed-v1";
+    status: "passed";
+    recommendation: string;
+    inputBodyDigest: string;
+    outputBodyDigest: string;
+  };
+}
 
 export interface GrowExperimentProposalInput {
   id: string;
@@ -22,6 +71,7 @@ export interface GrowExperimentProposalInput {
     originRef: string;
     canonicalUrl?: string | null;
   };
+  recommendation: SignalsExperimentRecommendationInput;
   selectedPlatforms: readonly string[];
   cut: {
     id: string;
@@ -50,6 +100,7 @@ export interface GrowExperimentProposalInput {
     experimentVariables: Readonly<Record<string, string>>;
     voiceCheck: "passed";
     originalityCheck: "passed";
+    generation: ExperimentGenerationEvidenceInput;
   }[];
   capacity: {
     day: string;
@@ -82,6 +133,7 @@ export interface GrowExperimentVariant {
   experimentVariables: Record<string, string>;
   voiceCheck: "passed";
   originalityCheck: "passed";
+  generation: ExperimentGenerationEvidenceInput;
   lineage: {
     sourceId: string;
     cutId: string;
@@ -96,6 +148,7 @@ export interface GrowExperimentProposal {
   id: string;
   createdAt: string;
   source: { id: string; kind: GrowExperimentSourceKind; body: string; originRef: string; canonicalUrl: string | null };
+  recommendation: SignalsExperimentRecommendationInput;
   selectedPlatforms: string[];
   cut: GrowExperimentProposalInput["cut"] & { sourceRefs: string[] };
   variants: GrowExperimentVariant[];
@@ -165,6 +218,10 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+export function experimentBodyDigest(body: string): string {
+  return `sha256:${createHash("sha256").update(body, "utf8").digest("hex")}`;
+}
+
 /** Static, dependency-free review surface for the exact digest-bound proposal. */
 export function renderGrowExperimentProposalHtml(proposal: GrowExperimentProposal): string {
   const decisionSeed = JSON.stringify({
@@ -179,6 +236,7 @@ export function renderGrowExperimentProposalHtml(proposal: GrowExperimentProposa
         <dt>Treatment</dt><dd>${escapeHtml(variant.treatment.ref)}</dd>
         <dt>Why</dt><dd>${escapeHtml(variant.treatment.rationale)}</dd>
         <dt>Evidence</dt><dd>${escapeHtml(variant.treatment.evidenceStatus)} · ${escapeHtml(variant.treatment.evidenceRefs.join(", "))}</dd>
+        <dt>Editor</dt><dd>Cold-feed editor passed · ${escapeHtml(variant.generation.editor.recommendation)}</dd>
         <dt>Variables</dt><dd>${escapeHtml(Object.entries(variant.experimentVariables).map(([key, value]) => `${key}=${value}`).join(" · "))}</dd>
         <dt>Lineage</dt><dd>${escapeHtml(variant.sourceRefs.join(", "))}</dd>
       </dl>
@@ -190,9 +248,29 @@ export function renderGrowExperimentProposalHtml(proposal: GrowExperimentProposa
   const review = proposal.capacity.review.map((entry) => `<li>${escapeHtml(entry.platform)}: ${entry.available} review decisions available</li>`).join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Content Studio Phase 3 Grow experiment review</title>
+<title>Content Studio Phase 3 Experiment review</title>
 <style>:root{color-scheme:light;--ink:#1c1917;--paper:#f6f1e8;--panel:#fffdf8;--line:#d7cbb8;--accent:#26594d;--danger:#9f2f24}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,sans-serif}main{width:min(1120px,calc(100% - 32px));margin:36px auto 72px}header,.card,.cut,.capacity,.decision-export{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}h1{font:700 clamp(32px,5vw,55px)/1.05 Georgia,serif;margin:0 0 12px}.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:12px;font-weight:800;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;margin-top:20px}.copy{font-size:18px;white-space:normal;margin:20px 0}dl{display:grid;grid-template-columns:100px 1fr;gap:7px 12px;font-size:13px}dt{font-weight:800}dd{margin:0;color:#5f584f}fieldset{margin-top:20px;border:1px solid var(--line);border-radius:9px;display:flex;flex-wrap:wrap;gap:14px}.field{display:block;font-size:13px;font-weight:700;margin-top:16px}textarea{display:block;width:100%;margin-top:5px;border:1px solid var(--line);border-radius:8px;padding:10px;background:#fff;font:14px/1.45 system-ui,sans-serif;resize:vertical}section{margin-top:34px}.digest{overflow-wrap:anywhere;font:12px ui-monospace,monospace;color:#655f57}.cut,.capacity{margin-top:14px}.notice{border-left:5px solid var(--accent);padding-left:14px}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}button{border:0;border-radius:9px;padding:11px 15px;background:var(--accent);color:white;font-weight:800;cursor:pointer}button.secondary{background:#5f584f}.decision-status{min-height:1.5em;color:var(--danger);font-weight:700}pre{max-height:360px;overflow:auto;background:#211f1b;color:#f8f2e8;padding:16px;border-radius:9px;font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap}</style></head>
-<body><main><header><p class="eyebrow">Human Inference · Phase 3 review</p><h1>One Grow-this experiment, with the gates visible</h1><p>This packet turns one approved cut into bounded platform treatments. Nothing here is approved, scheduled, published, measured, or a winner until the corresponding human and provider evidence exists.</p><p class="digest">Proposal digest: ${escapeHtml(proposal.digest)}</p></header>
+<body><main><header><p class="eyebrow">Human Inference · Phase 3 Experiment review</p><h1>A Signals-recommended content experiment</h1><p>Signals proposes the scientific question. Experiment preserves the controls, review, delivery, and measurement gates. Nothing here is approved, scheduled, published, measured, or a winner until the corresponding human and provider evidence exists.</p><p class="digest">Proposal digest: ${escapeHtml(proposal.digest)}</p></header>
+<section><h2>Why run this experiment?</h2><div class="capacity"><dl>
+<dt>Observation</dt><dd>${escapeHtml(proposal.recommendation.observation)}</dd>
+<dt>Interpretation</dt><dd>${escapeHtml(proposal.recommendation.interpretation)}</dd>
+<dt>Hypothesis</dt><dd>${escapeHtml(proposal.recommendation.hypothesis)}</dd>
+<dt>Expected</dt><dd>${escapeHtml(`${proposal.recommendation.expectedOutcome.variantId} should ${proposal.recommendation.expectedOutcome.direction} ${proposal.recommendation.expectedOutcome.metric} versus ${proposal.recommendation.expectedOutcome.comparisonRef}.`)}</dd>
+<dt>Why this input</dt><dd>${escapeHtml(proposal.recommendation.whyThisInput)}</dd>
+<dt>Changes</dt><dd>${escapeHtml(proposal.recommendation.controlledVariable)}</dd>
+<dt>Held constant</dt><dd>${escapeHtml(proposal.recommendation.constants.join(", "))}</dd>
+<dt>Primary metric</dt><dd>${escapeHtml(`${proposal.recommendation.primaryMetric.family}: ${proposal.recommendation.primaryMetric.metric}`)}</dd>
+<dt>Guardrails</dt><dd>${escapeHtml(proposal.recommendation.guardrails.map((item) => `${item.family}/${item.metric}: ${item.rule}`).join(" · "))}</dd>
+<dt>Evaluation</dt><dd>${escapeHtml(`${proposal.recommendation.minimumSample} comparable units and ${proposal.recommendation.minimumDays} days`)}</dd>
+<dt>Keep</dt><dd>${escapeHtml(proposal.recommendation.decisionRule.keep)}</dd>
+<dt>Revise</dt><dd>${escapeHtml(proposal.recommendation.decisionRule.revise)}</dd>
+<dt>Reject</dt><dd>${escapeHtml(proposal.recommendation.decisionRule.reject)}</dd>
+<dt>Confidence</dt><dd>${escapeHtml(proposal.recommendation.confidence)}</dd>
+<dt>Caveats</dt><dd>${escapeHtml(proposal.recommendation.caveats.join(" · "))}</dd>
+<dt>Capacity</dt><dd>${escapeHtml(proposal.recommendation.capacityRationale)}</dd>
+<dt>Evidence</dt><dd>${escapeHtml(proposal.recommendation.evidenceRefs.join(", "))}</dd>
+<dt>Science pass</dt><dd>${escapeHtml(`${proposal.recommendation.provenance.mechanism} · ${proposal.recommendation.provenance.engine} · prompt ${proposal.recommendation.provenance.promptDigest}`)}</dd>
+</dl></div></section>
 <section><h2>Approved message cut</h2><div class="cut"><div class="copy">${escapeHtml(proposal.cut.body)}</div><p>${escapeHtml(proposal.cut.rationale)}</p><p class="digest">${escapeHtml(proposal.cut.sourceRefs.join(", "))} · approved by Muxin at ${escapeHtml(proposal.cut.decision.decidedAt)}</p></div></section>
 <section><h2>Candidate treatments</h2><p class="notice">Candidate volume is ${proposal.capacityManifest.internalCandidateVolume}. Approved publish volume is ${proposal.capacityManifest.approvedPublishVolume} until you decide each item.</p><div class="grid">${cards}</div></section>
 <section><h2>Capacity and experiment</h2><div class="capacity"><p><strong>Declared capacity on ${escapeHtml(proposal.capacity.day)}:</strong></p><ul>${review}${slots}</ul><p><strong>Question:</strong> ${escapeHtml(proposal.experiment.question)}</p><p><strong>Outcome families:</strong> ${escapeHtml(proposal.experiment.outcomeFamilies.join(", "))}; minimum sample ${proposal.experiment.minimumSample}</p><p><strong>Winner:</strong> None. The experiment is proposed, not measured.</p></div></section>
@@ -239,7 +317,7 @@ document.querySelector("[data-copy-decision]").addEventListener("click",async fu
 });
 document.querySelector("[data-download-decision]").addEventListener("click",function(){
   const text=renderDecision();if(!text)return;
-  const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([text],{type:"application/json"}));link.download="content-studio-phase3-grow-experiment-decision.json";link.click();URL.revokeObjectURL(link.href);decisionStatus.textContent="Decision JSON downloaded.";
+  const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([text],{type:"application/json"}));link.download="content-studio-phase3-experiment-decision.json";link.click();URL.revokeObjectURL(link.href);decisionStatus.textContent="Decision JSON downloaded.";
 });
 </script></body></html>\n`;
 }
@@ -417,6 +495,15 @@ export function buildGrowExperimentProposal(input: GrowExperimentProposalInput):
     const experimentVariables = Object.fromEntries(Object.entries(variables).sort(([left], [right]) => left.localeCompare(right)).map(([key, value]) => [text(key, `${prefix}.experimentVariables key`), text(value, `${prefix}.experimentVariables.${key}`)]));
     if (variant.voiceCheck !== "passed") throw new Error(`${prefix}.voiceCheck must be passed`);
     if (variant.originalityCheck !== "passed") throw new Error(`${prefix}.originalityCheck must be passed`);
+    if (variant.generation?.pipeline !== "content-studio-configured-v1") throw new Error(`${prefix}.generation must come from the Content Studio configured pipeline`);
+    if (variant.generation.editor?.version !== "cold-feed-v1" || variant.generation.editor.status !== "passed") {
+      throw new Error(`${prefix}.generation.editor must record a passed cold-feed-v1 editor treatment`);
+    }
+    const editorRecommendation = text(variant.generation.editor.recommendation, `${prefix}.generation.editor.recommendation`);
+    const inputBodyDigest = text(variant.generation.editor.inputBodyDigest, `${prefix}.generation.editor.inputBodyDigest`);
+    const outputBodyDigest = text(variant.generation.editor.outputBodyDigest, `${prefix}.generation.editor.outputBodyDigest`);
+    if (!/^sha256:[a-f0-9]{64}$/.test(inputBodyDigest)) throw new Error(`${prefix}.generation.editor.inputBodyDigest is invalid`);
+    if (outputBodyDigest !== experimentBodyDigest(body)) throw new Error(`${prefix}.generation.editor.outputBodyDigest does not match the candidate body`);
     const sourceRefs = refs(variant.sourceRefs, `${prefix}.sourceRefs`);
     const variantCoverage = sourceRefCoverage(source.id, source.body, sourceRefs, `${prefix}.sourceRefs`);
     if ([...variantCoverage.keys].some((key) => !cutCoverage.keys.has(key))) throw new Error(`${prefix}.sourceRefs exceed the approved cut boundary`);
@@ -436,6 +523,10 @@ export function buildGrowExperimentProposal(input: GrowExperimentProposalInput):
       experimentVariables,
       voiceCheck: "passed",
       originalityCheck: "passed",
+      generation: {
+        pipeline: "content-studio-configured-v1",
+        editor: { version: "cold-feed-v1", status: "passed", recommendation: editorRecommendation, inputBodyDigest, outputBodyDigest },
+      },
       lineage: { sourceId: source.id, cutId: cut.id, experimentId: text(input.experiment?.id, "experiment.id") },
     };
   }).sort((left, right) => left.id.localeCompare(right.id));
@@ -471,6 +562,68 @@ export function buildGrowExperimentProposal(input: GrowExperimentProposalInput):
   const outcomeFamilies = uniqueTexts(input.experiment?.outcomeFamilies, "experiment.outcomeFamilies") as GrowExperimentOutcomeFamily[];
   if (outcomeFamilies.some((family) => !OUTCOME_FAMILIES.has(family))) throw new Error("experiment.outcomeFamilies contains an invalid family");
   const experimentId = text(input.experiment?.id, "experiment.id");
+  const suppliedRecommendation = input.recommendation;
+  if (suppliedRecommendation?.version !== "signals-experiment-recommendation-v1" || suppliedRecommendation.owner !== "signals") {
+    throw new Error("recommendation must be a Signals-owned signals-experiment-recommendation-v1 record");
+  }
+  const recommendationEvidenceRefs = refs(suppliedRecommendation.evidenceRefs, "recommendation.evidenceRefs");
+  const recommendationFamilies = new Set(outcomeFamilies);
+  const expected = suppliedRecommendation.expectedOutcome;
+  if (!variantIds.has(expected?.variantId)) throw new Error("recommendation.expectedOutcome must name a proposal variant");
+  const comparisonRef = text(expected?.comparisonRef, "recommendation.expectedOutcome.comparisonRef");
+  if (comparisonRef === expected.variantId || (!variantIds.has(comparisonRef) && !recommendationEvidenceRefs.includes(comparisonRef))) {
+    throw new Error("recommendation.expectedOutcome comparisonRef must name another proposal variant or cited baseline evidence");
+  }
+  if (!recommendationFamilies.has(expected.family)) throw new Error("recommendation.expectedOutcome family must be declared by the experiment");
+  if (!["increase", "decrease", "maintain"].includes(expected.direction)) throw new Error("recommendation.expectedOutcome direction is invalid");
+  const primaryMetric = suppliedRecommendation.primaryMetric;
+  if (!recommendationFamilies.has(primaryMetric?.family)) throw new Error("recommendation.primaryMetric family must be declared by the experiment");
+  if (expected.family !== primaryMetric.family || text(expected.metric, "recommendation.expectedOutcome.metric") !== text(primaryMetric.metric, "recommendation.primaryMetric.metric")) {
+    throw new Error("recommendation expected outcome must use the primary metric");
+  }
+  const minimumSample = positiveInteger(suppliedRecommendation.minimumSample, "recommendation.minimumSample");
+  if (minimumSample !== positiveInteger(input.experiment?.minimumSample, "experiment.minimumSample")) throw new Error("recommendation minimum sample must match the experiment");
+  const guardrails = (suppliedRecommendation.guardrails ?? []).map((guardrail, index) => {
+    if (!recommendationFamilies.has(guardrail.family)) throw new Error(`recommendation.guardrails[${index}].family must be declared by the experiment`);
+    return { family: guardrail.family, metric: text(guardrail.metric, `recommendation.guardrails[${index}].metric`), rule: text(guardrail.rule, `recommendation.guardrails[${index}].rule`) };
+  });
+  if (guardrails.length === 0) throw new Error("recommendation.guardrails must not be empty");
+  const recommendation: SignalsExperimentRecommendationInput = {
+    version: "signals-experiment-recommendation-v1",
+    id: text(suppliedRecommendation.id, "recommendation.id"),
+    owner: "signals",
+    createdAt: iso(suppliedRecommendation.createdAt, "recommendation.createdAt"),
+    evidenceRefs: recommendationEvidenceRefs,
+    observation: text(suppliedRecommendation.observation, "recommendation.observation"),
+    interpretation: text(suppliedRecommendation.interpretation, "recommendation.interpretation"),
+    hypothesis: text(suppliedRecommendation.hypothesis, "recommendation.hypothesis"),
+    expectedOutcome: { variantId: expected.variantId, comparisonRef, family: expected.family, metric: primaryMetric.metric, direction: expected.direction },
+    whyThisInput: text(suppliedRecommendation.whyThisInput, "recommendation.whyThisInput"),
+    controlledVariable: text(suppliedRecommendation.controlledVariable, "recommendation.controlledVariable"),
+    constants: uniqueTexts(suppliedRecommendation.constants, "recommendation.constants"),
+    primaryMetric: { family: primaryMetric.family, metric: text(primaryMetric.metric, "recommendation.primaryMetric.metric") },
+    guardrails,
+    minimumSample,
+    minimumDays: positiveInteger(suppliedRecommendation.minimumDays, "recommendation.minimumDays"),
+    decisionRule: {
+      keep: text(suppliedRecommendation.decisionRule?.keep, "recommendation.decisionRule.keep"),
+      revise: text(suppliedRecommendation.decisionRule?.revise, "recommendation.decisionRule.revise"),
+      reject: text(suppliedRecommendation.decisionRule?.reject, "recommendation.decisionRule.reject"),
+    },
+    confidence: (["low", "medium", "high"] as const).includes(suppliedRecommendation.confidence) ? suppliedRecommendation.confidence : (() => { throw new Error("recommendation.confidence is invalid"); })(),
+    caveats: uniqueTexts(suppliedRecommendation.caveats, "recommendation.caveats"),
+    capacityRationale: text(suppliedRecommendation.capacityRationale, "recommendation.capacityRationale"),
+    provenance: {
+      mechanism: suppliedRecommendation.provenance?.mechanism === "signals-science-agent-v1" ? suppliedRecommendation.provenance.mechanism : (() => { throw new Error("recommendation provenance must come from signals-science-agent-v1"); })(),
+      engine: (["claude", "grok", "codex"] as const).includes(suppliedRecommendation.provenance?.engine) ? suppliedRecommendation.provenance.engine : (() => { throw new Error("recommendation provenance engine is invalid"); })(),
+      evidenceDigest: text(suppliedRecommendation.provenance?.evidenceDigest, "recommendation.provenance.evidenceDigest"),
+      promptDigest: text(suppliedRecommendation.provenance?.promptDigest, "recommendation.provenance.promptDigest"),
+      responseDigest: text(suppliedRecommendation.provenance?.responseDigest, "recommendation.provenance.responseDigest"),
+    },
+  };
+  for (const [field, value] of Object.entries(recommendation.provenance).filter(([field]) => field.endsWith("Digest"))) {
+    if (!/^sha256:[a-f0-9]{64}$/.test(value)) throw new Error(`recommendation.provenance.${field} is invalid`);
+  }
   const capacity = {
     day: text(input.capacity?.day, "capacity.day"),
     review,
@@ -490,7 +643,7 @@ export function buildGrowExperimentProposal(input: GrowExperimentProposalInput):
     id: experimentId,
     question: text(input.experiment?.question, "experiment.question"),
     outcomeFamilies,
-    minimumSample: positiveInteger(input.experiment?.minimumSample, "experiment.minimumSample"),
+    minimumSample,
     topic: text(input.experiment?.topic, "experiment.topic"),
     audience: text(input.experiment?.audience, "experiment.audience"),
   };
@@ -502,14 +655,14 @@ export function buildGrowExperimentProposal(input: GrowExperimentProposalInput):
   const experimentRecord = buildExperimentRecord({
     id: experiment.id,
     question: experiment.question,
-    hypothesis: "The declared treatment may change outcomes; no direction or winner is assumed.",
+    hypothesis: recommendation.hypothesis,
     unit: "published platform variant",
     variables: [...variableOptions].map(([name, options]) => ({ name, options: [...options] })),
     scope: { platform: selectedPlatforms, format: [...new Set(variants.map((variant) => variant.format))], topic: [experiment.topic], audience: [experiment.audience] },
     lineage: { sourceRefs: [source.id], variantRefs: variants.map((variant) => variant.id), publishRefs: [], outcomeRefs: [] },
-    successObservations: outcomeFamilies.map((family) => ({ id: `${experiment.id}:${family}`, family, metric: `${family}-outcome`, measured: false })),
+    successObservations: outcomeFamilies.map((family) => ({ id: `${experiment.id}:${family}`, family, metric: family === recommendation.primaryMetric.family ? recommendation.primaryMetric.metric : `${family}-outcome`, measured: false })),
     minimumSample: experiment.minimumSample,
-    reviewRule: `Review after at least ${experiment.minimumSample} comparable published units; keep outcome families separate.`,
+    reviewRule: `Review after at least ${recommendation.minimumSample} comparable published units and ${recommendation.minimumDays} days. Keep: ${recommendation.decisionRule.keep} Revise: ${recommendation.decisionRule.revise} Reject: ${recommendation.decisionRule.reject}`,
     status: "proposed",
     winner: null,
   });
@@ -537,6 +690,7 @@ export function buildGrowExperimentProposal(input: GrowExperimentProposalInput):
     id,
     createdAt,
     source,
+    recommendation,
     selectedPlatforms,
     cut,
     variants,
@@ -565,6 +719,7 @@ export function buildGrowExperimentDecision(proposal: GrowExperimentProposal, in
     id: proposal.id,
     createdAt: proposal.createdAt,
     source: proposal.source,
+    recommendation: proposal.recommendation,
     selectedPlatforms: proposal.selectedPlatforms,
     cut: proposal.cut,
     variants: proposal.variants.map((variant) => ({
@@ -578,6 +733,7 @@ export function buildGrowExperimentDecision(proposal: GrowExperimentProposal, in
       experimentVariables: variant.experimentVariables,
       voiceCheck: variant.voiceCheck,
       originalityCheck: variant.originalityCheck,
+      generation: variant.generation,
     })),
     capacity: { day: proposal.capacity.day, review: proposal.capacity.review, slots: proposal.capacity.slots },
     experiment: {
@@ -593,7 +749,7 @@ export function buildGrowExperimentDecision(proposal: GrowExperimentProposal, in
   const { digest: suppliedDigest, ...proposalWithoutDigest } = proposal;
   const authenticDigest = digest(proposalWithoutDigest);
   if (suppliedDigest !== authenticDigest || input.proposalDigest !== authenticDigest) throw new Error("proposal digest does not match the immutable proposal");
-  if (text(input.decidedBy, "decidedBy").toLowerCase() !== "muxin") throw new Error("only Muxin can decide a Grow experiment review");
+  if (text(input.decidedBy, "decidedBy").toLowerCase() !== "muxin") throw new Error("only Muxin can decide an Experiment review");
   const decidedAt = iso(input.decidedAt, "decidedAt");
   if (!Array.isArray(input.decisions) || input.decisions.length !== proposal.variants.length) throw new Error("a decision is required for every variant");
   const variantMap = new Map(proposal.variants.map((variant) => [variant.id, variant]));

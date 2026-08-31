@@ -1,0 +1,52 @@
+{
+  "recommendationId": "signals-rec-used-to-think-vs-direct",
+  "createdAt": "2026-08-31T13:45:00.000Z",
+  "inputContext": {
+    "sourceKind": "long-form",
+    "cutId": "cut-action-and-coming-alive",
+    "cutRationale": "This approved source cut contains a real first-person change of mind, the consequence of inaction, and the practical emotional payoff. It can support both a belief-shift treatment and a direct-claim control without importing another part of the essay.",
+    "sourceRefs": ["essay-the-worlds-broken-what-do-we-do#L1-L4"]
+  },
+  "evidence": [
+    {
+      "id": "sha256:eab59aff9411365842a03776499907fdc7de36fa7e5984f3ae8f11ec90c850bb",
+      "family": "conversation",
+      "kind": "hypothesis",
+      "summary": "Muxin approved the bounded Phase 2 dossier as hypothesis-level evidence that a genuine used-to-think/now reversal is worth testing across text-first feeds. The dossier does not establish a winner for Human Inference.",
+      "sampleSize": null,
+      "window": "Phase 2 dossier finalized 2026-08-31",
+      "caveats": [
+        "The evidence is cross-account pattern evidence, not a controlled Human Inference result.",
+        "Available source metrics are not uniform enough to claim a pooled effect.",
+        "The mechanism must use a genuine change of mind rather than forcing a template."
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "variant-linkedin-direct-claim",
+      "platform": "linkedin",
+      "format": "post",
+      "treatment": "treatment:direct-claim-control",
+      "variables": {
+        "cta": "canonical-source-inline",
+        "hook": "direct-claim",
+        "length": "medium"
+      }
+    },
+    {
+      "id": "variant-linkedin-used-to-think-now",
+      "platform": "linkedin",
+      "format": "post",
+      "treatment": "pattern:used-to-think-now",
+      "variables": {
+        "cta": "canonical-source-inline",
+        "hook": "used-to-think-now",
+        "length": "medium"
+      }
+    }
+  ],
+  "availableOutcomeFamilies": ["attention", "conversation", "audience", "business"],
+  "minimumSample": 20,
+  "minimumDays": 14
+}

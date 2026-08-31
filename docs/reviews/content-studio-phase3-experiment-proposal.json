@@ -1,7 +1,7 @@
 {
   "kind": "grow_experiment_proposal",
   "version": "grow-experiment-proposal-v1",
-  "id": "phase3-worlds-broken-used-to-think-vs-direct",
+  "id": "phase3-experiment-worlds-broken-used-to-think-vs-direct",
   "createdAt": "2026-08-31T14:00:00.000Z",
   "source": {
     "id": "essay-the-worlds-broken-what-do-we-do",
@@ -9,6 +9,71 @@
     "body": "I used to think that if I attempted to make a difference, I would only make that pain worse. There is so much disappointment in the world.\nBut it turns out I was making the pain worse by not doing anything at all.\nBut this work is aligned with a part of me that has been wanting to come alive.\nDoing the work at all turned out to be its own reward. Not because the problems are solved. Not because success is guaranteed. Because it has helped me feel more connected to the kind of person I wanted to become.",
     "originRef": "obsidian:The world's broken. What do we do?#L187,L189,L200,L222",
     "canonicalUrl": "https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do"
+  },
+  "recommendation": {
+    "version": "signals-experiment-recommendation-v1",
+    "id": "signals-rec-used-to-think-vs-direct",
+    "owner": "signals",
+    "createdAt": "2026-08-31T13:45:00.000Z",
+    "evidenceRefs": [
+      "sha256:eab59aff9411365842a03776499907fdc7de36fa7e5984f3ae8f11ec90c850bb"
+    ],
+    "observation": "The approved Phase 2 dossier supports the used-to-think/now reversal only as a hypothesis worth testing; it provides no controlled result establishing that it outperforms a direct claim.",
+    "interpretation": "The approved cut rationale indicates that both treatments can express the same source point without importing another essay section, making opening structure a bounded uncertainty; the evidence does not establish causality or a winner.",
+    "hypothesis": "Across comparable LinkedIn text posts using this approved source cut, the genuine used-to-think/now opening will increase substantive replies per 1,000 impressions relative to the direct-claim opening, while canonical-source visits per 1,000 impressions do not decrease by more than 10%.",
+    "expectedOutcome": {
+      "variantId": "variant-linkedin-used-to-think-now",
+      "comparisonRef": "variant-linkedin-direct-claim",
+      "family": "conversation",
+      "metric": "substantive-replies-per-1000-impressions",
+      "direction": "increase"
+    },
+    "whyThisInput": "The input context identifies a real first-person change of mind, its consequence, and its emotional payoff, and explicitly says the cut can support both treatments without importing another essay part. The candidates share platform, format, CTA, and length metadata while differing in opening structure.",
+    "controlledVariable": "Opening structure: direct claim versus a genuine used-to-think/now belief shift.",
+    "constants": [
+      "approved source cut",
+      "balanced publishing windows across matched pairs",
+      "canonical-source-inline CTA",
+      "LinkedIn platform",
+      "medium length",
+      "post format",
+      "same measurement definitions",
+      "same substantive claim and consequence"
+    ],
+    "primaryMetric": {
+      "family": "conversation",
+      "metric": "substantive-replies-per-1000-impressions"
+    },
+    "guardrails": [
+      {
+        "family": "audience",
+        "metric": "canonical-source-visits-per-1000-impressions",
+        "rule": "Must not decrease by more than 10% relative to the direct-claim treatment."
+      }
+    ],
+    "minimumSample": 20,
+    "minimumDays": 14,
+    "decisionRule": {
+      "keep": "Keep testing the belief-shift mechanism if substantive replies are higher and the audience guardrail holds after at least 20 comparable published units and 14 days.",
+      "revise": "Revise the mechanism or collect another matched pair if the estimated direction is positive but the 20-unit multi-pair sample is incomplete, uncertainty remains high, or attribution is incomplete.",
+      "reject": "Reject the mechanism as a growth default if it does not improve substantive replies or if canonical-source visits breach the guardrail."
+    },
+    "confidence": "low",
+    "caveats": [
+      "At least 20 comparable units across multiple matched pairs over 14 days is an initial signal test, not sufficient to claim a general winner.",
+      "Available source metrics are not uniform enough to claim a pooled effect.",
+      "Publishing time, topic response, and pair-level variation may confound results and must be balanced across later pairs.",
+      "The evidence is hypothesis-level cross-account pattern evidence, not a controlled Human Inference result.",
+      "The treatment must express a genuine change of mind rather than force a template."
+    ],
+    "capacityRationale": "Use the two supplied LinkedIn variants for an initial matched pair and continue toward the multi-pair minimum only within normal publishing capacity; this bounded test can inform whether to invest further but cannot establish a broad winner on its own.",
+    "provenance": {
+      "mechanism": "signals-science-agent-v1",
+      "engine": "codex",
+      "evidenceDigest": "sha256:74682d099526a6d9608e440f851d249c2220d8cffff00e9201430d972e126425",
+      "promptDigest": "sha256:1984731c73a346b6b7782aae883af8dc4feacd77e34b02ce9ded6d9a85050edb",
+      "responseDigest": "sha256:422f18f25a090b92ef582873b9b53d3d978bc31c77cf3c9a8b538e85628f49ab"
+    }
   },
   "selectedPlatforms": [
     "linkedin"
@@ -32,7 +97,7 @@
       "platform": "linkedin",
       "medium": "text",
       "format": "post",
-      "body": "Trying to make a difference felt like it would only make the pain worse. Doing nothing made it worse. The work itself helps me feel more connected to the person I wanted to become.\n\nRead the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do",
+      "body": "Trying to respond when society is broken can feel like volunteering for more disappointment. I avoided it because I thought trying and failing would make the pain worse. Doing nothing made it worse instead. Taking action has helped me feel closer to the person I wanted to become, even when the problems remain unsolved.\n\nRead the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do",
       "sourceRefs": [
         "essay-the-worlds-broken-what-do-we-do#L1-L4"
       ],
@@ -51,6 +116,16 @@
       },
       "voiceCheck": "passed",
       "originalityCheck": "passed",
+      "generation": {
+        "pipeline": "content-studio-configured-v1",
+        "editor": {
+          "version": "cold-feed-v1",
+          "status": "passed",
+          "recommendation": "Make the subject explicit by naming the work of responding when society is broken, while preserving the direct-claim opening.",
+          "inputBodyDigest": "sha256:39d265d0e49ae4ad7c47978d9a8b020c2fd8a66f4041a31270493cdc2a9d6b9b",
+          "outputBodyDigest": "sha256:611d085e55b17198b18e1e1df2ead154d8b84652b2dd55078cefc7bcf3d7aeb1"
+        }
+      },
       "lineage": {
         "sourceId": "essay-the-worlds-broken-what-do-we-do",
         "cutId": "cut-action-and-coming-alive",
@@ -62,7 +137,7 @@
       "platform": "linkedin",
       "medium": "text",
       "format": "post",
-      "body": "I used to think trying to make a difference would only make the pain worse. I was wrong. Doing nothing made it worse. The work itself helps me feel more connected to the person I wanted to become.\n\nRead the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do",
+      "body": "I used to think taking action when society is broken would only make the disappointment hurt more. I was wrong. Avoiding the work made the pain worse. Taking action has helped me feel closer to the person I wanted to become, even though the problems are not solved and success is not guaranteed.\n\nRead the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do",
       "sourceRefs": [
         "essay-the-worlds-broken-what-do-we-do#L1-L4"
       ],
@@ -81,6 +156,16 @@
       },
       "voiceCheck": "passed",
       "originalityCheck": "passed",
+      "generation": {
+        "pipeline": "content-studio-configured-v1",
+        "editor": {
+          "version": "cold-feed-v1",
+          "status": "passed",
+          "recommendation": "Clarify that the reflection is about taking action when society is broken, while preserving the used-to-think-now structure.",
+          "inputBodyDigest": "sha256:6fa71187962cbdd23e7bd00f0b97405f849b405b6b3efb397f89ad9a0bc3d77e",
+          "outputBodyDigest": "sha256:446b6e0f08047922565dc907b54c4c9451b32a6093810161706fb7c3eb94f8e9"
+        }
+      },
       "lineage": {
         "sourceId": "essay-the-worlds-broken-what-do-we-do",
         "cutId": "cut-action-and-coming-alive",
@@ -165,7 +250,7 @@
     "version": "grow-experiment-v1",
     "id": "experiment-used-to-think-vs-direct",
     "question": "Does a genuine first-person belief-shift opening produce more qualified conversation than a direct-claim opening when the source, platform, format, CTA, and approximate length remain fixed?",
-    "hypothesis": "The declared treatment may change outcomes; no direction or winner is assumed.",
+    "hypothesis": "Across comparable LinkedIn text posts using this approved source cut, the genuine used-to-think/now opening will increase substantive replies per 1,000 impressions relative to the direct-claim opening, while canonical-source visits per 1,000 impressions do not decrease by more than 10%.",
     "unit": "published platform variant",
     "comparison": {
       "control": null,
@@ -271,7 +356,7 @@
       {
         "id": "experiment-used-to-think-vs-direct:conversation",
         "family": "conversation",
-        "metric": "conversation-outcome",
+        "metric": "substantive-replies-per-1000-impressions",
         "target": null,
         "measured": false,
         "value": null,
@@ -281,7 +366,7 @@
       }
     ],
     "minimumSample": 20,
-    "reviewRule": "Review after at least 20 comparable published units; keep outcome families separate.",
+    "reviewRule": "Review after at least 20 comparable published units and 14 days. Keep: Keep testing the belief-shift mechanism if substantive replies are higher and the audience guardrail holds after at least 20 comparable published units and 14 days. Revise: Revise the mechanism or collect another matched pair if the estimated direction is positive but the 20-unit multi-pair sample is incomplete, uncertainty remains high, or attribution is incomplete. Reject: Reject the mechanism as a growth default if it does not improve substantive replies or if canonical-source visits breach the guardrail.",
     "startAt": null,
     "endAt": null,
     "winner": null,
@@ -293,7 +378,7 @@
     {
       "kind": "grow_review_bundle",
       "version": "grow-review-bundle-v1",
-      "id": "review:phase3-worlds-broken-used-to-think-vs-direct:variant-linkedin-direct-claim",
+      "id": "review:phase3-experiment-worlds-broken-used-to-think-vs-direct:variant-linkedin-direct-claim",
       "reviewQueueRef": null,
       "sourceRef": {
         "recordType": "source",
@@ -367,7 +452,7 @@
     {
       "kind": "grow_review_bundle",
       "version": "grow-review-bundle-v1",
-      "id": "review:phase3-worlds-broken-used-to-think-vs-direct:variant-linkedin-used-to-think-now",
+      "id": "review:phase3-experiment-worlds-broken-used-to-think-vs-direct:variant-linkedin-used-to-think-now",
       "reviewQueueRef": null,
       "sourceRef": {
         "recordType": "source",
@@ -456,5 +541,5 @@
   "autoApproval": false,
   "autoScheduling": false,
   "autoPublishing": false,
-  "digest": "sha256:d1ad6f9d941d6d576c0491770f060ecaf33210819461ad917cb3cef6c78bc1ed"
+  "digest": "sha256:a5d7efbac3ddb88995b471dfcb109d6cd7684d62bee5a38e3160d54d3c677159"
 }

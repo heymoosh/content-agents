@@ -8,11 +8,13 @@ import type { PublishingStatus } from "../review/publishing-status.js";
 import { applyGrowExperimentQueueHandoff } from "./experiment-queue-handoff.js";
 import { scheduleGrowExperimentVariant } from "./experiment-scheduling.js";
 import { buildGrowExperimentProposal, type GrowExperimentDecisionInput, type GrowExperimentProposalInput } from "./experiment-slice.js";
+import { configuredEditorEvidence, signalsExperimentRecommendation } from "./experiment-test-fixtures.js";
 
 function proposalInput(): GrowExperimentProposalInput {
   return {
     id: "proposal-1", createdAt: "2026-08-30T12:00:00.000Z",
     source: { id: "source-1", kind: "long-form", body: "People can act together.", originRef: "fixture:source-1", canonicalUrl: "https://example.test/essay" },
+    recommendation: signalsExperimentRecommendation({ variantId: "x-direct", minimumSample: 10 }),
     cut: {
       id: "cut-1", body: "People can act together.", sourceRefs: ["source-1#body"], rationale: "One complete point.",
       decision: { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-30T11:00:00.000Z" },
@@ -25,6 +27,7 @@ function proposalInput(): GrowExperimentProposalInput {
       treatment: { ref: "treatment:direct", evidenceStatus: "supported", evidenceRefs: ["source-1#body"], rationale: "Ground the topic immediately." },
       experimentVariables: { opener: "direct" },
       voiceCheck: "passed", originalityCheck: "passed",
+      generation: configuredEditorEvidence("Collective action is a practical question.\n\nPeople can act together.\n\nRead the essay: https://example.test/essay"),
     }],
     capacity: {
       day: "2026-09-01",

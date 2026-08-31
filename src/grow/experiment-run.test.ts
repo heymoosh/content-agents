@@ -9,14 +9,16 @@ import { applyGrowExperimentQueueHandoff } from "./experiment-queue-handoff.js";
 import { buildGrowExperimentRun } from "./experiment-run.js";
 import { scheduleGrowExperimentVariant } from "./experiment-scheduling.js";
 import { buildGrowExperimentProposal, type GrowExperimentDecisionInput, type GrowExperimentProposalInput } from "./experiment-slice.js";
+import { configuredEditorEvidence, signalsExperimentRecommendation } from "./experiment-test-fixtures.js";
 
 function input(): GrowExperimentProposalInput {
   return {
     id: "p", createdAt: "2026-08-30T12:00:00Z",
     source: { id: "s", kind: "raw-thought", body: "A complete thought.", originRef: "fixture:s" },
+    recommendation: signalsExperimentRecommendation({ variantId: "v", minimumSample: 10 }),
     selectedPlatforms: ["x"],
     cut: { id: "c", body: "A complete thought.", sourceRefs: ["s#body"], rationale: "Complete.", decision: { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-30T11:00:00Z" } },
-    variants: [{ id: "v", platform: "x", medium: "text", format: "post", body: "A complete thought.", sourceRefs: ["s#body"], treatment: { ref: "t", rationale: "Direct.", evidenceStatus: "supported", evidenceRefs: ["s#body"] }, experimentVariables: { opener: "direct" }, voiceCheck: "passed", originalityCheck: "passed" }],
+    variants: [{ id: "v", platform: "x", medium: "text", format: "post", body: "A complete thought.", sourceRefs: ["s#body"], treatment: { ref: "t", rationale: "Direct.", evidenceStatus: "supported", evidenceRefs: ["s#body"] }, experimentVariables: { opener: "direct" }, voiceCheck: "passed", originalityCheck: "passed", generation: configuredEditorEvidence("A complete thought.") }],
     capacity: { day: "2026-09-01", review: [{ platform: "x", available: 1 }], slots: [{ platform: "x", available: 1, capacity: 1, scheduledCount: 0 }] },
     experiment: { id: "e", question: "Does it work?", outcomeFamilies: ["attention"], minimumSample: 10, topic: "topic", audience: "readers" },
   };

@@ -4,14 +4,17 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { runGrowExperimentSliceCli, type GrowExperimentSliceCliIo } from "./experiment-slice-cli.js";
 import { buildGrowExperimentProposal, renderGrowExperimentProposalHtml } from "./experiment-slice.js";
+import { configuredEditorEvidence, signalsExperimentRecommendation } from "./experiment-test-fixtures.js";
+import { parseSignalsExperimentScienceResult } from "../review/signals-experiment-recommendation.js";
 
 function proposalInput(): Record<string, unknown> {
   return {
     id: "one", createdAt: "2026-08-31T12:00:00Z",
     source: { id: "source-1", kind: "raw-thought", body: "A complete original thought.", originRef: "inline:source-1" },
+    recommendation: signalsExperimentRecommendation({ variantId: "variant-1", minimumSample: 10 }),
     selectedPlatforms: ["x"],
     cut: { id: "cut-1", body: "A complete original thought.", sourceRefs: ["source-1#body"], rationale: "Already concise.", decision: { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T11:00:00Z" } },
-    variants: [{ id: "variant-1", platform: "x", medium: "text", format: "post", body: "A complete original thought.", sourceRefs: ["source-1#body"], treatment: { ref: "control", rationale: "Preserve the thought.", evidenceStatus: "supported", evidenceRefs: ["source-1#body"] }, experimentVariables: { hook: "control" }, voiceCheck: "passed", originalityCheck: "passed" }],
+    variants: [{ id: "variant-1", platform: "x", medium: "text", format: "post", body: "A complete original thought.", sourceRefs: ["source-1#body"], treatment: { ref: "control", rationale: "Preserve the thought.", evidenceStatus: "supported", evidenceRefs: ["source-1#body"] }, experimentVariables: { hook: "control" }, voiceCheck: "passed", originalityCheck: "passed", generation: configuredEditorEvidence("A complete original thought.") }],
     capacity: { day: "2026-09-01", review: [{ platform: "x", available: 1 }], slots: [{ platform: "x", available: 1 }] },
     experiment: { id: "experiment-1", question: "What happens?", outcomeFamilies: ["attention"], minimumSample: 10, topic: "one thought", audience: "mixed-feed readers" },
   };
@@ -37,7 +40,7 @@ test("Phase 3 CLI writes JSON and a static review HTML from the same digest-boun
 
   const second = memory({ "input.json": JSON.stringify(proposalInput()) });
   assert.equal(await runGrowExperimentSliceCli(["propose", "--input", "input.json", "--html", "--output", "review.html"], second.io), 0);
-  assert.match(second.writes["review.html"]!, /One Grow-this experiment/);
+  assert.match(second.writes["review.html"]!, /Signals-recommended content experiment/);
   assert.match(second.writes["review.html"]!, new RegExp(proposal.digest));
 });
 
@@ -50,7 +53,10 @@ test("the static review HTML exports a complete digest-bound decision without pr
   assert.match(rendered, /value="needs-another-pass"/);
   assert.doesNotMatch(rendered, /type="radio"[^>]*\schecked(?:\s|>)/);
   assert.doesNotMatch(rendered, /type="radio" disabled/);
-  assert.match(rendered, /content-studio-phase3-grow-experiment-decision\.json/);
+  assert.match(rendered, /content-studio-phase3-experiment-decision\.json/);
+  assert.match(rendered, /Why run this experiment/);
+  assert.match(rendered, /Hypothesis/);
+  assert.match(rendered, /Cold-feed editor passed/);
   assert.match(rendered, /proposalDigest/);
   assert.match(rendered, new RegExp(proposal.digest));
   assert.match(rendered, /A decision is required for every candidate/);
@@ -72,10 +78,15 @@ test("Phase 3 CLI records a complete Muxin decision and rejects partial input", 
 
 test("the retained Phase 3 JSON and HTML are the same current digest-bound packet", () => {
   const root = process.cwd();
-  const input = JSON.parse(readFileSync(resolve(root, "docs/reviews/content-studio-phase3-grow-experiment-input.json"), "utf8"));
-  const retained = JSON.parse(readFileSync(resolve(root, "docs/reviews/content-studio-phase3-grow-experiment-proposal.json"), "utf8"));
-  const html = readFileSync(resolve(root, "docs/reviews/content-studio-phase3-grow-experiment-review.html"), "utf8");
+  const input = JSON.parse(readFileSync(resolve(root, "docs/reviews/content-studio-phase3-experiment-input.json"), "utf8"));
+  const retained = JSON.parse(readFileSync(resolve(root, "docs/reviews/content-studio-phase3-experiment-proposal.json"), "utf8"));
+  const html = readFileSync(resolve(root, "docs/reviews/content-studio-phase3-experiment-review.html"), "utf8");
+  const scienceInput = JSON.parse(readFileSync(resolve(root, "docs/reviews/content-studio-phase3-experiment-science-input.json"), "utf8"));
+  const scienceResponse = readFileSync(resolve(root, "docs/reviews/content-studio-phase3-experiment-science-response.json"), "utf8").trim();
   const fresh = buildGrowExperimentProposal(input);
+  const science = parseSignalsExperimentScienceResult(scienceResponse, scienceInput, "codex");
+  assert.equal(science.status, "recommended");
+  if (science.status === "recommended") assert.deepEqual(input.recommendation, science.recommendation);
   assert.deepEqual(retained, fresh);
   assert.match(html, new RegExp(fresh.digest));
   assert.equal(fresh.capacityManifest.version, "grow-capacity-manifest-v1");

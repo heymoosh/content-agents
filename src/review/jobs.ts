@@ -497,6 +497,24 @@ export function configuredDerivativeText(frontmatter: string, body: string, pres
   return preserveExact ? frontmatter + body : frontmatter + body.trim() + "\n";
 }
 
+export function configuredExperimentFrontmatter(request: ContentRequest, variantId: string): string[] {
+  const experiment = request.experiment;
+  if (!experiment) return [];
+  const variables = experiment.variablesByVariant[variantId];
+  if (!variables) throw new Error(`experiment variables are missing for ${variantId}`);
+  return [
+    `experiment_id: ${JSON.stringify(experiment.id)}`,
+    `experiment_recommendation_id: ${JSON.stringify(experiment.recommendationId)}`,
+    `experiment_plan_decision_digest: ${JSON.stringify(experiment.planDecisionDigest)}`,
+    `experiment_variables: ${JSON.stringify(variables)}`,
+  ];
+}
+
+export function configuredQueueNote(request: ContentRequest, kind: "control" | "treated", treatment: string): string {
+  const ordinary = kind === "control" ? "Untreated control" : `Treatment: ${treatment}`;
+  return request.experiment ? `Experiment: ${request.experiment.id}; ${ordinary}` : ordinary;
+}
+
 /**
  * Deterministic browser-harness engine. It is unavailable unless the combined E2E runner's
  * one-run token matches a private marker inside the disposable repository copy. A normal server,
@@ -777,7 +795,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         const sourceCtaUrl = request.sourceProvenance?.canonicalUrl && configuredSourceSupportsCta(request.sourceProvenance.canonicalUrl, sourceKind)
           ? request.sourceProvenance.canonicalUrl
           : null;
-        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...(variant.identity.kind === "treated" && coldFeedEditorApplied ? ["editor_pass: cold-feed-v1"] : []), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
+        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...(variant.identity.kind === "treated" && coldFeedEditorApplied ? ["editor_pass: cold-feed-v1"] : []), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
         writeFileSync(path, configuredDerivativeText(frontmatter, body, variant.identity.kind === "control"), { flag: "wx" }); created.push(path);
         const mediaOutput = mediaOutputs.find((output) => output.id === id)!;
         const stagePath = join(folder, "media-stages", `${id}.json`);
@@ -785,7 +803,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
           ? mediaOutput.record
           : { ...mediaOutput.record, plan: configuredMediaPlan(variant.media, body) };
         writeFileSync(stagePath, JSON.stringify(stagedRecord, null, 2) + "\n", { flag: "wx" }); created.push(stagePath);
-        queueRows.push({ id, platform: variant.platform, format: mediaOutput.queue.format, asset: mediaOutput.queue.asset, status: "pending", notes: variant.identity.kind === "control" ? "Untreated control" : `Treatment: ${treatment}`, origin: "from GUI queue" });
+        queueRows.push({ id, platform: variant.platform, format: mediaOutput.queue.format, asset: mediaOutput.queue.asset, status: "pending", notes: configuredQueueNote(request, variant.identity.kind, treatment), origin: "from GUI queue" });
       }
       appendRows(folder, queueRows);
     } catch (error) {

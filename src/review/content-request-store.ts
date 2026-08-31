@@ -48,6 +48,7 @@ function inputFromStored(request: ContentRequest): ContentRequestInput {
     ventureSource: request.ventureSource,
     sourceProvenance: request.sourceProvenance,
     sourceContext: request.sourceContext,
+    experiment: request.experiment,
   };
 }
 

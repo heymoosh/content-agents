@@ -5,6 +5,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { handleSignalsRoute } from "./serve-signals.js";
 import { appendSignalsDecision, readSignalsDecisions } from "./signals-decisions.js";
+import { buildContentRequest } from "./content-request.js";
+import { buildExperimentPlan } from "../grow/experiment-content-handoff.js";
+import { signalsExperimentRecommendation } from "../grow/experiment-test-fixtures.js";
+import { recordExperimentPlan } from "./signals-experiment-plan-store.js";
 
 function harness(method: string, path: string, body: Record<string, unknown> = {}) {
   let response: { code: number; value: unknown } | undefined;
@@ -27,7 +31,7 @@ test("decline is durably recorded and returned by a later Signals read", async (
     assert.equal(h.response()?.code, 200);
     assert.equal(readSignalsDecisions(ledger)["TEST:Try the audit hook"].decision, "decline");
     const read = harness("GET", "/api/signals");
-    assert.equal(await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: ledger }), true);
+    assert.equal(await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: ledger, proposalsPath: join(root, "proposals"), experimentPlansPath: join(root, "plans") }), true);
     assert.deepEqual((read.response()?.value as any).decisions["TEST:Try the audit hook"].decision, "decline");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -63,5 +67,83 @@ test("proposal review endpoints keep approval separate from apply", async () => 
     const apply = harness("POST", `/api/signals/proposals/${id}/apply`);
     await handleSignalsRoute({ ...apply, res: {} as any, proposalsPath, configRoot: root });
     assert.match(readFileSync(join(root, "config/platforms.yaml"), "utf8"), /posts_per_week: 5/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals experiment approval triggers canonical Content generation but leaves copy approval pending", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-experiment-"));
+  const plansPath = join(root, "plans.jsonl");
+  try {
+    const input = { id: "content-one", origin: "human-inference" as const, descriptor: "experiment", originalInput: "Source.", treatments: ["summary"], media: ["none"], platforms: ["linkedin"], sourceProvenance: { kind: "source" as const, sourceLines: [1] } };
+    const request = buildContentRequest(input);
+    const variantId = request.variants.find((variant) => variant.identity.kind === "treated")!.identity.id;
+    const comparisonRef = request.variants.find((variant) => variant.identity.kind === "control")!.identity.id;
+    const plan = buildExperimentPlan({
+      recommendation: { ...signalsExperimentRecommendation({ variantId, comparisonRef, minimumSample: 10 }), id: "experiment-one", confidence: "high" },
+      contentRequest: input,
+      variablesByVariant: Object.fromEntries(request.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }])),
+    });
+    recordExperimentPlan(plan, plansPath);
+    const approve = harness("POST", "/api/signals/experiments/experiment-one/approve");
+    await handleSignalsRoute({
+      ...approve, res: {} as any, experimentPlansPath: plansPath,
+      applyExperimentPlan: async (proposal, decision) => ({
+        kind: "experiment_content_handoff", version: "experiment-content-handoff-v1", experimentId: proposal.recommendation.id,
+        contentRequest: { ...proposal.contentRequest, experiment: null }, generatedIds: [variantId, comparisonRef],
+        copyApproval: "pending-in-content", contentIsCanonicalReviewSurface: true,
+      }),
+    });
+    assert.equal(approve.response()?.code, 200);
+    const value = approve.response()?.value as any;
+    assert.equal(value.handoff.copyApproval, "pending-in-content");
+    assert.equal(value.decision.authorizesCopyApproval, false);
+    assert.equal(value.experimentPlans[0].status, "drafts-pending-content-review");
+    const read = harness("GET", "/api/signals");
+    await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), proposalsPath: join(root, "changes"), experimentPlansPath: plansPath });
+    assert.equal((read.response()?.value as any).experimentPlans[0].generatedCopyIncluded, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals read exposes collecting and ready experiment evidence from the measurement loop", async () => {
+  const read = harness("GET", "/api/signals");
+  const experimentPerformance = {
+    kind: "signals_experiment_performance", version: "signals-experiment-performance-v1",
+    experiments: [{ experimentId: "ready", analysisStatus: "ready", blockers: [], autoWinner: false }],
+    autoWinner: false, sideEffects: "none",
+  };
+  await handleSignalsRoute({
+    ...read, res: {} as any,
+    decisionsPath: join(tmpdir(), "missing-signals-decisions"),
+    proposalsPath: join(tmpdir(), "missing-signals-proposals"),
+    experimentPlansPath: join(tmpdir(), "missing-signals-plans"),
+    readExperimentPerformance: () => experimentPerformance,
+  } as any);
+  assert.deepEqual((read.response()?.value as any).experimentPerformance, experimentPerformance);
+});
+
+test("Signals interpretation stays reviewable, persists the human decision, and never selects a winner", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-interpretation-"));
+  const resultsPath = join(root, "results.jsonl");
+  try {
+    const interpret = harness("POST", "/api/signals/experiments/experiment-one/interpret", { engine: "codex" });
+    const proposal = {
+      experimentId: "experiment-one", recommendation: "keep", rationale: "The primary metric improved and the guardrail held.",
+      evidenceRefs: ["analytics:one"], confidence: "medium", caveats: ["Small sample."], autoWinner: false,
+    };
+    assert.equal(await handleSignalsRoute({
+      ...interpret, res: {} as any, experimentResultsPath: resultsPath,
+      interpretExperiment: async (id: string, engine: string) => ({ ...proposal, experimentId: id, engine }),
+    } as any), true);
+    assert.equal(interpret.response()?.code, 200);
+    assert.equal((interpret.response()?.value as any).interpretation.recommendation, "keep");
+    assert.equal((interpret.response()?.value as any).interpretation.autoWinner, false);
+    assert.equal((interpret.response()?.value as any).interpretation.reviewStatus, "pending");
+
+    const review = harness("POST", "/api/signals/experiments/experiment-one/interpretation/accept", { rationale: "I reviewed the evidence and caveats." });
+    assert.equal(await handleSignalsRoute({ ...review, res: {} as any, experimentResultsPath: resultsPath } as any), true);
+    assert.equal((review.response()?.value as any).interpretation.reviewStatus, "accepted");
+    assert.equal((review.response()?.value as any).interpretation.recommendation, "keep");
+    assert.equal((review.response()?.value as any).interpretation.winner, null);
+    assert.equal((review.response()?.value as any).interpretation.autoWinner, false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
