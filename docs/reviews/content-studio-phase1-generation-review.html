@@ -25,6 +25,12 @@
     .eyebrow { color:var(--accent); font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
     .copy { white-space:normal; }
     .meta { margin-top:18px; padding-top:12px; border-top:1px solid var(--line); color:var(--muted); font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .comparison-label { margin-top:16px; color:var(--muted); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .before { color:#605b55; padding:10px 12px; background:#f2eee7; border-radius:8px; }
+    .recommendation { padding:10px 12px; color:var(--accent); background:#eef3ed; border-radius:8px; }
+    .cta-preview { display:grid; gap:4px; margin-top:16px; padding:12px 14px; border:1px solid #aac8bd; border-radius:9px; background:#edf7f3; font-size:14px; }
+    .cta-preview b { color:var(--accent); font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+    .cta-preview a { color:#174f91; overflow-wrap:anywhere; }
     .source { padding:20px 24px; border-left:5px solid var(--accent); background:#eef3ed; border-radius:8px; white-space:pre-wrap; }
     .boundary { padding:22px; margin-top:14px; border-color:#ddb997; background:#fff7ed; }
     .boundary strong { color:var(--warn); }
@@ -42,126 +48,226 @@
   <header>
     <div class="eyebrow">Human Inference · review artifact</div>
     <h1>What Phase 1 actually generates</h1>
-    <p class="dek">Every short post below was produced from Muxin's own essay by the committed Phase 1 prompt, parser, provenance, and voice checks. The model could select, omit, and reorder complete source segments. It could not write or paraphrase a sentence.</p>
+    <p class="dek">Every short post below is a source-grounded treatment of Muxin's essay. The writer may add connective structure, clarify, re-hook, trim, and reorder, but every substantive claim must remain supported by cited source lines.</p>
     <div class="facts">
-      <div class="fact"><b>Generated</b>2026-08-30T22:05:33.890Z</div>
-      <div class="fact"><b>Engines</b>codex-cli 0.151.0 · Grok 4.5 via managed subscription bridge</div>
+      <div class="fact"><b>Generated</b>2026-08-30T23:05:01.327Z</div>
+      <div class="fact"><b>Engines</b>Codex Luna subscription subagent · Grok 4.5 subscription subagent</div>
       <div class="fact"><b>Control</b>Byte-for-byte verified</div>
-      <div class="fact"><b>Voice gate</b>No em dashes or configured AI tells</div>
+      <div class="fact"><b>Voice gate</b>No footnote syntax, em dashes, or configured AI tells</div>
     </div>
   </header>
 
   <h2>1. Eight treatments of Muxin's essay</h2>
-  <p>The untreated control is intentionally not repeated here. The system verified it against the source byte for byte. SHA-256: <code>f244cd1c9112ab087a9ed766d07b13f33d3727ac6cc1ad69a5e4e274c7f87d90</code>. Each treatment below is assembled only from exact source segments and passed the hard voice gate before appearing.</p>
-  <h3 style="margin-top:30px">CODEX</h3><div class="grid">
+  <p>The untreated control is intentionally not repeated here. The system verified it against the source byte for byte. SHA-256: <code>f244cd1c9112ab087a9ed766d07b13f33d3727ac6cc1ad69a5e4e274c7f87d90</code>. Every treatment below makes a standalone point, carries claim provenance, and visibly includes the always-on published essay CTA. X places it in the first reply; the other platforms shown place it inline.</p>
+  <h3 style="margin-top:30px">LUNA</h3><div class="grid">
     <article class="card">
-      <div class="eyebrow">codex-selected exact extraction</div>
+      <div class="eyebrow">luna source-grounded rewrite</div>
       <h3>threads · cta</h3>
-      <div class="copy">But maybe the question is not only: What do I oppose?<br><br>Maybe it is also: What do I want badly enough to build with other people?</div>
-      <div class="meta">128 characters · source_lines: [226, 228] · pending review</div>
+
+      <div class="copy">I keep asking how ordinary people can do something useful when the problems feel too big. My answer is less dramatic than waiting for a hero: Find where you have leverage and build with other people.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">199 characters · source_lines: [5, 7, 9, 17, 33, 35] · CTA: source (inline at publish) · Turns the essay&#039;s opening question into a conversational, self-contained point. The essay CTA is attached separately at publish.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">codex-selected exact extraction</div>
+      <div class="eyebrow">luna source-grounded rewrite</div>
       <h3>x · viral-rewrite</h3>
-      <div class="copy">But it turns out I was making the pain worse by not doing anything at all.<br><br>I used to think that if I attempted to make a difference, I would only make that pain worse. There is so much disappointment in the world.</div>
-      <div class="meta">214 characters · source_lines: [189, 187] · pending review</div>
+
+      <div class="copy">The world does not need one brilliant leader or one perfect AI model. It needs ordinary people who know where they have leverage and build it together. That is the work.</div>
+      <div class="cta-preview"><b>First reply CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">169 characters · source_lines: [5, 7] · CTA: source (first reply) · Rewrites the opening into a sharp standalone claim with a clear landing line. The essay CTA is added outside the body.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">codex-selected exact extraction</div>
+      <div class="eyebrow">luna source-grounded rewrite</div>
       <h3>linkedin · platform-framing</h3>
-      <div class="copy">Workers still have specialized knowledge and real-world experience that companies cannot easily replace.<br><br>Labor strikes have proven to work in the past. Organized labor helped make the eight-hour workday a political and legal reality.[^6] Demonstrations are important, but they do not always create enough pressure by themselves. We need leverage, and labor is still one of our biggest leverage points.<br><br>But organized labor is a direct strike at the incentives of the biggest extractive actors, who want to profit immensely from our work, talents, and efforts. We ought to treat this form of leverage seriously.</div>
-      <div class="meta">611 characters · source_lines: [85, 87, 97] · pending review</div>
+
+      <div class="copy">Start with power, not technology.<br><br>AI will not save us if the systems around it stay the same. The first question is whether people can influence the decisions shaping their lives. That is why I would start with democracy.<br><br>Then look for leverage: Votes, labor, spending, care, and new tools or institutions.<br><br>I am building a voting app around that idea. The goal is simple: Make it easier to judge representatives by what they have done, not only by what they say.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">465 characters · source_lines: [13, 19, 23, 31, 33, 35, 49, 51, 53, 55] · CTA: source (inline at publish) · Frames the essay as a practitioner lesson: establish the power problem first, then position technology as a tool for acting on leverage. The essay CTA is placed inline outside the body.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">codex-selected exact extraction</div>
+      <div class="eyebrow">luna source-grounded rewrite</div>
       <h3>x · shorter-version</h3>
-      <div class="copy">People can say anything. Action is where it counts.</div>
-      <div class="meta">51 characters · source_lines: [55] · pending review</div>
+
+      <div class="copy">AI will not save us if we keep the systems that produced the problem. It can automate those decisions faster. Before asking what AI can do, ask what should change first.</div>
+      <div class="cta-preview"><b>First reply CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">169 characters · source_lines: [13, 15] · CTA: source (first reply) · Compresses the essay&#039;s technology argument into one clear warning and one practical question. The essay CTA is added outside the body.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">codex-selected exact extraction</div>
+      <div class="eyebrow">luna source-grounded rewrite</div>
       <h3>x · thread</h3>
-      <div class="copy">The world is not going to be saved by one brilliant leader, one election, or one AI model.<br><br>It will change when ordinary people learn where their leverage is, and build it together.<br><br>The forms of leverage I see most clearly are our votes, our labor, our spending, our care for one another, and our ability to build new tools and institutions.<br><br>We need to make the preferred future more attractive than the status quo.</div>
-      <div class="meta">417 characters · source_lines: [5, 7, 35, 220] · pending review</div>
+
+      <div class="copy">1/ The world won&#039;t be saved by one leader, election, or AI model.<br>2/ Change starts when ordinary people find their leverage and build it together.<br>3/ One place to start: Judge representatives by their actions, not their rhetoric.</div>
+      <div class="cta-preview"><b>First reply CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">229 characters · source_lines: [5, 7, 23, 33, 35, 49, 51, 53, 55] · CTA: source (first reply) · Uses a compact numbered sequence to move from the central claim to a concrete civic action without leaving the reader in abstraction. The essay CTA is added as a separate publish attachment.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">codex-selected exact extraction</div>
+      <div class="eyebrow">luna source-grounded rewrite</div>
       <h3>bluesky · counterpoint</h3>
-      <div class="copy">Money is not the only thing that determines an election. Incumbency, party, district, candidate quality, and the larger political environment matter, too. But fundraising and spending are part of the incentive structure candidates are responding to.</div>
-      <div class="meta">249 characters · source_lines: [43] · pending review</div>
+
+      <div class="copy">People often treat democracy as voting. I think the more useful definition is power: The ability to shape the society you live in. That means finding leverage in your vote, labor, spending, care, and tools.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">206 characters · source_lines: [19, 23, 31, 33, 35] · CTA: source (inline at publish) · Uses a counterpoint structure to challenge the narrow definition of democracy and replace it with the essay&#039;s broader definition. The essay CTA is placed inline outside the body.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">codex-selected exact extraction</div>
+      <div class="eyebrow">luna source-grounded rewrite</div>
       <h3>linkedin · summary</h3>
-      <div class="copy">The world is not going to be saved by one brilliant leader, one election, or one AI model.<br><br>It will change when ordinary people learn where their leverage is, and build it together.<br><br>The forms of leverage I see most clearly are our votes, our labor, our spending, our care for one another, and our ability to build new tools and institutions.</div>
-      <div class="meta">342 characters · source_lines: [5, 7, 35] · pending review</div>
+
+      <div class="copy">Here is the map I am working from.<br><br>Democracy gives people the power to shape society. Power needs leverage. The forms I can see most clearly are votes, labor, spending, care, and building tools and institutions.<br><br>AI can lower the cost of building. That matters, but it does not fix the systems around it. If we automate those systems without changing them, we can accelerate the damage.<br><br>So the practical question is not whether one person can save the world. It is where ordinary people can apply pressure, then build that power together.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">540 characters · source_lines: [5, 7, 13, 15, 19, 23, 31, 33, 35, 133, 135, 141] · CTA: source (inline at publish) · Builds a complete summary with a beginning, organizing framework, technology caveat, and practical conclusion. The essay CTA is placed inline outside the body.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">codex-selected exact extraction</div>
+      <div class="eyebrow">luna source-grounded rewrite</div>
       <h3>threads · hook-variants</h3>
-      <div class="copy">Imagine removing all the workers from a company and leaving AI and upper management behind. Who would have the deep, updated understanding of how everything actually works? Without specialized knowledge and real-world tested experience, all you&#039;d get is slop outcomes, which would eventually lead to failure in the market.</div>
-      <div class="meta">322 characters · source_lines: [93] · pending review</div>
+
+      <div class="copy">I used to think trying to change the world would only make the disappointment worse. I was wrong. Doing nothing was making the pain worse. The work gives me a way to move toward the future I want.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">196 characters · source_lines: [161, 177, 187, 189, 198, 200, 202, 204, 218, 220, 222, 224, 228, 232] · CTA: source (inline at publish) · Tests a personal, emotionally direct opening and carries it to the essay&#039;s point about action, joy, and building toward a preferred future. The essay CTA is attached separately at publish.</div>
     </article></div><h3 style="margin-top:30px">GROK</h3><div class="grid">
     <article class="card">
-      <div class="eyebrow">grok-selected exact extraction</div>
+      <div class="eyebrow">grok source-grounded rewrite</div>
       <h3>threads · cta</h3>
-      <div class="copy">What&#039;s difficult about this is information and scale. I don&#039;t exactly have an easy-to-access feed of verified boycotts and good brand alternatives to use during my weekly meal planning and grocery shopping.<br><br>Maybe someone out there ought to build this.<br><br>Maybe that someone is you.</div>
-      <div class="meta">280 characters · source_lines: [125, 127, 129] · pending review</div>
+
+      <div class="copy">I&#039;ve been asking the same question a lot of people are asking: The world feels broken, so what can ordinary people actually do?<br><br>My working answer is a map, not a hero story. Change happens when we find leverage in votes, labor, spending, care, and the tools we build, then use that pressure together.<br><br>I wrote the fuller map because I needed it myself.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">353 characters · source_lines: [5, 7, 9, 33, 35, 37] · CTA: source (inline at publish) · Turns the essay&#039;s central question into a conversational Threads point that earns the invite to read the fuller map, without putting the essay URL in the body.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">grok-selected exact extraction</div>
+      <div class="eyebrow">grok source-grounded rewrite</div>
       <h3>x · viral-rewrite</h3>
-      <div class="copy">The world is not going to be saved by one brilliant leader, one election, or one AI model.<br><br>It will change when ordinary people learn where their leverage is, and build it together.</div>
-      <div class="meta">181 characters · source_lines: [5, 7] · pending review</div>
+
+      <div class="copy">If AI automates the decisions that got us here, it doesn&#039;t save us. It speeds up the collapse.<br><br>Change the systems first. Then the tools matter.</div>
+      <div class="cta-preview"><b>First reply CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">144 characters · source_lines: [13, 15] · CTA: source (first reply) · Leads with the essay&#039;s sharpest AI warning, then lands the practical consequence in two short beats for X.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">grok-selected exact extraction</div>
+      <div class="eyebrow">grok source-grounded rewrite</div>
       <h3>linkedin · platform-framing</h3>
-      <div class="copy">AI is making coding as easy as writing. No longer do you need the blessings of a venture capital fund or investors to pay for the upfront cost of making an idea come to life.<br><br>You can build things that solve real problems, even if they do not lead to a trillion-dollar exit in five years.<br><br>You can charge a lower price because your costs are lower, and your financial goals are not tied up with short-term moneyed interests. You can make something more accessible by keeping the price low.</div>
-      <div class="meta">489 characters · source_lines: [133, 135, 137] · pending review</div>
+
+      <div class="copy">Start with power, not the tool.<br><br>AI will not fix social problems if the systems around it stay the same. Wealth inequality and concentrated power have lasted for centuries. Technology alone has not solved them.<br><br>So I start with democracy: The power for people to shape society, not only a ballot every few years.<br><br>Power needs leverage. The clearest forms I see are votes, labor, spending, care for one another, and building new tools and institutions.<br><br>One practical move: Judge representatives by actions. What bills they supported. Who they took money from. What they did with the power they were given.<br><br>That is why I am building a voting app. People can say anything. Action is where it counts.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">698 characters · source_lines: [13, 19, 23, 31, 33, 35, 49, 51, 53, 55] · CTA: source (inline at publish) · Frames the essay as a LinkedIn practitioner lesson: power first, then concrete leverage, then an action-based diagnostic move.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">grok-selected exact extraction</div>
+      <div class="eyebrow">grok source-grounded rewrite</div>
       <h3>x · shorter-version</h3>
-      <div class="copy">People can say anything. Action is where it counts.</div>
-      <div class="meta">51 characters · source_lines: [55] · pending review</div>
+
+      <div class="copy">Democracy is at risk. Without it, people&#039;s demands do not get honored.<br><br>Start there. Then find leverage: Votes, labor, spending, care, and new tools.</div>
+      <div class="cta-preview"><b>First reply CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">149 characters · source_lines: [19, 23, 33, 35] · CTA: source (first reply) · Compresses the essay to setup, point, and next move in the shortest X form that still stands alone.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">grok-selected exact extraction</div>
+      <div class="eyebrow">grok source-grounded rewrite</div>
       <h3>x · thread</h3>
-      <div class="copy">The world is not going to be saved by one brilliant leader, one election, or one AI model.<br><br>It will change when ordinary people learn where their leverage is, and build it together.<br><br>So democracy is where I would start. Without it, we have no meaningful power to shape the future.<br><br>The forms of leverage I see most clearly are our votes, our labor, our spending, our care for one another, and our ability to build new tools and institutions.<br><br>We cannot spend all our energy running away from what is broken. At some point, we need to start running toward something we love.<br><br>Maybe it is also: What do I want badly enough to build with other people?</div>
-      <div class="meta">648 characters · source_lines: [5, 7, 23, 35, 218, 228] · pending review</div>
+
+      <div class="copy">1/ The world will not be saved by one leader, one election, or one AI model.<br>2/ It changes when ordinary people find leverage and build it together.<br>3/ Judge representatives by actions, not rhetoric. That is one place to start.</div>
+      <div class="cta-preview"><b>First reply CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">227 characters · source_lines: [5, 7, 49, 51, 55] · CTA: source (first reply) · Uses a numbered X sequence that moves from claim to mechanism to one concrete civic action.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">grok-selected exact extraction</div>
+      <div class="eyebrow">grok source-grounded rewrite</div>
       <h3>bluesky · counterpoint</h3>
-      <div class="copy">We know the problems are big and complex. We also know that new technology like AI won&#039;t save us if we don&#039;t change the systems around it first. Wealth inequality and the tight capture of money and power have been problems for centuries. Technology alone has not solved these critical social issues.<br><br>If too many people and institutions are extracting value without returning it, the socioeconomic and environmental ecosystems we all depend on eventually collapse. If AI simply automates and scales up the decisions that led us here, then we are going to accelerate the collapse unless we change the conditions first.</div>
-      <div class="meta">617 characters · source_lines: [13, 15] · pending review</div>
+
+      <div class="copy">Demonstrations matter. They still do not always create enough pressure on their own.<br><br>We need leverage strong enough that ignoring it costs more than keeping things as they are.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">177 characters · source_lines: [33, 87] · CTA: source (inline at publish) · Makes the essay&#039;s correction of protest-only politics the standalone Bluesky point: pressure needs real leverage.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">grok-selected exact extraction</div>
+      <div class="eyebrow">grok source-grounded rewrite</div>
       <h3>linkedin · summary</h3>
-      <div class="copy">The world is not going to be saved by one brilliant leader, one election, or one AI model.<br><br>It will change when ordinary people learn where their leverage is, and build it together.<br><br>So democracy is where I would start. Without it, we have no meaningful power to shape the future.<br><br>The forms of leverage I see most clearly are our votes, our labor, our spending, our care for one another, and our ability to build new tools and institutions.<br><br>We need to make the preferred future more attractive than the status quo.</div>
-      <div class="meta">516 characters · source_lines: [5, 7, 23, 35, 220] · pending review</div>
+
+      <div class="copy">Here is the map I have been building.<br><br>The world will not be saved by one brilliant leader, one election, or one AI model. It will change when ordinary people learn where their leverage is and build it together.<br><br>I start with democracy, because without the power to shape society, our concerns stay wishes. Power needs pressure: Votes, labor, spending, care, and the ability to build new tools and institutions.<br><br>AI can make building cheaper. That helps. It does not replace changing the systems we are about to automate. If we scale the decisions that led us here, we accelerate the damage.<br><br>Fear, guilt, and anger alone burn people out. We also need a future worth running toward, and work that feels alive enough to sustain.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">727 characters · source_lines: [5, 7, 13, 15, 19, 23, 31, 33, 35, 133, 135, 206, 218, 220] · CTA: source (inline at publish) · Summarizes the essay&#039;s central argument, leverage map, AI caveat, and sustainment point as one coherent LinkedIn post.</div>
     </article>
     <article class="card">
-      <div class="eyebrow">grok-selected exact extraction</div>
+      <div class="eyebrow">grok source-grounded rewrite</div>
       <h3>threads · hook-variants</h3>
-      <div class="copy">The world is not going to be saved by one brilliant leader, one election, or one AI model.<br><br>It will change when ordinary people learn where their leverage is, and build it together.<br><br>We know the problems are big and complex. We also know that new technology like AI won&#039;t save us if we don&#039;t change the systems around it first. Wealth inequality and the tight capture of money and power have been problems for centuries. Technology alone has not solved these critical social issues.</div>
-      <div class="meta">482 characters · source_lines: [5, 7, 13] · pending review</div>
+
+      <div class="copy">When I was 10 or 11, I knew I wanted to help society somehow. I just did not have the words yet.<br><br>If that kid could look at me now, she&#039;d be proud.<br><br>I am not doing this from fear, guilt, or anger. I am doing it because it makes me happy, and because joy is part of how we keep the work alive.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">292 characters · source_lines: [161, 167, 169, 204, 216] · CTA: source (inline at publish) · Opens on the childhood-alignment hook from the essay, then completes the point about joy as sustainment so the Threads post stands alone.</div>
     </article></div>
 
-  <h2>2. Cross-room safety boundaries</h2>
+  <h2>2. Cold-feed editor experiment</h2><p>The editor assumed a reader scanning unrelated posts with no prior interest or context. It received only each finished draft, its platform, and its character limit, then strengthened the opening so the concrete topic is legible within seconds. It did not receive the essay, source lines, treatment rationale, or repository context. The source-aware validator was applied again after editing.</p><div class="grid">
+    <article class="card">
+      <div class="eyebrow">blind editor experiment</div>
+      <h3>threads · cta</h3>
+      <div class="comparison-label">Without editor</div><div class="copy before">I keep asking how ordinary people can do something useful when the problems feel too big. My answer is less dramatic than waiting for a hero: Find where you have leverage and build with other people.</div><div class="comparison-label">Blind editor recommendation</div><div class="recommendation">Keep the focus on ordinary civic action.</div><div class="comparison-label">With editor</div>
+      <div class="copy">Ordinary people can help with social and political problems that feel too big. My answer is less dramatic than waiting for a hero: Find where you have civic leverage, then build with other people.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">Editor saw only the draft, platform, and character limit · source-aware validation reapplied afterward · CTA: source (inline at publish)</div>
+    </article>
+    <article class="card">
+      <div class="eyebrow">blind editor experiment</div>
+      <h3>x · viral-rewrite</h3>
+      <div class="comparison-label">Without editor</div><div class="copy before">The world does not need one brilliant leader or one perfect AI model. It needs ordinary people who know where they have leverage and build it together. That is the work.</div><div class="comparison-label">Blind editor recommendation</div><div class="recommendation">Keep the contrast between exceptional solutions and collective action.</div><div class="comparison-label">With editor</div>
+      <div class="copy">A brilliant leader or perfect AI model is not enough for social change. Ordinary people need to know where they have leverage and build together.</div>
+      <div class="cta-preview"><b>First reply CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">Editor saw only the draft, platform, and character limit · source-aware validation reapplied afterward · CTA: source (first reply)</div>
+    </article>
+    <article class="card">
+      <div class="eyebrow">blind editor experiment</div>
+      <h3>linkedin · platform-framing</h3>
+      <div class="comparison-label">Without editor</div><div class="copy before">Start with power, not technology.<br><br>AI will not save us if the systems around it stay the same. The first question is whether people can influence the decisions shaping their lives. That is why I would start with democracy.<br><br>Then look for leverage: Votes, labor, spending, care, and new tools or institutions.<br><br>I am building a voting app around that idea. The goal is simple: Make it easier to judge representatives by what they have done, not only by what they say.</div><div class="comparison-label">Blind editor recommendation</div><div class="recommendation">Keep the voting app as the practical endpoint.</div><div class="comparison-label">With editor</div>
+      <div class="copy">AI raises a basic democratic issue: Whether people can influence the decisions shaping their lives.<br><br>AI will not save us if the systems around it stay the same. That is why I would start with democracy.<br><br>Then look for leverage: Votes, labor, spending, care, and new tools or institutions.<br><br>I am building a voting app around that idea. The goal is simple: Make it easier to judge representatives by what they have done, not only by what they say.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">Editor saw only the draft, platform, and character limit · source-aware validation reapplied afterward · CTA: source (inline at publish)</div>
+    </article>
+    <article class="card">
+      <div class="eyebrow">blind editor experiment</div>
+      <h3>x · shorter-version</h3>
+      <div class="comparison-label">Without editor</div><div class="copy before">AI will not save us if we keep the systems that produced the problem. It can automate those decisions faster. Before asking what AI can do, ask what should change first.</div><div class="comparison-label">Blind editor recommendation</div><div class="recommendation">Keep the short sequence from diagnosis to action.</div><div class="comparison-label">With editor</div>
+      <div class="copy">AI can automate broken systems faster. It will not save us if we keep the systems that produced the problem. Before asking what AI can do, ask what should change first.</div>
+      <div class="cta-preview"><b>First reply CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">Editor saw only the draft, platform, and character limit · source-aware validation reapplied afterward · CTA: source (first reply)</div>
+    </article>
+    <article class="card">
+      <div class="eyebrow">blind editor experiment</div>
+      <h3>x · thread</h3>
+      <div class="comparison-label">Without editor</div><div class="copy before">1/ The world won&#039;t be saved by one leader, election, or AI model.<br>2/ Change starts when ordinary people find their leverage and build it together.<br>3/ One place to start: Judge representatives by their actions, not their rhetoric.</div><div class="comparison-label">Blind editor recommendation</div><div class="recommendation">Keep the three-beat thread structure.</div><div class="comparison-label">With editor</div>
+      <div class="copy">1/ No single leader, election, or AI model will save society.<br>2/ Change starts when ordinary people find their leverage and build together.<br>3/ Start by judging representatives by their actions, not just their rhetoric.</div>
+      <div class="cta-preview"><b>First reply CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">Editor saw only the draft, platform, and character limit · source-aware validation reapplied afterward · CTA: source (first reply)</div>
+    </article>
+    <article class="card">
+      <div class="eyebrow">blind editor experiment</div>
+      <h3>bluesky · counterpoint</h3>
+      <div class="comparison-label">Without editor</div><div class="copy before">People often treat democracy as voting. I think the more useful definition is power: The ability to shape the society you live in. That means finding leverage in your vote, labor, spending, care, and tools.</div><div class="comparison-label">Blind editor recommendation</div><div class="recommendation">Keep the compact list of civic leverage points.</div><div class="comparison-label">With editor</div>
+      <div class="copy">Democracy is about people&#039;s ability to shape the society they live in. Voting is one way to exercise that ability. Find leverage in your vote, labor, spending, care, and tools.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">Editor saw only the draft, platform, and character limit · source-aware validation reapplied afterward · CTA: source (inline at publish)</div>
+    </article>
+    <article class="card">
+      <div class="eyebrow">blind editor experiment</div>
+      <h3>linkedin · summary</h3>
+      <div class="comparison-label">Without editor</div><div class="copy before">Here is the map I am working from.<br><br>Democracy gives people the power to shape society. Power needs leverage. The forms I can see most clearly are votes, labor, spending, care, and building tools and institutions.<br><br>AI can lower the cost of building. That matters, but it does not fix the systems around it. If we automate those systems without changing them, we can accelerate the damage.<br><br>So the practical question is not whether one person can save the world. It is where ordinary people can apply pressure, then build that power together.</div><div class="comparison-label">Blind editor recommendation</div><div class="recommendation">Keep the progression from civic power to AI&#039;s limits to collective action.</div><div class="comparison-label">With editor</div>
+      <div class="copy">Democracy gives people power to shape society. Power needs leverage. The forms I see most clearly are votes, labor, spending, care, and building tools and institutions.<br><br>AI can lower the cost of building. That matters, but it does not fix the systems around it. Automating those systems without changing them can accelerate the damage.<br><br>The practical question is not whether one person can save the world. It is where ordinary people can apply pressure, then build that power together.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">Editor saw only the draft, platform, and character limit · source-aware validation reapplied afterward · CTA: source (inline at publish)</div>
+    </article>
+    <article class="card">
+      <div class="eyebrow">blind editor experiment</div>
+      <h3>threads · hook-variants</h3>
+      <div class="comparison-label">Without editor</div><div class="copy before">I used to think trying to change the world would only make the disappointment worse. I was wrong. Doing nothing was making the pain worse. The work gives me a way to move toward the future I want.</div><div class="comparison-label">Blind editor recommendation</div><div class="recommendation">Keep the personal turn from disappointment to movement.</div><div class="comparison-label">With editor</div>
+      <div class="copy">Trying to change society used to feel like it would only deepen the disappointment. I was wrong. Doing nothing made the pain worse. The work gives me a way to move toward the future I want.</div>
+      <div class="cta-preview"><b>Inline CTA</b><span>Read the full essay:</span><a href="https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do">https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</a></div>
+      <div class="meta">Editor saw only the draft, platform, and character limit · source-aware validation reapplied afterward · CTA: source (inline at publish)</div>
+    </article></div>
+
+  <h2>3. Cross-room safety boundaries</h2>
   <p>Fiction and Charles may enter Content with approved prose, but Phase 1 deliberately refuses AI treatments because no enforceable restricted transformation exists yet.</p>
   <div class="boundary"><strong>Fiction treatment refused:</strong><br>configured fiction treatments are unavailable: no enforceable restricted transformation exists; request an untreated control only</div>
   <div class="boundary"><strong>Charles treatment refused:</strong><br>configured charles treatments are unavailable: no enforceable restricted transformation exists; request an untreated control only</div>
 
-  <h2>3. Seven staged media paths</h2>
+  <h2>4. Seven staged media paths</h2>
   <p>These are the inspectable artifacts created before rendering. Each waits for explicit approval; a declared path is never presented as a finished asset.</p>
   <table><thead><tr><th>Media</th><th>Gate</th><th>Plan created by Phase 1</th><th>Existing primitives</th></tr></thead><tbody>
     <tr><td><b>static-quote-card</b><br><span class="note">queue: image</span></td><td>render-required</td><td><pre>{
   &quot;kind&quot;: &quot;quote-render-plan&quot;,
-  &quot;sourceText&quot;: &quot;[control omitted from review]&quot;,
+  &quot;sourceText&quot;: &quot;[control omitted from review]&quot;
+}</pre></td><td>existing deterministic QuoteCard render; existing missing-asset approval gate</td></tr><tr><td><b>animated-quote-card</b><br><span class="note">queue: video</span></td><td>render-required</td><td><pre>{
+  &quot;kind&quot;: &quot;quote-render-plan&quot;,
   &quot;sourceText&quot;: &quot;[control omitted from review]&quot;
 }</pre></td><td>existing deterministic QuoteCard render; existing missing-asset approval gate</td></tr><tr><td><b>image</b><br><span class="note">queue: image</span></td><td>prompt-approval-required</td><td><pre>{
   &quot;kind&quot;: &quot;image-prompt-brief&quot;,
@@ -208,6 +314,6 @@
   </tbody></table>
 
   <h2>How to evaluate this</h2>
-  <p>Judge whether each exact-source treatment is useful, distinct, short enough for its platform, and recognizably Muxin. Any em dash or configured AI tell causes generation to fail rather than queue the draft.</p>
+  <p>Judge whether each source-grounded treatment makes a clear standalone point, materially applies its named treatment, fits its platform, and sounds recognizably like Muxin. Footnote markers, em dashes, configured AI tells, duplicate bodies, and untraced claims fail before queueing.</p>
   <p class="note">Reproduce the Codex set with <code>npx tsx scripts/phase1-generation-review.ts docs/reviews/content-studio-phase1-generation-review.html /absolute/path/to/source.md</code>. The Grok comparison shown here came from the managed subscription bridge and was fed back through the same deterministic parser with <code>PHASE1_REVIEW_GROK_OUTPUT</code>.</p>
 </main></body></html>

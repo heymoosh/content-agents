@@ -13,7 +13,7 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { resolveContentTypeCtas, resolveCtaLines, loadContentTypesConfig } from "./cta.js";
+import { resolveContentTypeCtas, resolveCtaLines, resolvePrimaryCtaDestination, loadContentTypesConfig } from "./cta.js";
 import type { CtaConfig } from "./cta.js";
 
 const CFG: CtaConfig = {
@@ -25,6 +25,19 @@ const CFG: CtaConfig = {
 const CANONICAL = "https://example.com/essay";
 const PROJECT = "https://example.com/my-project";
 const LINKEDIN = "https://www.linkedin.com/in/muxinli";
+
+describe("resolvePrimaryCtaDestination follows publish precedence", () => {
+  const contentTypes = loadContentTypesConfig();
+  test("canonical long-form source wins", () => {
+    assert.equal(resolvePrimaryCtaDestination({ content_type: ["product_builder_insight"] }, CANONICAL, CFG, "essay", contentTypes), "source");
+  });
+  test("Substack Note does not point back to itself", () => {
+    assert.equal(resolvePrimaryCtaDestination({}, "https://example.com/p/a-note", CFG, "substack-note", contentTypes), null);
+  });
+  test("reviewed high-fit and high-value promotion is eligible without a canonical source", () => {
+    assert.equal(resolvePrimaryCtaDestination({ content_type: ["offer_adjacent_post"], cta_reviewed: true, cta_fit: "high", cta_value: "high" }, null, CFG, "essay", contentTypes), "work_with_me");
+  });
+});
 
 const ALL_TYPE_KEYS = [
   "essay_excerpt",
@@ -232,12 +245,12 @@ describe("resolveCtaLines: the top-level entry point publishers call", () => {
     assert.deepEqual(ctas, [{ url: "https://voter-choice.vercel.app/", label: "Vote:" }]);
   });
 
-  test("no explicit cta, content_type set: resolves via content-type routing", () => {
+  test("a canonical published source is always the default CTA", () => {
     const { ctas } = resolveCtaLines({ content_type: ["essay_excerpt"] }, CANONICAL, CFG, "", ctCfg);
-    assert.deepEqual(ctas, [{ url: CANONICAL, label: "Read full essay on Substack" }]);
+    assert.deepEqual(ctas, [{ url: CANONICAL, label: CFG.fallbackLabel }]);
   });
 
-  test("no explicit cta, content_type + project_url set: resolves both entries via content-type routing", () => {
+  test("a project candidate cannot displace a canonical source", () => {
     const { ctas } = resolveCtaLines(
       { content_type: ["essay_excerpt"], project_url: PROJECT },
       CANONICAL,
@@ -245,20 +258,30 @@ describe("resolveCtaLines: the top-level entry point publishers call", () => {
       "",
       ctCfg
     );
-    assert.deepEqual(
-      ctas.map((r) => r.label),
-      ["Read full essay on Substack", "See related project"]
-    );
+    assert.deepEqual(ctas, [{ url: CANONICAL, label: CFG.fallbackLabel }]);
   });
 
-  test("no explicit cta, work-flavored content_type set: resolves to LinkedIn, never the essay link", () => {
+  test("work-flavored content points to the canonical source instead of forcing lead generation", () => {
     const { ctas } = resolveCtaLines({ content_type: ["offer_adjacent_post"] }, CANONICAL, CFG, "", ctCfg);
-    assert.deepEqual(ctas, [{ url: LINKEDIN, label: "Connect on LinkedIn" }]);
+    assert.deepEqual(ctas, [{ url: CANONICAL, label: CFG.fallbackLabel }]);
   });
 
-  test("no explicit cta, no content_type: no link (legacy empty-cta behavior unchanged)", () => {
+  test("canonical source is on even without content_type", () => {
     const { ctas } = resolveCtaLines({}, CANONICAL, CFG, "", ctCfg);
-    assert.deepEqual(ctas, []);
+    assert.deepEqual(ctas, [{ url: CANONICAL, label: CFG.fallbackLabel }]);
+  });
+
+  test("Substack Notes never link back to their canonical Note URL", () => {
+    assert.deepEqual(resolveCtaLines({}, CANONICAL, CFG, "substack-note", ctCfg).ctas, []);
+    assert.deepEqual(resolveCtaLines({ cta: "source" }, CANONICAL, CFG, "substack-note", ctCfg).ctas, []);
+  });
+
+  test("non-source promotional CTA requires reviewed high fit and high value", () => {
+    assert.deepEqual(resolveCtaLines({ content_type: ["offer_adjacent_post"] }, null, CFG, "", ctCfg).ctas, []);
+    assert.deepEqual(resolveCtaLines({ content_type: ["offer_adjacent_post"], cta_reviewed: true, cta_fit: "high" }, null, CFG, "", ctCfg).ctas, []);
+    assert.deepEqual(resolveCtaLines({ content_type: ["offer_adjacent_post"], cta_reviewed: true, cta_fit: "high", cta_value: "high" }, null, CFG, "", ctCfg).ctas, [
+      { url: LINKEDIN, label: "Connect on LinkedIn" },
+    ]);
   });
 
   test("cta: none still means no link even with a content_type set", () => {

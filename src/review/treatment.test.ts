@@ -262,6 +262,7 @@ test("routing.md's recorded decision is returned alongside the recomputed one", 
 test("no pillar → an explicit no-pillar state, null fit, and reuse/slots still answered", () => {
   const f = folderWith(null); // pasted foreign essay: never routed, no routing.md
   try {
+    writeFileSync(join(f.dir, "source.md"), "---\nsource_kind: substack-note\n---\n\nOne compact thought.");
     const t = readTreatment("slug", base({ folder: f.dir }));
     assert.deepEqual(t.pillars, []);
     assert.equal(t.pillarSource, "none");
@@ -277,6 +278,8 @@ test("no pillar → an explicit no-pillar state, null fit, and reuse/slots still
     }
     assert.deepEqual(t.scoredBelowFloorButEnabled, []);
     assert.equal(t.channels.find((c) => c.channel === "linkedin")!.reuse!.minDays, 60);
+    assert.deepEqual(t.distribution.platforms.map((item) => item.option), ["x", "threads", "bluesky", "mastodon", "linkedin"]);
+    assert.deepEqual(t.distribution.media, []);
   } finally {
     f.cleanup();
   }

@@ -79,12 +79,12 @@ describe("resolveCta: table-driven", () => {
       },
     },
     {
-      name: "substack-note, empty cta: upgraded default to source (the note's own canonical url)",
+      name: "substack-note, empty cta: no link",
       fm: {},
       canonicalUrl: "https://example.com/note-1",
       cfg: CFG,
       sourceKind: "substack-note",
-      expected: { url: "https://example.com/note-1", label: "", usedFallback: false },
+      expected: { url: null, label: "", usedFallback: false },
     },
     {
       name: "substack-note, explicit cta: none: explicit wins over the note default",
@@ -95,7 +95,7 @@ describe("resolveCta: table-driven", () => {
       expected: { url: null, label: "", usedFallback: false },
     },
     {
-      name: "substack-note, explicit literal url: explicit wins over the note default",
+      name: "substack-note, explicit literal non-source url remains available",
       fm: { cta: "https://example.com/elsewhere" },
       canonicalUrl: "https://example.com/note-1",
       cfg: CFG,
@@ -122,11 +122,11 @@ describe("resolveCta: table-driven", () => {
 
 
 describe("loadCtaConfig: smoke test against the real config/cta.yaml", () => {
-  test("loads placement rules and a source fallback from the real config", () => {
+  test("loads placement rules without a generic homepage fallback", () => {
     const cfg = loadCtaConfig();
     assert.equal(cfg.placement.x, "reply");
     assert.equal(cfg.placement.linkedin, "inline");
-    assert.ok(cfg.fallbackUrl, "source_fallback.url should be set in the real config");
+    assert.equal(cfg.fallbackUrl, null);
   });
 });
 

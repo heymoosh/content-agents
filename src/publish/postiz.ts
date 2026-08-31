@@ -1,4 +1,4 @@
-export type PostizDestination = "x" | "linkedin" | "bluesky" | "mastodon" | "threads" | "tiktok" | "youtube" | "substack";
+export type PostizDestination = "x" | "linkedin" | "bluesky" | "mastodon" | "threads" | "instagram" | "tiktok" | "youtube" | "substack";
 export type PostizMedia = "text" | "image" | "video";
 
 export interface PostizCapability {

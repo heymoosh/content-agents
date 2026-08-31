@@ -2793,7 +2793,7 @@ const CONTENT_CONFIG_OPTIONS = {
     ["video-caption-package","Video transcript / caption package"],["audiogram","Audiogram / waveform clip"],
   ],
   platform: [
-    ["substack","Substack"],["linkedin","LinkedIn"],["x","X"],["bluesky","Bluesky"],
+    ["substack","Substack"],["linkedin","LinkedIn"],["x","X"],["bluesky","Bluesky"],["mastodon","Mastodon"],
     ["threads","Threads"],["instagram","Instagram"],["tiktok","TikTok"],["youtube","YouTube"],
   ],
 };
@@ -2809,19 +2809,24 @@ function cwEnsureConfig(){
   const s = cwSession();
   if(!s) return null;
   if(CW.config && CW.config.slug===s.slug) return CW.config;
-  const routed = (CW.treat && CW.treat.channels || []).filter(c=>c.decision!=="exclude").map(c=>c.channel);
+  const routed = (CW.treat && CW.treat.channels || []).filter(c=>c.decision==="include").map(c=>c.channel);
   const supported = CONTENT_CONFIG_OPTIONS.platform.map(x=>x[0]);
   const platforms = routed.filter(p=>supported.includes(p));
   const defaults = CW.signalDefaults || {};
+  const sourceDistribution = CW.treat && CW.treat.distribution || {platforms:[],media:[]};
   const recommended = key => (defaults[key]||[]).filter(x=>x.recommended).map(x=>x.option);
   const treatments = recommended("treatments").filter(x=>CONTENT_CONFIG_OPTIONS.treatment.some(o=>o[0]===x));
-  const media = recommended("media").filter(x=>CONTENT_CONFIG_OPTIONS.media.some(o=>o[0]===x));
+  const sourceMedia = (sourceDistribution.media||[]).map(x=>x.option).filter(x=>CONTENT_CONFIG_OPTIONS.media.some(o=>o[0]===x));
+  const sourcePlatforms = (sourceDistribution.platforms||[]).map(x=>x.option).filter(x=>supported.includes(x));
+  const platformRequiredMedia = (sourceDistribution.platforms||[]).filter(x=>sourcePlatforms.includes(x.option) && x.requiredMedia).map(x=>x.requiredMedia);
+  const media = [...new Set([...sourceMedia, ...platformRequiredMedia])];
+  const fallbackMedia = recommended("media").filter(x=>CONTENT_CONFIG_OPTIONS.media.some(o=>o[0]===x));
   const defaultPlatforms = recommended("platforms").filter(x=>supported.includes(x));
   CW.config = {
     slug:s.slug,
     treatment:new Set(treatments.length ? treatments : ["summary"]),
-    media:new Set(media.length ? media : ["static-quote-card"]),
-    platform:new Set(platforms.length ? platforms : defaultPlatforms.length ? defaultPlatforms : ["bluesky"]),
+    media:new Set(media.length ? media : fallbackMedia),
+    platform:new Set(platforms.length ? platforms : sourcePlatforms.length ? sourcePlatforms : defaultPlatforms.length ? defaultPlatforms : ["bluesky"]),
     control:true,
     saving:false,
     saved:false,
@@ -2974,7 +2979,10 @@ function cwStep2Html(){
   if(CW.treatErr) return cwPickedHtml(s)+'<div class="fam-note t-amber" style="margin-top:16px">Could not read recommendations for this piece: '+esc(CW.treatErr)+'</div>';
   if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+'<div class="empty">Reading recommendations…</div>';
   const cfg = cwEnsureConfig();
-  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these platforms?</summary><div class="src" style="margin-top:8px;max-width:620px">Selections start from this source\\'s routing evidence. When that evidence is insufficient, Substack and LinkedIn are safe cold-start defaults. Every checkbox remains yours to change.</div></details>';
+  const dist=CW.treat.distribution||{platforms:[],media:[],mediaRationale:""};
+  const platformWhy=(dist.platforms||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
+  const mediaWhy=(dist.media||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
+  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these platforms and media?</summary><div style="margin-top:8px;max-width:680px">'+platformWhy+(mediaWhy||'<div class="src" style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<div class="src" style="margin-top:10px">Source fit supplies the cold-start recommendation. Existing routing and measured performance evidence remain stronger when available. Every checkbox remains yours to change.</div></div></details>';
   return cwPickedHtml(s)+
     '<div class="src" style="margin-top:18px;max-width:640px">Choose treatments, media, and platforms independently. Recommendations preselect a starting point; they never remove your control.</div>'+
     cwConfigSectionHtml("treatment","TREATMENTS",CONTENT_CONFIG_OPTIONS.treatment,s)+
@@ -3037,12 +3045,17 @@ async function cwSaveConfig(){
   if(!cfg.platform.size){ flash("Choose at least one platform"); return; }
   const engine = $("#contentTreatmentEngine")?.value || "codex";
   cfg.saving = true; renderContentWizard();
-  const recommendedPlatforms = (CW.treat && CW.treat.channels || []).filter(c=>c.decision!=="exclude").map(c=>c.channel);
+  const recommendedPlatforms = (CW.treat && CW.treat.channels || []).filter(c=>c.decision==="include").map(c=>c.channel);
   const signalEvidence = ["treatments","media","platforms"].flatMap(key=>(CW.signalDefaults&&CW.signalDefaults[key]||[]).filter(x=>x.recommended).map(x=>({
     option:x.option, kind:key==="treatments"?"treatment":key==="platforms"?"platform":"media",
     reason:x.explanation, source:x.source, recommended:true,
   })));
+  const distributionEvidence = [
+    ...((CW.treat&&CW.treat.distribution&&CW.treat.distribution.platforms)||[]).map(x=>({option:x.option,kind:"platform",reason:x.reason,source:"source-fit",recommended:true})),
+    ...((CW.treat&&CW.treat.distribution&&CW.treat.distribution.media)||[]).map(x=>({option:x.option,kind:"media",reason:x.reason,source:"source-fit",recommended:true})),
+  ];
   const evidence = [
+    ...distributionEvidence,
     ...signalEvidence,
     ...recommendedPlatforms.map(option=>({option,kind:"platform",reason:"Current routing includes this platform",source:"routing",recommended:true})),
   ];

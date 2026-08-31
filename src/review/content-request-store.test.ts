@@ -48,7 +48,7 @@ describe("content request store", () => {
       ...input, originalInput: "One.", sourceProvenance: { kind: "approved-cut", lens: "belief-audit", sourceLines: [999] },
     });
     assert.equal(authorized.originalInput, "One.");
-    assert.deepEqual(authorized.sourceProvenance, { kind: "approved-cut", lens: "belief-audit", sourceLines: [6] });
+    assert.deepEqual(authorized.sourceProvenance, { kind: "approved-cut", lens: "belief-audit", sourceLines: [6], canonicalUrl: "https://humaninference.substack.com/p/source" });
   });
 
   test("an edited cut containing an uncited claim is refused even when its stale source_lines remain", async () => {

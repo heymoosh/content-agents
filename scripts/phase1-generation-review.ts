@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { buildContentRequest, type ContentRequest, type ContentVariant } from "../src/review/content-request.js";
 import { configuredMediaPlan, configuredMediaStage, CONFIGURED_MEDIA } from "../src/review/configured-media.js";
 import { buildEngineSpawn, type Engine } from "../src/review/engines.js";
@@ -15,6 +15,8 @@ const {
   assertConfiguredTreatmentPolicy,
   configuredContentPrompt,
   configuredDerivativeText,
+  configuredSourceCtaLabel,
+  configuredSourceSupportsCta,
   configuredSourceSegments,
   parseConfiguredVariantBodies,
   resolveConfiguredProvenance,
@@ -24,16 +26,23 @@ const outputPath = resolve(process.argv[2] ?? "docs/reviews/content-studio-phase
 const sourcePath = resolve(process.argv[3] ?? process.env.PHASE1_REVIEW_SOURCE ?? "");
 if (!sourcePath) throw new Error("pass the source essay path as the second argument or PHASE1_REVIEW_SOURCE");
 const sourceText = readFileSync(sourcePath, "utf8");
+const sourceName = process.env.PHASE1_REVIEW_TITLE?.trim() || basename(sourcePath, ".md");
+const canonicalUrl = process.env.PHASE1_REVIEW_CANONICAL_URL?.trim() || undefined;
+const sourceCtaUrl = canonicalUrl && configuredSourceSupportsCta(canonicalUrl) ? canonicalUrl : undefined;
+const sourceCtaLabel = sourceCtaUrl ? configuredSourceCtaLabel(sourceCtaUrl) : undefined;
 const generatedAt = new Date().toISOString();
 const engines: readonly Engine[] = process.env.PHASE1_REVIEW_ENGINE
   ? [process.env.PHASE1_REVIEW_ENGINE as Engine]
-  : process.env.PHASE1_REVIEW_GROK_OUTPUT ? ["codex", "grok"] : ["codex"];
+  : [];
 
 const treatments = ["cta", "viral-rewrite", "platform-framing", "shorter-version", "thread", "counterpoint", "summary", "hook-variants"] as const;
 const treatmentPlatforms: Record<(typeof treatments)[number], string> = {
   cta: "threads", "viral-rewrite": "x", "platform-framing": "linkedin", "shorter-version": "x",
   thread: "x", counterpoint: "bluesky", summary: "linkedin", "hook-variants": "threads",
 };
+const ctaMeta = (variant: ContentVariant): string => sourceCtaUrl
+  ? `CTA: source (${variant.platform === "x" ? "first reply" : "inline at publish"})`
+  : "CTA: none (no published source or reviewed high-fit/high-value destination)";
 
 function escapeHtml(value: unknown): string {
   return String(value)
@@ -68,12 +77,14 @@ function variantLabel(variant: ContentVariant): string {
   return `${variant.platform} · ${treatment}`;
 }
 
-function cards(items: readonly { title: string; eyebrow: string; body: string; meta?: string }[]): string {
+function cards(items: readonly { title: string; eyebrow: string; body: string; before?: string; recommendation?: string; ctaUrl?: string; ctaPlacement?: string; meta?: string }[]): string {
   return items.map((item) => `
     <article class="card">
       <div class="eyebrow">${escapeHtml(item.eyebrow)}</div>
       <h3>${escapeHtml(item.title)}</h3>
+      ${item.before ? `<div class="comparison-label">Without editor</div><div class="copy before">${escapeHtml(item.before).replaceAll("\n", "<br>")}</div><div class="comparison-label">Blind editor recommendation</div><div class="recommendation">${escapeHtml(item.recommendation ?? "")}</div><div class="comparison-label">With editor</div>` : ""}
       <div class="copy">${escapeHtml(item.body).replaceAll("\n", "<br>")}</div>
+      ${item.ctaUrl ? `<div class="cta-preview"><b>${escapeHtml(item.ctaPlacement === "first reply" ? "First reply CTA" : "Inline CTA")}</b><span>${escapeHtml(sourceCtaLabel)}</span><a href="${escapeHtml(item.ctaUrl)}">${escapeHtml(item.ctaUrl)}</a></div>` : ""}
       ${item.meta ? `<div class="meta">${escapeHtml(item.meta)}</div>` : ""}
     </article>`).join("");
 }
@@ -100,17 +111,18 @@ for (let index = 0; index < sourceLines.length;) {
   index += 1;
 }
 const approvedBody = sourceText;
+const approvedSourceLines: (number | string)[] = sourceLines.length === 1 ? [1] : [`1-${sourceLines.length}`];
 
 const ordinary = buildContentRequest({
   id: "phase1-review-ordinary",
   origin: "studio",
-  descriptor: "Muxin's essay, The world's broken. What do we do? Create distinct short posts using only her exact sentences.",
+  descriptor: `Muxin's essay, ${sourceName}. Create distinct source-grounded social treatments in her voice.`,
   originalInput: approvedBody,
   treatments,
   media: [],
   platforms: [...new Set(Object.values(treatmentPlatforms))],
   includeUntreatedControl: true,
-  sourceProvenance: { kind: "source", sourceLines: lineRefs },
+  sourceProvenance: { kind: "source", sourceLines: approvedSourceLines, ...(canonicalUrl ? { canonicalUrl } : {}) },
 });
 const ordinaryTreated = treatments.map((treatment) => ordinary.variants.find((variant) =>
   variant.identity.kind === "treated" && variant.platform === treatmentPlatforms[treatment] && variant.treatments[0] === treatment,
@@ -130,7 +142,53 @@ if (process.env.PHASE1_REVIEW_PROMPT_PATH) {
   console.log(resolve(process.env.PHASE1_REVIEW_PROMPT_PATH));
   process.exit(0);
 }
-const engineReviews = engines.map((engine) => {
+type WriterEntry = { treatment?: unknown; id_placeholder?: unknown; body?: unknown; source_lines?: unknown; treatment_reason?: unknown };
+function normalizedExternalOutput(path: string): { output: string; reasons: Map<string, string> } {
+  const raw = JSON.parse(readFileSync(resolve(path), "utf8")) as WriterEntry[];
+  if (!Array.isArray(raw)) throw new Error("external writer output must be an array");
+  const reasons = new Map<string, string>();
+  const output = raw.map((entry) => {
+    const treatment = String(entry.treatment ?? entry.id_placeholder ?? "").split("/")[0]!;
+    const variant = ordinaryTreated.find((candidate) => candidate.treatments[0] === treatment);
+    if (!variant) throw new Error(`external writer returned unknown treatment ${treatment}`);
+    reasons.set(variant.identity.id, String(entry.treatment_reason ?? "Source-grounded treatment."));
+    if (!Array.isArray(entry.source_lines)) throw new Error(`external writer returned no source lines for ${treatment}`);
+    const mappedRefs = [...new Set(entry.source_lines.map((rawRef) => {
+      const line = Number(String(rawRef).split("-")[0]);
+      const mapped = lineRefs.find((candidate) => {
+        const [start, end = start] = String(candidate).split("-").map(Number);
+        return line >= start! && line <= end!;
+      });
+      if (mapped === undefined) throw new Error(`external writer cited unavailable source line ${rawRef}`);
+      return mapped;
+    }))];
+    return { id: variant.identity.id, body: entry.body, source_lines: mappedRefs };
+  });
+  return { output: JSON.stringify(output), reasons };
+}
+
+const externalReviews = [
+  ...(process.env.PHASE1_REVIEW_LUNA_OUTPUT ? [{ engine: "luna", path: process.env.PHASE1_REVIEW_LUNA_OUTPUT, version: "Codex Luna subscription subagent" }] : []),
+  ...(process.env.PHASE1_REVIEW_GROK_OUTPUT ? [{ engine: "grok", path: process.env.PHASE1_REVIEW_GROK_OUTPUT, version: "Grok 4.5 subscription subagent" }] : []),
+].map((review) => {
+  const external = normalizedExternalOutput(review.path);
+  const bodies = parseConfiguredVariantBodies(external.output, ordinaryTreated, folder, lineRefs);
+  return {
+    engine: review.engine,
+    version: review.version,
+    cards: ordinaryTreated.map((variant) => {
+      const generated = bodies.get(variant.identity.id)!;
+      return {
+        title: variantLabel(variant), eyebrow: `${review.engine} source-grounded rewrite`, body: generated.body,
+        ctaUrl: sourceCtaUrl,
+        ctaPlacement: variant.platform === "x" ? "first reply" : "inline",
+        meta: `${generated.body.length} characters · source_lines: [${generated.sourceLines.join(", ")}] · ${ctaMeta(variant)} · ${external.reasons.get(variant.identity.id)}`,
+      };
+    }),
+  };
+});
+
+const generatedReviews = engines.map((engine) => {
   let prompt = basePrompt;
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -146,8 +204,10 @@ const engineReviews = engines.map((engine) => {
         cards: ordinaryTreated.map((variant) => {
           const generated = bodies.get(variant.identity.id)!;
           return {
-            title: variantLabel(variant), eyebrow: `${engine}-selected exact extraction`, body: generated.body,
-            meta: `${generated.body.length} characters · source_lines: [${generated.sourceLines.join(", ")}] · pending review`,
+            title: variantLabel(variant), eyebrow: `${engine} source-grounded rewrite`, body: generated.body,
+            ctaUrl: sourceCtaUrl,
+            ctaPlacement: variant.platform === "x" ? "first reply" : "inline",
+            meta: `${generated.body.length} characters · source_lines: [${generated.sourceLines.join(", ")}] · ${ctaMeta(variant)} · pending review`,
           };
         }),
       };
@@ -159,6 +219,34 @@ const engineReviews = engines.map((engine) => {
   }
   throw lastError;
 });
+const engineReviews = [...externalReviews, ...generatedReviews];
+
+const editorExperiment = (() => {
+  const editorPath = process.env.PHASE1_REVIEW_EDITOR_OUTPUT;
+  const luna = externalReviews.find((review) => review.engine === "luna");
+  if (!editorPath || !luna) return [];
+  const raw = JSON.parse(readFileSync(resolve(editorPath), "utf8")) as { treatment?: unknown; recommendation?: unknown; edited_body?: unknown }[];
+  if (!Array.isArray(raw) || raw.length !== ordinaryTreated.length) throw new Error("blind editor returned the wrong treatment count");
+  const baseline = normalizedExternalOutput(process.env.PHASE1_REVIEW_LUNA_OUTPUT!);
+  const baselineBodies = parseConfiguredVariantBodies(baseline.output, ordinaryTreated, folder, lineRefs);
+  const editedOutput = raw.map((entry) => {
+    const treatment = String(entry.treatment ?? "").split("/")[0]!;
+    const variant = ordinaryTreated.find((candidate) => candidate.treatments[0] === treatment);
+    if (!variant) throw new Error(`blind editor returned unknown treatment ${treatment}`);
+    return { id: variant.identity.id, body: entry.edited_body, source_lines: baselineBodies.get(variant.identity.id)!.sourceLines };
+  });
+  const editedBodies = parseConfiguredVariantBodies(JSON.stringify(editedOutput), ordinaryTreated, folder, lineRefs);
+  return ordinaryTreated.map((variant) => ({
+    title: variantLabel(variant),
+    eyebrow: "blind editor experiment",
+    before: baselineBodies.get(variant.identity.id)!.body,
+    recommendation: String(raw.find((entry) => String(entry.treatment).split("/")[0] === variant.treatments[0])?.recommendation ?? ""),
+    body: editedBodies.get(variant.identity.id)!.body,
+    ctaUrl: sourceCtaUrl,
+    ctaPlacement: variant.platform === "x" ? "first reply" : "inline",
+    meta: `Editor saw only the draft, platform, and character limit · source-aware validation reapplied afterward · ${ctaMeta(variant)}`,
+  }));
+})();
 const controlEnvelope = configuredDerivativeText("---\nvariant_kind: control\n---\n\n", sourceText, true);
 const controlBody = controlEnvelope.slice(controlEnvelope.indexOf("\n\n") + 2);
 if (controlBody !== sourceText) throw new Error("untreated control did not preserve the source byte for byte");
@@ -203,7 +291,7 @@ const html = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Content Studio Phase 1 generation review</title>
+  <title>${escapeHtml(sourceName)} · Content Studio generation review</title>
   <style>
     :root { color-scheme: light; --ink:#1c1917; --muted:#6b645c; --paper:#f7f3ea; --panel:#fffdf8; --line:#d9cfbd; --accent:#244f43; --warn:#8a451c; }
     * { box-sizing:border-box; }
@@ -225,6 +313,12 @@ const html = `<!doctype html>
     .eyebrow { color:var(--accent); font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
     .copy { white-space:normal; }
     .meta { margin-top:18px; padding-top:12px; border-top:1px solid var(--line); color:var(--muted); font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .comparison-label { margin-top:16px; color:var(--muted); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .before { color:#605b55; padding:10px 12px; background:#f2eee7; border-radius:8px; }
+    .recommendation { padding:10px 12px; color:var(--accent); background:#eef3ed; border-radius:8px; }
+    .cta-preview { display:grid; gap:4px; margin-top:16px; padding:12px 14px; border:1px solid #aac8bd; border-radius:9px; background:#edf7f3; font-size:14px; }
+    .cta-preview b { color:var(--accent); font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+    .cta-preview a { color:#174f91; overflow-wrap:anywhere; }
     .source { padding:20px 24px; border-left:5px solid var(--accent); background:#eef3ed; border-radius:8px; white-space:pre-wrap; }
     .boundary { padding:22px; margin-top:14px; border-color:#ddb997; background:#fff7ed; }
     .boundary strong { color:var(--warn); }
@@ -241,36 +335,38 @@ const html = `<!doctype html>
 <body><main>
   <header>
     <div class="eyebrow">Human Inference · review artifact</div>
-    <h1>What Phase 1 actually generates</h1>
-    <p class="dek">Every short post below was produced from Muxin's own essay by the committed Phase 1 prompt, parser, provenance, and voice checks. The model could select, omit, and reorder complete source segments. It could not write or paraphrase a sentence.</p>
+    <h1>${escapeHtml(sourceName)} treatments</h1>
+    <p class="dek">Every short post below is a source-grounded treatment of Muxin's essay. The writer may add connective structure, clarify, re-hook, trim, and reorder, but every substantive claim must remain supported by cited source lines.</p>
     <div class="facts">
       <div class="fact"><b>Generated</b>${escapeHtml(generatedAt)}</div>
       <div class="fact"><b>Engines</b>${escapeHtml(engineReviews.map((review) => review.version).join(" · "))}</div>
       <div class="fact"><b>Control</b>Byte-for-byte verified</div>
-      <div class="fact"><b>Voice gate</b>No em dashes or configured AI tells</div>
+      <div class="fact"><b>Voice gate</b>No footnote syntax, em dashes, or configured AI tells</div>
     </div>
   </header>
 
   <h2>1. Eight treatments of Muxin's essay</h2>
-  <p>The untreated control is intentionally not repeated here. The system verified it against the source byte for byte. SHA-256: <code>${controlHash}</code>. Each treatment below is assembled only from exact source segments and passed the hard voice gate before appearing.</p>
+  <p>The untreated control is intentionally not repeated here. The system verified it against the source byte for byte. SHA-256: <code>${controlHash}</code>. Every treatment below makes a standalone point and carries claim provenance. ${canonicalUrl ? "The published-source CTA is visibly attached to every card. X places it in the first reply; the other platforms shown place it inline." : "This source has no canonical published URL, so the resolver correctly emits no forced link, generic homepage, LinkedIn ask, or invented lead magnet."}</p>
   ${engineReviews.map((review) => `<h3 style="margin-top:30px">${escapeHtml(review.engine.toUpperCase())}</h3><div class="grid">${cards(review.cards)}</div>`).join("")}
 
-  <h2>2. Cross-room safety boundaries</h2>
+  ${editorExperiment.length ? `<h2>2. Cold-feed editor experiment</h2><p>The editor assumed a reader scanning unrelated posts with no prior interest or context. It received only each finished draft, its platform, and its character limit, then strengthened the opening so the concrete topic is legible within seconds. It did not receive the essay, source lines, treatment rationale, or repository context. The source-aware validator was applied again after editing.</p><div class="grid">${cards(editorExperiment)}</div>` : ""}
+
+  <h2>${editorExperiment.length ? "3" : "2"}. Cross-room safety boundaries</h2>
   <p>Fiction and Charles may enter Content with approved prose, but Phase 1 deliberately refuses AI treatments because no enforceable restricted transformation exists yet.</p>
   <div class="boundary"><strong>Fiction treatment refused:</strong><br>${escapeHtml(policyError(fiction))}</div>
   <div class="boundary"><strong>Charles treatment refused:</strong><br>${escapeHtml(policyError(charles))}</div>
 
-  <h2>3. Seven staged media paths</h2>
+  <h2>${editorExperiment.length ? "4" : "3"}. Seven staged media paths</h2>
   <p>These are the inspectable artifacts created before rendering. Each waits for explicit approval; a declared path is never presented as a finished asset.</p>
   <table><thead><tr><th>Media</th><th>Gate</th><th>Plan created by Phase 1</th><th>Existing primitives</th></tr></thead><tbody>
     ${mediaRows.map((row) => `<tr><td><b>${escapeHtml(row.media)}</b><br><span class="note">queue: ${escapeHtml(row.queue)}</span></td><td>${escapeHtml(row.stage)}</td><td><pre>${escapeHtml(row.plan)}</pre></td><td>${escapeHtml(row.primitives)}</td></tr>`).join("")}
   </tbody></table>
 
   <h2>How to evaluate this</h2>
-  <p>Judge whether each exact-source treatment is useful, distinct, short enough for its platform, and recognizably Muxin. Any em dash or configured AI tell causes generation to fail rather than queue the draft.</p>
+  <p>Judge whether each source-grounded treatment makes a clear standalone point, materially applies its named treatment, fits its platform, and sounds recognizably like Muxin. Footnote markers, em dashes, configured AI tells, duplicate bodies, and untraced claims fail before queueing.</p>
   <p class="note">Reproduce the Codex set with <code>npx tsx scripts/phase1-generation-review.ts docs/reviews/content-studio-phase1-generation-review.html /absolute/path/to/source.md</code>. The Grok comparison shown here came from the managed subscription bridge and was fed back through the same deterministic parser with <code>PHASE1_REVIEW_GROK_OUTPUT</code>.</p>
 </main></body></html>`;
 
 mkdirSync(dirname(outputPath), { recursive: true });
-writeFileSync(outputPath, html);
+writeFileSync(outputPath, html.replace(/[ \t]+$/gm, ""));
 console.log(outputPath);

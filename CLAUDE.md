@@ -24,6 +24,15 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    lines from the source; light edits for platform format only. NEVER compose new claims,
    arguments, or worldview statements in Muxin's voice. Every such derivative must carry
    `source_lines` frontmatter tracing the lines it was built from.
+   - **Scoped exception -- approved social treatments.** A configured Content Studio treatment
+     may re-hook, reorder, trim, clarify, and add connective structure so an essay-derived social
+     post makes one intelligible standalone point. It may not invent a factual claim, statistic,
+     example, experience, metaphor, or worldview position outside its cited `source_lines`.
+     The untreated control remains byte-for-byte exact. Treated copy must pass `config/voice.yaml`,
+     strip source footnote syntax, carry source provenance, attach `cta: source` when an essay or
+     other long-form source has a canonical URL, never link back to a Substack Note, and remain pending until Muxin reviews it. This is the same narrow
+     source-grounded latitude used by Spin and `/patterns rewrite`, not permission for freeform
+     authorship or untraced claims.
    - **Scoped exception -- common platform hook templates.** The newer Grow/patterns path may
      generate a platform-specific opening from a common, widely shared hook template in mad-lib
      form, using Muxin's supplied thought, claim, experience, evidence, and point of view. This
@@ -73,6 +82,11 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    files — they're more reliable. Where no usable API exists (e.g. Substack), a constrained browser
    agent MAY post, but only on content Muxin has approved — rule 2 still governs, nothing posts
    unreviewed. Never auto-post via browser without that approval.
+   Published-source CTAs follow the same review-first policy: a derivative with a canonical essay
+   or chapter points back to that long-form source by default. A Substack Note never links back to
+   itself. A project, offer, or lead-generating CTA
+   may replace an absent source only when its destination already exists and is explicitly reviewed
+   as both high-fit and high-value. Never invent a lead magnet or force a generic promotional ask.
 4. **Discrete verifiable outputs.** Every pipeline step writes a file or DB rows that can be
    inspected. Scripts do deterministic work; Claude does judgment (tagging, synthesis,
    extraction, scoring) inline while running skills.

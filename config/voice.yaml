@@ -6,9 +6,9 @@
 #   - the /strategy brief prose
 #   - ready-to-paste copy, anything else with words in it
 #
-# Extraction-first still wins (CLAUDE.md rule 1): derivatives quote Muxin verbatim. This guide
-# governs the edits you ARE allowed to make for platform format, plus any non-verbatim copy
-# (video scripts, the brief, titles). When in doubt: cut, do not add.
+# Source-grounding still wins (CLAUDE.md rule 1): untreated controls remain exact and treated
+# derivatives may clarify structure without inventing claims. This guide governs every permitted
+# edit plus other generated copy (video scripts, the brief, titles). When in doubt: cut, do not add.
 
 voice:
   # Muxin writes like a working product manager thinking out loud, not a thought-leader
@@ -20,6 +20,7 @@ voice:
     - "First person, grounded in real experience ('I've spent hundreds of hours...')."
     - "Contrarian when earned. States the counterintuitive claim flat, no drumroll before it."
     - "Lets one good sentence land. Never restates the same point three ways."
+    - "Capitalizes the first word after a colon."
   is_not:
     - "Thought-leader cadence. No performing insight."
     - "Hype, hedging, or throat-clearing."
@@ -53,4 +54,5 @@ check_before_queue:
   - "Read it aloud. If it sounds like a confident person talking, keep it. If it sounds like a brand, cut it."
   - "Count the em dashes. Target is zero."
   - "Scan for the banned phrases and words above. Replace, do not just trim."
+  - "After every prose colon, capitalize the first word."
   - "Did you add a claim Muxin did not make? Extraction-first: delete it."

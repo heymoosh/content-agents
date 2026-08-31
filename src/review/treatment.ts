@@ -28,6 +28,8 @@ import { repoRoot } from "../db/db.js";
 import { checkReuse as realCheckReuse, type ReuseCheckResult } from "../publish/reuse-guard.js";
 import { claimSlots as realClaimSlots } from "../publish/slots.js";
 import { parseRoutingDecisions } from "../atomize/validate.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
+import { recommendSourceDistribution, type SourceDistributionRecommendation } from "./source-distribution.js";
 import {
   CORE_TEXT,
   PILLARS,
@@ -172,6 +174,7 @@ export interface Treatment {
   // Channels with a MEASURED score under the floor that routing still includes. Information, not
   // an exclusion — see honesty rule 2 at the top of this file.
   scoredBelowFloorButEnabled: string[];
+  distribution: SourceDistributionRecommendation;
 }
 
 export interface TreatmentDeps {
@@ -233,6 +236,12 @@ export function readTreatment(slug: string, deps: TreatmentDeps = {}): Treatment
 
   const folder = deps.folder ?? join(repoRoot, "content", slug);
   const routingPath = join(folder, "routing.md");
+  const sourcePath = join(folder, "source.md");
+  const source: { fm: Record<string, unknown>; body: string } = existsSync(sourcePath)
+    ? splitFrontmatter(readFileSync(sourcePath, "utf8"))
+    : { fm: {}, body: "" };
+  const sourceKind = typeof source.fm.source_kind === "string" ? source.fm.source_kind.trim() : "";
+  const distribution = recommendSourceDistribution({ body: source.body, sourceKind });
   const routingMd = existsSync(routingPath) ? readFileSync(routingPath, "utf8") : "";
   const pillars = parsePillars(routingMd);
   const recorded = routingMd ? parseRoutingDecisions(routingMd) : new Map<string, "include" | "skip">();
@@ -314,5 +323,6 @@ export function readTreatment(slug: string, deps: TreatmentDeps = {}): Treatment
     floor,
     channels,
     scoredBelowFloorButEnabled: channels.filter((c) => c.belowFloor).map((c) => c.channel),
+    distribution,
   };
 }

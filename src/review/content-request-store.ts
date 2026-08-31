@@ -95,6 +95,7 @@ export async function authorizeGuiContentRequest(contentRoot: string, input: Con
   const { fm } = splitFrontmatter(raw);
   const storedOrigin = String(fm.origin ?? "").trim().toLowerCase();
   const sourceKind = String(fm.source_kind ?? "").trim().toLowerCase();
+  const canonicalUrl = String(fm.canonical_url ?? "").trim();
   const crossRoom = ["fiction-promotion", "charles", "venture"].includes(sourceKind)
     || /^(fiction|charles|venture):/.test(storedOrigin);
   if (crossRoom) {
@@ -123,7 +124,7 @@ export async function authorizeGuiContentRequest(contentRoot: string, input: Con
     originalInput: cut.body.trim(),
     ventureId: null,
     ventureSource: null,
-    sourceProvenance: { kind: "approved-cut", lens, sourceLines: refs },
+    sourceProvenance: { kind: "approved-cut", lens, sourceLines: refs, ...(canonicalUrl ? { canonicalUrl } : {}) },
     sourceContext: null,
   };
 }

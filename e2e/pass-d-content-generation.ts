@@ -140,19 +140,27 @@ async function main(): Promise<void> {
     await page.waitForFunction(() => document.querySelector("#reviewSheet")?.hasAttribute("hidden") === false, undefined, { timeout: 20_000 }).catch(() => {});
 
     const folder = join(ROOT, "content", SLUG);
-    const stored = JSON.parse(readFileSync(join(folder, "content-request.json"), "utf8")) as { sourceProvenance?: { sourceLines?: unknown[] } };
+    const stored = JSON.parse(readFileSync(join(folder, "content-request.json"), "utf8")) as { sourceProvenance?: { sourceLines?: unknown[]; canonicalUrl?: string } };
     const derivativeFiles = readdirSync(join(folder, "derivatives")).filter((name) => name.endsWith(".md"));
     const derivatives = derivativeFiles.map((name) => readFileSync(join(folder, "derivatives", name), "utf8"));
     const queue = readFileSync(join(folder, "review-queue.md"), "utf8");
-    const traced = derivatives.length > 0 && derivatives.every((body) => /source_lines:\s*\[/.test(body));
-    const authoritative = derivatives.every((body) => body.includes("The approved first claim is exactly this sentence.") && !body.includes("invented"));
+    const generated = (payload.ids ?? []).map((id) => readFileSync(join(folder, "derivatives", `${id}.md`), "utf8"));
+    const traced = generated.length > 0 && generated.every((body) => /source_lines:\s*\[/.test(body));
+    const controlExact = generated.some((body) => /variant_kind:\s*["']?control/.test(body)
+      && body.endsWith("The approved first claim is exactly this sentence.\nThe approved second claim stays inside the same boundary."));
+    const treatedStandalone = generated.some((body) => /variant_kind:\s*["']?treated/.test(body)
+      && body.includes("Fixture standalone point 1.") && !body.includes("invented"));
+    const editorStamped = generated.some((body) => /variant_kind:\s*["']?treated/.test(body)
+      && !/^editor_pass:/m.test(body));
+    const essayCta = generated.every((body) => /^cta:\s*source$/m.test(body) && /^cta_label:\s*["']Read the full essay:["']$/m.test(body))
+      && stored.sourceProvenance?.canonicalUrl === "https://humaninference.substack.com/p/e2e-authoritative-source";
     const pending = (payload.ids ?? []).every((id) => new RegExp(`\\| ${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\|[^\\n]+\\| pending \\|`).test(queue));
     const passed = response.ok() && payload.ok === true && payload.engineExecution === "disposable-injected"
-      && Array.isArray(stored.sourceProvenance?.sourceLines) && traced && authoritative && pending;
+      && Array.isArray(stored.sourceProvenance?.sourceLines) && traced && controlExact && treatedStandalone && editorStamped && essayCta && pending;
     record({
       feature: "Content GUI saves authoritative provenance and generates pending traced derivatives",
       status: passed ? "pass" : "fail",
-      detail: `HTTP ${response.status()}; injected=${payload.engineExecution}; derivatives=${derivativeFiles.length}; traced=${traced}; authoritative=${authoritative}; pending=${pending}${payload.error ? `; error=${payload.error}` : ""}`,
+      detail: `HTTP ${response.status()}; injected=${payload.engineExecution}; derivatives=${derivativeFiles.length}; traced=${traced}; controlExact=${controlExact}; treatedStandalone=${treatedStandalone}; editorStamped=${editorStamped}; essayCta=${essayCta}; pending=${pending}${payload.error ? `; error=${payload.error}` : ""}`,
     });
     record({
       feature: "Configured-generation browser pass cannot invoke a real model or provider",

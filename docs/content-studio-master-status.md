@@ -9,10 +9,29 @@ coverage, and one authenticated Codex generation canary passed; authenticated pr
 safe next actions, advisor-cut enforcement, seven staged media pipelines, normalized delivery and
 reconciliation, one locked operational data root, the gated Postiz-first/Typefully-fallback canary
 matrix, and reviewed Signals apply/rollback; authenticated provider lifecycle canaries remain unrun.
-**Generation review:** open `docs/reviews/content-studio-phase1-generation-review.html` for eight
-Codex and eight Grok treatments of Muxin's own essay, plus cross-room refusal and all-seven-media
-plans. The hidden untreated control is byte-for-byte verified by hash; treated posts can only select,
-omit, or reorder exact source segments and fail closed on em dashes or configured AI tells.
+**Generation review:** Muxin approved the treatment, editor, voice, CTA, and distribution behavior
+shown in `docs/reviews/content-studio-phase1-generation-review.html`. The artifact contains eight Luna and eight Grok
+source-grounded treatments of Muxin's essay plus eight before/after examples from a blind Luna
+cold-feed editor that saw no source context and grounded each opening for a reader scanning
+unrelated topics. The untreated control remains byte-for-byte exact; treated
+posts must make a standalone point, cite supporting source lines, strip footnote syntax, capitalize
+after colons, pass the voice gate, and attach the canonical essay CTA with platform-aware placement.
+This approved behavior is locked by the root policy, `/atomize` instructions, runtime validation,
+and deterministic tests.
+**Distribution recommendations:** the Content treatment read now derives cold-start platform and
+media defaults from the source's topic, length, structure, and source kind, with a visible reason
+for every preselection. The evaluator covers every configured downstream text, visual, and video destination;
+it does not recommend reposting to the source channel itself (for example, a Substack essay or Note back to Substack).
+Video-first recommendations name and preselect the required short-video asset, and final delivery remains gated
+by discovered provider capabilities. Existing routing and measured performance remain stronger evidence. The
+three-source review is `docs/reviews/source-distribution-recommendations-review.html`.
+**CTA default:** a real canonical essay, chapter, or other long-form published source is now the
+default CTA for every derivative and cannot be displaced by automatic content-type lead routing.
+Substack Notes are deliberately excluded: they are complete short-form objects and never link
+back to their own Note URL.
+With no canonical source, a promotional destination must already exist and be explicitly reviewed
+as high-fit and high-value; otherwise the resolver emits no forced link and never invents a lead
+magnet or substitutes a generic homepage.
 **Provider-cost update:** Studio edits already route Claude, Grok, and GPT/Codex through local
 subscription CLIs. Grok prose now uses the subscription CLI, transcription uses local whisper.cpp,
 and unattended image generation is disabled; reviewed Codex-generated image files are the preferred
@@ -110,7 +129,7 @@ The system is **not** complete end to end. The largest unresolved boundaries are
 | Studio capture | One front door accepts a thought or link, identifies the destination, explains it, and starts the next safe step. | Classification and a `content-studio.capture-handoff.v1` browser `localStorage` record exist. The target room can display and clear it. | Deterministic browser/UI coverage. | **Partially wired.** The capture is not repository-durable, starts no backend job, and has no real next action in Content. “Start on it” currently overstates the result. |
 | Advisor and cuts | Muxin supplies substance; the advisor proposes lens/CTA choices; Muxin edits message-level cuts before formatting. | `/develop`, recommendation rounds, deterministic accept/dismiss, cuts, and cut comments exist. | Deterministic unit coverage; model route not browser-verified. | The advisor/cut path is not the primary current Content cycle. Reconnect it before platform/media formatting. |
 | Content configuration | The system recommends treatments, media, and destinations; Muxin accepts or overrides rather than constructing the plan from scratch. | Durable `content-request.json` now persists validated source or approved-cut provenance, treatment/media/platform selections, untreated controls, recommendations, and grouped input-request filters. The working-tree merge path preserves the authoritative provenance/context rather than accepting client replacement. | Deterministic request, persistence, and UI coverage. | Current UI makes Muxin choose the matrix directly. Real recommendation evidence is blocked or generic until reviewed mechanism data exists. |
-| Configured text generation | Extraction-first for Muxin's content; every generated item remains pending review and preserves provenance. | In the working tree, Human Inference/Studio generation requires authoritative `source_lines`, resolves them through the established source/cut extractor, accepts only a nonempty engine-selected subset/reordering within the approved boundary, writes the selected `source_lines` to frontmatter, and refuses body/provenance mismatches. The engine selects approved lines; it does not compose treated prose. | Deterministic prompt/parser/provenance/output coverage, a disposable injected-engine Chromium pass through the real GUI save-and-generate flow, and one bounded authenticated Codex CLI generation canary in a throwaway repository copy. | Keep provenance enforcement fail-closed while reconnecting advisor/cut review. Repeat authenticated canaries when engine adapters change. |
+| Configured text generation | The untreated control is byte-exact. Approved treatments may re-hook, reorder, trim, clarify, and add connective structure within cited source boundaries; every generated item remains pending review and preserves provenance. | Human Inference/Studio generation requires authoritative `source_lines`, materially applies the selected treatment, then runs a blind cold-feed editor that sees only the finished drafts and sharpens topic grounding for a rapidly context-switching reader. Voice validation rejects AI tells, dashes, footnote syntax, and lowercase prose after colons. Canonical long-form sources get a CTA; Substack Notes never self-link. | Deterministic prompt/parser/provenance/editor/voice/CTA/output coverage, a disposable injected-engine Chromium pass through the real GUI save-and-generate flow, reviewed Luna and Grok comparison artifacts, and one bounded authenticated Codex CLI generation canary in a throwaway repository copy. | Keep provenance enforcement and human review fail-closed while reconnecting advisor/cut review. Repeat authenticated canaries when engine adapters change. |
 | Media generation | Requested media should invoke the relevant text/script, review, render, and asset pipeline. Paid steps remain explicit. | The classic quote-card, image, storyboard/video, captions, TTS, and render subsystems exist. The configured request can name media and declare expected paths. | Classic subsystems have deterministic tests; paid/live paths are gated. | **Partially wired.** Configured image, carousel, audiogram, and video selections do not create the assets. Wire each media type to its real staged pipeline and review gates. |
 | Content review | Group by original request; edit directly; comment/revise; approve explicitly; keep publishing status separate. | Searchable request filter, direct derivative editor, revise notes/engine, bulk selection, approval, and four-step Content views exist. PRs #404/#406. | Strong unit/UI coverage. | Add a disposable-browser pass for Content direct edit, grouped approval, and injected provider outcomes. Clarify in UI that approval currently attempts scheduling immediately. |
 | Cross-room Content handoffs | Venture, Fiction, and Charles reuse one Content workflow while retaining source identity, voice/canon rules, CTA ownership, and delivery policy. | Typed idempotent handoff contracts and routes exist for all three. The working tree requires and persists Fiction's approved promotion body plus locked passages/canon/provenance restrictions, and Charles's approved post body plus persona/CTA/manual-delivery restrictions. Fiction/Charles configured generation permits only an untreated control copied from that approved body and records context/restriction references; any treated variant fails closed before a job or write. Venture retains its scoped composition exception: treated variants use an approved Venture artifact, `claim_refs`, `config/voice.yaml`, and the no-invented-proof constraint. | Deterministic unit, persistence, route, generation-policy, and Venture prompt/parser coverage. The disposable Chromium pass directly proves Fiction treatment refusal before a job or derivative write. | Add broader cross-room browser scenarios for approved-body/restriction display and Venture composition. Fiction remains provider-blocked until it has a separate configured account; Charles remains manual by decision. |
@@ -215,11 +234,12 @@ history and its “nothing built yet” statement is obsolete.
 
 ### P0: safety and truthfulness before broader use
 
-Implemented in the current uncommitted working tree, with deterministic evidence:
+Implemented in the PR #412 change set, with deterministic evidence:
 
-1. Configured Muxin-voice generation enforces approved source/cut provenance and writes the
-   engine-selected nonempty subset/reordering as traceable `source_lines`; missing, mismatched,
-   or out-of-bound references fail closed.
+1. Configured Muxin-voice generation enforces approved source/cut provenance, applies only
+   source-grounded treatments within cited `source_lines`, and sends treated long-form derivatives
+   through the blind cold-feed editor. Missing, mismatched, or out-of-bound references fail closed;
+   untreated controls remain byte-exact.
 2. Fiction/Charles handoffs preserve the approved body plus canon/persona/provenance/CTA
    restrictions in the durable Content request. Configured generation copies that body only for an
    untreated control and refuses treated variants before starting a job or writing output. Venture

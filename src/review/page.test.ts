@@ -2838,7 +2838,8 @@ test("Content configuration exposes independent treatments, media, platforms, an
   assert.ok(script.includes('engineSelectHtml("contentTreatmentEngine")'), "AI treatments need a nearby model selector");
   assert.ok(script.includes('id="contentControlEnabled"'), "the untreated control must be explicit and disable-able");
   assert.ok(script.includes("Untreated control"));
-  assert.ok(script.includes("Why these platforms?"), "recommendations need an explanation on request");
+  assert.ok(script.includes("Why these platforms and media?"), "recommendations need a source-specific explanation on request");
+  assert.ok(script.includes("source-fit"), "saved recommendation evidence must preserve source-fit provenance");
   assert.ok(!script.includes("CHOOSE CUTS TO FORMAT"), "Cuts must not remain the primary configuration concept");
   assert.ok(!script.includes("CHANNELS · READ, NOT CHOSEN HERE"), "the routing diagnostic must not remain the selector");
   assert.ok(html.includes('id="contentConfigSave"') || script.includes('id="contentConfigSave"'),
