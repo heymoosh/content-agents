@@ -1,17 +1,38 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Content Studio Phase 3 Grow experiment review</title>
+<title>Content Studio Phase 3 Experiment review</title>
 <style>:root{color-scheme:light;--ink:#1c1917;--paper:#f6f1e8;--panel:#fffdf8;--line:#d7cbb8;--accent:#26594d;--danger:#9f2f24}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,sans-serif}main{width:min(1120px,calc(100% - 32px));margin:36px auto 72px}header,.card,.cut,.capacity,.decision-export{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}h1{font:700 clamp(32px,5vw,55px)/1.05 Georgia,serif;margin:0 0 12px}.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:12px;font-weight:800;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;margin-top:20px}.copy{font-size:18px;white-space:normal;margin:20px 0}dl{display:grid;grid-template-columns:100px 1fr;gap:7px 12px;font-size:13px}dt{font-weight:800}dd{margin:0;color:#5f584f}fieldset{margin-top:20px;border:1px solid var(--line);border-radius:9px;display:flex;flex-wrap:wrap;gap:14px}.field{display:block;font-size:13px;font-weight:700;margin-top:16px}textarea{display:block;width:100%;margin-top:5px;border:1px solid var(--line);border-radius:8px;padding:10px;background:#fff;font:14px/1.45 system-ui,sans-serif;resize:vertical}section{margin-top:34px}.digest{overflow-wrap:anywhere;font:12px ui-monospace,monospace;color:#655f57}.cut,.capacity{margin-top:14px}.notice{border-left:5px solid var(--accent);padding-left:14px}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}button{border:0;border-radius:9px;padding:11px 15px;background:var(--accent);color:white;font-weight:800;cursor:pointer}button.secondary{background:#5f584f}.decision-status{min-height:1.5em;color:var(--danger);font-weight:700}pre{max-height:360px;overflow:auto;background:#211f1b;color:#f8f2e8;padding:16px;border-radius:9px;font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap}</style></head>
-<body><main><header><p class="eyebrow">Human Inference · Phase 3 review</p><h1>One Grow-this experiment, with the gates visible</h1><p>This packet turns one approved cut into bounded platform treatments. Nothing here is approved, scheduled, published, measured, or a winner until the corresponding human and provider evidence exists.</p><p class="digest">Proposal digest: sha256:d1ad6f9d941d6d576c0491770f060ecaf33210819461ad917cb3cef6c78bc1ed</p></header>
+<body><main><header><p class="eyebrow">Human Inference · Phase 3 Experiment review</p><h1>A Signals-recommended content experiment</h1><p>Signals proposes the scientific question. Experiment preserves the controls, review, delivery, and measurement gates. Nothing here is approved, scheduled, published, measured, or a winner until the corresponding human and provider evidence exists.</p><p class="digest">Proposal digest: sha256:3297e9d9effb94337a98f182d67053bb54615978de9aedb4b48eb6202b2bfe8c</p></header>
+<section><h2>Why run this experiment?</h2><div class="capacity"><dl>
+<dt>Observation</dt><dd>The approved Phase 2 dossier supports the used-to-think/now reversal only as a hypothesis worth testing; it provides no controlled result establishing that it outperforms a direct claim.</dd>
+<dt>Interpretation</dt><dd>The approved cut rationale indicates that both treatments can express the same source point without importing another essay section, making opening structure a bounded uncertainty; the evidence does not establish causality or a winner.</dd>
+<dt>Hypothesis</dt><dd>Across comparable LinkedIn text posts using this approved source cut, the genuine used-to-think/now opening will increase substantive replies per 1,000 impressions relative to the direct-claim opening, while canonical-source visits per 1,000 impressions do not decrease by more than 10%.</dd>
+<dt>Expected</dt><dd>variant-linkedin-used-to-think-now should increase substantive-replies-per-1000-impressions versus variant-linkedin-direct-claim.</dd>
+<dt>Why this input</dt><dd>The input context identifies a real first-person change of mind, its consequence, and its emotional payoff, and explicitly says the cut can support both treatments without importing another essay part. The candidates share platform, format, CTA, and length metadata while differing in opening structure.</dd>
+<dt>Changes</dt><dd>Opening structure: direct claim versus a genuine used-to-think/now belief shift.</dd>
+<dt>Held constant</dt><dd>approved source cut, balanced publishing windows across matched pairs, canonical-source-inline CTA, LinkedIn platform, medium length, post format, same measurement definitions, same substantive claim and consequence</dd>
+<dt>Primary metric</dt><dd>conversation: substantive-replies-per-1000-impressions</dd>
+<dt>Guardrails</dt><dd>audience/canonical-source-visits-per-1000-impressions: Must not decrease by more than 10% relative to the direct-claim treatment.</dd>
+<dt>Evaluation</dt><dd>20 comparable units and 14 days</dd>
+<dt>Keep</dt><dd>Keep testing the belief-shift mechanism if substantive replies are higher and the audience guardrail holds after at least 20 comparable published units and 14 days.</dd>
+<dt>Revise</dt><dd>Revise the mechanism or collect another matched pair if the estimated direction is positive but the 20-unit multi-pair sample is incomplete, uncertainty remains high, or attribution is incomplete.</dd>
+<dt>Reject</dt><dd>Reject the mechanism as a growth default if it does not improve substantive replies or if canonical-source visits breach the guardrail.</dd>
+<dt>Confidence</dt><dd>low</dd>
+<dt>Caveats</dt><dd>At least 20 comparable units across multiple matched pairs over 14 days is an initial signal test, not sufficient to claim a general winner. · Available source metrics are not uniform enough to claim a pooled effect. · Publishing time, topic response, and pair-level variation may confound results and must be balanced across later pairs. · The evidence is hypothesis-level cross-account pattern evidence, not a controlled Human Inference result. · The treatment must express a genuine change of mind rather than force a template.</dd>
+<dt>Capacity</dt><dd>Use the two supplied LinkedIn variants for an initial matched pair and continue toward the multi-pair minimum only within normal publishing capacity; this bounded test can inform whether to invest further but cannot establish a broad winner on its own.</dd>
+<dt>Evidence</dt><dd>sha256:eab59aff9411365842a03776499907fdc7de36fa7e5984f3ae8f11ec90c850bb</dd>
+<dt>Science pass</dt><dd>signals-science-agent-v1 · codex · prompt sha256:e40ebe9a53e156a5c4dbc8a687709e59cf6a18844668cbf5da1ecb327f904137</dd>
+</dl></div></section>
 <section><h2>Approved message cut</h2><div class="cut"><div class="copy">I used to think that if I attempted to make a difference, I would only make that pain worse. There is so much disappointment in the world. But it turns out I was making the pain worse by not doing anything at all. But this work is aligned with a part of me that has been wanting to come alive. Doing the work at all turned out to be its own reward. Not because the problems are solved. Not because success is guaranteed. Because it has helped me feel more connected to the kind of person I wanted to become.</div><p>This approved source cut contains a real first-person change of mind, the consequence of inaction, and the practical emotional payoff. It can support both a belief-shift treatment and a direct-claim control without importing another part of the essay.</p><p class="digest">essay-the-worlds-broken-what-do-we-do#L1-L4 · approved by Muxin at 2026-08-30T23:05:01.327Z</p></div></section>
 <section><h2>Candidate treatments</h2><p class="notice">Candidate volume is 2. Approved publish volume is 0 until you decide each item.</p><div class="grid">
     <article class="card" data-variant-id="variant-linkedin-direct-claim">
       <p class="eyebrow">linkedin · text · post</p>
-      <div class="copy">Trying to make a difference felt like it would only make the pain worse. Doing nothing made it worse. The work itself helps me feel more connected to the person I wanted to become.<br><br>Read the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</div>
+      <div class="copy">Trying to respond when society is broken can feel like volunteering for more disappointment. I avoided it because I thought trying and failing would make the pain worse. Doing nothing made it worse instead. Taking action has helped me feel closer to the person I wanted to become, even when the problems remain unsolved.<br><br>Read the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</div>
       <dl>
         <dt>Treatment</dt><dd>treatment:direct-claim-control</dd>
         <dt>Why</dt><dd>Use the same source cut, platform, format, CTA, and approximate length without the reviewed belief-shift scaffold, so the opening treatment is the declared variable.</dd>
         <dt>Evidence</dt><dd>supported · essay-the-worlds-broken-what-do-we-do#L1-L4</dd>
+        <dt>Editor</dt><dd>Cold-feed editor passed · Make the subject explicit by naming the work of responding when society is broken, while preserving the direct-claim opening.</dd>
         <dt>Variables</dt><dd>cta=canonical-source-inline · hook=direct-claim · length=medium</dd>
         <dt>Lineage</dt><dd>essay-the-worlds-broken-what-do-we-do#L1-L4</dd>
       </dl>
@@ -22,11 +43,12 @@
 
     <article class="card" data-variant-id="variant-linkedin-used-to-think-now">
       <p class="eyebrow">linkedin · text · post</p>
-      <div class="copy">I used to think trying to make a difference would only make the pain worse. I was wrong. Doing nothing made it worse. The work itself helps me feel more connected to the person I wanted to become.<br><br>Read the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</div>
+      <div class="copy">I used to think taking action when society is broken would only make the disappointment hurt more. I was wrong. Avoiding the work made the pain worse. Taking action has helped me feel closer to the person I wanted to become, even though the problems are not solved and success is not guaranteed.<br><br>Read the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do</div>
       <dl>
         <dt>Treatment</dt><dd>pattern:used-to-think-now</dd>
         <dt>Why</dt><dd>Test the reviewed first-person belief-shift scaffold because this source contains an explicit former belief and a genuine correction. This remains a hypothesis, not a winner claim.</dd>
         <dt>Evidence</dt><dd>hypothesis · sha256:eab59aff9411365842a03776499907fdc7de36fa7e5984f3ae8f11ec90c850bb</dd>
+        <dt>Editor</dt><dd>Cold-feed editor passed · Clarify that the reflection is about taking action when society is broken, while preserving the used-to-think-now structure.</dd>
         <dt>Variables</dt><dd>cta=canonical-source-inline · hook=used-to-think-now · length=medium</dd>
         <dt>Lineage</dt><dd>essay-the-worlds-broken-what-do-we-do#L1-L4</dd>
       </dl>
@@ -37,7 +59,7 @@
 <section><h2>Capacity and experiment</h2><div class="capacity"><p><strong>Declared capacity on 2026-09-01:</strong></p><ul><li>linkedin: 2 review decisions available</li><li>linkedin: 2 publishing slots available</li></ul><p><strong>Question:</strong> Does a genuine first-person belief-shift opening produce more qualified conversation than a direct-claim opening when the source, platform, format, CTA, and approximate length remain fixed?</p><p><strong>Outcome families:</strong> attention, audience, business, conversation; minimum sample 20</p><p><strong>Winner:</strong> None. The experiment is proposed, not measured.</p></div></section>
 <section><h2>Export your decisions</h2><div class="decision-export"><p>A decision is required for every candidate. This creates the digest-bound JSON file used by the next local command. It does not approve, schedule, publish, or send anything by itself.</p><p class="decision-status" role="status" aria-live="polite"></p><div class="actions"><button type="button" data-copy-decision>Copy decision JSON</button><button type="button" class="secondary" data-download-decision>Download decision JSON</button></div><pre data-decision-preview aria-label="Decision JSON preview">Choose one decision for every candidate.</pre></div></section>
 </main><script>
-const decisionSeed={"proposalDigest":"sha256:d1ad6f9d941d6d576c0491770f060ecaf33210819461ad917cb3cef6c78bc1ed","variantIds":["variant-linkedin-direct-claim","variant-linkedin-used-to-think-now"]};
+const decisionSeed={"proposalDigest":"sha256:3297e9d9effb94337a98f182d67053bb54615978de9aedb4b48eb6202b2bfe8c","variantIds":["variant-linkedin-direct-claim","variant-linkedin-used-to-think-now"]};
 const decisionCards=Array.from(document.querySelectorAll("[data-variant-id]"));
 const decisionStatus=document.querySelector(".decision-status");
 const decisionPreview=document.querySelector("[data-decision-preview]");
@@ -78,6 +100,6 @@ document.querySelector("[data-copy-decision]").addEventListener("click",async fu
 });
 document.querySelector("[data-download-decision]").addEventListener("click",function(){
   const text=renderDecision();if(!text)return;
-  const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([text],{type:"application/json"}));link.download="content-studio-phase3-grow-experiment-decision.json";link.click();URL.revokeObjectURL(link.href);decisionStatus.textContent="Decision JSON downloaded.";
+  const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([text],{type:"application/json"}));link.download="content-studio-phase3-experiment-decision.json";link.click();URL.revokeObjectURL(link.href);decisionStatus.textContent="Decision JSON downloaded.";
 });
 </script></body></html>

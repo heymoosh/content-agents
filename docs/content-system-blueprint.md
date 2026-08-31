@@ -764,8 +764,13 @@ publish, or mark an experiment measured merely because a reference exists.
 
 `src/grow/experiment-slice.ts` is the first body-bearing Phase 3 review boundary. It accepts one
 explicit raw source, an already-approved readable cut, caller-produced platform treatments, the
-selected platform set, evidence references, experiment variables, and declared review/slot
-capacity. `propose` binds that exact packet to a digest, renders the static HTML review, and
+selected platform set, a strictly parsed Signals recommendation, editor provenance for every
+candidate, experiment variables, and declared review/slot capacity. The body-free Signals science
+boundary in `src/review/signals-experiment-recommendation.ts` receives qualified evidence, cut
+context, and candidate metadata without candidate prose; it permits an honest no-experiment result
+and binds an accepted recommendation to evidence, prompt, and response digests. `propose` rejects
+missing or inconsistent science/editor evidence, binds the exact packet to a digest, renders the
+static HTML review, and
 composes the canonical `grow-capacity-manifest-v1`, `grow-review-bundle-v1`, and
 `grow-experiment-v1` records. `decide` requires one explicit Muxin decision per variant and emits
 only approved unchanged candidates through canonical `grow-delivery-record-v1` records. An edit is
@@ -806,10 +811,12 @@ scheduled are included. `npm run grow:experiment-run -- --input <envelope.json>`
 does not contact providers, alter the queue, infer outcomes, select a winner, or create a Venture
 handoff. Failed, duplicate, drifted, unapproved, or pre-decision observations fail closed.
 
-The current real packet remains pending Muxin's item-level decisions, so it advances the vertical
-slice but does not complete this phase. After a decision is applied, the deterministic scheduling
-boundary and running-record transition are ready; the remaining operational evidence is an
-explicitly authorized provider action and its observed result, followed later by outcome evidence.
+The current real packet retains its science input, raw response, parsed recommendation provenance,
+and cold-feed-editor evidence under `docs/reviews/`. It remains pending Muxin's item-level decisions,
+so it advances the vertical slice but does not complete this phase. After a decision is applied,
+the deterministic scheduling boundary and running-record transition are ready; the remaining
+operational evidence is an explicitly authorized provider action and its observed result, followed
+later by outcome evidence and Signals interpretation.
 
 ### Phase 4: Cross-system learning and Venture handoff
 

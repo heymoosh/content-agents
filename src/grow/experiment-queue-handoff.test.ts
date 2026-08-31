@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readQueue } from "../publish/queue.js";
 import { buildGrowExperimentProposal, type GrowExperimentDecisionInput, type GrowExperimentProposalInput } from "./experiment-slice.js";
+import { configuredEditorEvidence, signalsExperimentRecommendation } from "./experiment-test-fixtures.js";
 import { applyGrowExperimentQueueHandoff, buildGrowExperimentQueueHandoff } from "./experiment-queue-handoff.js";
 
 function proposalInput(): GrowExperimentProposalInput {
@@ -18,6 +19,7 @@ function proposalInput(): GrowExperimentProposalInput {
       originRef: "fixture:source-1",
       canonicalUrl: "https://www.humaninference.ai/essays/source-1",
     },
+    recommendation: signalsExperimentRecommendation({ variantId: "linkedin-direct", comparisonRef: "x-question", families: ["attention", "conversation"], minimumSample: 10 }),
     selectedPlatforms: ["linkedin", "x"],
     cut: {
       id: "cut-1",
@@ -36,6 +38,7 @@ function proposalInput(): GrowExperimentProposalInput {
         sourceRefs: ["source-1#L1-L2"],
         treatment: { ref: "treatment:direct", rationale: "Ground the subject immediately.", evidenceStatus: "supported", evidenceRefs: ["source-1#L1-L2"] },
         experimentVariables: { opener: "direct" }, voiceCheck: "passed", originalityCheck: "passed",
+        generation: configuredEditorEvidence("People keep waiting for a hero. The more practical answer is to build power together.\n\nRead the essay: https://www.humaninference.ai/essays/source-1"),
       },
       {
         id: "x-question",
@@ -46,6 +49,7 @@ function proposalInput(): GrowExperimentProposalInput {
         sourceRefs: ["source-1#L1-L2"],
         treatment: { ref: "treatment:question", rationale: "Use a legible question.", evidenceStatus: "hypothesis", evidenceRefs: ["evidence:question"] },
         experimentVariables: { opener: "question" }, voiceCheck: "passed", originalityCheck: "passed",
+        generation: configuredEditorEvidence("Why do we keep waiting for a hero? People can build power together.\n\nRead the essay: https://www.humaninference.ai/essays/source-1"),
       },
     ],
     capacity: {

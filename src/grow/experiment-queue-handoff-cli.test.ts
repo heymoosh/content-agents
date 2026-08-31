@@ -3,14 +3,16 @@ import assert from "node:assert/strict";
 import { buildGrowExperimentProposal, type GrowExperimentProposalInput } from "./experiment-slice.js";
 import { buildGrowExperimentQueueHandoff } from "./experiment-queue-handoff.js";
 import { runGrowExperimentQueueHandoffCli, type GrowExperimentQueueHandoffCliIo } from "./experiment-queue-handoff-cli.js";
+import { configuredEditorEvidence, signalsExperimentRecommendation } from "./experiment-test-fixtures.js";
 
 function proposal() {
   const input: GrowExperimentProposalInput = {
     id: "cli-handoff", createdAt: "2026-08-30T12:00:00Z",
     source: { id: "source-cli", kind: "raw-thought", body: "A complete thought.", originRef: "fixture:cli" },
+    recommendation: signalsExperimentRecommendation({ variantId: "linkedin-cli", families: ["attention"], minimumSample: 5 }),
     selectedPlatforms: ["linkedin"],
     cut: { id: "cut-cli", body: "A complete thought.", sourceRefs: ["source-cli#body"], rationale: "Complete.", decision: { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-30T11:00:00Z" } },
-    variants: [{ id: "linkedin-cli", platform: "linkedin", medium: "text", format: "post", body: "A complete thought, made legible for a busy reader.", sourceRefs: ["source-cli#body"], treatment: { ref: "treatment:direct", rationale: "Direct context.", evidenceStatus: "hypothesis", evidenceRefs: ["evidence:direct"] }, experimentVariables: { opener: "direct" }, voiceCheck: "passed", originalityCheck: "passed" }],
+    variants: [{ id: "linkedin-cli", platform: "linkedin", medium: "text", format: "post", body: "A complete thought, made legible for a busy reader.", sourceRefs: ["source-cli#body"], treatment: { ref: "treatment:direct", rationale: "Direct context.", evidenceStatus: "hypothesis", evidenceRefs: ["evidence:direct"] }, experimentVariables: { opener: "direct" }, voiceCheck: "passed", originalityCheck: "passed", generation: configuredEditorEvidence("A complete thought, made legible for a busy reader.") }],
     capacity: { day: "2026-09-01", review: [{ platform: "linkedin", available: 1 }], slots: [{ platform: "linkedin", available: 1, capacity: 1, scheduledCount: 0 }] },
     experiment: { id: "experiment-cli", question: "Does direct context help?", outcomeFamilies: ["attention"], minimumSample: 5, topic: "clarity", audience: "mixed-feed readers" },
   };
