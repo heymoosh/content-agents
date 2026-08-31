@@ -167,8 +167,12 @@ function escapeHtml(value: string): string {
 
 /** Static, dependency-free review surface for the exact digest-bound proposal. */
 export function renderGrowExperimentProposalHtml(proposal: GrowExperimentProposal): string {
+  const decisionSeed = JSON.stringify({
+    proposalDigest: proposal.digest,
+    variantIds: proposal.variants.map((variant) => variant.id),
+  }).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
   const cards = proposal.variants.map((variant) => `
-    <article class="card">
+    <article class="card" data-variant-id="${escapeHtml(variant.id)}">
       <p class="eyebrow">${escapeHtml(variant.platform)} · ${escapeHtml(variant.medium)} · ${escapeHtml(variant.format)}</p>
       <div class="copy">${escapeHtml(variant.body).replace(/\n/g, "<br>")}</div>
       <dl>
@@ -178,19 +182,66 @@ export function renderGrowExperimentProposalHtml(proposal: GrowExperimentProposa
         <dt>Variables</dt><dd>${escapeHtml(Object.entries(variant.experimentVariables).map(([key, value]) => `${key}=${value}`).join(" · "))}</dd>
         <dt>Lineage</dt><dd>${escapeHtml(variant.sourceRefs.join(", "))}</dd>
       </dl>
-      <fieldset><legend>Muxin decision</legend><label><input type="radio" disabled> Approve</label><label><input type="radio" disabled> Edit</label><label><input type="radio" disabled> Reject</label><label><input type="radio" disabled> Another pass</label></fieldset>
+      <fieldset><legend>Muxin decision</legend><label><input type="radio" name="decision-${escapeHtml(variant.id)}" value="approved"> Approve</label><label><input type="radio" name="decision-${escapeHtml(variant.id)}" value="edited"> Edit</label><label><input type="radio" name="decision-${escapeHtml(variant.id)}" value="rejected"> Reject</label><label><input type="radio" name="decision-${escapeHtml(variant.id)}" value="needs-another-pass"> Another pass</label></fieldset>
+      <label class="field">Decision note (optional)<textarea data-note rows="2" placeholder="Why this decision?"></textarea></label>
+      <label class="field edit-field" hidden>Edited body<textarea data-edited-body rows="8" placeholder="Paste the complete revised post. It will require a fresh validated proposal before delivery."></textarea></label>
     </article>`).join("\n");
   const slots = proposal.capacity.slots.map((slot) => `<li>${escapeHtml(slot.platform)}: ${slot.available} publishing slots available</li>`).join("");
   const review = proposal.capacity.review.map((entry) => `<li>${escapeHtml(entry.platform)}: ${entry.available} review decisions available</li>`).join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Content Studio Phase 3 Grow experiment review</title>
-<style>:root{color-scheme:light;--ink:#1c1917;--paper:#f6f1e8;--panel:#fffdf8;--line:#d7cbb8;--accent:#26594d}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,sans-serif}main{width:min(1120px,calc(100% - 32px));margin:36px auto 72px}header,.card,.cut,.capacity{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}h1{font:700 clamp(32px,5vw,55px)/1.05 Georgia,serif;margin:0 0 12px}.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:12px;font-weight:800;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;margin-top:20px}.copy{font-size:18px;white-space:normal;margin:20px 0}dl{display:grid;grid-template-columns:100px 1fr;gap:7px 12px;font-size:13px}dt{font-weight:800}dd{margin:0;color:#5f584f}fieldset{margin-top:20px;border:1px solid var(--line);border-radius:9px;display:flex;flex-wrap:wrap;gap:14px}section{margin-top:34px}.digest{overflow-wrap:anywhere;font:12px ui-monospace,monospace;color:#655f57}.cut,.capacity{margin-top:14px}.notice{border-left:5px solid var(--accent);padding-left:14px}</style></head>
+<style>:root{color-scheme:light;--ink:#1c1917;--paper:#f6f1e8;--panel:#fffdf8;--line:#d7cbb8;--accent:#26594d;--danger:#9f2f24}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,sans-serif}main{width:min(1120px,calc(100% - 32px));margin:36px auto 72px}header,.card,.cut,.capacity,.decision-export{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}h1{font:700 clamp(32px,5vw,55px)/1.05 Georgia,serif;margin:0 0 12px}.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:12px;font-weight:800;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;margin-top:20px}.copy{font-size:18px;white-space:normal;margin:20px 0}dl{display:grid;grid-template-columns:100px 1fr;gap:7px 12px;font-size:13px}dt{font-weight:800}dd{margin:0;color:#5f584f}fieldset{margin-top:20px;border:1px solid var(--line);border-radius:9px;display:flex;flex-wrap:wrap;gap:14px}.field{display:block;font-size:13px;font-weight:700;margin-top:16px}textarea{display:block;width:100%;margin-top:5px;border:1px solid var(--line);border-radius:8px;padding:10px;background:#fff;font:14px/1.45 system-ui,sans-serif;resize:vertical}section{margin-top:34px}.digest{overflow-wrap:anywhere;font:12px ui-monospace,monospace;color:#655f57}.cut,.capacity{margin-top:14px}.notice{border-left:5px solid var(--accent);padding-left:14px}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}button{border:0;border-radius:9px;padding:11px 15px;background:var(--accent);color:white;font-weight:800;cursor:pointer}button.secondary{background:#5f584f}.decision-status{min-height:1.5em;color:var(--danger);font-weight:700}pre{max-height:360px;overflow:auto;background:#211f1b;color:#f8f2e8;padding:16px;border-radius:9px;font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap}</style></head>
 <body><main><header><p class="eyebrow">Human Inference · Phase 3 review</p><h1>One Grow-this experiment, with the gates visible</h1><p>This packet turns one approved cut into bounded platform treatments. Nothing here is approved, scheduled, published, measured, or a winner until the corresponding human and provider evidence exists.</p><p class="digest">Proposal digest: ${escapeHtml(proposal.digest)}</p></header>
 <section><h2>Approved message cut</h2><div class="cut"><div class="copy">${escapeHtml(proposal.cut.body)}</div><p>${escapeHtml(proposal.cut.rationale)}</p><p class="digest">${escapeHtml(proposal.cut.sourceRefs.join(", "))} · approved by Muxin at ${escapeHtml(proposal.cut.decision.decidedAt)}</p></div></section>
 <section><h2>Candidate treatments</h2><p class="notice">Candidate volume is ${proposal.capacityManifest.internalCandidateVolume}. Approved publish volume is ${proposal.capacityManifest.approvedPublishVolume} until you decide each item.</p><div class="grid">${cards}</div></section>
 <section><h2>Capacity and experiment</h2><div class="capacity"><p><strong>Declared capacity on ${escapeHtml(proposal.capacity.day)}:</strong></p><ul>${review}${slots}</ul><p><strong>Question:</strong> ${escapeHtml(proposal.experiment.question)}</p><p><strong>Outcome families:</strong> ${escapeHtml(proposal.experiment.outcomeFamilies.join(", "))}; minimum sample ${proposal.experiment.minimumSample}</p><p><strong>Winner:</strong> None. The experiment is proposed, not measured.</p></div></section>
-</main></body></html>\n`;
+<section><h2>Export your decisions</h2><div class="decision-export"><p>A decision is required for every candidate. This creates the digest-bound JSON file used by the next local command. It does not approve, schedule, publish, or send anything by itself.</p><p class="decision-status" role="status" aria-live="polite"></p><div class="actions"><button type="button" data-copy-decision>Copy decision JSON</button><button type="button" class="secondary" data-download-decision>Download decision JSON</button></div><pre data-decision-preview aria-label="Decision JSON preview">Choose one decision for every candidate.</pre></div></section>
+</main><script>
+const decisionSeed=${decisionSeed};
+const decisionCards=Array.from(document.querySelectorAll("[data-variant-id]"));
+const decisionStatus=document.querySelector(".decision-status");
+const decisionPreview=document.querySelector("[data-decision-preview]");
+function buildDecision(){
+  const missing=[];
+  const decisions=decisionCards.map(function(card){
+    const variantId=card.dataset.variantId;
+    const selected=card.querySelector('input[type="radio"]:checked');
+    if(!selected){missing.push(variantId);return null;}
+    const note=card.querySelector("[data-note]").value.trim();
+    const item={variantId:variantId,status:selected.value,note:note||null};
+    if(selected.value==="edited"){
+      const editedBody=card.querySelector("[data-edited-body]").value;
+      if(!editedBody.trim())missing.push(variantId+" (edited body)");
+      item.editedBody=editedBody;
+    }
+    return item;
+  });
+  if(missing.length){throw new Error("Choose a decision for: "+missing.join(", "));}
+  return {proposalDigest:decisionSeed.proposalDigest,decidedBy:"muxin",decidedAt:new Date().toISOString(),decisions:decisions};
+}
+function renderDecision(){
+  try{const text=JSON.stringify(buildDecision(),null,2)+"\\n";decisionPreview.textContent=text;decisionStatus.textContent="";return text;}
+  catch(error){decisionStatus.textContent=error.message;decisionPreview.textContent="Decision JSON is incomplete.";return null;}
+}
+decisionCards.forEach(function(card){
+  card.addEventListener("change",function(){
+    const selected=card.querySelector('input[type="radio"]:checked');
+    card.querySelector(".edit-field").hidden=!selected||selected.value!=="edited";
+    renderDecision();
+  });
+  card.addEventListener("input",renderDecision);
+});
+document.querySelector("[data-copy-decision]").addEventListener("click",async function(){
+  const text=renderDecision();if(!text)return;
+  try{await navigator.clipboard.writeText(text);decisionStatus.textContent="Decision JSON copied.";}
+  catch(error){decisionStatus.textContent="Clipboard access was unavailable. Select and copy the JSON preview below.";}
+});
+document.querySelector("[data-download-decision]").addEventListener("click",function(){
+  const text=renderDecision();if(!text)return;
+  const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([text],{type:"application/json"}));link.download="content-studio-phase3-grow-experiment-decision.json";link.click();URL.revokeObjectURL(link.href);decisionStatus.textContent="Decision JSON downloaded.";
+});
+</script></body></html>\n`;
 }
 
 const SOURCE_KINDS = new Set<GrowExperimentSourceKind>(["raw-thought", "long-form", "substack-note"]);

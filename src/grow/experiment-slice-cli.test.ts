@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { runGrowExperimentSliceCli, type GrowExperimentSliceCliIo } from "./experiment-slice-cli.js";
-import { buildGrowExperimentProposal } from "./experiment-slice.js";
+import { buildGrowExperimentProposal, renderGrowExperimentProposalHtml } from "./experiment-slice.js";
 
 function proposalInput(): Record<string, unknown> {
   return {
@@ -39,6 +39,21 @@ test("Phase 3 CLI writes JSON and a static review HTML from the same digest-boun
   assert.equal(await runGrowExperimentSliceCli(["propose", "--input", "input.json", "--html", "--output", "review.html"], second.io), 0);
   assert.match(second.writes["review.html"]!, /One Grow-this experiment/);
   assert.match(second.writes["review.html"]!, new RegExp(proposal.digest));
+});
+
+test("the static review HTML exports a complete digest-bound decision without pre-approving anything", () => {
+  const proposal = buildGrowExperimentProposal(proposalInput() as never);
+  const rendered = renderGrowExperimentProposalHtml(proposal);
+  assert.match(rendered, /data-variant-id="variant-1"/);
+  assert.match(rendered, /value="approved"/);
+  assert.match(rendered, /value="edited"/);
+  assert.match(rendered, /value="needs-another-pass"/);
+  assert.doesNotMatch(rendered, /type="radio"[^>]*\schecked(?:\s|>)/);
+  assert.doesNotMatch(rendered, /type="radio" disabled/);
+  assert.match(rendered, /content-studio-phase3-grow-experiment-decision\.json/);
+  assert.match(rendered, /proposalDigest/);
+  assert.match(rendered, new RegExp(proposal.digest));
+  assert.match(rendered, /A decision is required for every candidate/);
 });
 
 test("Phase 3 CLI records a complete Muxin decision and rejects partial input", async () => {

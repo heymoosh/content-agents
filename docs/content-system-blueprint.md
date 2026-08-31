@@ -755,6 +755,12 @@ composes the canonical `grow-capacity-manifest-v1`, `grow-review-bundle-v1`, and
 only approved unchanged candidates through canonical `grow-delivery-record-v1` records. An edit is
 recorded as `needs-another-pass` and must enter a fresh validated proposal before delivery. No
 record claims a queue row, scheduler slot, provider object, publication, measurement, or winner.
+The generated static HTML now owns the item-level review handoff as well: every candidate requires
+one unselected Muxin decision, edits require a complete replacement body, and the page can copy or
+download the exact digest-bound `GrowExperimentDecisionInput` JSON. The page is local and
+dependency-free; exporting a decision changes no repository or provider state, and the existing
+`decide` command still performs the authoritative digest, authority, capacity, voice, CTA, and
+completeness validation.
 `src/grow/experiment-queue-handoff.ts` is the explicit next boundary. It rebuilds that digest-bound
 decision, admits only unchanged variants Muxin marked `approved`, writes their exact bodies and
 lineage into the canonical Content derivative folder, appends one `approve` row per variant under
