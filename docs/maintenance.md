@@ -49,6 +49,15 @@ Narrower than a rule-wide or repo-wide exemption, but broader than a single-fing
 documented in a `.gitleaks.toml` comment. Nothing was rotated or treated as a real leak because
 it isn't one.
 
+The 2026-08-30 local-first policy pass exposed two more historical
+`generic-api-key` false positives after the hosted job was prevented from
+starting by GitHub billing. Both flagged values are explicitly named SHA-256
+cohort fingerprints in retained JSON review artifacts. The current files and
+the exact flagged historical blobs (`15b76c6` and `d091f62`) were read in full.
+Two exact-file path allowlists now cover those immutable review artifacts;
+the generic API-key rule remains active everywhere else. A full-history local
+scan with the same gitleaks 8.30.1 configuration passes after the change.
+
 Baseline `npm audit --audit-level=high` run on 2026-07-20 found **9
 advisories (6 high)** — `ws` (via `@remotion/renderer`/`@remotion/studio`)
 and `uuid` (via `exceljs`), both fixable with `npm audit fix` /
