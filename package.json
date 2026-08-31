@@ -122,6 +122,7 @@
     "patterns:reviewed-evidence-ledger-bridge": "tsx src/patterns/reviewed-evidence-ledger-bridge-cli.ts",
     "patterns:ledger-account-example-table": "tsx src/patterns/ledger-account-example-table-cli.ts",
     "patterns:reviewed-account-registry": "tsx src/patterns/reviewed-account-registry-cli.ts",
+    "patterns:research-dossier": "tsx src/patterns/research-dossier-cli.ts",
     "patterns:hook-templates": "tsx src/patterns/hook-template-ledger-cli.ts",
     "grow:plan": "tsx src/grow/cli.ts",
     "grow:this": "tsx src/grow/grow-this-plan-cli.ts",
