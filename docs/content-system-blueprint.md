@@ -776,9 +776,10 @@ decisions, scheduler/provider records, outcome records, and Signals interpretati
 The approval surface must show the motivating observation and evidence, interpretation,
 directional falsifiable hypothesis, reason the input is a valid test, controlled variable,
 constants, primary success metric and outcome family, guardrails, sample size or duration,
-keep/revise/reject decision rule, confidence and caveats, and publishing-capacity rationale. Every
-candidate must pass the ordinary Content treatment, platform/media, provenance, CTA, voice, and
-blind cold-feed-editor path before the digest-bound experiment proposal is constructed. A manually
+keep/revise/reject decision rule, confidence and caveats, and publishing-capacity rationale. The
+proposal contains no candidate copy. After Muxin approves the plan, every generated candidate must
+pass the ordinary Content treatment, platform/media, provenance, CTA, voice, and blind
+cold-feed-editor path before it appears as a pending Content draft. A manually
 supplied comparison or a hypothesis saying only that a treatment may affect outcomes is mechanical
 test data, not an approval-ready experiment recommendation.
 
@@ -810,13 +811,11 @@ download the exact digest-bound `GrowExperimentDecisionInput` JSON. The page is 
 dependency-free; exporting a decision changes no repository or provider state, and the existing
 `decide` command still performs the authoritative digest, authority, capacity, voice, CTA, and
 completeness validation.
-`src/grow/experiment-queue-handoff.ts` is the explicit next boundary. It rebuilds that digest-bound
-decision, admits only unchanged variants Muxin marked `approved`, writes their exact bodies and
-lineage into the canonical Content derivative folder, appends one `approve` row per variant under
-a folder lock, and immediately reconciles the rows through the existing Grow queue/delivery
-binding. The handoff is byte-idempotent and rejects row or asset conflicts before its first write.
-`npm run grow:experiment-handoff` previews by default; `--apply` is required for filesystem writes.
-Neither mode claims a slot, contacts a provider, or publishes. A ready binding requires explicit
+`src/grow/experiment-queue-handoff.ts` is retained only as historical vertical-slice compatibility.
+Its direct npm command has been removed. If called internally, it writes exact bodies and lineage
+only as `pending` Content rows, strips the old copy-approval claims, and cannot create a ready
+delivery binding until Content separately approves the copy. The handoff remains byte-idempotent
+and rejects row or asset conflicts before its first write. A ready binding requires explicit
 total, scheduled, and available slot facts; the older remaining-capacity-only packet stays honest
 and cannot be promoted to a fully bound delivery merely because a number was present.
 
@@ -842,9 +841,15 @@ handoff. Failed, duplicate, drifted, unapproved, or pre-decision observations fa
 The retained real packet preserves useful science input, raw response, parsed recommendation
 provenance, and cold-feed-editor evidence under `docs/reviews/`; Muxin approved its rationale on
 2026-08-31. Its separate body-bearing item review is now historical vertical-slice evidence, not the
-target product workflow. Phase 3 remains incomplete until plan approval feeds the canonical
-configured Content generator, produces ordinary `pending` review rows, supports multiple active
-experiment identities, and later returns grouped outcome evidence to Signals.
+target product workflow. The production Signals proposal route now reads a persisted normal Content
+request, canonically replays a digest-bound usable Phase 2 dossier and Muxin's two review receipts,
+then sends body-free candidate metadata and that qualified evidence to the selected Claude, Grok,
+or Codex subscription CLI. Missing, invalid, or insufficient capacity declarations fail before the model runs. The
+route records either an honest abstention or an approval-ready ranked plan.
+Plan approval feeds the canonical configured Content generator, produces ordinary `pending` review
+rows, supports multiple active experiment identities, and returns grouped outcome evidence to
+Signals. Phase 3 is complete; the next operational proof is a real approved experiment carried
+through publication and its declared measurement window.
 
 ### Phase 4: Cross-system learning and Venture handoff
 
@@ -899,7 +904,7 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
 | Internal candidates versus publish volume | `src/grow/capacity.ts` emits a deterministic, side-effect-free capacity manifest with candidate/approved counts, human capacity, slots, pauses, and rollback conditions; `src/grow/delivery-record.ts` consumes a capacity slice without claiming it; `src/grow/delivery-binding.ts` reconciles that slice with explicit queue/scheduler/provider facts; the experiment queue handoff now requires total/scheduled/available slot facts for a ready live binding | Observe the later scheduler/provider transition and retain its exact capacity facts without allowing accounting to approve or publish | Partial |
 | Source-to-publish path | Existing extraction, review, and publish engines; typed `src/grow/variants.ts` and `src/grow/generation-brief.ts` emit provisional no-copy platform/format specifications, `src/grow/volume-plan.ts` allocates those variants into deterministic daily slots, `src/grow/treatment-coverage.ts` reconciles requested treatment cells, `src/grow/draft-batch.ts` fans one thought into unique exact treatment requests, `src/grow/generation-run.ts` records explicit artifact/review references, `src/grow/draft-request.ts` binds one original thought to one treatment without composing copy, `src/grow/grow-this-plan.ts` joins the lifecycle read-only, and `npm run grow:this` exposes the next-action view, while delivery and outcome ledgers preserve the later handoff | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
-| Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit, `src/grow/delivery-record.ts` blocks delivery without it, `src/grow/queue-facts.ts` normalizes facts, `src/grow/live-facts.ts` adapts existing queue/scheduler records, `src/grow/live-reconciliation.ts` composes them without inference, `src/grow/reconciliation.ts` reports drift without repairing it, `src/grow/delivery-binding.ts` performs the exact delivery handoff join, and `src/grow/experiment-queue-handoff.ts` now materializes approved unchanged variants into canonical assets/queue rows and reconciles them | Bind the observed scheduler/provider result after an explicit scheduling action while retaining per-artifact approval | Partial |
+| Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit, `src/grow/delivery-record.ts` blocks delivery without it, `src/grow/queue-facts.ts` normalizes facts, `src/grow/live-facts.ts` adapts existing queue/scheduler records, `src/grow/live-reconciliation.ts` composes them without inference, `src/grow/reconciliation.ts` reports drift without repairing it, `src/grow/delivery-binding.ts` performs the exact delivery handoff join, and the compatibility `src/grow/experiment-queue-handoff.ts` can materialize experiment variants only as pending Content-review assets/queue rows before later scheduling revalidates live approval and capacity | Bind the observed scheduler/provider result after an explicit scheduling action while retaining per-artifact approval | Partial |
 | Phase contracts | `src/blueprint/phase-contracts.ts` provides deterministic contract definitions and fact evaluation, while live producers and reviewed data remain separate | The contracts document records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Scaffolded |
 | Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` emit a deterministic descriptive report; `src/patterns/operator-readiness.ts` adds deterministic ready/blocked coverage by pool, platform, medium, format, and gap; `src/patterns/manual-platform-report.ts` and `patterns:manual-platform-report` summarize collectorless observations; `src/patterns/source-evidence-cli.ts` exposes source/post readiness; `src/patterns/evidence-readiness.ts` composes pool, source, comparison, and operator readiness without side effects | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
 | Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, `src/patterns/comparison-readiness.ts` joins them to source/post evidence, `src/patterns/account-table.ts` produces the body-free account/example table, `src/patterns/overlay-coverage.ts` reports per-key mapping status, `src/patterns/review-queue.ts` emits the actionable body-free review handoff, `src/patterns/review-batch.ts` pages unreviewed rows for human processing, `src/patterns/pool-review-handoff.ts` adds account context and explicit pool-choice blockers, `src/patterns/reviewed-evidence-intake.ts` normalizes reviewed account/evidence/baseline rows, `src/patterns/reviewed-evidence-ledger-bridge.ts` projects that intake into append-ready ledger inputs, `src/patterns/reviewed-evidence-ledger-bridge-cli.ts` exposes the projection, `src/patterns/account-review-ledger.ts` persists append-only reviewed account facts, `src/patterns/reviewed-account-registry.ts` resolves one current row per identity and adapts the same facts to downstream consumers, `src/patterns/reviewed-account-registry-report.ts` joins the registry to the account/example table and platform/pool matrix, and `patterns:reviewed-account-registry` exposes the deterministic operator view; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, baseline terms, and review status | Scaffolded |

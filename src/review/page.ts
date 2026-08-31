@@ -5085,10 +5085,11 @@ function displayLabel(value){
 }
 function signalsExperimentsHtml(){
   const plans=(SIGNALS&&SIGNALS.experimentPlans)||[];
-  if(!plans.length) return '<section style="margin-top:26px"><div class="wb-label">EXPERIMENTS</div><div class="empty" style="padding:14px">Signals has not retained a sufficiently useful experiment proposal yet.</div></section>';
+  const propose='<div class="actions"><button class="sig-experiment-propose primary">Ask Signals to evaluate a Content request</button><span class="src">Uses reviewed evidence and body-free Content metadata. It may honestly recommend no experiment.</span></div>';
+  if(!plans.length) return '<section style="margin-top:26px"><div class="wb-label">EXPERIMENTS</div>'+propose+'<div class="empty" style="padding:14px">Signals has not retained a sufficiently useful experiment proposal yet.</div></section>';
   const performanceById=new Map((((SIGNALS&&SIGNALS.experimentPerformance)||{}).experiments||[]).map(row=>[row.experimentId,row]));
   const interpretationById=new Map(((SIGNALS&&SIGNALS.experimentInterpretations)||[]).map(row=>[row.experimentId,row]));
-  return '<section style="margin-top:26px"><div class="wb-label">EXPERIMENTS</div><div class="src" style="margin:5px 0 12px">High-confidence proposals appear first. Approving a plan creates pending drafts in Content; it does not approve their copy or publish anything.</div>'+plans.map(p=>{
+  return '<section style="margin-top:26px"><div class="wb-label">EXPERIMENTS</div>'+propose+'<div class="src" style="margin:5px 0 12px">High-confidence proposals appear first. Approving a plan creates pending drafts in Content; it does not approve their copy or publish anything.</div>'+plans.map(p=>{
     const status=String(p.status||"proposed");
     const confidence=String(p.confidence||"unknown");
     const controls=status==="proposed"
@@ -5097,8 +5098,9 @@ function signalsExperimentsHtml(){
         ? '<button class="sig-experiment primary" data-id="'+esc(p.experimentId)+'" data-action="start">Retry draft creation</button>'
         : status==="drafts-pending-content-review"
           ? '<button class="sig-experiment-open primary" data-request="'+esc(p.contentRequestId||p.requestId||"")+'">Open pending drafts in Content</button>'
-          : '<span class="src">'+(status==="deferred"?'Deferred before generation because confidence is low.':esc(status.replaceAll("-"," ")))+'</span>';
+          : '<span class="src">'+(status==="deferred"?'Deferred before generation. '+esc(p.priorityReason||'Confidence or declared capacity is insufficient.') : esc(status.replaceAll("-"," ")))+'</span>';
     const metric=p.primaryMetric ? p.primaryMetric.family+': '+p.primaryMetric.metric : 'not configured';
+    const expected=p.expectedOutcome||{};
     const perf=performanceById.get(p.experimentId);
     const interpretation=interpretationById.get(p.experimentId);
     let measurement='';
@@ -5121,9 +5123,20 @@ function signalsExperimentsHtml(){
           : '<div class="src">Interpretation review: '+esc(reviewStatus)+' by Muxin. Winner remains unset.</div>');
     }
     return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(confidence)+' confidence</span><span style="font-weight:600;font-size:14px;">'+esc(p.hypothesis)+'</span></div>'+
+      '<div class="dev-summary"><strong>Observation:</strong> '+esc(p.observation)+'</div>'+
+      '<div class="dev-summary"><strong>Evidence:</strong> '+(p.evidenceRefs||[]).map(esc).join(', ')+'</div>'+
+      '<div class="dev-summary"><strong>Interpretation:</strong> '+esc(p.interpretation)+'</div>'+
+      '<div class="dev-summary"><strong>Why this input:</strong> '+esc(p.whyThisInput)+'</div>'+
+      '<div class="dev-summary"><strong>Expected outcome:</strong> '+esc(expected.direction||'not configured')+' '+esc(expected.metric||'not configured')+' for '+esc(expected.variantId||'not configured')+'</div>'+
+      '<div class="src"><strong>Comparison:</strong> '+esc(expected.comparisonRef||'not configured')+' · '+esc(expected.family||'not configured')+'</div>'+
       '<div class="dev-summary"><strong>Change one thing:</strong> '+esc(p.controlledVariable)+'</div>'+
+      '<div class="src">Hold constant: '+(p.constants||[]).map(esc).join('; ')+'</div>'+
       '<div class="src">Primary metric: '+esc(metric)+' · Minimum '+esc(p.minimumSample)+' observations over '+esc(p.minimumDays)+' days</div>'+
       ((p.guardrails||[]).length?'<div class="src">Guardrails: '+p.guardrails.map(g=>esc(g.family+': '+g.metric+' · '+g.rule)).join('; ')+'</div>':'')+
+      (p.decisionRule?'<div class="src"><strong>Keep:</strong> '+esc(p.decisionRule.keep)+' <strong>Revise:</strong> '+esc(p.decisionRule.revise)+' <strong>Reject:</strong> '+esc(p.decisionRule.reject)+'</div>':'')+
+      '<div class="src"><strong>Capacity:</strong> '+esc(p.capacityRationale)+(p.capacity?' · '+esc(p.capacity.availablePublishingUnits)+' units / '+esc(p.capacity.availableDays)+' days declared':'')+'</div>'+
+      ((p.caveats||[]).length?'<div class="src"><strong>Caveats:</strong> '+p.caveats.map(esc).join('; ')+'</div>':'')+
+      (p.planDecision&&p.planDecision.rationale?'<div class="src"><strong>Decision rationale:</strong> '+esc(p.planDecision.rationale)+'</div>':'')+
       '<div class="actions">'+controls+'</div>'+measurement+'</div>';
   }).join('')+'</section>';
 }
@@ -5181,10 +5194,30 @@ function renderSignals(){
   bindSignalsExperimentActions(box);
 }
 function bindSignalsExperimentActions(box){
+  box.querySelectorAll(".sig-experiment-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsExperiment(b)));
   box.querySelectorAll(".sig-experiment").forEach(b=>b.addEventListener("click", ()=>actOnSignalsExperiment(b.dataset.id,b.dataset.action,b)));
   box.querySelectorAll(".sig-experiment-open").forEach(b=>b.addEventListener("click", ()=>openExperimentDrafts(b.dataset.request)));
   box.querySelectorAll(".sig-experiment-interpret").forEach(b=>b.addEventListener("click", ()=>interpretSignalsExperiment(b.dataset.id,b)));
   box.querySelectorAll(".sig-experiment-interpret-review").forEach(b=>b.addEventListener("click", ()=>reviewSignalsExperimentInterpretation(b.dataset.id,b.dataset.action,b)));
+}
+async function proposeSignalsExperiment(button){
+  const contentRequestId=(prompt("Content request ID to evaluate:")||"").trim();
+  if(!contentRequestId) return;
+  const evidenceDossierPath=(prompt('Reviewed evidence dossier path under docs/reviews:','docs/reviews/content-studio-phase2-used-to-think-final-dossier.json')||"").trim();
+  if(!evidenceDossierPath) return;
+  const evidenceFamily=(prompt('Outcome family for this evidence: attention, conversation, audience, or business','conversation')||"").trim().toLowerCase();
+  if(!["attention","conversation","audience","business"].includes(evidenceFamily)){flash("Choose a valid outcome family.");return;}
+  const minimumSample=Number(prompt("Minimum published units:","10")||"10");
+  const minimumDays=Number(prompt("Minimum elapsed days:","7")||"7");
+  const availablePublishingUnits=Number(prompt("Publishing units available in that window:",String(minimumSample))||String(minimumSample));
+  const availableDays=Number(prompt("Days available:",String(minimumDays))||String(minimumDays));
+  const selected=$("#signalsAnalysisEngine").value||"codex";
+  if(selected==="ollama-gpt-oss"){flash("Choose Claude, Grok, or Codex for experiment proposals.");return;}
+  button.disabled=true;
+  const result=await post("/api/signals/experiments/propose",{contentRequestId,evidenceDossierPath,evidenceFamily,minimumSample,minimumDays,availablePublishingUnits,availableDays,engine:selected});
+  if(!result.ok){button.disabled=false;flash(result.error||"Could not evaluate the experiment.");return;}
+  flash(result.result&&result.result.status==="no-experiment"?"Signals found no experiment worth the capacity.":"Signals experiment proposal is ready for review.");
+  await loadSignals();
 }
 async function actOnSignalsExperiment(id,action,button){
   let rationale="";

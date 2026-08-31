@@ -3420,6 +3420,22 @@ test("Signals experiment plans approve generation into the ordinary Content revi
   assert.match(html, /\/api\/signals\/experiments\//);
   assert.match(html, /Open pending drafts in Content/);
   assert.match(html, /reviewRequestFilter/);
+  assert.match(html, /Ask Signals to evaluate a Content request/);
+  assert.match(html, /Reviewed evidence dossier path under docs\/reviews/);
+  assert.match(html, /evidenceDossierPath,evidenceFamily/);
+  assert.match(html, /Publishing units available in that window/);
+  assert.match(html, /Observation:/);
+  assert.match(html, /Evidence:/);
+  assert.match(html, /Interpretation:/);
+  assert.match(html, /Why this input:/);
+  assert.match(html, /Expected outcome:/);
+  assert.match(html, /Comparison:/);
+  assert.match(html, /Hold constant:/);
+  assert.match(html, /Capacity:/);
+  assert.match(html, /Caveats:/);
+  assert.match(html, /Decision rationale:/);
+  assert.match(html, /\/api\/signals\/experiments\/propose/);
+  assert.doesNotMatch(html, /Paste the reviewed evidence JSON array/);
 });
 
 test("Signals experiments expose collecting or ready evidence and keep interpretation review separate", () => {

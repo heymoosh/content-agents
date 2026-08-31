@@ -31,6 +31,7 @@ const ROUTE_COST: Record<Reason, string> = {
 export const NOT_COVERED: { feature: string; route: string; engine: string; why: Reason; pr?: string }[] = [
   { feature: "Atomize a piece into platform drafts", route: "POST /api/atomize", engine: "claude -p (subscription)", why: "time+nondeterm" },
   { feature: "Run configured Content generation against an authenticated live CLI", route: "POST /api/content/generate", engine: "selected Studio CLI engine (Codex, Claude, or Grok)", why: "time+nondeterm" },
+  { feature: "Ask Signals for an experiment proposal from reviewed evidence", route: "POST /api/signals/experiments/propose", engine: "selected Claude, Grok, or Codex subscription CLI", why: "time+nondeterm" },
   { feature: "Hand a thought to the creative director (develop)", route: "POST /api/develop/start|reply|format", engine: "claude -p (subscription)", why: "time+nondeterm", pr: "#349" },
   { feature: "Ask Claude to revise a draft", route: "POST /api/revise", engine: "claude -p (subscription)", why: "time+nondeterm" },
   { feature: "Draft or re-pass a fiction scene", route: "POST /api/fiction/draft|repass", engine: "selected Claude, Grok, or Codex subscription CLI", why: "time+nondeterm", pr: "#352" },

@@ -93,6 +93,7 @@ import { handleFictionRoute } from "./serve-fiction.js";
 import { handleCharlesRoute } from "./serve-charles.js";
 import { handleSignalsRoute, prepareLiveExperimentInterpretation } from "./serve-signals.js";
 import { parseExperimentInterpretationResult, type ExperimentInterpretationInput } from "./signals-experiment-result-store.js";
+import { proposeSignalsExperiment, type SignalsExperimentProposalRequest } from "./signals-experiment-proposal.js";
 import { createApprovedVentureHandoff, findExistingVentureContentFolder } from "./venture-content-handoff-store.js";
 import { toContentRequestInput as ventureToContentRequestInput } from "./venture-content-handoff.js";
 import { isOutreachEngine, type OutreachEngine } from "./page-outreach.js";
@@ -152,6 +153,23 @@ async function interpretSignalsExperiment(id: string, engine: Engine): Promise<E
     return result.stdout.trim();
   }, engine);
   return parseExperimentInterpretationResult(output, row, engine);
+}
+
+async function createSignalsExperimentProposal(input: SignalsExperimentProposalRequest) {
+  return proposeSignalsExperiment(input, async (prompt, engine) => runQueued("insights", `Propose experiment with ${ENGINE_LABELS[engine]}`, async (job) => {
+    const result = await runAgentSpawn(job, engine, prompt, {
+      timeoutMs: 180_000,
+      permissionMode: null,
+      tools: engine === "codex" ? undefined : "",
+      sandbox: "read-only",
+    });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: `${ENGINE_LABELS[engine]} experiment proposal`, timeoutLabel: "180s",
+      exitVerb: `${ENGINE_LABELS[engine]} experiment proposal`, command: ENGINE_COMMANDS[engine],
+    });
+    if (failure) throw new Error(failure);
+    return result.stdout.trim();
+  }, engine));
 }
 
 type SyncEngineProbe = (file: string, args: readonly string[], options: { encoding?: BufferEncoding; stdio?: "ignore" | "pipe"; timeout: number }) => string | Buffer;
@@ -1136,7 +1154,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       return;
     }
     if (await handleCharlesRoute({ req, res, url, readBody, json, requestEngine })) return;
-    if (await handleSignalsRoute({ req, res, url, readBody, json, interpretExperiment: interpretSignalsExperiment })) return;
+    if (await handleSignalsRoute({ req, res, url, readBody, json, interpretExperiment: interpretSignalsExperiment, proposeExperiment: createSignalsExperimentProposal })) return;
     // Approved Venture primary copy enters the ordinary Content configuration cycle. This keeps
     // its Venture provenance and does not generate or deliver anything. A retry recovers the
     // same Content folder; entering configuration is not falsely recorded as Venture delivery.

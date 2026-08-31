@@ -57,7 +57,7 @@ function yaml(value: string): string {
 function derivativeContent(
   proposal: GrowExperimentProposal,
   record: GrowExperimentSlice["approvedRecords"][number],
-  decidedAt: string,
+  _decidedAt: string,
 ): string {
   return [
     "---",
@@ -72,8 +72,7 @@ function derivativeContent(
     `experiment_id: ${yaml(record.experimentId)}`,
     `review_bundle_id: ${yaml(`review:${proposal.id}:${record.variantId}`)}`,
     `delivery_record_id: ${yaml(record.deliveryRecordId)}`,
-    `approved_by: muxin`,
-    `approved_at: ${yaml(decidedAt)}`,
+    `copy_approval: pending-in-content`,
     "---",
     "",
     record.body,
@@ -119,8 +118,8 @@ export function buildGrowExperimentQueueHandoff(
       platform: record.platform,
       format: record.format,
       asset: relativePath,
-      status: "approve",
-      notes: `Grow ${proposal.experiment.id}; Muxin-approved decision ${proposal.digest}`,
+      status: "pending",
+      notes: `Legacy Grow ${proposal.experiment.id}; experiment decision ${proposal.digest}; copy requires ordinary Content review`,
       origin: "from GUI queue",
       lineage,
       reviewBundleId: bundle.id,
@@ -159,9 +158,10 @@ function target(folder: string, relativePath: string): string {
 }
 
 /**
- * Materialize approved variants into the existing Content review queue under a folder lock.
+ * Materialize legacy experiment variants into the existing Content review queue under a folder
+ * lock. An old experiment decision does not carry copy approval into Content.
  * The operation is idempotent for byte-identical assets/rows and rejects every conflict before
- * its first write. It deliberately stops at `approve`; scheduling stays an explicit downstream act.
+ * its first write. Every row is pending and must pass the ordinary Content review before scheduling.
  */
 export function applyGrowExperimentQueueHandoff(
   folder: string,

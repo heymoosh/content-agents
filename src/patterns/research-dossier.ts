@@ -713,3 +713,26 @@ export function recordResearchDossierDecision(dossier: ResearchDossier, input: R
   const status = disposition === "revise" ? "revision_requested" : disposition === "reject" ? "rejected" : "usable";
   return freeze({ ...dossier, usabilityDecision: decision, readiness: { status, blockers: [] } });
 }
+
+/**
+ * Replays both human-review gates and every canonical digest check before a downstream
+ * consumer is allowed to treat a serialized dossier as reviewed evidence.
+ */
+export function validateUsableResearchDossier(value: unknown): ResearchDossier {
+  assertDossierShape(value);
+  const dossier = value as ResearchDossier;
+  if (dossier.readiness.status !== "usable" || dossier.readiness.blockers.length !== 0 || dossier.usabilityDecision === null) {
+    fail("dossier must have a usable Muxin decision");
+  }
+  if (!new Set<ResearchDossierDisposition>(["observation", "hypothesis", "experiment_input"]).has(dossier.usabilityDecision.disposition)) {
+    fail("dossier usability decision does not authorize downstream evidence use");
+  }
+  const pending: ResearchDossier = {
+    ...dossier,
+    usabilityDecision: null,
+    readiness: { status: "pending_muxin_review", blockers: ["Muxin usability decision is required"] },
+  };
+  const replayed = recordResearchDossierDecision(pending, dossier.usabilityDecision);
+  if (stableJson(replayed) !== stableJson(dossier)) fail("usable dossier does not canonically replay its review decisions");
+  return replayed;
+}

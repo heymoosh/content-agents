@@ -71,7 +71,7 @@ function providerFacts(status: PublishingStatus): GrowDeliveryBindingProviderFac
 }
 
 /**
- * Dispatch exactly one already-approved Grow handoff through Studio's canonical, attempt-ledgered
+ * Dispatch exactly one Content-approved legacy Grow handoff through Studio's canonical, attempt-ledgered
  * scheduler and immediately bind the observed queue/provider result back to Phase 3. Merely
  * importing or constructing this function does nothing: calling it is the explicit schedule act.
  */
@@ -84,9 +84,6 @@ export async function scheduleGrowExperimentVariant(
   const asset = handoff.assets.find((item) => item.variantId === variantId);
   const priorBinding = handoff.bindings.find((binding) => binding.candidateId === variantId);
   if (!planned || !asset || !priorBinding) throw new Error(`approved Grow handoff has no candidate ${variantId}`);
-  if (priorBinding.status !== "approved" || priorBinding.readiness.status !== "ready") {
-    throw new Error(`Grow candidate ${variantId} is not ready for explicit scheduling`);
-  }
   const before = readQueue(handoff.folder).rows.find((row) => row.id === variantId);
   if (!before || before.status !== "approve") throw new Error(`Grow candidate ${variantId} must still be explicitly approved`);
   if (before.asset !== planned.asset || before.platform !== planned.platform || before.format !== planned.format) {
@@ -94,6 +91,23 @@ export async function scheduleGrowExperimentVariant(
   }
   if (readFileSync(safeAsset(handoff.folder, before.asset), "utf8") !== asset.content) {
     throw new Error(`Grow candidate ${variantId} no longer matches its approved body`);
+  }
+  const bundle = handoff.decision.reviewBundles.find((item) => item.id === planned.reviewBundleId);
+  const capacitySlice = handoff.decision.capacityManifest.slices.find((slice) =>
+    slice.day === handoff.decision.capacityManifest.days[0] && slice.platform === planned.platform) ?? null;
+  if (!bundle) throw new Error(`Grow candidate ${variantId} lost its review bundle`);
+  const currentQueueFacts = adaptQueueRowToGrowFacts(before, planned.lineage);
+  const currentBinding = buildGrowDeliveryBinding({
+    reviewBundle: bundle,
+    candidate: { id: planned.id, day: handoff.decision.capacityManifest.days[0]!, platform: planned.platform, variantId: planned.lineage.variantId, lineage: planned.lineage },
+    capacitySlice,
+    queueFacts: { ...currentQueueFacts, lineage: planned.lineage },
+    schedulerFacts: priorBinding.schedulerFacts,
+    providerFacts: null,
+    deliveryMode: "provider",
+  });
+  if (currentBinding.status !== "approved" || currentBinding.readiness.status !== "ready") {
+    throw new Error(`Grow candidate ${variantId} is not ready for explicit scheduling`);
   }
 
   const schedule: ScheduleOnce = deps.schedule ?? ((folder, slug, row) =>
@@ -103,10 +117,6 @@ export async function scheduleGrowExperimentVariant(
 
   const after = readQueue(handoff.folder).rows.find((row) => row.id === variantId);
   if (!after) throw new Error(`Grow candidate ${variantId} disappeared after scheduling`);
-  const bundle = handoff.decision.reviewBundles.find((item) => item.id === planned.reviewBundleId);
-  const capacitySlice = handoff.decision.capacityManifest.slices.find((slice) =>
-    slice.day === handoff.decision.capacityManifest.days[0] && slice.platform === planned.platform) ?? null;
-  if (!bundle) throw new Error(`Grow candidate ${variantId} lost its review bundle`);
   const observedPublishId = attempt.publishing.providerObjectId ?? attempt.publishing.ref ?? null;
   const observedLineage = { ...planned.lineage, publishId: observedPublishId };
   const queueFacts = adaptQueueRowToGrowFacts(after, observedLineage);

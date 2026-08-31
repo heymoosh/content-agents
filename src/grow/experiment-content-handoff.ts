@@ -10,6 +10,7 @@ export interface ExperimentPlanInput {
   readonly recommendation: SignalsExperimentRecommendationInput;
   readonly contentRequest: ContentRequestInput;
   readonly variablesByVariant: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  readonly capacity: { readonly availablePublishingUnits: number; readonly availableDays: number };
 }
 
 export interface ExperimentPlan {
@@ -20,6 +21,7 @@ export interface ExperimentPlan {
   readonly variablesByVariant: Record<string, Record<string, string>>;
   readonly priority: "high" | "medium" | "deferred";
   readonly priorityReason: string;
+  readonly capacity: { readonly availablePublishingUnits: number; readonly availableDays: number; readonly sufficient: boolean };
   readonly digest: string;
   readonly generatesCopy: false;
   readonly authorizesCopyApproval: false;
@@ -29,6 +31,7 @@ export interface ExperimentPlanDecisionInput {
   readonly status: "approved" | "declined";
   readonly decidedBy: "muxin";
   readonly decidedAt: string;
+  readonly rationale?: string;
 }
 
 export interface ExperimentPlanDecision {
@@ -38,6 +41,7 @@ export interface ExperimentPlanDecision {
   readonly status: "approved" | "declined";
   readonly decidedBy: "muxin";
   readonly decidedAt: string;
+  readonly rationale: string;
   readonly authorizesGeneration: boolean;
   readonly authorizesCopyApproval: false;
   readonly digest: string;
@@ -102,9 +106,19 @@ export function buildExperimentPlan(input: ExperimentPlanInput): ExperimentPlan 
     throw new Error("Signals recommendation comparison must name two configured Content variants");
   }
   const variablesByVariant = normalizeVariables(input.variablesByVariant, contentRequest);
-  const priority: ExperimentPlan["priority"] = input.recommendation.confidence === "low" ? "deferred" : input.recommendation.confidence;
+  const capacity = {
+    availablePublishingUnits: input.capacity.availablePublishingUnits,
+    availableDays: input.capacity.availableDays,
+    sufficient: false,
+  };
+  if (!Number.isInteger(capacity.availablePublishingUnits) || capacity.availablePublishingUnits < 0) throw new Error("available publishing units must be a non-negative integer");
+  if (!Number.isInteger(capacity.availableDays) || capacity.availableDays < 0) throw new Error("available days must be a non-negative integer");
+  capacity.sufficient = capacity.availablePublishingUnits >= input.recommendation.minimumSample && capacity.availableDays >= input.recommendation.minimumDays;
+  const priority: ExperimentPlan["priority"] = input.recommendation.confidence === "low" || !capacity.sufficient ? "deferred" : input.recommendation.confidence;
   const priorityReason = priority === "deferred"
-    ? "Deferred because Signals reported low confidence; do not spend generation or publishing capacity."
+    ? input.recommendation.confidence === "low"
+      ? "Deferred because Signals reported low confidence; do not spend generation or publishing capacity."
+      : `Deferred because declared capacity (${capacity.availablePublishingUnits} units over ${capacity.availableDays} days) cannot satisfy the ${input.recommendation.minimumSample}-unit, ${input.recommendation.minimumDays}-day plan.`
     : `${priority[0]!.toUpperCase()}${priority.slice(1)}-confidence Signals proposal; rank before lower-confidence work.`;
   const base = {
     kind: "experiment_plan" as const,
@@ -112,6 +126,7 @@ export function buildExperimentPlan(input: ExperimentPlanInput): ExperimentPlan 
     recommendation: input.recommendation,
     contentRequest,
     variablesByVariant,
+    capacity,
     priority,
     priorityReason,
     generatesCopy: false as const,
@@ -133,10 +148,23 @@ export function rankExperimentPlans(plans: readonly ExperimentPlan[]): RankedExp
   return { ready: sorted.filter((plan) => plan.priority !== "deferred"), deferred: sorted.filter((plan) => plan.priority === "deferred"), ranking: "confidence-descending" };
 }
 
+export function assertExperimentPlanCanGenerate(proposal: ExperimentPlan): void {
+  const capacity = proposal.capacity;
+  if (!capacity?.sufficient
+    || capacity.availablePublishingUnits < proposal.recommendation.minimumSample
+    || capacity.availableDays < proposal.recommendation.minimumDays
+    || proposal.recommendation.confidence === "low"
+    || proposal.priority === "deferred") {
+    throw new Error("deferred experiment or insufficient declared capacity cannot authorize generation");
+  }
+}
+
 export function approveExperimentPlan(proposal: ExperimentPlan, input: ExperimentPlanDecisionInput): ExperimentPlanDecision {
   if (input.decidedBy !== "muxin") throw new Error("only Muxin can decide an experiment plan");
   const decidedAt = timestamp(input.decidedAt, "decidedAt");
-  if (input.status === "approved" && proposal.priority === "deferred") throw new Error("low-confidence experiment is deferred and cannot authorize generation");
+  const rationale = input.rationale?.trim() ?? "";
+  if (input.status === "declined" && !rationale) throw new Error("declining an experiment plan requires a rationale");
+  if (input.status === "approved") assertExperimentPlanCanGenerate(proposal);
   const base = {
     kind: "experiment_plan_decision" as const,
     version: EXPERIMENT_CONTENT_HANDOFF_VERSION,
@@ -144,6 +172,7 @@ export function approveExperimentPlan(proposal: ExperimentPlan, input: Experimen
     status: input.status,
     decidedBy: "muxin" as const,
     decidedAt,
+    rationale,
     authorizesGeneration: input.status === "approved",
     authorizesCopyApproval: false as const,
   };
@@ -165,6 +194,7 @@ export async function applyApprovedExperimentToContent(
   if (decision.status !== "approved" || decision.decidedBy !== "muxin" || !decision.authorizesGeneration || decision.authorizesCopyApproval !== false) {
     throw new Error("approved Muxin plan decision is required before Content generation");
   }
+  assertExperimentPlanCanGenerate(proposal);
   if (basename(folder) !== proposal.contentRequest.id) throw new Error("Content folder must match the experiment request id");
   const input: ContentRequestInput = {
     id: proposal.contentRequest.id,
