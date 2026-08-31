@@ -54,7 +54,7 @@ export interface GrowExperimentProposalInput {
   capacity: {
     day: string;
     review: readonly { platform: string; available: number }[];
-    slots: readonly { platform: string; available: number }[];
+    slots: readonly { platform: string; available: number; capacity?: number; scheduledCount?: number }[];
   };
   experiment: {
     id: string;
@@ -99,7 +99,7 @@ export interface GrowExperimentProposal {
   selectedPlatforms: string[];
   cut: GrowExperimentProposalInput["cut"] & { sourceRefs: string[] };
   variants: GrowExperimentVariant[];
-  capacity: { day: string; review: { platform: string; available: number }[]; slots: { platform: string; available: number }[] };
+  capacity: { day: string; review: { platform: string; available: number }[]; slots: { platform: string; available: number; capacity?: number; scheduledCount?: number }[] };
   capacityManifest: GrowCapacityManifest;
   experiment: GrowExperimentProposalInput["experiment"];
   experimentRecord: ExperimentRecord;
@@ -408,7 +408,12 @@ export function buildGrowExperimentProposal(input: GrowExperimentProposalInput):
     if (!selectedPlatforms.includes(platform)) throw new Error(`capacity slot platform ${platform} is not selected`);
     if (slotPlatforms.has(platform)) throw new Error(`duplicate capacity slot for ${platform}`);
     slotPlatforms.add(platform);
-    return { platform, available: nonNegativeInteger(slot.available, `capacity.slots[${index}].available`) };
+    const available = nonNegativeInteger(slot.available, `capacity.slots[${index}].available`);
+    const capacityValue = slot.capacity === undefined ? undefined : nonNegativeInteger(slot.capacity, `capacity.slots[${index}].capacity`);
+    const scheduledCount = slot.scheduledCount === undefined ? undefined : nonNegativeInteger(slot.scheduledCount, `capacity.slots[${index}].scheduledCount`);
+    if ((capacityValue === undefined) !== (scheduledCount === undefined)) throw new Error(`capacity.slots[${index}] must supply capacity and scheduledCount together`);
+    if (capacityValue !== undefined && scheduledCount! + available !== capacityValue) throw new Error(`capacity.slots[${index}] capacity must equal scheduledCount plus available`);
+    return { platform, available, ...(capacityValue === undefined ? {} : { capacity: capacityValue, scheduledCount }) };
   }).sort((left, right) => left.platform.localeCompare(right.platform));
   for (const platform of selectedPlatforms) if (!slotPlatforms.has(platform)) throw new Error(`capacity slot is missing for ${platform}`);
 
@@ -428,7 +433,7 @@ export function buildGrowExperimentProposal(input: GrowExperimentProposalInput):
     // avoids mislabeling an exactly-full batch as paused; the explicit per-platform limit remains
     // in proposal.capacity.review and is enforced when decisions are applied.
     reviewCapacity: review.map((entry) => ({ day: capacity.day, platform: entry.platform, capacity: null })),
-    slotCapacity: slots.map((slot) => ({ day: capacity.day, platform: slot.platform, capacity: null, scheduledCount: null, availableSlots: slot.available })),
+    slotCapacity: slots.map((slot) => ({ day: capacity.day, platform: slot.platform, capacity: slot.capacity ?? null, scheduledCount: slot.scheduledCount ?? null, availableSlots: slot.available })),
   });
   const experiment = {
     id: experimentId,
@@ -465,7 +470,8 @@ export function buildGrowExperimentProposal(input: GrowExperimentProposalInput):
     publishRefs: null,
     lineage: [
       { recordType: "source", id: source.id }, { recordType: "cut", id: cut.id },
-      { recordType: "variant", id: variant.id }, { recordType: "experiment", id: experiment.id },
+      { recordType: "variant", id: variant.id }, { recordType: "treatment", id: variant.treatment.ref },
+      { recordType: "experiment", id: experiment.id },
     ],
     evidenceStatus: variant.treatment.evidenceStatus,
     evidenceRefs: [...variant.sourceRefs, ...variant.treatment.evidenceRefs],
@@ -584,7 +590,7 @@ export function buildGrowExperimentDecision(proposal: GrowExperimentProposal, in
       return { id: variant.id, day: proposal.capacity.day, platform: variant.platform, status: status === "approved" ? "approved" : status === "rejected" ? "rejected" : "blocked" };
     }),
     reviewCapacity: proposal.capacity.review.map((entry) => ({ day: proposal.capacity.day, platform: entry.platform, capacity: entry.available })),
-    slotCapacity: proposal.capacity.slots.map((slot) => ({ day: proposal.capacity.day, platform: slot.platform, capacity: null, scheduledCount: null, availableSlots: slot.available })),
+    slotCapacity: proposal.capacity.slots.map((slot) => ({ day: proposal.capacity.day, platform: slot.platform, capacity: slot.capacity ?? null, scheduledCount: slot.scheduledCount ?? null, availableSlots: slot.available })),
   });
   const reviewBundles = proposal.variants.map((variant) => {
     const decision = decisionByVariant.get(variant.id)!;
@@ -597,7 +603,8 @@ export function buildGrowExperimentDecision(proposal: GrowExperimentProposal, in
       publishRefs: null,
       lineage: [
         { recordType: "source", id: proposal.source.id }, { recordType: "cut", id: proposal.cut.id },
-        { recordType: "variant", id: variant.id }, { recordType: "experiment", id: proposal.experiment.id },
+        { recordType: "variant", id: variant.id }, { recordType: "treatment", id: variant.treatment.ref },
+        { recordType: "experiment", id: proposal.experiment.id },
       ],
       evidenceStatus: decision.status === "approved" ? "supported" : variant.treatment.evidenceStatus,
       evidenceRefs: [...variant.sourceRefs, ...variant.treatment.evidenceRefs],

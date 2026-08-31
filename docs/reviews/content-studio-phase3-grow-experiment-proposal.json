@@ -330,6 +330,11 @@
           "relation": null
         },
         {
+          "recordType": "treatment",
+          "id": "treatment:direct-claim-control",
+          "relation": null
+        },
+        {
           "recordType": "variant",
           "id": "variant-linkedin-direct-claim",
           "relation": null
@@ -399,6 +404,11 @@
           "relation": null
         },
         {
+          "recordType": "treatment",
+          "id": "pattern:used-to-think-now",
+          "relation": null
+        },
+        {
           "recordType": "variant",
           "id": "variant-linkedin-used-to-think-now",
           "relation": null
@@ -446,5 +456,5 @@
   "autoApproval": false,
   "autoScheduling": false,
   "autoPublishing": false,
-  "digest": "sha256:18b33ad6ddf4c46eaf2b7d1b385727fe9e8145afa07240fd13d6687a556bec5d"
+  "digest": "sha256:d1ad6f9d941d6d576c0491770f060ecaf33210819461ad917cb3cef6c78bc1ed"
 }

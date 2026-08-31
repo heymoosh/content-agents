@@ -142,6 +142,7 @@
     "grow:draft-request": "tsx src/grow/draft-request-cli.ts",
     "grow:draft-batch-run": "tsx src/grow/draft-batch-run-cli.ts",
     "grow:experiment-slice": "tsx src/grow/experiment-slice-cli.ts",
+    "grow:experiment-handoff": "tsx src/grow/experiment-queue-handoff-cli.ts",
     "review:comment-intake": "tsx src/review/comment-intake-cli.ts",
     "review:approved-reply": "tsx src/review/approved-reply-task-cli.ts",
     "studio:coord": "node --import tsx src/studio-coord/cli.ts",
