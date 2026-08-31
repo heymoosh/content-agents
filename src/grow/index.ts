@@ -1,4 +1,18 @@
 export {
+  buildGrowExperimentDecision,
+  buildGrowExperimentProposal,
+  renderGrowExperimentProposalHtml,
+  GROW_EXPERIMENT_PROPOSAL_VERSION,
+  GROW_EXPERIMENT_SLICE_VERSION,
+  type GrowExperimentDecisionInput,
+  type GrowExperimentProposal,
+  type GrowExperimentProposalInput,
+  type GrowExperimentSlice,
+  type GrowExperimentVariant,
+  type GrowExperimentVariantDecisionStatus,
+} from "./experiment-slice.js";
+
+export {
   createGrowPlan,
   type EngineCapability,
   type ExperimentVariable,

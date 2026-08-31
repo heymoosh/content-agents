@@ -746,6 +746,19 @@ conversation without pretending that the downstream systems are wired. It report
 human gates, evidence blockers, and the absence of a winner; it does not generate copy, schedule,
 publish, or mark an experiment measured merely because a reference exists.
 
+`src/grow/experiment-slice.ts` is the first body-bearing Phase 3 review boundary. It accepts one
+explicit raw source, an already-approved readable cut, caller-produced platform treatments, the
+selected platform set, evidence references, experiment variables, and declared review/slot
+capacity. `propose` binds that exact packet to a digest, renders the static HTML review, and
+composes the canonical `grow-capacity-manifest-v1`, `grow-review-bundle-v1`, and
+`grow-experiment-v1` records. `decide` requires one explicit Muxin decision per variant and emits
+only approved unchanged candidates through canonical `grow-delivery-record-v1` records. An edit is
+recorded as `needs-another-pass` and must enter a fresh validated proposal before delivery. No
+record claims a queue row, scheduler slot, provider object, publication, measurement, or winner.
+The current real packet remains pending Muxin review, so it advances the vertical slice but does
+not complete this phase or replace the live review queue, scheduler/provider facts, or outcome
+contracts.
+
 ### Phase 4: Venture learning
 
 **Ship predicate:** Given measured variants, qualified comments, funnel events, and business

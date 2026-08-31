@@ -1,0 +1,450 @@
+{
+  "kind": "grow_experiment_proposal",
+  "version": "grow-experiment-proposal-v1",
+  "id": "phase3-worlds-broken-used-to-think-vs-direct",
+  "createdAt": "2026-08-31T14:00:00.000Z",
+  "source": {
+    "id": "essay-the-worlds-broken-what-do-we-do",
+    "kind": "long-form",
+    "body": "I used to think that if I attempted to make a difference, I would only make that pain worse. There is so much disappointment in the world.\nBut it turns out I was making the pain worse by not doing anything at all.\nBut this work is aligned with a part of me that has been wanting to come alive.\nDoing the work at all turned out to be its own reward. Not because the problems are solved. Not because success is guaranteed. Because it has helped me feel more connected to the kind of person I wanted to become.",
+    "originRef": "obsidian:The world's broken. What do we do?#L187,L189,L200,L222",
+    "canonicalUrl": "https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do"
+  },
+  "selectedPlatforms": [
+    "linkedin"
+  ],
+  "cut": {
+    "id": "cut-action-and-coming-alive",
+    "body": "I used to think that if I attempted to make a difference, I would only make that pain worse. There is so much disappointment in the world. But it turns out I was making the pain worse by not doing anything at all. But this work is aligned with a part of me that has been wanting to come alive. Doing the work at all turned out to be its own reward. Not because the problems are solved. Not because success is guaranteed. Because it has helped me feel more connected to the kind of person I wanted to become.",
+    "sourceRefs": [
+      "essay-the-worlds-broken-what-do-we-do#L1-L4"
+    ],
+    "rationale": "This approved source cut contains a real first-person change of mind, the consequence of inaction, and the practical emotional payoff. It can support both a belief-shift treatment and a direct-claim control without importing another part of the essay.",
+    "decision": {
+      "status": "approved",
+      "decidedBy": "muxin",
+      "decidedAt": "2026-08-30T23:05:01.327Z"
+    }
+  },
+  "variants": [
+    {
+      "id": "variant-linkedin-direct-claim",
+      "platform": "linkedin",
+      "medium": "text",
+      "format": "post",
+      "body": "Trying to make a difference felt like it would only make the pain worse. Doing nothing made it worse. The work itself helps me feel more connected to the person I wanted to become.\n\nRead the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do",
+      "sourceRefs": [
+        "essay-the-worlds-broken-what-do-we-do#L1-L4"
+      ],
+      "treatment": {
+        "ref": "treatment:direct-claim-control",
+        "rationale": "Use the same source cut, platform, format, CTA, and approximate length without the reviewed belief-shift scaffold, so the opening treatment is the declared variable.",
+        "evidenceStatus": "supported",
+        "evidenceRefs": [
+          "essay-the-worlds-broken-what-do-we-do#L1-L4"
+        ]
+      },
+      "experimentVariables": {
+        "cta": "canonical-source-inline",
+        "hook": "direct-claim",
+        "length": "medium"
+      },
+      "voiceCheck": "passed",
+      "originalityCheck": "passed",
+      "lineage": {
+        "sourceId": "essay-the-worlds-broken-what-do-we-do",
+        "cutId": "cut-action-and-coming-alive",
+        "experimentId": "experiment-used-to-think-vs-direct"
+      }
+    },
+    {
+      "id": "variant-linkedin-used-to-think-now",
+      "platform": "linkedin",
+      "medium": "text",
+      "format": "post",
+      "body": "I used to think trying to make a difference would only make the pain worse. I was wrong. Doing nothing made it worse. The work itself helps me feel more connected to the person I wanted to become.\n\nRead the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do",
+      "sourceRefs": [
+        "essay-the-worlds-broken-what-do-we-do#L1-L4"
+      ],
+      "treatment": {
+        "ref": "pattern:used-to-think-now",
+        "rationale": "Test the reviewed first-person belief-shift scaffold because this source contains an explicit former belief and a genuine correction. This remains a hypothesis, not a winner claim.",
+        "evidenceStatus": "hypothesis",
+        "evidenceRefs": [
+          "sha256:eab59aff9411365842a03776499907fdc7de36fa7e5984f3ae8f11ec90c850bb"
+        ]
+      },
+      "experimentVariables": {
+        "cta": "canonical-source-inline",
+        "hook": "used-to-think-now",
+        "length": "medium"
+      },
+      "voiceCheck": "passed",
+      "originalityCheck": "passed",
+      "lineage": {
+        "sourceId": "essay-the-worlds-broken-what-do-we-do",
+        "cutId": "cut-action-and-coming-alive",
+        "experimentId": "experiment-used-to-think-vs-direct"
+      }
+    }
+  ],
+  "capacity": {
+    "day": "2026-09-01",
+    "review": [
+      {
+        "platform": "linkedin",
+        "available": 2
+      }
+    ],
+    "slots": [
+      {
+        "platform": "linkedin",
+        "available": 2
+      }
+    ]
+  },
+  "capacityManifest": {
+    "version": "grow-capacity-manifest-v1",
+    "days": [
+      "2026-09-01"
+    ],
+    "platforms": [
+      "linkedin"
+    ],
+    "slices": [
+      {
+        "day": "2026-09-01",
+        "platform": "linkedin",
+        "candidateCount": 2,
+        "approvedCount": 0,
+        "rejectedCount": 0,
+        "blockedCount": 0,
+        "reviewCapacity": null,
+        "slotCapacity": null,
+        "scheduledCount": null,
+        "availableSlots": 2,
+        "approvedPublishCount": 0,
+        "paused": false,
+        "pauseReasons": [],
+        "rollbackConditions": [],
+        "gapReasons": []
+      }
+    ],
+    "counts": {
+      "candidates": 2,
+      "approved": 0,
+      "rejected": 0,
+      "blocked": 0
+    },
+    "internalCandidateVolume": 2,
+    "approvedPublishVolume": 0,
+    "unassignedCandidates": 0,
+    "pauses": [],
+    "rollbackConditions": [],
+    "generatesCopy": false,
+    "autoApproval": false,
+    "scheduling": "none",
+    "publishing": "none",
+    "sideEffects": "none"
+  },
+  "experiment": {
+    "id": "experiment-used-to-think-vs-direct",
+    "question": "Does a genuine first-person belief-shift opening produce more qualified conversation than a direct-claim opening when the source, platform, format, CTA, and approximate length remain fixed?",
+    "outcomeFamilies": [
+      "attention",
+      "audience",
+      "business",
+      "conversation"
+    ],
+    "minimumSample": 20,
+    "topic": "collective agency and the emotional consequence of inaction",
+    "audience": "mixed-feed readers interested in civic systems and practical agency"
+  },
+  "experimentRecord": {
+    "recordType": "experiment",
+    "version": "grow-experiment-v1",
+    "id": "experiment-used-to-think-vs-direct",
+    "question": "Does a genuine first-person belief-shift opening produce more qualified conversation than a direct-claim opening when the source, platform, format, CTA, and approximate length remain fixed?",
+    "hypothesis": "The declared treatment may change outcomes; no direction or winner is assumed.",
+    "unit": "published platform variant",
+    "comparison": {
+      "control": null,
+      "treatment": null
+    },
+    "variables": [
+      {
+        "name": "cta",
+        "options": [
+          "canonical-source-inline"
+        ]
+      },
+      {
+        "name": "hook",
+        "options": [
+          "direct-claim",
+          "used-to-think-now"
+        ]
+      },
+      {
+        "name": "length",
+        "options": [
+          "medium"
+        ]
+      }
+    ],
+    "variableNames": [
+      "cta",
+      "hook",
+      "length"
+    ],
+    "scope": {
+      "platform": [
+        "linkedin"
+      ],
+      "format": [
+        "post"
+      ],
+      "topic": [
+        "collective agency and the emotional consequence of inaction"
+      ],
+      "audience": [
+        "mixed-feed readers interested in civic systems and practical agency"
+      ]
+    },
+    "platformScope": [
+      "linkedin"
+    ],
+    "formatScope": [
+      "post"
+    ],
+    "topicScope": [
+      "collective agency and the emotional consequence of inaction"
+    ],
+    "audienceScope": [
+      "mixed-feed readers interested in civic systems and practical agency"
+    ],
+    "lineage": {
+      "sourceRefs": [
+        "essay-the-worlds-broken-what-do-we-do"
+      ],
+      "variantRefs": [
+        "variant-linkedin-direct-claim",
+        "variant-linkedin-used-to-think-now"
+      ],
+      "publishRefs": [],
+      "outcomeRefs": []
+    },
+    "successObservations": [
+      {
+        "id": "experiment-used-to-think-vs-direct:attention",
+        "family": "attention",
+        "metric": "attention-outcome",
+        "target": null,
+        "measured": false,
+        "value": null,
+        "sample": null,
+        "observedAt": null,
+        "outcomeRefs": []
+      },
+      {
+        "id": "experiment-used-to-think-vs-direct:audience",
+        "family": "audience",
+        "metric": "audience-outcome",
+        "target": null,
+        "measured": false,
+        "value": null,
+        "sample": null,
+        "observedAt": null,
+        "outcomeRefs": []
+      },
+      {
+        "id": "experiment-used-to-think-vs-direct:business",
+        "family": "business",
+        "metric": "business-outcome",
+        "target": null,
+        "measured": false,
+        "value": null,
+        "sample": null,
+        "observedAt": null,
+        "outcomeRefs": []
+      },
+      {
+        "id": "experiment-used-to-think-vs-direct:conversation",
+        "family": "conversation",
+        "metric": "conversation-outcome",
+        "target": null,
+        "measured": false,
+        "value": null,
+        "sample": null,
+        "observedAt": null,
+        "outcomeRefs": []
+      }
+    ],
+    "minimumSample": 20,
+    "reviewRule": "Review after at least 20 comparable published units; keep outcome families separate.",
+    "startAt": null,
+    "endAt": null,
+    "winner": null,
+    "status": "proposed",
+    "generatesCopy": false,
+    "sideEffects": "none"
+  },
+  "reviewBundles": [
+    {
+      "kind": "grow_review_bundle",
+      "version": "grow-review-bundle-v1",
+      "id": "review:phase3-worlds-broken-used-to-think-vs-direct:variant-linkedin-direct-claim",
+      "reviewQueueRef": null,
+      "sourceRef": {
+        "recordType": "source",
+        "id": "essay-the-worlds-broken-what-do-we-do",
+        "relation": null
+      },
+      "cutRef": {
+        "recordType": "cut",
+        "id": "cut-action-and-coming-alive",
+        "relation": null
+      },
+      "variantRefs": [
+        {
+          "recordType": "variant",
+          "id": "variant-linkedin-direct-claim",
+          "relation": null
+        }
+      ],
+      "publishRefs": null,
+      "lineage": [
+        {
+          "recordType": "cut",
+          "id": "cut-action-and-coming-alive",
+          "relation": null
+        },
+        {
+          "recordType": "experiment",
+          "id": "experiment-used-to-think-vs-direct",
+          "relation": null
+        },
+        {
+          "recordType": "source",
+          "id": "essay-the-worlds-broken-what-do-we-do",
+          "relation": null
+        },
+        {
+          "recordType": "variant",
+          "id": "variant-linkedin-direct-claim",
+          "relation": null
+        }
+      ],
+      "evidenceStatus": "supported",
+      "evidenceRefs": [
+        "essay-the-worlds-broken-what-do-we-do#L1-L4"
+      ],
+      "evidenceNote": "Source references are within the approved cut; semantic grounding remains for Muxin to review. Treatment evidence status is supported.",
+      "voiceCheck": "passed",
+      "originalityCheck": "passed",
+      "readiness": {
+        "status": "blocked",
+        "blockingFields": [
+          "humanReview"
+        ],
+        "reason": "Blocked: humanReview."
+      },
+      "humanDecision": {
+        "status": "candidate",
+        "decidedBy": null,
+        "decidedAt": null,
+        "note": null
+      },
+      "status": "candidate",
+      "generatesCopy": false,
+      "sideEffects": "none"
+    },
+    {
+      "kind": "grow_review_bundle",
+      "version": "grow-review-bundle-v1",
+      "id": "review:phase3-worlds-broken-used-to-think-vs-direct:variant-linkedin-used-to-think-now",
+      "reviewQueueRef": null,
+      "sourceRef": {
+        "recordType": "source",
+        "id": "essay-the-worlds-broken-what-do-we-do",
+        "relation": null
+      },
+      "cutRef": {
+        "recordType": "cut",
+        "id": "cut-action-and-coming-alive",
+        "relation": null
+      },
+      "variantRefs": [
+        {
+          "recordType": "variant",
+          "id": "variant-linkedin-used-to-think-now",
+          "relation": null
+        }
+      ],
+      "publishRefs": null,
+      "lineage": [
+        {
+          "recordType": "cut",
+          "id": "cut-action-and-coming-alive",
+          "relation": null
+        },
+        {
+          "recordType": "experiment",
+          "id": "experiment-used-to-think-vs-direct",
+          "relation": null
+        },
+        {
+          "recordType": "source",
+          "id": "essay-the-worlds-broken-what-do-we-do",
+          "relation": null
+        },
+        {
+          "recordType": "variant",
+          "id": "variant-linkedin-used-to-think-now",
+          "relation": null
+        }
+      ],
+      "evidenceStatus": "hypothesis",
+      "evidenceRefs": [
+        "essay-the-worlds-broken-what-do-we-do#L1-L4",
+        "sha256:eab59aff9411365842a03776499907fdc7de36fa7e5984f3ae8f11ec90c850bb"
+      ],
+      "evidenceNote": "Source references are within the approved cut; semantic grounding remains for Muxin to review. Treatment evidence status is hypothesis.",
+      "voiceCheck": "passed",
+      "originalityCheck": "passed",
+      "readiness": {
+        "status": "blocked",
+        "blockingFields": [
+          "evidenceStatus",
+          "humanReview"
+        ],
+        "reason": "Blocked: evidenceStatus, humanReview."
+      },
+      "humanDecision": {
+        "status": "candidate",
+        "decidedBy": null,
+        "decidedAt": null,
+        "note": null
+      },
+      "status": "candidate",
+      "generatesCopy": false,
+      "sideEffects": "none"
+    }
+  ],
+  "review": {
+    "required": true,
+    "owner": "muxin",
+    "status": "pending",
+    "decisionOptions": [
+      "approved",
+      "edited",
+      "rejected",
+      "needs-another-pass"
+    ]
+  },
+  "winner": null,
+  "autoApproval": false,
+  "autoScheduling": false,
+  "autoPublishing": false,
+  "digest": "sha256:18b33ad6ddf4c46eaf2b7d1b385727fe9e8145afa07240fd13d6687a556bec5d"
+}

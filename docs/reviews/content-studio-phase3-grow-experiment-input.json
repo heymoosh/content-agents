@@ -1,0 +1,80 @@
+{
+  "id": "phase3-worlds-broken-used-to-think-vs-direct",
+  "createdAt": "2026-08-31T14:00:00.000Z",
+  "source": {
+    "id": "essay-the-worlds-broken-what-do-we-do",
+    "kind": "long-form",
+    "body": "I used to think that if I attempted to make a difference, I would only make that pain worse. There is so much disappointment in the world.\nBut it turns out I was making the pain worse by not doing anything at all.\nBut this work is aligned with a part of me that has been wanting to come alive.\nDoing the work at all turned out to be its own reward. Not because the problems are solved. Not because success is guaranteed. Because it has helped me feel more connected to the kind of person I wanted to become.",
+    "originRef": "obsidian:The world's broken. What do we do?#L187,L189,L200,L222",
+    "canonicalUrl": "https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do"
+  },
+  "selectedPlatforms": ["linkedin"],
+  "cut": {
+    "id": "cut-action-and-coming-alive",
+    "body": "I used to think that if I attempted to make a difference, I would only make that pain worse. There is so much disappointment in the world. But it turns out I was making the pain worse by not doing anything at all. But this work is aligned with a part of me that has been wanting to come alive. Doing the work at all turned out to be its own reward. Not because the problems are solved. Not because success is guaranteed. Because it has helped me feel more connected to the kind of person I wanted to become.",
+    "sourceRefs": ["essay-the-worlds-broken-what-do-we-do#L1-L4"],
+    "rationale": "This approved source cut contains a real first-person change of mind, the consequence of inaction, and the practical emotional payoff. It can support both a belief-shift treatment and a direct-claim control without importing another part of the essay.",
+    "decision": {
+      "status": "approved",
+      "decidedBy": "muxin",
+      "decidedAt": "2026-08-30T23:05:01.327Z"
+    }
+  },
+  "variants": [
+    {
+      "id": "variant-linkedin-used-to-think-now",
+      "platform": "linkedin",
+      "medium": "text",
+      "format": "post",
+      "body": "I used to think trying to make a difference would only make the pain worse. I was wrong. Doing nothing made it worse. The work itself helps me feel more connected to the person I wanted to become.\n\nRead the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do",
+      "sourceRefs": ["essay-the-worlds-broken-what-do-we-do#L1-L4"],
+      "treatment": {
+        "ref": "pattern:used-to-think-now",
+        "rationale": "Test the reviewed first-person belief-shift scaffold because this source contains an explicit former belief and a genuine correction. This remains a hypothesis, not a winner claim.",
+        "evidenceStatus": "hypothesis",
+        "evidenceRefs": ["sha256:eab59aff9411365842a03776499907fdc7de36fa7e5984f3ae8f11ec90c850bb"]
+      },
+      "experimentVariables": {
+        "cta": "canonical-source-inline",
+        "hook": "used-to-think-now",
+        "length": "medium"
+      },
+      "voiceCheck": "passed",
+      "originalityCheck": "passed"
+    },
+    {
+      "id": "variant-linkedin-direct-claim",
+      "platform": "linkedin",
+      "medium": "text",
+      "format": "post",
+      "body": "Trying to make a difference felt like it would only make the pain worse. Doing nothing made it worse. The work itself helps me feel more connected to the person I wanted to become.\n\nRead the full essay: https://www.humaninference.ai/essays/the-worlds-broken-what-do-we-do",
+      "sourceRefs": ["essay-the-worlds-broken-what-do-we-do#L1-L4"],
+      "treatment": {
+        "ref": "treatment:direct-claim-control",
+        "rationale": "Use the same source cut, platform, format, CTA, and approximate length without the reviewed belief-shift scaffold, so the opening treatment is the declared variable.",
+        "evidenceStatus": "supported",
+        "evidenceRefs": ["essay-the-worlds-broken-what-do-we-do#L1-L4"]
+      },
+      "experimentVariables": {
+        "cta": "canonical-source-inline",
+        "hook": "direct-claim",
+        "length": "medium"
+      },
+      "voiceCheck": "passed",
+      "originalityCheck": "passed"
+    }
+  ],
+  "capacity": {
+    "day": "2026-09-01",
+    "review": [{ "platform": "linkedin", "available": 2 }],
+    "slots": [{ "platform": "linkedin", "available": 2 }]
+  },
+  "experiment": {
+    "id": "experiment-used-to-think-vs-direct",
+    "question": "Does a genuine first-person belief-shift opening produce more qualified conversation than a direct-claim opening when the source, platform, format, CTA, and approximate length remain fixed?",
+    "outcomeFamilies": ["attention", "conversation", "audience", "business"],
+    "minimumSample": 20,
+    "topic": "collective agency and the emotional consequence of inaction",
+    "audience": "mixed-feed readers interested in civic systems and practical agency"
+  }
+}
