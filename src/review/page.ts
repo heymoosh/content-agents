@@ -110,9 +110,12 @@ export function imageMissingHtml(row: { kind?: string; assetUrl?: string }): str
 }
 
 /** Actions shared by every persisted configured-media stage, independent of media kind. */
-export function mediaPlanActionsHtml(asset: string | undefined): string {
+export function mediaPlanActionsHtml(asset: string | undefined, media?: string): string {
+  const attach = media === "image" || media === "image-carousel"
+    ? '<button data-act="attach-reviewed-media">Attach reviewed image file(s)</button>'
+    : "";
   return String(asset || "").startsWith("media-stages/")
-    ? '<span class="storyboard-control"><button data-act="approve-media-plan">Approve media plan/source</button><button class="storyboard" data-act="render-media">Render approved media</button></span>'
+    ? '<span class="storyboard-control"><button data-act="approve-media-plan">Approve media plan/source</button><button class="storyboard" data-act="render-media">Render approved media</button>'+attach+'</span>'
     : "";
 }
 
@@ -1484,7 +1487,7 @@ function rowEl(piece, row){
         ? '<span class="hint">generating storyboard… (the Studio room has progress)</span>'
         : '<span class="storyboard-control">'+engineSelectHtml()+'<button class="storyboard" data-act="gen-storyboard">Generate storyboard</button></span>')
     : "";
-  const mediaPlanBtns = mediaPlanActionsHtml(row.asset);
+  const mediaPlanBtns = mediaPlanActionsHtml(row.asset, row.mediaStage?.media);
   // "Duplicate to platform" (card 9304e4a5's missing "create a post for another platform"):
   // options come from DATA.textPlatforms (server's TEXT_PLATFORMS), excluding this row's own
   // platform so the dropdown only ever offers an actual new target.
@@ -1663,6 +1666,15 @@ async function onAction(e, piece, row, el){
     const r = await post("/api/content/media/render",{slug:piece.slug,id:row.id});
     if(r.ok){ flash("Configured media render queued"); loadJobs(); }
     else { e.target.disabled=false; flash(r.error||"Could not queue media render"); }
+  } else if (act === "attach-reviewed-media"){
+    const entered = window.prompt("Paste one relative file per line. Each must be an image already inside this content folder.", "reviewed/image.png");
+    if(entered===null) return;
+    const assetPaths = entered.split(/\\r?\\n/).map(value=>value.trim()).filter(Boolean);
+    if(!assetPaths.length){ flash("Enter at least one relative image path"); return; }
+    e.target.disabled = true;
+    const r = await post("/api/content/media/attach-reviewed",{slug:piece.slug,id:row.id,assetPaths});
+    if(r.ok){ flash("Reviewed image file(s) attached for draft review"); await load(); }
+    else { e.target.disabled=false; flash(r.error||"Could not attach reviewed image files"); }
   } else if (act === "dup"){
     const box = el.querySelector(".dupbox"); box.classList.toggle("show");
     if(!box.classList.contains("show")) row.dupError = null; // closing dismisses any stale error
@@ -1824,7 +1836,7 @@ async function approveReviewSelection(){
 }
 
 // ── rooms ──
-// Six rooms on the desk (Content Studio Riff): Content, Studio, Outreach, Fiction, Charles, Signals.
+// Seven rooms on the desk: Studio, Venture, Content, Outreach, Fiction, Charles, and Signals.
 // Refresh stays room-aware: it only re-reads whatever the CURRENT room shows, labeled per room,
 // with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = ${JSON.stringify(BOOT_ROOM)};
@@ -5315,7 +5327,7 @@ function renderStudio(){
   // The four stat tiles (drafts / dossiers / follow-ups / posts holding) were the pre-prototype
   // summary. "Needs you today" already names the same work in sentences, and each tile's click
   // path already has a needs-you row or the room nav, so the tiles go rather than relocate.
-  const captures = readCaptureHandoffs().map(captureHandoffSummary).filter(Boolean).map(c=>({...c, urgent:true}));
+  const captures = SERVER_CAPTURES.map(captureHandoffSummary).filter(Boolean).map(c=>({...c, urgent:true}));
   const items = [...captures, ...(STUDIO.needsYou||[])];
   const rows = items.map(n=>
     '<div class="ny-row'+(n.urgent?" urgent":"")+'"><span class="ny-room">'+esc(n.label)+'</span>'+
@@ -5887,26 +5899,6 @@ function captureVerdict(room){
 
 let linkAskUrl = null;          // the bare link the two-button ask is open on
 let captureSubmitting = false;  // the two Studio handoffs share one guard, so Enter cannot double-queue
-const CAPTURE_HANDOFF_KEY = "content-studio.capture-handoff.v1";
-function readCaptureHandoffs(){
-  try {
-    const value = JSON.parse(localStorage.getItem(CAPTURE_HANDOFF_KEY) || "null");
-    const rows = Array.isArray(value) ? value : value ? [value] : [];
-    return rows.filter(row=>row && typeof row.room === "string" && typeof row.text === "string" && typeof row.id === "string");
-  } catch { return []; }
-}
-function saveCaptureHandoff(room, text){
-  const capture = { id:String(Date.now())+":"+Math.random().toString(36).slice(2), room, text: String(text).trim() };
-  if(!capture.text) return null;
-  try {
-    localStorage.setItem(CAPTURE_HANDOFF_KEY, JSON.stringify([...readCaptureHandoffs(), capture]));
-    return capture;
-  } catch { return null; }
-}
-function clearCaptureHandoff(id){
-  try { localStorage.setItem(CAPTURE_HANDOFF_KEY, JSON.stringify(readCaptureHandoffs().filter(c=>c.id!==id))); }
-  catch { flash("Could not clear this capture. It is still saved."); }
-}
 function captureHandoffSummary(capture){
   if(!capture || !String(capture.text || "").trim() || !String(capture.room || "").trim()) return null;
   const room = String(capture.room);
