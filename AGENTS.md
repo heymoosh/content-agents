@@ -60,10 +60,14 @@ Hard-won on 2026-07-17; these are properties of Muxin's machine, not of any one 
   the "Updating a..b" line prints BEFORE a would-be-overwritten abort, so a filtered pull looks
   successful while deploying nothing (eight merges silently undeployed once). Verify with
   `git status -sb` (look for "behind") or check a merged file exists on disk.
-- **macOS TCC can silently revoke ~/Documents access mid-run** (EPERM everywhere under it while
-  `~` still works). It is not a sandbox/config issue and no agent can fix it: a human re-Allows
-  in System Settings → Privacy & Security → Files & Folders (never Full Disk Access) and restarts
-  the process. Stop and surface; don't retry-loop.
+- **Do not diagnose macOS TCC from `EPERM` alone.** First identify the denied operation: sandboxed
+  port binding, process inspection, networking, and out-of-workspace writes can also return
+  `EPERM`. Treat it as a possible Files & Folders problem only when the denied operation names a
+  path under `~/Documents` and both a direct read of a known file and a narrowly scoped write probe
+  fail inside a workspace that Codex declares writable. Then stop and ask the human to re-Allow
+  the host app under System Settings → Privacy & Security → Files & Folders (never Full Disk
+  Access) and fully restart that host process. Otherwise, handle the specific denied operation
+  through the normal sandbox approval path.
 - **Board writes:** only through `prose_kanban` (coordinator / `locked_rewrite`) — never edit
   `docs/content-agents-backlog.md` as text. The board's merge machinery treats direct edits as a
   guardrail violation.
