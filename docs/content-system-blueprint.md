@@ -782,10 +782,18 @@ human display label. `npm run grow:experiment-schedule` is preview-only by defau
 `--schedule` flag is required before it applies the handoff or contacts a provider. No path
 auto-approves or treats provider acceptance as confirmed publication.
 
+`src/grow/experiment-run.ts` closes the next evidence transition. Given the original proposal,
+its complete digest-bound Muxin decision, and one or more successful scheduler observations, it
+revalidates approval, exact lineage, provider references, claimed times, and delivery identity,
+then emits the canonical `running` experiment record. Only variants actually observed as
+scheduled are included. `npm run grow:experiment-run -- --input <envelope.json>` is read-only: it
+does not contact providers, alter the queue, infer outcomes, select a winner, or create a Venture
+handoff. Failed, duplicate, drifted, unapproved, or pre-decision observations fail closed.
+
 The current real packet remains pending Muxin's item-level decisions, so it advances the vertical
 slice but does not complete this phase. After a decision is applied, the deterministic scheduling
-boundary is ready; the remaining operational evidence is an explicitly authorized provider action
-and its observed result, followed later by outcome evidence.
+boundary and running-record transition are ready; the remaining operational evidence is an
+explicitly authorized provider action and its observed result, followed later by outcome evidence.
 
 ### Phase 4: Venture learning
 

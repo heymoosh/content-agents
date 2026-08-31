@@ -17,6 +17,7 @@ export const GROW_EXPERIMENT_SCHEDULING_VERSION = "grow-experiment-scheduling-v1
 export interface GrowExperimentScheduleAttempt {
   readonly kind: "grow_experiment_schedule_attempt";
   readonly version: typeof GROW_EXPERIMENT_SCHEDULING_VERSION;
+  readonly proposalDigest: string;
   readonly variantId: string;
   readonly attempted: true;
   readonly scheduled: unknown;
@@ -132,6 +133,7 @@ export async function scheduleGrowExperimentVariant(
   return {
     kind: "grow_experiment_schedule_attempt",
     version: GROW_EXPERIMENT_SCHEDULING_VERSION,
+    proposalDigest: handoff.proposalDigest,
     variantId,
     attempted: true,
     scheduled: attempt.scheduled,
