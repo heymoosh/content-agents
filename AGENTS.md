@@ -16,10 +16,14 @@ use `AGENTS.md` so any agent can discover them consistently.
   backlog, SimpleKanban, conductor, or related orchestration workflows unless Muxin explicitly
   requests that workflow by name. Do not read or modify the backlog merely because a task could
   become a card. Repository architecture and safety rules still apply.
-- Inner loop: verify every change with `npm run check`.
+- Inner loop: verify every change with `npm run check` (typecheck + unit tests).
+- Local-first merge gate: the recorded local `npm run check` result is the
+  ordinary merge proof. Do not push solely to obtain a hosted test result, and
+  do not wait on the manual CI workflow for routine changes.
 - Behavior gate: run `TODO: e2e/integration command` once, only when user-visible behavior changed.
 - Heavy checks (mutation testing, full matrices) are CI-only — never run them locally.
-- After pushing, check CI once with `gh pr checks` — don't poll.
+- After pushing, inspect only retained workflows that were intentionally
+  triggered (for example the secret scan); do not poll for routine test CI.
 - Maturity: when you finish a feature or open a PR (not small fixes), check the next rung in `docs/maturity.md` and propose it if its trigger fires — never auto-apply.
 - Living document: when a correction recurs, add the rule here.
 
