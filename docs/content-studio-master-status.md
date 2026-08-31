@@ -1,14 +1,19 @@
 # Content Studio master status
 
 **Last reconciled:** 2026-08-30
-**Repository baseline:** PR #412 branch `docs/content-studio-master-status-final`, rebased onto
-`origin/main` at `06bd00c`, with Phase 0 already landed on `main` and Phase 1 committed on this branch.
+**Repository baseline:** merged `origin/main` commit `0ad0a32` (PR #412), plus the Phase 1
+completion patch recorded by the current branch until that follow-up PR merges. PR #412 contains
+the Phase 0 safety wiring and the core Phase 1 operating-loop implementation; the follow-up closes
+the audited reviewed-image and status-reconciliation gaps.
 **Phase 0 status:** operational provenance and policy wiring are complete with deterministic browser
 coverage, and one authenticated Codex generation canary passed; authenticated provider canaries remain.
-**Phase 1 status:** implementation and deterministic verification are complete for durable capture and
+**Phase 1 status:** repository implementation and deterministic verification are complete for durable capture and
 safe next actions, advisor-cut enforcement, seven staged media pipelines, normalized delivery and
 reconciliation, one locked operational data root, the gated Postiz-first/Typefully-fallback canary
-matrix, and reviewed Signals apply/rollback; authenticated provider lifecycle canaries remain unrun.
+matrix, and reviewed Signals apply/rollback. Operational acceptance is still open because the
+authenticated Postiz-first/Typefully-fallback lifecycle matrix has not run. A read-only discovery
+attempt on 2026-08-30 reached the configured `localhost:4007` address but the Postiz instance was
+not running, so it changed no provider state and proved no live capability.
 **Generation review:** Muxin approved the treatment, editor, voice, CTA, and distribution behavior
 shown in `docs/reviews/content-studio-phase1-generation-review.html`. The artifact contains eight Luna and eight Grok
 source-grounded treatments of Muxin's essay plus eight before/after examples from a blind Luna
@@ -35,13 +40,14 @@ magnet or substitutes a generic homepage.
 **Provider-cost update:** Studio edits already route Claude, Grok, and GPT/Codex through local
 subscription CLIs. Grok prose now uses the subscription CLI, transcription uses local whisper.cpp,
 and unattended image generation is disabled; reviewed Codex-generated image files are the preferred
-art path until Studio has a reviewed-file attachment step. OpenRouter remains temporarily for Kling video interpolation only while Wan 2.2
+art path through Studio's reviewed-file attachment step. OpenRouter remains temporarily for Kling video interpolation only while Wan 2.2
 is evaluated locally; HunyuanVideo 1.5 is not a fit for this Apple-Silicon machine.
 **Verification status:** the subscription-backed Grok prose adapter completed a live nonempty
-canary at zero reported cost; provider-policy, Studio scheduling, and Content capture regressions
-are covered locally. The Postiz adapter is not ready for a live canary because its account and
-capability contract still does not match the self-hosted API, so publishing remains blocked pending
-that correction and an attended lifecycle test.
+canary at zero reported cost; provider-policy, Studio scheduling, Content capture, all seven media
+stage contracts, durable runtime state, provider reconciliation, and Signals apply/rollback are
+covered locally. The Postiz adapter and attended canary harness exist, but the configured local
+instance was offline during the latest read-only discovery attempt. Publishing remains live-unverified
+until Postiz capability discovery and the attended create/read/cancel/reconcile matrix pass.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
 
@@ -98,39 +104,40 @@ Content handoff, Signals decisions, Outreach tracking improvements, durable Cont
 and engine boundaries. PR #407 added Fiction passage editing and review history plus Charles
 status views, prose-only editing, and retry-safe review notes.
 
-The current working tree closes the four Phase 0 safety boundaries with deterministic coverage:
+Merged PR #412 closes the four Phase 0 safety boundaries with deterministic coverage:
 configured Muxin-voice generation is constrained within an approved source/cut boundary; Fiction
 and Charles handoffs preserve their approved body and domain restrictions; delivery resolves origin
 to a fail-closed brand/account policy; and a disposable injected-engine Chromium pass now drives
-the real configured-generation GUI flow. These changes are not yet a PR or merge. A bounded
+the real configured-generation GUI flow. A bounded
 authenticated Codex CLI generation canary passed in a throwaway repository copy; no authenticated
 provider lifecycle canary is claimed. A read-only authenticated Substack saved-session check also
 passed, proving login readiness but not create/list/cancel or live delivery.
 
-The system is **not** complete end to end. The largest unresolved boundaries are:
+The system is **not operationally verified end to end**. The largest unresolved boundaries are:
 
-1. Configured media choices produce Markdown rows and declared asset paths, not the requested
-   rendered image, carousel, audiogram, or video assets.
-2. Publishing records scheduling attempts but does not reliably confirm terminal live delivery
-   across providers.
-3. Studio capture is browser-local and does not start durable work.
-4. Signals adoption records Muxin's decision but does not apply an approved change to system
-   behavior.
-5. The newer Grow/pattern architecture contains many useful typed contracts, but much of it remains
+1. The authenticated Postiz-first/Typefully-fallback create/read/cancel/reconcile matrix has not
+   run. The configured Postiz instance was offline at the latest read-only discovery attempt.
+2. Provider reconciliation records explicit `uncertain` evidence instead of guessing when an API
+   cannot prove a terminal state. Typefully and YouTube list absence is not terminal proof, and
+   Substack still needs provider or reviewed human evidence.
+3. Media pipelines are deterministically wired behind approval gates, including a safe reviewed-file
+   attachment path for attended Codex image and carousel files. Paid/authenticated provider renders
+   and delivery paths remain live-unverified.
+4. The newer Grow/pattern architecture contains many useful typed contracts, but much of it remains
    scaffolded or partially connected to live generation, review, delivery, and outcomes.
-6. Provider delivery lifecycles remain live-unverified because this environment has no provider
-   credentials or non-secret account bindings.
+5. Provider credentials and non-secret account bindings are configured locally, but credentials
+   alone are not lifecycle evidence and must not be described as a successful canary.
 
 ## Studio and Content
 
 | Capability | Latest decision | Current state | Verification | Remaining work |
 |---|---|---|---|---|
 | Global Studio shell | One global room bar; each room has a small local view menu; persistent references live in the right rail. | Seven rooms are implemented: Studio, Venture, Content, Outreach, Fiction, Charles, Signals. PR #404. | Deterministic tested in DOM and Chromium fixture passes. | `src/review/page.ts` remains a very large generated HTML/JS module. Keep room labels and supporting documentation synchronized with the seven-room model. |
-| Studio capture | One front door accepts a thought or link, identifies the destination, explains it, and starts the next safe step. | Classification and a `content-studio.capture-handoff.v1` browser `localStorage` record exist. The target room can display and clear it. | Deterministic browser/UI coverage. | **Partially wired.** The capture is not repository-durable, starts no backend job, and has no real next action in Content. “Start on it” currently overstates the result. |
-| Advisor and cuts | Muxin supplies substance; the advisor proposes lens/CTA choices; Muxin edits message-level cuts before formatting. | `/develop`, recommendation rounds, deterministic accept/dismiss, cuts, and cut comments exist. | Deterministic unit coverage; model route not browser-verified. | The advisor/cut path is not the primary current Content cycle. Reconnect it before platform/media formatting. |
+| Studio capture | One front door accepts a thought or link, identifies the destination, explains it, and starts the next safe step. | `studio-capture-v1` records are repository-owned under the operational data root, locked, idempotent, and restart-safe. The current classifier has four actionable destinations: Content reserves and starts one durable advisor job; Fiction, Outreach, and Venture open the existing room-owned human gate with the saved capture visible. It does not claim to route directly to Charles or Signals. | Deterministic cross-process, crash-recovery, route, and browser/UI coverage for those four destinations. | Add Charles and Signals only after each has a room-owned safe capture action; until then the global bar is not evidence of direct seven-room classification. |
+| Advisor and cuts | Muxin supplies substance; the advisor proposes lens/CTA choices; Muxin edits message-level cuts before formatting. | `/develop`, recommendation rounds, deterministic accept/dismiss, cuts, and cut comments exist. Content configuration re-reads the authoritative approved cut and refuses missing, dismissed, mismatched, ambiguous, malformed, or uncited cut provenance before formatting. | Deterministic unit, persistence, and authorization coverage; authenticated model calls remain nondeterministic. | Repeat the authenticated model canary when the advisor engine adapter changes. |
 | Content configuration | The system recommends treatments, media, and destinations; Muxin accepts or overrides rather than constructing the plan from scratch. | Durable `content-request.json` now persists validated source or approved-cut provenance, treatment/media/platform selections, untreated controls, recommendations, and grouped input-request filters. The working-tree merge path preserves the authoritative provenance/context rather than accepting client replacement. | Deterministic request, persistence, and UI coverage. | Current UI makes Muxin choose the matrix directly. Real recommendation evidence is blocked or generic until reviewed mechanism data exists. |
 | Configured text generation | The untreated control is byte-exact. Approved treatments may re-hook, reorder, trim, clarify, and add connective structure within cited source boundaries; every generated item remains pending review and preserves provenance. | Human Inference/Studio generation requires authoritative `source_lines`, materially applies the selected treatment, then runs a blind cold-feed editor that sees only the finished drafts and sharpens topic grounding for a rapidly context-switching reader. Voice validation rejects AI tells, dashes, footnote syntax, and lowercase prose after colons. Canonical long-form sources get a CTA; Substack Notes never self-link. | Deterministic prompt/parser/provenance/editor/voice/CTA/output coverage, a disposable injected-engine Chromium pass through the real GUI save-and-generate flow, reviewed Luna and Grok comparison artifacts, and one bounded authenticated Codex CLI generation canary in a throwaway repository copy. | Keep provenance enforcement and human review fail-closed while reconnecting advisor/cut review. Repeat authenticated canaries when engine adapters change. |
-| Media generation | Requested media should invoke the relevant text/script, review, render, and asset pipeline. Paid steps remain explicit. | The classic quote-card, image, storyboard/video, captions, TTS, and render subsystems exist. The configured request can name media and declare expected paths. | Classic subsystems have deterministic tests; paid/live paths are gated. | **Partially wired.** Configured image, carousel, audiogram, and video selections do not create the assets. Wire each media type to its real staged pipeline and review gates. |
+| Media generation | Requested media should invoke the relevant text/script, review, render, and asset pipeline. Paid steps remain explicit. | All seven configured choices create a source-bound, inspectable stage; require explicit digest-bound approval; dispatch to the production renderer/provider; verify the created assets and cost; checkpoint promotion; and update the review row without double-rendering after a promotion failure. Image and carousel stages also accept attended Codex files already placed inside the content folder, validate regular nonempty nonsymlink image files and matching image signatures, enforce the approved image count, preserve the supplied positional slide order, reject contradictory numbered filenames, copy files to canonical output paths, and use the same manifest/promotion checkpoint. | Deterministic registry, plan, approval, tamper, reviewed-file safety, renderer-injection, asset-verification, promotion-retry, and no-double-billing coverage for quote still, animated quote, image, carousel, short video, caption package, and audiogram. | Authenticated/paid provider renders remain live-unverified. Attended Codex images are now supported through the reviewed-file workflow. |
 | Content review | Group by original request; edit directly; comment/revise; approve explicitly; keep publishing status separate. | Searchable request filter, direct derivative editor, revise notes/engine, bulk selection, approval, and four-step Content views exist. PRs #404/#406. | Strong unit/UI coverage. | Add a disposable-browser pass for Content direct edit, grouped approval, and injected provider outcomes. Clarify in UI that approval currently attempts scheduling immediately. |
 | Cross-room Content handoffs | Venture, Fiction, and Charles reuse one Content workflow while retaining source identity, voice/canon rules, CTA ownership, and delivery policy. | Typed idempotent handoff contracts and routes exist for all three. The working tree requires and persists Fiction's approved promotion body plus locked passages/canon/provenance restrictions, and Charles's approved post body plus persona/CTA/manual-delivery restrictions. Fiction/Charles configured generation permits only an untreated control copied from that approved body and records context/restriction references; any treated variant fails closed before a job or write. Venture retains its scoped composition exception: treated variants use an approved Venture artifact, `claim_refs`, `config/voice.yaml`, and the no-invented-proof constraint. | Deterministic unit, persistence, route, generation-policy, and Venture prompt/parser coverage. The disposable Chromium pass directly proves Fiction treatment refusal before a job or derivative write. | Add broader cross-room browser scenarios for approved-body/restriction display and Venture composition. Fiction remains provider-blocked until it has a separate configured account; Charles remains manual by decision. |
 
@@ -139,7 +146,7 @@ The system is **not** complete end to end. The largest unresolved boundaries are
 | Capability | Latest decision | Current state | Verification | Remaining work |
 |---|---|---|---|---|
 | Engine selection | Choose per run. Prefer subscription/free routes. Claude, Grok, and GPT/Codex use their installed subscription CLIs; reserve Grok for deliberate cross-family work. Stop GPT-OSS experiments unless Muxin explicitly reopens them. | Claude, Grok, Codex, and restricted local-engine dispatch exist across supported actions; availability and engine provenance are exposed. PR #406. | Extensive argv/domain/UI tests; real multi-engine jobs remain nondeterministic and unverified end to end. | Mark GPT-OSS paused in product choices, not available merely because Ollama reports a model. Stamp Fiction draft and continuity outputs with engine provenance consistently. |
-| Shared job queue | One bounded lane, real elapsed time, logs, stop/retry, blocked questions, engine attribution, artifact-based success. | One serialized in-memory queue with persisted logs and visible job state exists. | Strong unit and deterministic browser coverage. | Queue state is memory-only. Restart loses queued/running/blocked jobs, no cross-process global mutex exists, and a killed model may leave partial writes. Add a durable job/event store and recovery contract if restart recovery is promised. |
+| Shared job queue | One bounded lane, real elapsed time, logs, stop/retry, blocked questions, engine attribution, artifact-based success. | One serialized lane persists durable job summaries under the operational data root, uses a cross-process execution lease, and recovers abandoned queued/running work fail-closed as nonretryable instead of silently replaying a possibly non-idempotent model call. | Strong unit, cross-process, stale-lock, restart-recovery, and deterministic browser coverage. | Recovery deliberately does not resume an interrupted model call. A future resumable engine contract would need artifact checkpoints and engine-specific idempotency. |
 | Approval boundary | Generation never implies approval; no delivery without explicit approval. | Review queues and Muxin-only Venture/Fiction/Charles gates are enforced in domain code. | Strong deterministic tests. | Provider and cross-brand integration must continue to fail closed while the account/policy gaps above remain. |
 
 ## Publishing and delivery
@@ -155,22 +162,22 @@ Postiz does not support the required destination or capability.
 
 | Destination | Current provider/path | State | What is still unverified or missing |
 |---|---|---|---|
-| X, LinkedIn, Bluesky, Mastodon, Threads text | **Target:** self-hosted Postiz; **current fallback:** Typefully scheduled drafts | Postiz **Not implemented**; Typefully provider unverified | Implement and verify the Postiz account/auth/create/list/cancel/reconciliation path. Keep Typefully working and verify its fallback lifecycle before any migration or removal. |
-| X, LinkedIn, Bluesky quote cards | **Target:** self-hosted Postiz where supported; **current fallback:** native Typefully image drafts | Postiz **Not implemented**; Typefully provider unverified | Verify Postiz media upload and create/list/cancel. Keep Typefully media fallback available until the Postiz path is verified. |
-| TikTok | **Target:** Postiz where supported; **current exception/fallback:** PostPeer upload and scheduled post | Postiz **Not implemented**; PostPeer provider unverified | Confirm whether the connected Postiz instance supports TikTok and the required media. Otherwise verify PostPeer schedule/list/cancel live. |
-| YouTube Shorts | **Target:** Postiz where supported; **current exception/fallback:** YouTube Data API, private until `publishAt` | Postiz **Not implemented**; YouTube provider unverified | Confirm Postiz capability first. If unsupported, verify OAuth upload, scheduled-public transition, final URL, and terminal reconciliation for the YouTube path. |
+| X, LinkedIn, Bluesky, Mastodon, Threads text | Self-hosted Postiz when live discovery advertises the exact account/destination/media capability; Typefully scheduled drafts only after an explicit unsupported result | Postiz and Typefully adapters deterministic-tested; both provider-unverified | Start the configured Postiz instance and run the attended Postiz-first matrix. Verify Typefully fallback in the same matrix before any migration or removal. |
+| X, LinkedIn, Bluesky quote cards | Postiz when live discovery advertises media upload for the exact account/destination; native Typefully image drafts only after an explicit unsupported result | Postiz and Typefully media paths deterministic-tested; both provider-unverified | Verify Postiz media registration/create/read/cancel and retain the Typefully image fallback until its own lifecycle passes. |
+| TikTok | Postiz when live discovery advertises TikTok/video; otherwise the explicit PostPeer exception | Capability-first selection implemented; providers unverified | Discover the connected Postiz capability first. If unsupported, verify PostPeer schedule/list/cancel live. |
+| YouTube Shorts | Postiz when live discovery advertises YouTube/video; otherwise the explicit YouTube Data API exception, private until `publishAt` | Capability-first selection implemented; providers unverified | Discover Postiz first. If unsupported, verify OAuth upload, scheduled-public transition, final URL, and terminal reconciliation for YouTube. |
 | Substack Notes | Constrained saved-session browser automation | Provider unverified | Run an explicitly approved canary; maintain selectors; add independent live confirmation. Full essays remain manual. |
 | Community/manual destinations | `ready-to-paste/` | Intentionally manual | Surface the handoff and status in the Studio consistently. |
-| Postiz | Self-hosted Postiz | **Decided primary; Not implemented** | No adapter, environment variables, routes, jobs, account mapping, reconciliation, or tests exist in reachable history. Build the primary path, expose capabilities dynamically, and verify it before changing the working fallback. |
+| Postiz | Self-hosted Postiz | **Implemented and deterministic-tested; provider unverified** | The adapter, environment contract, dynamic capability/account registry, Studio scheduling path, stable provider IDs, create/read/cancel/reconcile lifecycle, recovery ledger, gated canary, and fallback matrix exist. The configured local instance was offline at the latest discovery attempt; start it and pass the attended matrix before changing the working fallback. |
 | Outreach email/Gmail | **Target:** send from the Content Agents GUI through the connected email account after explicit approval; **current fallback:** manual/external send with a “sent elsewhere” record | **Not implemented** for GUI sending; manual fallback currently available | Add authenticated send, success/failure reconciliation, and automatic sent-state updates. Keep manual/external sending for unsupported channels such as LinkedIn DMs. |
 
 ### Scheduler and publishing status
 
 | Capability | Current state | Verification | Remaining work |
 |---|---|---|---|
-| Unified scheduler | `src/publish/slots.ts`, `config/platforms.yaml`, and local append-only `data/publish-schedule.jsonl` claim PT/DST-aware slots across streams. | Strong deterministic tests. | The ledger is gitignored and checkout-local. Define one operational data root and cross-process concurrency/recovery behavior. |
-| Publish orchestration | Studio approval dispatches through the currently implemented provider paths; Postiz remains the decided but unimplemented primary. The working tree resolves persisted origin before dispatch: Human Inference/Venture require an exact non-secret account assertion matching the credential identity, Fiction fails closed without a separate account, Charles writes ready-to-paste copy, and missing/ambiguous origins are blocked. Publisher adapters also assert the supplied policy at their boundary. | Deterministic policy-matrix, scheduler, adapter, and mocked-provider tests only; Postiz is not implemented and no authenticated provider lifecycle was exercised. | Use the self-hosted Postiz capability/account registry as canonical. Keep Typefully fallback behavior verified during migration. Current Content choices omit supported Mastodon, expose unsupported Instagram generation/delivery, and omit community. Configure and live-verify each asserted account before operational dispatch. |
-| Publishing status | Append-only `data/publishing-status.jsonl` records atomic per-row attempts, planned provider/time, retry blocking, uncertainty, and human reconciliation. The working tree also records policy version, origin, brand, delivery mode, provider account ID, and policy reason, including blocked/manual outcomes. | Strong deterministic unit/UI coverage; no authenticated provider verification. | There is no reliable terminal `published/live` ingest across all providers. Distinguish delivered, deleted, canceled, failed, private, and uncertain; persist provider IDs and `published_at`/URL instead of parsing free-text logs. |
+| Unified scheduler | `src/publish/slots.ts`, configuration, publish ledger, durable jobs, captures, provider status, and reconciliation health all resolve through `CONTENT_AGENTS_DATA_ROOT` (defaulting outside the checkout). File locks and execution leases serialize cross-process mutation; startup recovery fails abandoned non-idempotent work closed. | Strong deterministic PT/DST, migration, cross-process, stale-lock, lease, and restart-recovery tests. | Operational backup/retention for the external data root remains an installation concern, not a second checkout-local authority. |
+| Publish orchestration | Studio approval discovers the live Postiz account/capability registry first and chooses Postiz only for exact advertised support. A verified unsupported result permits the explicit Typefully/PostPeer/YouTube/manual fallback. Human Inference/Venture require exact non-secret account assertions, Fiction fails closed without a separate account, Charles is ready-to-paste, and missing/ambiguous origins are blocked at scheduler and adapter boundaries. | Deterministic policy, discovery, capability-first selection, scheduler, adapter, fallback, and mocked lifecycle coverage; no authenticated lifecycle pass. | Start Postiz and run the attended matrix. Do not treat discovery transport failure as unsupported, and do not remove Typefully before its fallback canary passes. |
+| Publishing status | Append-only normalized events record atomic claims, provider/account/object IDs, provider URLs, planned and observed timestamps, policy identity, uncertainty, human evidence, and delivered/deleted/canceled/failed/private/uncertain outcomes. A bounded reconciler runs under one cross-process lease and persists last-run health. | Strong deterministic unit, cross-process, runner-wiring, all-state normalization, human-evidence, and no-blind-retry coverage; no authenticated provider verification. | APIs that cannot prove terminal state remain explicitly `uncertain`. Run authenticated provider lifecycles and retain reviewed human evidence for providers without authoritative reads. |
 
 ## Venture
 
@@ -225,7 +232,7 @@ history and its “nothing built yet” statement is obsolete.
 | Capability | Latest decision | Current state | Verification | Remaining work |
 |---|---|---|---|---|
 | Analytics and strategy | Keep attention, conversation, audience, and business separate; thin data stays insufficient; no silent routing changes. | Analytics DB, strategy briefs, bets, routing/resonance, and several recommendation layers exist. | Extensive deterministic tests plus historic operational data. | Landing/opt-in/business outcome ingestion remains incomplete; account/brand separation is not complete in the Studio read. |
-| Signals decisions | Muxin adopts or declines recommendations; adoption should eventually change system behavior through a visible gate. | PR #406 stores append-only adopt/decline decisions. | Deterministic unit/UI coverage. | **Partially wired.** Adoption records intent only. Build an explicit apply/review step and audit trail before changing config or generation behavior. |
+| Signals decisions | Muxin adopts or declines recommendations; an adopted recommendation may change behavior only through a separate visible review/apply gate. | Adoption creates an exact allowlisted cadence or routing proposal against a configuration digest. Muxin separately approves or rejects it, apply uses a write-ahead intent and conflict guard, restart reconciles an interrupted apply without guessing, and rollback requires the exact applied value plus evidence. Unsupported prose recommendations remain blocked. | Deterministic intent, allowlist, preview, review, apply, conflict, crash-recovery, rollback, append-only audit, concurrency, route, and UI coverage. | Expand the allowlist only with a reviewed typed delta and matching recovery semantics; never turn free-form recommendation prose directly into configuration writes. |
 | Per-brand Signals | Human Inference, Charles, and Fiction have separate content, goals, strategy, and accounts. | Source/origin concepts exist in some Content contracts. | Partial domain tests. | No complete brand/account/outcome partition in analytics, Signals, or provider reconciliation. |
 | Pattern evidence | Use reviewed common mechanisms without copying creator-specific prose; evidence and originality remain explicit. | Corpus, pattern, review metadata, evidence ledgers, mechanism blueprints, and many reports/adapters exist. PR #405 added mechanism proposals and mad-lib hook frames. | Strong deterministic contract/report tests. | Much of the reviewed account metadata, baseline coverage, platform/pool matrix, and live mechanism ledger remains awaiting human review or scaffolded. Do not call it an integrated recommendation engine yet. |
 | Grow lifecycle | Connect source, claim/cut, variant, review, capacity, delivery, outcome, and Venture without auto-approval. | Many typed, side-effect-free records and reconciliation projections exist. | Deterministic contract tests. | **Scaffold/partial.** Connect the lifecycle to live generation, review queue, scheduler/provider facts, comments, funnel events, and business outcomes. |
@@ -253,26 +260,39 @@ Implemented in the PR #412 change set, with deterministic evidence:
    That pass proves GUI authority, traced pending output, zero external calls, and Fiction treatment
    refusal. Pass E separately inventories only authenticated live CLI execution as nondeterministic.
 
-One bounded authenticated Codex CLI generation canary passed in a throwaway repository copy. No
-provider credential or non-secret provider-account binding is available in this environment, so no
-authenticated provider lifecycle canary ran. Before operationally broadening delivery, configure
-and explicitly gate those provider canaries. Do not treat a working-tree diff or deterministic test
-as a PR, merge, or live delivery proof. The read-only `publish:substack -- --check` probe did confirm
+One bounded authenticated Codex CLI generation canary passed in a throwaway repository copy.
+Provider credentials and non-secret provider-account bindings are configured locally, but the
+configured Postiz service was offline, so no authenticated provider lifecycle canary ran. Before
+operationally broadening delivery, start Postiz and explicitly gate those provider canaries. Do not
+treat a working-tree diff or deterministic test as a PR, merge, or live delivery proof. The
+read-only `publish:substack -- --check` probe did confirm
 that the saved Substack browser session is currently authenticated.
 
 ### P1: complete the promised operating loop
 
-1. Make Studio capture durable and make “Start on it” launch the real next safe action.
-2. Reconnect advisor/cut review ahead of treatment formatting.
-3. Wire configured media choices to actual render pipelines and staged approvals.
-4. Persist provider IDs and terminal delivery outcomes; reconcile delivered vs canceled/deleted/
-   failed/private/uncertain for every provider.
-5. Define one operational scheduler/job data root with cross-process locking and restart recovery.
-6. Add gated live canaries with **Postiz first** for each supported destination/media, then verify
-   **Typefully as the fallback** before any migration or removal. Verify PostPeer, YouTube, and
-   Substack only for destinations or capabilities Postiz does not support. A live canary must never
-   bypass approval or make an instant public post.
-7. Make adopted Signals changes enter a separate explicit apply/review audit flow.
+Repository implementation and deterministic verification are complete across merged PR #412 and
+the current Phase 1 completion patch:
+
+1. Studio capture is durable. Content starts one idempotent advisor job; Fiction, Outreach, and
+   Venture open their existing human-gated next step without implying autonomous work.
+2. Content configuration requires an authoritative approved cut before treatment formatting.
+3. All seven configured media choices have source-bound stages, explicit approval, production
+   dispatch, asset verification, promotion checkpoints, and retry-safe deterministic coverage.
+4. Provider/account/object IDs and normalized delivered/deleted/canceled/failed/private/uncertain
+   evidence persist append-only. Reconciliation never converts absence or transport failure into a
+   guessed terminal state.
+5. Scheduler, job, capture, publishing, and reconciliation state share one operational data root
+   with cross-process locks, leases, migration, and fail-closed restart recovery.
+6. Postiz-first discovery, Typefully fallback, explicit provider exceptions, and the attended
+   lifecycle matrix are implemented and deterministic-tested.
+7. Signals uses separate propose, review, apply, recovery, and rollback events for exact allowlisted
+   configuration deltas.
+
+**Remaining Phase 1 acceptance gate:** start the configured Postiz instance, pass read-only live
+capability discovery, then run the explicitly approved attended Postiz-first/Typefully-fallback
+create/read/cancel/reconcile matrix. The 2026-08-30 discovery attempt failed closed with
+`ECONNREFUSED` at `localhost:4007`; it created or changed nothing. Do not label Phase 1 live verified
+until the matrix finishes with terminal cleanup for every created canary object.
 
 ### P2: complete product depth
 
@@ -288,7 +308,8 @@ that the saved Substack browser session is currently authenticated.
 ### Recorded product decisions
 
 1. Postiz is the canonical primary social publishing infrastructure. Self-hosted Postiz is the
-   default path for supported destinations/media, but it is not implemented yet.
+   default path for capabilities advertised by live discovery. The repository path is implemented;
+   authenticated lifecycle verification remains open.
 2. Typefully remains the working fallback and must not be removed before Postiz is implemented and
    verified.
 3. Outreach email is intended to send from the Content Agents GUI after Muxin's explicit approval.

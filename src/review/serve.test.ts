@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -35,9 +36,11 @@ import {
   requestAnalysisEngine,
   requestInteractiveAnalysisEngine,
   recordOutreachInitialSend,
+  reviewRequestHandler,
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
+import { approveConfiguredMediaStage } from "./configured-media-runtime.js";
 
 test("engine availability requires the exact GPT-OSS model, not merely an Ollama binary", () => {
   const missing = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\nllama3.2:latest\n" : "");
@@ -98,13 +101,50 @@ test("configured Content requests have one explicit draft-generation route", () 
   assert.match(source, /generateConfiguredContent/);
 });
 
-test("configured media has separate plan approval and queued render routes", () => {
+test("configured media has separate plan approval, queued render, and reviewed-file attachment routes", () => {
   const source = readFileSync(join(process.cwd(), "src/review/serve.ts"), "utf8");
   assert.ok(source.includes('url.pathname === "/api/content/media/approve"'));
   assert.ok(source.includes('url.pathname === "/api/content/media/render"'));
+  assert.ok(source.includes('url.pathname === "/api/content/media/attach-reviewed"'));
   assert.match(source, /approveConfiguredMediaStage\(safeFolder\(slug\), id\)/);
   assert.match(source, /executeConfiguredMediaStage\(folder, id, defaultConfiguredMediaRenderer\)/);
+  assert.match(source, /attachReviewedConfiguredMediaFiles\(folder, id, assetPaths\)/);
   assert.match(source, /runQueued\("configured-media-render"/);
+  const attachRoute = source.slice(source.indexOf('url.pathname === "/api/content/media/attach-reviewed"'), source.indexOf('url.pathname === "/api/develop/start"'));
+  assert.match(attachRoute, /await runQueued\("configured-media-render"/);
+  assert.match(attachRoute, /attachReviewedConfiguredMediaFiles\(folder, id, assetPaths\)/);
+});
+
+test("POST attach-reviewed executes the real route and returns promoted reviewed media", async () => {
+  const slug = `.test-attach-reviewed-${process.pid}-${Date.now()}`;
+  const folder = join(process.cwd(), "content", slug);
+  mkdirSync(join(folder, "media-stages"), { recursive: true });
+  mkdirSync(join(folder, "reviewed"));
+  writeFileSync(join(folder, "review-queue.md"), `| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| m1 | linkedin | image | media-stages/m1.json | — | — | — | pending | | from GUI queue |\n`);
+  writeFileSync(join(folder, "media-stages/m1.json"), JSON.stringify({
+    version: "configured-media-stage-v1", id: "m1", media: "image", status: "staged",
+    stage: "prompt-approval-required", plan: { kind: "image-prompt-brief", sourceExcerpt: "approved" }, primitives: ["reviewed"],
+  }));
+  writeFileSync(join(folder, "reviewed/art.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]));
+  approveConfiguredMediaStage(folder, "m1");
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/content/media/attach-reviewed`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug, id: "m1", assetPaths: ["reviewed/art.png"] }),
+    });
+    const body = await response.json() as { ok?: boolean; result?: { primaryAsset?: string }; error?: string };
+    assert.equal(response.status, 200, body.error ?? "attach-reviewed route failed");
+    assert.equal(body.ok, true);
+    assert.equal(body.result?.primaryAsset, "configured-media/m1/image.png");
+    assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /Attached reviewed image/);
+  } finally {
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 test("the initial GUI Content save derives source authority on the server", () => {

@@ -101,7 +101,10 @@ test("configured quote/video stage rows expose approval and actual-render action
     const html = mediaPlanActionsHtml(`media-stages/${id}.json`);
     assert.match(html, /approve-media-plan/);
     assert.match(html, /render-media/);
+    assert.doesNotMatch(html, /attach-reviewed-media/);
   }
+  assert.match(mediaPlanActionsHtml("media-stages/image.json", "image"), /attach-reviewed-media/);
+  assert.match(mediaPlanActionsHtml("media-stages/carousel.json", "image-carousel"), /attach-reviewed-media/);
   assert.equal(mediaPlanActionsHtml("images/already-rendered.png"), "");
 });
 
@@ -2307,6 +2310,7 @@ test("Studio capture: top-level Start on it advances every classified build to i
   const paths = [...new Set([...section.matchAll(/\/api\/[a-z0-9/-]+/g)].map((m) => m[0]))].sort();
   assert.deepEqual(paths, ["/api/captures", "/api/captures/start"]);
   assert.ok(section.includes('SERVER_CAPTURES'));
+  assert.ok(!section.includes('content-studio.capture-handoff.v1'), "the retired browser-local capture store must not remain a second authority");
   assert.ok(section.includes('CAPTURE WAITING HERE'));
   assert.ok(section.includes('Start on it'));
   assert.ok(section.includes('Approval and publishing remain separate.'));
@@ -2324,6 +2328,8 @@ test("Studio capture: top-level Start on it advances every classified build to i
   const routeBody = section.slice(section.indexOf("async function takeCaptureTo"), section.indexOf("let SERVER_CAPTURES"));
   assert.ok(routeBody.includes('/api/captures'), "routing persists through the server");
   assert.ok(routeBody.includes('advanceCaptureSafely(room,t)'), "the top-level action must advance after its durable save");
+  const studioRender = script.slice(script.indexOf("function renderStudio()"), script.indexOf("function renderTeamRail", script.indexOf("function renderStudio()")));
+  assert.ok(studioRender.includes("SERVER_CAPTURES.map(captureHandoffSummary)"), "Studio needs-you reads the repository-backed captures");
 });
 
 test("Studio capture copy: no em dashes and every classified build names its safe next gate", () => {
@@ -3393,11 +3399,14 @@ test("Outreach puts a concrete recommendation before the yes-or-no choice", () =
   assert.ok(body.includes("WHY THIS MAY BE WORTH A CONVERSATION"));
   assert.ok(body.includes("recommendation+decideBtns"));
 });
-test("configured media rows expose distinct plan approval and render actions", () => {
+test("configured media rows expose plan approval, production render, and reviewed-file attachment actions", () => {
   const source = readFileSync(join(process.cwd(), "src/review/page.ts"), "utf8");
   assert.match(source, /data-act="approve-media-plan"/);
   assert.match(source, /data-act="render-media"/);
+  assert.match(source, /data-act="attach-reviewed-media"/);
   assert.match(source, /\/api\/content\/media\/approve/);
   assert.match(source, /\/api\/content\/media\/render/);
+  assert.match(source, /\/api\/content\/media\/attach-reviewed/);
+  assert.match(source, /one relative file per line/i);
   assert.match(source, /JSON\.stringify\(row\.mediaStage,null,2\)/);
 });

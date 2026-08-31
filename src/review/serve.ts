@@ -104,7 +104,7 @@ import { loadFictionPromotionDraft } from "./fiction-promotion-draft.js";
 import { createApprovedCharlesHandoff } from "./charles-content-handoff-store.js";
 import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
 import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
-import { approveConfiguredMediaStage, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
+import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
 import { saveCutBody, addCutComment } from "./rows.js";
 import { providerReconciliationHealth, startProviderReconciliationLoop } from "./provider-reconciliation-runner.js";
 
@@ -884,7 +884,7 @@ function json(res: ServerResponse, code: number, obj: unknown): void {
   res.end(s);
 }
 
-const server = createServer(async (req, res) => {
+export async function reviewRequestHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
   try {
     // Fixture mode is read-only by construction. This sits ABOVE every route on purpose: nothing
@@ -1274,6 +1274,20 @@ const server = createServer(async (req, res) => {
         }, "codex");
         json(res, 200, { ok: true, queued: true, ids: [id] });
         void result.catch(() => undefined);
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/content/media/attach-reviewed") {
+      const b = await readBody(req);
+      try {
+        const slug = String(b.slug ?? "").trim(), id = String(b.id ?? "").trim();
+        const assetPaths = Array.isArray(b.assetPaths) ? b.assetPaths.map((value) => String(value).trim()).filter(Boolean) : [];
+        const folder = safeFolder(slug);
+        const result = await runQueued("configured-media-render", `Attach reviewed configured media: ${slug}/${id}`, async (job) => {
+          job.slugs = [slug];
+          return attachReviewedConfiguredMediaFiles(folder, id, assetPaths);
+        }, "codex");
+        json(res, 200, { ok: true, result });
       } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
       return;
     }
@@ -1950,7 +1964,9 @@ const server = createServer(async (req, res) => {
   } catch (e) {
     json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
   }
-});
+}
+
+const server = createServer(reviewRequestHandler);
 
 // Start the server only when run directly (npm run review), so tests can import revisePrompt et al.
 // without binding the port. The explicit function is also the narrow seam used by the hermetic
