@@ -1,6 +1,6 @@
 # Content Studio master status
 
-**Last reconciled:** 2026-08-30
+**Last reconciled:** 2026-08-31
 **Repository baseline:** merged `origin/main` commit `0ad0a32` (PR #412), plus the Phase 1
 completion patch recorded by the current branch until that follow-up PR merges. PR #412 contains
 the Phase 0 safety wiring and the core Phase 1 operating-loop implementation; the follow-up closes
@@ -123,7 +123,7 @@ The system is **not operationally verified end to end**. The largest unresolved 
 3. Media pipelines are deterministically wired behind approval gates, including a safe reviewed-file
    attachment path for attended Codex image and carousel files. Paid/authenticated provider renders
    and delivery paths remain live-unverified.
-4. The newer Grow/pattern architecture contains many useful typed contracts, but much of it remains
+4. The newer Experiment/pattern architecture contains many useful typed contracts, but much of it remains
    scaffolded or partially connected to live generation, review, delivery, and outcomes.
 5. Provider credentials and non-secret account bindings are configured locally, but credentials
    alone are not lifecycle evidence and must not be described as a successful canary.
@@ -227,15 +227,46 @@ history and its “nothing built yet” statement is obsolete.
 | Delivery | Charles remains ready-to-paste unless Muxin explicitly approves account automation. | Intentionally manual in `charles/AGENTS.md`. | Policy tests. | No Charles-owned provider/account implementation, by design. |
 | Charles to Content | Approved Charles prose can enter Content without inheriting another venture/CTA. | Typed handoff exists. The working tree preserves approved prose and persona restrictions, refuses unsupported treatments, and records manual ready-to-paste delivery as private with no provider account. | Deterministic handoff, generation-policy, delivery-policy, and publishing-ledger coverage. | Deterministic safety boundaries are closed. Delivery remains intentionally manual unless Muxin explicitly changes the policy; no authenticated Charles provider path is claimed. |
 
-## Signals, analytics, patterns, and Grow
+## Signals, analytics, patterns, and Experiment
+
+**Resolved architecture decision:** “Experiment” is the user-facing name for the capability
+previously called Grow. Existing `src/grow/**`, `grow-*`, and `npm run grow:*` identifiers are
+legacy implementation names and may remain until a deliberate migration; they do not define the
+product boundary. Signals is the scientific intelligence layer: it reviews ordinary Content
+performance and other qualified evidence, separates attention, conversation, audience, and
+business outcomes, and recommends the next bounded content-growth experiment when a useful
+uncertainty warrants publishing capacity. Experiment is the execution layer: it preserves the
+approved hypothesis and lineage, creates controlled variants through the normal Content treatment
+and cold-feed-editor path, obtains Muxin's approval, schedules safely, records observations, and
+returns results to Signals for interpretation. Experiment does not invent its own rationale or
+silently turn every post into a test.
+
+There are two distinct experiment families. A **content-growth experiment** is Signals-owned and
+tests a general content, treatment, media, platform, distribution, or audience-growth question.
+A **venture-learning experiment** is owned by one named Venture and tests that venture's market,
+reader problem, product, offer, or demand hypothesis. Venture surveys belong to the latter: Venture
+owns their questions, responses, clustering, interpretation, and phase decisions. Shared Experiment
+machinery may provide review, scheduling, attribution, and measurement, but it may not detach a
+Venture result from its venture context or reinterpret it as a global content rule. Any learning
+crossing between Venture and Signals requires a visible reviewed handoff with provenance, scope,
+sample size, and caveats.
+
+Before Muxin can approve any experiment, its review must show: the observation and evidence that
+motivated it; the proposed interpretation; a directional, falsifiable hypothesis; why the chosen
+input is a valid test; the single controlled variable and held-constant factors; primary success
+metric and outcome family; guardrails; sample size or duration; keep/revise/reject decision rule;
+confidence and caveats; and why the opportunity is worth the publishing capacity. Candidate copy
+must already have passed the same treatments, media/platform configuration, voice validation,
+source/CTA rules, and blind cold-feed editor used by ordinary Content generation. A generic claim
+that a treatment “may change outcomes” is not an approval-ready hypothesis.
 
 | Capability | Latest decision | Current state | Verification | Remaining work |
 |---|---|---|---|---|
 | Analytics and strategy | Keep attention, conversation, audience, and business separate; thin data stays insufficient; no silent routing changes. | Analytics DB, strategy briefs, bets, routing/resonance, and several recommendation layers exist. | Extensive deterministic tests plus historic operational data. | Landing/opt-in/business outcome ingestion remains incomplete; account/brand separation is not complete in the Studio read. |
 | Signals decisions | Muxin adopts or declines recommendations; an adopted recommendation may change behavior only through a separate visible review/apply gate. | Adoption creates an exact allowlisted cadence or routing proposal against a configuration digest. Muxin separately approves or rejects it, apply uses a write-ahead intent and conflict guard, restart reconciles an interrupted apply without guessing, and rollback requires the exact applied value plus evidence. Unsupported prose recommendations remain blocked. | Deterministic intent, allowlist, preview, review, apply, conflict, crash-recovery, rollback, append-only audit, concurrency, route, and UI coverage. | Expand the allowlist only with a reviewed typed delta and matching recovery semantics; never turn free-form recommendation prose directly into configuration writes. |
 | Per-brand Signals | Human Inference, Charles, and Fiction have separate content, goals, strategy, and accounts. | Source/origin concepts exist in some Content contracts. | Partial domain tests. | No complete brand/account/outcome partition in analytics, Signals, or provider reconciliation. |
-| Pattern evidence | Use reviewed common mechanisms without copying creator-specific prose; evidence and originality remain explicit. | **Phase 2 vertical slice complete.** Corpus, pattern, review metadata, evidence ledgers, mechanism blueprints, and reports/adapters exist. The first real `research-dossier-v2` records Muxin's approval of the bounded evidence and a separate `hypothesis` disposition for the used-to-think/now scaffold. The packet, receipt, caveats, citations, and no-winner boundary remain digest-bound. | Strong deterministic contract/report tests, including forged receipt, partial-approval, unknown-field, tamper, body, winner-claim, and authority failures; the approved real dossier is retained under `docs/reviews/`. | Move to the Phase 3 Grow-this experiment slice. Continue expanding reviewed account metadata, baselines, platform/pool coverage, and the live mechanism ledger without calling the current evidence an integrated recommendation engine or a winner claim. |
-| Grow lifecycle | Connect source, claim/cut, variant, review, capacity, delivery, outcome, and Venture without auto-approval. | Many typed records and reconciliation projections exist. **Phase 3 vertical slice is in Muxin item review:** `grow-experiment-proposal-v1` binds one real approved cut and controlled treatments to one digest. Its retained static review page now collects one explicit decision per candidate and copies or downloads the exact decision JSON without changing repository/provider state. The queue handoff rebuilds that decision, admits only unchanged Muxin-approved variants, writes exact derivative assets plus canonical `approve` queue rows idempotently, and returns the existing Grow delivery binding. The explicit scheduling boundary rechecks the approved row and exact bytes, uses Studio's durable no-blind-retry scheduler, and binds the observed provider object and exact claimed ISO timestamp back into Grow. Successful scheduler observations can now be revalidated into the canonical body-free `running` experiment containing only actually scheduled approved variants and exact publish references. Preview is the default and only `--schedule` can dispatch; the running-record command is read-only. | Focused proposal/decision/export/handoff/scheduling/running-record/CLI, conflict, idempotency, lineage, failure/uncertainty, retained-artifact sync, publisher timestamp, full Grow-suite coverage, and a disposable Chromium pass against the retained local HTML. No authenticated provider action is claimed. | Muxin must decide the real packet's individual variants in the retained HTML and provide/save its exported JSON. Apply that decision, then explicitly authorize/run its provider action for operational evidence; comments, funnel events, and business outcomes remain later evidence. |
+| Pattern evidence | Use reviewed common mechanisms without copying creator-specific prose; evidence and originality remain explicit. | **Phase 2 vertical slice complete.** Corpus, pattern, review metadata, evidence ledgers, mechanism blueprints, and reports/adapters exist. The first real `research-dossier-v2` records Muxin's approval of the bounded evidence and a separate `hypothesis` disposition for the used-to-think/now scaffold. The packet, receipt, caveats, citations, and no-winner boundary remain digest-bound. | Strong deterministic contract/report tests, including forged receipt, partial-approval, unknown-field, tamper, body, winner-claim, and authority failures; the approved real dossier is retained under `docs/reviews/`. | Connect reviewed evidence to a Signals-authored Phase 3 Experiment recommendation. Continue expanding reviewed account metadata, baselines, platform/pool coverage, and the live mechanism ledger without calling the current evidence an integrated recommendation engine or a winner claim. |
+| Experiment lifecycle | Signals recommends and later interprets content-growth experiments; Experiment executes approved controlled tests without auto-approval. Venture owns venture-learning experiments and surveys within one venture's hypothesis chain. | Many typed records and reconciliation projections exist under legacy `src/grow/**` names. The current Phase 3 packet proves digest-bound proposal, review, handoff, scheduling, and running-record mechanics, but it was manually supplied rather than recommended from observed performance, its hypothesis rationale is not approval-ready, and its candidate copy bypassed the configured cold-feed editor. It must not be treated as a valid pending experiment. | Focused proposal/decision/export/handoff/scheduling/running-record/CLI, conflict, idempotency, lineage, failure/uncertainty, publisher timestamp, Grow-suite coverage, and a disposable Chromium pass against the retained local HTML. This verifies mechanics, not a Signals recommendation, editor integration, scientific rationale, authenticated provider action, or measured result. | Build the Signals-to-Experiment recommendation boundary and the explicit rationale/decision-rule review contract; route candidates through ordinary Content generation and its blind editor; regenerate the retained review with a new digest. Keep Venture survey learning venture-scoped and require reviewed handoffs for any cross-system generalization. |
 
 ## Prioritized remaining work
 

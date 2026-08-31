@@ -314,8 +314,14 @@ remain exploratory.
 
 ## 5. Lightweight skills and orchestration boundaries
 
-**Grow-this** is the surface contract. It coordinates one conversation and exposes only the next
+**Experiment** is the user-facing surface contract formerly called Grow-this. It coordinates one conversation and exposes only the next
 decision. It does not replace the engines below it.
+
+Signals owns scientific recommendation and interpretation for content-growth tests. It reviews
+qualified performance evidence, identifies a useful uncertainty, and proposes a directional,
+falsifiable hypothesis. Experiment owns the controlled execution, review, scheduling, lineage,
+measurement, and return of results to Signals. Existing `grow-*` code and command names are legacy
+implementation identifiers, not a reason to expose Grow as a separate product concept.
 
 - `develop` is the advisor and cut engine. It recommends angles and assembles cuts from source
   material; it is not an invisible author.
@@ -347,7 +353,7 @@ pretend that a target contract exists while its producer is still current-state 
 ```text
 coverage/catalog
   -> pool evidence
-  -> Grow variants
+  -> Experiment variants
   -> review/publish
   -> comments/Signals
   -> Venture
@@ -357,7 +363,7 @@ coverage/catalog
    current-versus-target coverage. It is the inventory foundation.
 2. **Pool evidence** adds bounded evidence, pool membership, denominators, dates, selection rules,
    and caveats. It may identify hypotheses, not manufacture winners.
-3. **Grow variants** turns an approved source or raw thought into cuts and platform treatments,
+3. **Experiment variants** turns an approved source or raw thought into controlled platform treatments,
    retaining lineage, variables, rationale, and the mad-lib originality boundary.
 4. **Review/publish** exposes decisions, enforces human approval, claims only valid platform slots,
    and records scheduling and delivery outcomes. The current typed seams are the review bundle,
@@ -695,7 +701,7 @@ provenance, metadata gaps, and blocked rows deterministic and inspectable. It is
 scaffold for Phase 2, not the Phase 2 ship predicate: the phase remains incomplete until the
 normalized evidence set, reviewable summaries and selection rules, denominators, dates, caveats,
 source citations, originality checks, and Muxin's judgment are present. A provisional inventory
-does not unlock Grow variants or permit a winner claim.
+does not unlock Experiment variants or permit a winner claim.
 
 `research-dossier-v2` is the first end-to-end Phase 2 decision boundary. It binds one declared
 question and intended use to an exact included/excluded evidence set, an explicit selection
@@ -726,17 +732,27 @@ rows remain `blocked` and no pool comparison or winner claim may proceed.
 claiming winners, generating body or opener copy, replacing human judgment with ranking, or
 generalizing from a single account or small sample.
 
-### Phase 3: Grow-this experiments
+### Phase 3: Experiment execution
 
-**Ship predicate:** Given one raw input, a selected platform set, available evidence, and the
-configured review and slot capacity, the owner produces a readable cut, bounded platform/format
+**Ship predicate:** Given one normal Content input, a Signals recommendation with qualified
+evidence and an approval-ready hypothesis, a selected platform set, and the configured review and
+slot capacity, the owner produces a readable cut, bounded platform/format
 variants, a review bundle, and publish-ready records. Each output retains lineage, experiment
 variables, treatment rationale, evidence status, and pending decisions. Muxin decides which items
 are approved, edited, rejected, or sent for another pass. The review bundle makes that decision
 explicit, the capacity manifest keeps candidate volume separate from approved publish volume, and
 the experiment record preserves scope and measured outcome families. Evidence is the cut, variant
-bundle, decision record, scheduler record, and any outcome record. The owner is Grow variants,
+bundle, decision record, scheduler record, and any outcome record. The owner is Experiment execution,
 with review/publish owning the approval and delivery gate.
+
+The approval surface must show the motivating observation and evidence, interpretation,
+directional falsifiable hypothesis, reason the input is a valid test, controlled variable,
+constants, primary success metric and outcome family, guardrails, sample size or duration,
+keep/revise/reject decision rule, confidence and caveats, and publishing-capacity rationale. Every
+candidate must pass the ordinary Content treatment, platform/media, provenance, CTA, voice, and
+blind cold-feed-editor path before the digest-bound experiment proposal is constructed. A manually
+supplied comparison or a hypothesis saying only that a treatment may affect outcomes is mechanical
+test data, not an approval-ready experiment recommendation.
 
 **Not in scope:** silent platform selection, publishing without approval, auto-replies, or changing
 voice/pillars/routing from metrics alone.
@@ -795,14 +811,22 @@ slice but does not complete this phase. After a decision is applied, the determi
 boundary and running-record transition are ready; the remaining operational evidence is an
 explicitly authorized provider action and its observed result, followed later by outcome evidence.
 
-### Phase 4: Venture learning
+### Phase 4: Cross-system learning and Venture handoff
 
-**Ship predicate:** Given measured variants, qualified comments, funnel events, and business
-outcomes, the owner produces a caveated Venture input with provenance, scope, sample size, and
-decision context. Muxin decides whether to adopt, decline, or request more evidence, and Venture's
-own gate decides whether the input becomes a Venture artifact or phase transition. Evidence is the
-linked signal, decision record, Venture artifact, and approval record. The owner is Venture after
-comments/Signals has produced qualified inputs.
+**Ship predicate:** Given measured Content variants, qualified comments, funnel events, and business
+outcomes, Signals may propose a caveated handoff to a named Venture with provenance, scope, sample
+size, and decision context. Muxin decides whether to adopt, decline, or request more evidence, and
+Venture's own gate decides whether the input becomes a Venture artifact or phase transition.
+Evidence is the linked signal, decision record, Venture artifact, and approval record. The owner is
+Venture only after Signals has produced qualified inputs and Muxin has approved the boundary crossing.
+
+This cross-system phase is not Venture's internal survey workflow. Surveys created for a Venture
+remain inside that named Venture and help test its market, reader-problem, product, offer, and
+demand hypotheses. Venture owns survey design, response intake, clustering, interpretation, and
+phase decisions. Shared Experiment machinery may help deliver probes or preserve attribution, but
+content-growth success criteria cannot replace the Venture's market-learning criteria. A Venture
+finding reaches Signals or becomes a general Content rule only through a separate reviewed handoff
+that retains venture identity, evidence, sample size, scope, and caveats.
 
 The current side-effect-free bridges are `src/review/learning-packet.ts`,
 `src/grow/comment-learning.ts`, and `src/grow/learning-bundle.ts`. They are review views, not
