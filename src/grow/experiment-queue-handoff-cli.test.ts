@@ -39,7 +39,7 @@ test("handoff CLI previews by default and requires --apply for filesystem writes
   const applied: string[] = [];
   assert.equal(await runGrowExperimentQueueHandoffCli(["--proposal", "proposal", "--decision", "decision", "--folder", "/content/example"], io(files, applied)), 0);
   assert.equal(applied.length, 0);
-  assert.equal(JSON.parse(files.stdout!).rows[0].status, "approve");
+  assert.equal(JSON.parse(files.stdout!).rows[0].status, "pending");
   assert.equal(await runGrowExperimentQueueHandoffCli(["--proposal", "proposal", "--decision", "decision", "--folder", "/content/example", "--apply"], io(files, applied)), 0);
   assert.deepEqual(applied, ["/content/example"]);
 });

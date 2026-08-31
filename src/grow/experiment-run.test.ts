@@ -35,6 +35,7 @@ function folder(): string {
 async function fixture() {
   const root = folder(); const proposal = buildGrowExperimentProposal(input()); const selected = decision(proposal.digest);
   const handoff = applyGrowExperimentQueueHandoff(root, proposal, selected);
+  writeCell(root, "v", { status: "approve" });
   const attempt = await scheduleGrowExperimentVariant(handoff, "v", { schedule: async (_folder, slug) => {
     writeCell(root, "v", { status: "published" });
     const publishing: PublishingStatus = { slug, rowId: "v", provider: "typefully", state: "planned", at: "2026-08-30T14:00:00Z", plannedFor: "2026-09-01T16:00:00Z", providerObjectId: "tf-1", deliveryMode: "provider" };

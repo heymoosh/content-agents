@@ -18,7 +18,7 @@ const input = (): SignalsExperimentScienceInput => ({
 
 const recommended = JSON.stringify({
   status: "recommended", evidenceRefs: ["evidence-1", "baseline-1"], observation: "A reviewed mechanism remains untested for this audience.", interpretation: "The belief shift may create a clearer entry point.",
-  hypothesis: "The belief-shift opening will increase substantive replies per 1,000 impressions without reducing essay visits beyond the guardrail.",
+  hypothesis: "The belief-shift opening will increase substantive replies per 1,000 impressions relative to the direct opening without reducing essay visits beyond the guardrail.",
   expectedOutcome: { variantId: "variant-a", comparisonRef: "variant-b", family: "conversation", metric: "substantive-replies-per-1000", direction: "increase" },
   whyThisInput: "The input contains a genuine change of mind.", controlledVariable: "opening structure", constants: ["platform", "source", "CTA"],
   primaryMetric: { family: "conversation", metric: "substantive-replies-per-1000" }, guardrails: [{ family: "audience", metric: "essay-visits-per-1000", rule: "Must not fall more than 10%." }],
@@ -53,5 +53,19 @@ describe("Signals science agent experiment recommendation", () => {
     assert.deepEqual(parseSignalsExperimentScienceResult(JSON.stringify({ status: "no-experiment", reason: "Evidence is too thin.", evidenceRefs: ["evidence-1"] }), input(), "codex").status, "no-experiment");
     assert.throws(() => parseSignalsExperimentScienceResult(recommended.replace('"evidence-1"', '"invented"'), input(), "codex"), /outside the supplied pack/i);
     assert.throws(() => parseSignalsExperimentScienceResult(recommended.replace('"variant-a"', '"invented"'), input(), "codex"), /unknown or self-referential candidate/i);
+  });
+
+  test("rejects a generic hypothesis that is not directional and falsifiable", () => {
+    const generic = JSON.parse(recommended);
+    generic.hypothesis = "This treatment may affect outcomes.";
+    assert.throws(() => parseSignalsExperimentScienceResult(JSON.stringify(generic), input(), "codex"), /directional and falsifiable/i);
+    generic.hypothesis = "This treatment will increase outcomes relative to the control.";
+    assert.throws(() => parseSignalsExperimentScienceResult(JSON.stringify(generic), input(), "codex"), /directional and falsifiable/i);
+  });
+
+  test("accepts a concrete comparative hypothesis written with natural inflection", () => {
+    const concrete = JSON.parse(recommended);
+    concrete.hypothesis = "The belief-shift opening improves substantive replies compared with the direct opening.";
+    assert.equal(parseSignalsExperimentScienceResult(JSON.stringify(concrete), input(), "codex").status, "recommended");
   });
 });

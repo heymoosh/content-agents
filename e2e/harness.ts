@@ -103,6 +103,7 @@ export function changedWorktreePaths(before: Map<string, string>, after: Map<str
 export const EXPENSIVE_ROUTES = [
   "/api/atomize",
   "/api/content/generate",
+  "/api/signals/experiments/propose",
   "/api/develop/start",
   "/api/develop/reply",
   "/api/develop/format",

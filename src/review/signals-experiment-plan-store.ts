@@ -21,14 +21,24 @@ export interface SignalsExperimentPlanRead {
   readonly experimentId: string;
   readonly contentRequestId: string;
   readonly confidence: ExperimentPlan["recommendation"]["confidence"];
+  readonly evidenceRefs: string[];
+  readonly observation: string;
+  readonly interpretation: string;
   readonly priority: ExperimentPlan["priority"];
   readonly priorityReason: string;
   readonly hypothesis: string;
+  readonly expectedOutcome: ExperimentPlan["recommendation"]["expectedOutcome"];
   readonly controlledVariable: string;
+  readonly whyThisInput: string;
+  readonly constants: string[];
   readonly primaryMetric: ExperimentPlan["recommendation"]["primaryMetric"];
   readonly guardrails: ExperimentPlan["recommendation"]["guardrails"];
   readonly minimumSample: number;
   readonly minimumDays: number;
+  readonly decisionRule: ExperimentPlan["recommendation"]["decisionRule"];
+  readonly caveats: string[];
+  readonly capacityRationale: string;
+  readonly capacity: ExperimentPlan["capacity"];
   readonly status: "proposed" | "deferred" | "declined" | "plan-approved" | "drafts-pending-content-review";
   readonly planDecision: ExperimentPlanDecision | null;
   readonly generatedIds: string[];
@@ -129,22 +139,38 @@ export function markExperimentContentHandoff(
 
 export function readExperimentPlans(path: string = SIGNALS_EXPERIMENT_PLANS_PATH): SignalsExperimentPlanRead[] {
   return withFileLock(`${path}.lock`, () => [...fold(path).values()].map((row): SignalsExperimentPlanRead => {
+    const capacity = row.plan.capacity ?? { availablePublishingUnits: 0, availableDays: 0, sufficient: false };
+    const effectivePriority = capacity.sufficient ? row.plan.priority : "deferred";
     const status = row.handoff ? "drafts-pending-content-review"
       : row.decision?.status === "approved" ? "plan-approved"
         : row.decision?.status === "declined" ? "declined"
-          : row.plan.priority === "deferred" ? "deferred" : "proposed";
+          : effectivePriority === "deferred" ? "deferred" : "proposed";
     return {
       experimentId: row.plan.recommendation.id,
       contentRequestId: row.plan.contentRequest.id,
       confidence: row.plan.recommendation.confidence,
-      priority: row.plan.priority,
-      priorityReason: row.plan.priorityReason,
+      evidenceRefs: [...row.plan.recommendation.evidenceRefs],
+      observation: row.plan.recommendation.observation,
+      interpretation: row.plan.recommendation.interpretation,
+      priority: effectivePriority,
+      priorityReason: capacity.sufficient
+        ? row.plan.priorityReason
+        : row.plan.capacity
+          ? "Deferred because declared publishing capacity is insufficient for the minimum sample or duration."
+          : "Deferred because this legacy plan has no declared publishing capacity.",
       hypothesis: row.plan.recommendation.hypothesis,
+      expectedOutcome: { ...row.plan.recommendation.expectedOutcome },
       controlledVariable: row.plan.recommendation.controlledVariable,
+      whyThisInput: row.plan.recommendation.whyThisInput,
+      constants: [...row.plan.recommendation.constants],
       primaryMetric: { ...row.plan.recommendation.primaryMetric },
       guardrails: row.plan.recommendation.guardrails.map((item) => ({ ...item })),
       minimumSample: row.plan.recommendation.minimumSample,
       minimumDays: row.plan.recommendation.minimumDays,
+      decisionRule: { ...row.plan.recommendation.decisionRule },
+      caveats: [...row.plan.recommendation.caveats],
+      capacityRationale: row.plan.recommendation.capacityRationale,
+      capacity: { ...capacity },
       status,
       planDecision: row.decision ? { ...row.decision } : null,
       generatedIds: row.handoff ? [...row.handoff.generatedIds] : [],

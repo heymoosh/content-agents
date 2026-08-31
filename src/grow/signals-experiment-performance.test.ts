@@ -166,6 +166,7 @@ describe("Signals per-experiment performance view", () => {
       },
       contentRequest: input,
       variablesByVariant: Object.fromEntries(request.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }])),
+      capacity: { availablePublishingUnits: 2, availableDays: 1 },
     });
     const buildLive = (performanceSubject as any).buildLiveSignalsExperimentPerformance;
     const view = buildLive({

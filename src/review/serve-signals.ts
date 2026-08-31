@@ -6,14 +6,15 @@ import { readSignals, readOutcomeFamilies, readResearchReport } from "./signals.
 import { buildSignalsRecommendationRead } from "./signals-recommendations.js";
 import { appendSignalsDecision, readSignalsDecisions, recommendationKey, type SignalsDecisionKind, type SignalsRecommendationType } from "./signals-decisions.js";
 import { applySignalsProposal, proposeSignalsChange, readSignalsProposals, reconcileSignalsApplyIntents, reviewSignalsProposal, rollbackSignalsProposal } from "./signals-change-proposals.js";
-import { applyApprovedExperimentToContent, approveExperimentPlan, type AppliedExperimentContentHandoff, type ExperimentPlan, type ExperimentPlanDecision } from "../grow/experiment-content-handoff.js";
+import { applyApprovedExperimentToContent, approveExperimentPlan, assertExperimentPlanCanGenerate, type AppliedExperimentContentHandoff, type ExperimentPlan, type ExperimentPlanDecision } from "../grow/experiment-content-handoff.js";
 import { buildLiveSignalsExperimentPerformance, buildSignalsExperimentInterpretationPrompt, type ExperimentAnalyticsObservation, type SignalsExperimentPerformanceRow } from "../grow/signals-experiment-performance.js";
-import { loadExperimentPlan, loadExperimentPlanDecision, markExperimentContentHandoff, readExperimentPlans, readExperimentPlansForPerformance, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
+import { loadExperimentPlan, loadExperimentPlanDecision, markExperimentContentHandoff, readExperimentPlans, readExperimentPlansForPerformance, recordExperimentPlan, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
 import { readExperimentInterpretations, recordExperimentInterpretation, reviewExperimentInterpretation, type ExperimentInterpretationInput } from "./signals-experiment-result-store.js";
 import { isEngine, type Engine } from "./engines.js";
 import { safeFolder } from "./rows.js";
 import { readPublishingStatuses } from "./publishing-status.js";
 import { buildOutcomeLedger, readOutcomeLedger } from "../grow/outcome-ledger.js";
+import type { SignalsExperimentProposalRequest, SignalsExperimentProposalResult } from "./signals-experiment-proposal.js";
 
 type SignalsRouteContext = {
   req: IncomingMessage;
@@ -30,7 +31,15 @@ type SignalsRouteContext = {
   readExperimentPerformance?: () => unknown;
   interpretExperiment?: (id: string, engine: Engine) => Promise<ExperimentInterpretationInput & { readonly autoWinner?: false }>;
   applyExperimentPlan?: (plan: ExperimentPlan, decision: ExperimentPlanDecision) => Promise<AppliedExperimentContentHandoff>;
+  proposeExperiment?: (input: SignalsExperimentProposalRequest) => Promise<SignalsExperimentProposalResult>;
 };
+
+function requiredPositiveInteger(value: unknown, field: string): number {
+  if (value === undefined || value === null || value === "") throw new Error(`${field} is required`);
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${field} must be a positive integer`);
+  return parsed;
+}
 
 function readLiveExperimentPerformance(experimentPlansPath?: string) {
   const plans = readExperimentPlansForPerformance(experimentPlansPath);
@@ -65,7 +74,7 @@ export function prepareLiveExperimentInterpretation(id: string, experimentPlansP
 
 // Signals stays split by its existing response contracts: signal summary, outcome families, and
 // redacted research report remain separate reads; decisions are explicit append-only writes.
-export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, experimentResultsPath, readExperimentPerformance, interpretExperiment, applyExperimentPlan }: SignalsRouteContext): Promise<boolean> {
+export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, experimentResultsPath, readExperimentPerformance, interpretExperiment, applyExperimentPlan, proposeExperiment }: SignalsRouteContext): Promise<boolean> {
   // Signals room (design 3e): deterministic brief + durable user decisions. Muxin decides;
   // adoption records intent only and never mutates configuration or the repository backlog.
   if (req.method === "GET" && url.pathname === "/api/signals") {
@@ -103,6 +112,26 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
     }
     return true;
   }
+  if (req.method === "POST" && url.pathname === "/api/signals/experiments/propose") {
+    const body = await readBody(req);
+    try {
+      if (!proposeExperiment) throw new Error("Signals experiment proposal runner is unavailable");
+      const engine = body.engine === "claude" || body.engine === "grok" || body.engine === "codex" ? body.engine : "codex";
+      const result = await proposeExperiment({
+        contentRequestId: String(body.contentRequestId ?? "").trim(), engine,
+        evidenceDossierPath: String(body.evidenceDossierPath ?? "").trim(),
+        evidenceFamily: String(body.evidenceFamily ?? "") as SignalsExperimentProposalRequest["evidenceFamily"],
+        minimumSample: Number(body.minimumSample ?? 10), minimumDays: Number(body.minimumDays ?? 7),
+        availablePublishingUnits: requiredPositiveInteger(body.availablePublishingUnits, "availablePublishingUnits"),
+        availableDays: requiredPositiveInteger(body.availableDays, "availableDays"),
+      });
+      if (result.status === "recommended") recordExperimentPlan(result.plan, experimentPlansPath);
+      json(res, 200, { ok: true, result: result.status === "recommended" ? { status: result.status, experimentId: result.plan.recommendation.id } : result, experimentPlans: readExperimentPlans(experimentPlansPath) });
+    } catch (e) {
+      json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e), experimentPlans: readExperimentPlans(experimentPlansPath) });
+    }
+    return true;
+  }
   if (req.method === "POST" && /^\/api\/signals\/experiments\/[^/]+\/interpretation\/(accept|reject)$/.test(url.pathname)) {
     const [, , , , encodedId, , action] = url.pathname.split("/");
     const id = decodeURIComponent(encodedId);
@@ -118,18 +147,20 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
   if (req.method === "POST" && /^\/api\/signals\/experiments\/[^/]+\/(approve|decline|start)$/.test(url.pathname)) {
     const [, , , , encodedId, action] = url.pathname.split("/");
     const id = decodeURIComponent(encodedId);
+    const body = await readBody(req);
     try {
       const plan = loadExperimentPlan(id, experimentPlansPath);
       let decision = loadExperimentPlanDecision(id, experimentPlansPath);
       if (action === "approve" || action === "decline") {
         if (decision) throw new Error(`experiment plan ${id} was already reviewed`);
-        decision = approveExperimentPlan(plan, { status: action === "approve" ? "approved" : "declined", decidedBy: "muxin", decidedAt: new Date().toISOString() });
+        decision = approveExperimentPlan(plan, { status: action === "approve" ? "approved" : "declined", decidedBy: "muxin", decidedAt: new Date().toISOString(), rationale: String(body.rationale ?? "") });
         reviewExperimentPlan(id, decision, experimentPlansPath);
       }
       if (!decision || decision.status !== "approved") {
         json(res, 200, { ok: true, decision, experimentPlans: readExperimentPlans(experimentPlansPath) });
         return true;
       }
+      assertExperimentPlanCanGenerate(plan);
       const apply = applyExperimentPlan ?? ((proposal, approved) => applyApprovedExperimentToContent(safeFolder(proposal.contentRequest.id), proposal, approved));
       const handoff = await apply(plan, decision);
       markExperimentContentHandoff(id, handoff, experimentPlansPath);

@@ -59,6 +59,21 @@ function texts(value: unknown, field: string): string[] {
   return [...new Set(value.map((item, index) => text(item, `${field}[${index}]`)))].sort();
 }
 
+function directionalFalsifiableHypothesis(value: unknown): string {
+  const hypothesis = text(value, "hypothesis");
+  const normalized = hypothesis.toLowerCase();
+  const directional = /\b(increas(?:e|es|ed)|decreas(?:e|es|ed)|improv(?:e|es|ed)|reduc(?:e|es|ed)|rais(?:e|es|ed)|lower(?:s|ed)?|maintain(?:s|ed)?|higher)\b/.test(normalized);
+  const comparison = normalized.match(/\b(?:relative to|compared (?:with|to)|versus|vs\.?|than)\s+(?:the\s+)?([a-z0-9][a-z0-9-]*(?:\s+[a-z0-9][a-z0-9-]*){0,3})/);
+  const comparisonTarget = comparison?.[1]?.replace(/[.,;:].*$/, "").trim() ?? "";
+  const genericComparison = /^(?:control|baseline|variant|other variant)$/.test(comparisonTarget);
+  const genericClaim = /^(?:this|the) (?:treatment|variant|content)\b/.test(normalized)
+    && /\b(?:outcomes?|results?|performance|engagement)\b/.test(normalized);
+  if (!directional || !comparison || genericComparison || genericClaim || /\bmay (?:affect|change|influence)\b/.test(normalized)) {
+    throw new Error("hypothesis must be directional and falsifiable against a named comparison");
+  }
+  return hypothesis;
+}
+
 export function buildSignalsExperimentSciencePrompt(input: SignalsExperimentScienceInput): { prompt: string; evidenceDigest: string; promptDigest: string } {
   if (input.evidence.length === 0) throw new Error("Signals experiment science requires qualified evidence");
   if (input.candidates.length === 0) throw new Error("Signals experiment science requires candidate metadata");
@@ -119,7 +134,7 @@ export function parseSignalsExperimentScienceResult(
   const recommendation: SignalsExperimentRecommendationInput = {
     version: "signals-experiment-recommendation-v1",
     id: text(input.recommendationId, "recommendationId"), owner: "signals", createdAt: text(input.createdAt, "createdAt"), evidenceRefs,
-    observation: text(value.observation, "observation"), interpretation: text(value.interpretation, "interpretation"), hypothesis: text(value.hypothesis, "hypothesis"),
+    observation: text(value.observation, "observation"), interpretation: text(value.interpretation, "interpretation"), hypothesis: directionalFalsifiableHypothesis(value.hypothesis),
     expectedOutcome: { variantId, comparisonRef, family, metric, direction }, whyThisInput: text(value.whyThisInput, "whyThisInput"), controlledVariable: text(value.controlledVariable, "controlledVariable"),
     constants: texts(value.constants, "constants"), primaryMetric: { family: primaryFamily, metric: primaryMetric }, guardrails,
     minimumSample: input.minimumSample, minimumDays: input.minimumDays,

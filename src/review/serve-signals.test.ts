@@ -6,9 +6,9 @@ import { tmpdir } from "node:os";
 import { handleSignalsRoute } from "./serve-signals.js";
 import { appendSignalsDecision, readSignalsDecisions } from "./signals-decisions.js";
 import { buildContentRequest } from "./content-request.js";
-import { buildExperimentPlan } from "../grow/experiment-content-handoff.js";
+import { approveExperimentPlan, buildExperimentPlan } from "../grow/experiment-content-handoff.js";
 import { signalsExperimentRecommendation } from "../grow/experiment-test-fixtures.js";
-import { recordExperimentPlan } from "./signals-experiment-plan-store.js";
+import { recordExperimentPlan, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
 
 function harness(method: string, path: string, body: Record<string, unknown> = {}) {
   let response: { code: number; value: unknown } | undefined;
@@ -82,6 +82,7 @@ test("Signals experiment approval triggers canonical Content generation but leav
       recommendation: { ...signalsExperimentRecommendation({ variantId, comparisonRef, minimumSample: 10 }), id: "experiment-one", confidence: "high" },
       contentRequest: input,
       variablesByVariant: Object.fromEntries(request.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }])),
+      capacity: { availablePublishingUnits: 10, availableDays: 7 },
     });
     recordExperimentPlan(plan, plansPath);
     const approve = harness("POST", "/api/signals/experiments/experiment-one/approve");
@@ -101,6 +102,101 @@ test("Signals experiment approval triggers canonical Content generation but leav
     const read = harness("GET", "/api/signals");
     await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), proposalsPath: join(root, "changes"), experimentPlansPath: plansPath });
     assert.equal((read.response()?.value as any).experimentPlans[0].generatedCopyIncluded, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals retry cannot generate from a historical approval whose plan lacks current capacity", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-legacy-capacity-"));
+  const plansPath = join(root, "plans.jsonl");
+  try {
+    const contentInput = { id: "legacy-capacity", origin: "human-inference" as const, descriptor: "experiment", originalInput: "Source.", treatments: ["summary"], media: ["none"], platforms: ["linkedin"], sourceProvenance: { kind: "source" as const, sourceLines: [1] } };
+    const request = buildContentRequest(contentInput);
+    const variantId = request.variants.find((variant) => variant.identity.kind === "treated")!.identity.id;
+    const comparisonRef = request.variants.find((variant) => variant.identity.kind === "control")!.identity.id;
+    const current = buildExperimentPlan({
+      recommendation: { ...signalsExperimentRecommendation({ variantId, comparisonRef }), id: "legacy-capacity", confidence: "high" },
+      contentRequest: contentInput,
+      variablesByVariant: Object.fromEntries(request.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }])),
+      capacity: { availablePublishingUnits: 10, availableDays: 7 },
+    });
+    const decision = approveExperimentPlan(current, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-30T18:00:00.000Z" });
+    recordExperimentPlan({ ...current, capacity: undefined } as any, plansPath);
+    reviewExperimentPlan(current.recommendation.id, decision, plansPath);
+    let applied = false;
+    const start = harness("POST", "/api/signals/experiments/legacy-capacity/start");
+    await handleSignalsRoute({
+      ...start, res: {} as any, experimentPlansPath: plansPath,
+      applyExperimentPlan: async () => { applied = true; throw new Error("must not run"); },
+    });
+    assert.equal(start.response()?.code, 409);
+    assert.match(String((start.response()?.value as any).error), /capacity/i);
+    assert.equal(applied, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals proposal endpoint runs science on a normal Content request and records an approval-ready plan", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-propose-"));
+  const plansPath = join(root, "plans.jsonl");
+  try {
+    const contentInput = { id: "content-proposed", origin: "human-inference" as const, descriptor: "experiment", originalInput: "Source.", treatments: ["summary"], media: ["none"], platforms: ["linkedin"], sourceProvenance: { kind: "source" as const, sourceLines: [1] } };
+    const request = buildContentRequest(contentInput);
+    const variantId = request.variants.find((variant) => variant.identity.kind === "treated")!.identity.id;
+    const comparisonRef = request.variants.find((variant) => variant.identity.kind === "control")!.identity.id;
+    const plan = buildExperimentPlan({
+      recommendation: { ...signalsExperimentRecommendation({ variantId, comparisonRef }), id: "experiment-proposed", confidence: "high" },
+      contentRequest: contentInput,
+      variablesByVariant: Object.fromEntries(request.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }])),
+      capacity: { availablePublishingUnits: 10, availableDays: 7 },
+    });
+    const propose = harness("POST", "/api/signals/experiments/propose", {
+      contentRequestId: "content-proposed", engine: "grok",
+      evidenceDossierPath: "docs/reviews/reviewed.json", evidenceFamily: "conversation",
+      minimumSample: 10, minimumDays: 7, availablePublishingUnits: 10, availableDays: 7,
+    });
+    let received: Record<string, unknown> | undefined;
+    await handleSignalsRoute({
+      ...propose, res: {} as any, experimentPlansPath: plansPath,
+      proposeExperiment: async (body: any) => { received = body; return { status: "recommended", plan }; },
+    } as any);
+    assert.equal(propose.response()?.code, 200);
+    assert.equal(received?.engine, "grok");
+    assert.equal(received?.evidenceDossierPath, "docs/reviews/reviewed.json");
+    assert.equal((propose.response()?.value as any).experimentPlans[0].experimentId, "experiment-proposed");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals proposal endpoint fails closed when publishing capacity is omitted", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-capacity-"));
+  try {
+    let called = false;
+    const propose = harness("POST", "/api/signals/experiments/propose", {
+      contentRequestId: "content-one", evidenceDossierPath: "docs/reviews/reviewed.json", evidenceFamily: "conversation",
+      minimumSample: 10, minimumDays: 7,
+    });
+    await handleSignalsRoute({
+      ...propose, res: {} as any, experimentPlansPath: join(root, "plans.jsonl"),
+      proposeExperiment: async () => { called = true; return { status: "no-experiment", reason: "unused", evidenceRefs: [] }; },
+    } as any);
+    assert.equal(propose.response()?.code, 409);
+    assert.match(String((propose.response()?.value as any).error), /availablePublishingUnits.*required/i);
+    assert.equal(called, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals proposal endpoint records an honest no-experiment without creating a plan", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-no-experiment-"));
+  try {
+    const propose = harness("POST", "/api/signals/experiments/propose", {
+      contentRequestId: "content-one", evidenceDossierPath: "docs/reviews/reviewed.json", evidenceFamily: "conversation",
+      minimumSample: 10, minimumDays: 7, availablePublishingUnits: 10, availableDays: 7,
+    });
+    await handleSignalsRoute({
+      ...propose, res: {} as any, experimentPlansPath: join(root, "plans.jsonl"),
+      proposeExperiment: async () => ({ status: "no-experiment", reason: "No useful bounded uncertainty.", evidenceRefs: ["evidence-1"] }),
+    } as any);
+    assert.equal(propose.response()?.code, 200);
+    assert.equal((propose.response()?.value as any).result.status, "no-experiment");
+    assert.deepEqual((propose.response()?.value as any).experimentPlans, []);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

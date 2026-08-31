@@ -99,7 +99,8 @@ describe("Phase 3 experiment queue handoff", () => {
     const handoff = buildGrowExperimentQueueHandoff(proposal, decision(proposal.digest));
     assert.equal(handoff.rows.length, 1);
     assert.equal(handoff.rows[0]?.id, "linkedin-direct");
-    assert.equal(handoff.rows[0]?.status, "approve");
+    assert.equal(handoff.rows[0]?.status, "pending");
+    assert.doesNotMatch(handoff.assets[0]!.content, /approved_by|approved_at/);
     assert.equal(handoff.assets[0]?.body, proposal.variants[0]?.body);
     assert.deepEqual(handoff.rows[0]?.lineage, {
       sourceId: "source-1", cutId: "cut-1", variantId: "linkedin-direct",
@@ -120,9 +121,8 @@ describe("Phase 3 experiment queue handoff", () => {
       assert.equal(second.existing, 1);
       const rows = readQueue(root).rows;
       assert.equal(rows.length, 1);
-      assert.equal(rows[0]?.status, "approve");
-      assert.equal(first.bindings[0]?.status, "approved", JSON.stringify(first.bindings[0]?.readiness));
-      assert.equal(first.bindings[0]?.readiness.status, "ready");
+      assert.equal(rows[0]?.status, "pending");
+      assert.notEqual(first.bindings[0]?.readiness.status, "ready");
       const asset = readFileSync(join(root, rows[0]!.asset), "utf8");
       assert.match(asset, /grow_proposal_digest:/);
       assert.match(asset, /variant_id: "linkedin-direct"/);

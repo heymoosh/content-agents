@@ -36,7 +36,7 @@ function plan(id: string, confidence: "low" | "medium" | "high") {
   const variantId = request.variants.find((variant) => variant.identity.kind === "treated")!.identity.id;
   const comparisonRef = request.variants.find((variant) => variant.identity.kind === "control")!.identity.id;
   const recommendation = { ...signalsExperimentRecommendation({ variantId, comparisonRef, minimumSample: 10 }), id: `signals-rec:${id}`, confidence };
-  return buildExperimentPlan({ recommendation, contentRequest: contentInput(id), variablesByVariant: Object.fromEntries(request.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }])) });
+  return buildExperimentPlan({ recommendation, contentRequest: contentInput(id), variablesByVariant: Object.fromEntries(request.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }])), capacity: { availablePublishingUnits: 10, availableDays: 7 } });
 }
 
 describe("Signals plan to canonical Content handoff", () => {
@@ -54,6 +54,35 @@ describe("Signals plan to canonical Content handoff", () => {
     assert.equal(decision.authorizesCopyApproval, false);
     assert.equal(JSON.stringify(proposal).includes("editor_pass"), false);
     assert.throws(() => approveExperimentPlan(proposal, { status: "approved", decidedBy: "system" as "muxin", decidedAt: "2026-08-31T18:00:00.000Z" }), /Muxin/i);
+  });
+
+  test("defers a plan when declared publishing capacity cannot satisfy its sample or duration", async () => {
+    const request = buildContentRequest(contentInput("capacity-blocked"));
+    const variantId = request.variants.find((variant) => variant.identity.kind === "treated")!.identity.id;
+    const comparisonRef = request.variants.find((variant) => variant.identity.kind === "control")!.identity.id;
+    const proposal = buildExperimentPlan({
+      recommendation: { ...signalsExperimentRecommendation({ variantId, comparisonRef, minimumSample: 10 }), id: "signals-rec:capacity", confidence: "high" },
+      contentRequest: contentInput("capacity-blocked"),
+      variablesByVariant: Object.fromEntries(request.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }])),
+      capacity: { availablePublishingUnits: 8, availableDays: 14 },
+    });
+    assert.equal(proposal.priority, "deferred");
+    assert.match(proposal.priorityReason, /capacity/i);
+    assert.throws(() => approveExperimentPlan(proposal, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" }), /deferred/i);
+    const missingCapacity = { ...plan("legacy-capacity", "high"), capacity: undefined } as any;
+    assert.throws(() => approveExperimentPlan(missingCapacity, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" }), /capacity/i);
+    const inconsistentCapacity = { ...plan("inconsistent-capacity", "high"), capacity: { availablePublishingUnits: 1, availableDays: 7, sufficient: true } } as any;
+    assert.throws(() => approveExperimentPlan(inconsistentCapacity, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" }), /capacity/i);
+    const disguisedLowConfidence = { ...plan("disguised-low", "low"), priority: "high" } as any;
+    assert.throws(() => approveExperimentPlan(disguisedLowConfidence, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" }), /deferred/i);
+    const historical = plan("legacy-capacity", "high");
+    const historicalDecision = approveExperimentPlan(historical, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-30T18:00:00.000Z" });
+    let generated = false;
+    await assert.rejects(
+      () => applyApprovedExperimentToContent("/unused/legacy-capacity", { ...historical, capacity: undefined } as any, historicalDecision, { generate: async () => { generated = true; return { ids: [] }; } }),
+      /capacity/i,
+    );
+    assert.equal(generated, false);
   });
 
   test("approved plans use the normal generator and land experiment-tagged drafts pending in Content", async () => {

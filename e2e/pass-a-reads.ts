@@ -103,8 +103,13 @@ async function main(): Promise<void> {
     // announcing its own emptiness. Apply a running job first: with that scenario the queue MUST
     // list it, so absence is a failure rather than an empty-fixture excuse.
     await openRoom(s.page, "studio");
+    // Opening Studio starts ordinary reads. Let those finish before installing the fixture or an
+    // older real /api/jobs response can arrive last and overwrite the forced scenario.
+    await s.page.waitForLoadState("networkidle");
     await applyScenario(s.page, "job-running");
-    await s.page.waitForSelector("#jobs:not([hidden])", { timeout: 15_000 }).catch(() => null);
+    // The panel may already be visible for a prior real job when the fixture chip is clicked. Wait
+    // for the scenario payload itself, not merely for visibility, or a fast read can race reload().
+    await s.page.waitForFunction(() => document.querySelector("#jobs")?.textContent?.includes("FIXTURE: a job that is not running"), null, { timeout: 15_000 });
     const jobsText = await textOf(s.page, "#jobs");
     record({
       feature: "Studio job queue lists jobs",

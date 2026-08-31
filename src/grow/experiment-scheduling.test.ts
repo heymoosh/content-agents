@@ -65,6 +65,7 @@ describe("Phase 3 experiment scheduling evidence", () => {
     try {
       const proposal = buildGrowExperimentProposal(proposalInput());
       const handoff = applyGrowExperimentQueueHandoff(root, proposal, decision(proposal.digest));
+      writeCell(root, "x-direct", { status: "approve" });
       const schedule = async (_folder: string, slug: string): Promise<{ scheduled: unknown; scheduleError: null; publishing: PublishingStatus }> => {
         assert.equal(slug, root.split("/").at(-1));
         writeCell(root, "x-direct", { status: "published" });
@@ -93,6 +94,7 @@ describe("Phase 3 experiment scheduling evidence", () => {
     try {
       const proposal = buildGrowExperimentProposal(proposalInput());
       const handoff = applyGrowExperimentQueueHandoff(root, proposal, decision(proposal.digest));
+      writeCell(root, "x-direct", { status: "approve" });
       const result = await scheduleGrowExperimentVariant(handoff, "x-direct", {
         schedule: async (_folder, slug) => ({
           scheduled: null, scheduleError: "provider timeout",
@@ -111,7 +113,6 @@ describe("Phase 3 experiment scheduling evidence", () => {
     try {
       const proposal = buildGrowExperimentProposal(proposalInput());
       const handoff = applyGrowExperimentQueueHandoff(root, proposal, decision(proposal.digest));
-      writeCell(root, "x-direct", { status: "pending" });
       let calls = 0;
       await assert.rejects(
         scheduleGrowExperimentVariant(handoff, "x-direct", { schedule: async () => { calls += 1; throw new Error("should not run"); } }),
@@ -126,6 +127,7 @@ describe("Phase 3 experiment scheduling evidence", () => {
     try {
       const proposal = buildGrowExperimentProposal(proposalInput());
       const handoff = applyGrowExperimentQueueHandoff(root, proposal, decision(proposal.digest));
+      writeCell(root, "x-direct", { status: "approve" });
       writeFileSync(join(root, handoff.rows[0]!.asset), "changed after approval\n");
       let calls = 0;
       await assert.rejects(
