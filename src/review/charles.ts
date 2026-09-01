@@ -122,7 +122,18 @@ export function stampCharlesEngine(id: string, engine: string, root: string = CH
     return cells.join("|");
   });
   if (!found) throw new Error("no such post in queue: " + id);
-  writeFileSync(path, out.join("\n"));
+  const normalized = out.map((line) => {
+    if (!line.trim().startsWith("|")) return line;
+    const cells = line.split("|");
+    if (cells.length < 7) return line;
+    const first = cells[1].trim();
+    if (cells.length < 8) {
+      const engineCell = first === "id" ? " engine " : /^-+$/.test(first) ? "------" : " ";
+      cells.splice(cells.length - 1, 0, engineCell);
+    }
+    return cells.join("|");
+  });
+  writeFileSync(path, normalized.join("\n"));
 }
 
 // Muxin's original persona brief, verbatim — for a one-click copy to another tool. Never a

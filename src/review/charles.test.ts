@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { listCharlesPosts, readCharlesPost, saveCharlesPost, setCharlesStatus, readPersonaBrief } from "./charles.js";
+import { listCharlesPosts, readCharlesPost, saveCharlesPost, setCharlesStatus, readPersonaBrief, stampCharlesEngine } from "./charles.js";
 
 function tmpCharles(): string {
   const root = mkdtempSync(join(tmpdir(), "charles-test-"));
@@ -36,6 +36,22 @@ test("listCharlesPosts reads every row + its draft body", () => {
     const essay = posts.find((p) => p.id === "cheat-sheet")!;
     assert.equal(essay.status, "approve");
     assert.match(essay.body, /So You Wish to Be an Oligarch/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("stampCharlesEngine normalizes the queue column and leaves legacy rows explicitly unstamped", () => {
+  const root = tmpCharles();
+  try {
+    stampCharlesEngine("dapper", "grok", root);
+    const queue = readFileSync(join(root, "review-queue.md"), "utf8");
+    assert.match(queue, /\| id \| type \| file \| status \| notes \| engine \|/);
+    assert.match(queue, /\| dapper \| one-liner \| posts\/one-liners\/dapper\.md \| pending \| mood post \| grok \|/);
+    assert.match(queue, /\| cheat-sheet \| essay \| posts\/essays\/cheat-sheet\.md \| approve \| intro essay \|\s+\|/);
+    const posts = listCharlesPosts(root);
+    assert.equal(posts.find((post) => post.id === "dapper")?.engine, "grok");
+    assert.equal(posts.find((post) => post.id === "cheat-sheet")?.engine, undefined);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

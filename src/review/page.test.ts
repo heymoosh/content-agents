@@ -45,6 +45,13 @@ test("Charles pages separate work needing review from approved and historical dr
   assert.deepEqual(charlesPostsForPage(posts, "input"), []);
 });
 
+test("Charles review names the producing engine and labels legacy drafts honestly", () => {
+  const script = emittedScripts().join("\n");
+  assert.match(script, /Drafted with.*engineLabel\(post\.engine\)/);
+  assert.match(script, /Engine not recorded \(legacy draft\)/);
+  assert.match(script, /p\.engine \? "Drafted with "\+engineLabel\(p\.engine\)/);
+});
+
 test("fictionEditableSpans keeps exact chapter bytes for surgical in-app edits", () => {
   assert.deepEqual(fictionEditableSpans("First sentence.\nSecond sentence.\n\nAnother paragraph."), [
     "First sentence.\nSecond sentence.", "Another paragraph.",

@@ -5235,6 +5235,7 @@ function renderCharles(){
     $("#charlesDraftList").innerHTML=""; return;
   }
   charlesId=post.id;
+  const engineProvenance=post.engine ? "Drafted with "+engineLabel(post.engine) : "Engine not recorded (legacy draft)";
   const reviewHistory=(post.comments||[]).length
     ? '<details class="lead-details" open style="margin-top:18px"><summary>Review history · '+post.comments.length+'</summary>'+post.comments.map(item=>'<div class="src" style="margin-top:9px"><strong>'+esc(String(item.createdAt||"").slice(0,16).replace("T"," "))+'</strong><br>'+esc(item.body)+'</div>').join("")+'</details>'
     : '<div class="src" style="margin-top:14px">Review history starts when you save a revision note.</div>';
@@ -5242,6 +5243,7 @@ function renderCharles(){
     '<div class="wb-label">Charles Lord Featherbottom · '+esc(typeLabel(post.type))+'</div>'+
     '<div style="display:flex;align-items:center;gap:10px;margin:2px 0 14px;">'+
       '<span class="pill '+pillClass(post.status)+'">'+esc(statusLabel(post.status))+'</span>'+
+      '<span class="src">'+esc(engineProvenance)+'</span>'+
       (post.notes ? '<span class="src">'+esc(post.notes)+'</span>' : "")+
     '</div>'+
     '<div id="charlesBody" style="font:400 16px/1.75 Georgia,serif;border:1px dashed #e0d6c0;border-radius:8px;padding:20px 22px;background:#fcfbf7;white-space:pre-wrap;max-height:460px;overflow:auto;">'+esc(post.body)+'</div>'+
@@ -5259,6 +5261,7 @@ function renderCharles(){
     '<div class="wb-margin-cap">DRAFTS · CLICK TO OPEN</div>'+
     visible.map(p=>'<div class="lead-chip'+(p.id===charlesId?" on":"")+'" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px" data-id="'+esc(p.id)+'">'+
       '<span>'+esc(typeLabel(p.type))+' · '+esc(p.id)+'</span>'+
+      '<span class="src" style="font-size:10px">'+esc(p.engine ? "Drafted with "+engineLabel(p.engine) : "Engine not recorded (legacy draft)")+'</span>'+
       '<span class="pill '+pillClass(p.status)+'" style="font-size:10px">'+esc(statusLabel(p.status))+'</span>'+
     '</div>').join("");
   document.querySelectorAll("#charlesDraftList .lead-chip").forEach(c=>c.addEventListener("click",()=>{ charlesId=c.dataset.id; renderCharles(); }));
