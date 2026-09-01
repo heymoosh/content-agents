@@ -1,10 +1,10 @@
 # Content Studio master status
 
-**Last reconciled:** 2026-08-31
-**Repository baseline:** merged `origin/main` commit `0ad0a32` (PR #412), plus the Phase 1
-completion patch recorded by the current branch until that follow-up PR merges. PR #412 contains
-the Phase 0 safety wiring and the core Phase 1 operating-loop implementation; the follow-up closes
-the audited reviewed-image and status-reconciliation gaps.
+**Last reconciled:** 2026-09-01
+**Repository baseline:** merged `origin/main` commit `10e678e` (PR #419), plus the Charles persona-edit
+patch recorded by the current branch until its held review PR merges. PR #419 contains the audited
+Phase 3 Experiment implementation. The current patch adds a digest-bound Studio review gate for
+production persona changes while preserving the verbatim brief and manual delivery policy.
 **Phase 0 status:** operational provenance and policy wiring are complete with deterministic browser
 coverage, and one authenticated Codex generation canary passed; authenticated provider canaries remain.
 **Phase 1 status:** repository implementation and deterministic verification are complete for durable capture and
@@ -223,7 +223,7 @@ history and its “nothing built yet” statement is obsolete.
 |---|---|---|---|---|
 | Persona drafting | One-liner, essay, and reply composed under `charles/config/persona.yaml`; memes stay external; never apply Muxin's voice. | Implemented. | Strong deterministic tests; model drafting unverified end to end. | Preserve leak-bank truthfulness and stamp engine provenance consistently. |
 | Review and editing | Input, Needs review, Approved, All; prose-only editor; append-only retry-safe review notes. | Implemented in PR #407. | Disposable Chromium proves prose save, frontmatter preservation, retry deduplication, and reload history. | Review history is local single-process JSONL and silently appears empty on read failure. Add visible health/error state if it becomes operationally important. |
-| Persona editing | Muxin wants to update the persona source from the Studio without accidental rewriting. | The persona brief can be read/copied; production persona files are not directly editable in the UI. | Read-only UI coverage. | Add an explicit, reviewable persona-edit workflow that preserves the verbatim brief and treats changes to drafting logic as held for review. |
+| Persona editing | Muxin updates the production persona from Studio only through an exact old/new review gate; the original brief remains a separate verbatim copy surface. | Implemented in this change set. Saving validated YAML creates a digest-bound proposal without mutating `persona.yaml`; explicit approval atomically applies exactly the reviewed bytes and is retry-safe. Stale, tampered, malformed, schema-invalid, source-stripping, and client-path-injection attempts fail closed. Rejection changes nothing. | Focused unit and route tests cover proposal/save/approve/reject, exact bytes, digest conflicts, leak-source retention, server-owned paths, and the byte-exact brief. The disposable Chromium suite proves preview-before-mutation, exact approved-byte application, brief preservation, rejection without mutation, durable decisions after reload, and a clean browser session (42 pass, 0 fail, 17 deliberately blocked external/model paths across the full suite). No live model proof is claimed; this edit workflow makes no model call, and Charles drafting remains separately live-unverified. | Keep persona-logic PRs held for Muxin's review and delivery manual. |
 | Delivery | Charles remains ready-to-paste unless Muxin explicitly approves account automation. | Intentionally manual in `charles/AGENTS.md`. | Policy tests. | No Charles-owned provider/account implementation, by design. |
 | Charles to Content | Approved Charles prose can enter Content without inheriting another venture/CTA. | Typed handoff exists. The working tree preserves approved prose and persona restrictions, refuses unsupported treatments, and records manual ready-to-paste delivery as private with no provider account. | Deterministic handoff, generation-policy, delivery-policy, and publishing-ledger coverage. | Deterministic safety boundaries are closed. Delivery remains intentionally manual unless Muxin explicitly changes the policy; no authenticated Charles provider path is claimed. |
 
@@ -350,7 +350,8 @@ until the matrix finishes with terminal cleanup for every created canary object.
 1. Finish Fiction's conversational idea router, non-paraphrasing canonical updates, Studio-to-PR
    bridge, and per-comment engine routing.
 2. Finish the ratified Outreach Phase 5 discovery/calibration method and weekly Strategy summary.
-3. Add a safe Charles persona-edit workflow and keep delivery manual unless the policy changes.
+3. Review the held safe Charles persona-edit PR; its disposable-browser workflow is verified, and
+   delivery remains manual unless the policy changes.
 4. Complete per-brand analytics, Signals, platform, and provider-account separation.
 5. Populate and review pattern/account/baseline/mechanism evidence, then connect it to honest
    recommendations.

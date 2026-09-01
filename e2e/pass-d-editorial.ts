@@ -54,6 +54,43 @@ async function main(): Promise<void> {
 
     await openRoom(page, "charles");
     await waitLoaded(page, "#charlesMain");
+    await page.waitForFunction(() => (document.querySelector("#charlesPersonaYaml") as HTMLTextAreaElement)?.value.includes("short_name:"));
+    const personaPath = join(ROOT, "charles", "config", "persona.yaml");
+    const briefPath = join(ROOT, "charles", "config", "persona-brief.md");
+    const personaBefore = readFileSync(personaPath, "utf8");
+    const briefBefore = readFileSync(briefPath, "utf8");
+    const personaApproved = personaBefore.replace('short_name: "Charles"', 'short_name: "Charles E2E Reviewed"');
+    await page.locator("#charlesPersonaYaml").fill(personaApproved);
+    await page.click("#charlesPersonaProposeBtn");
+    await page.waitForSelector('[data-persona-decision="approve"]');
+    const unchangedBeforeApproval = readFileSync(personaPath, "utf8") === personaBefore;
+    page.once("dialog", (dialog) => dialog.accept("E2E reviewed the exact old and new YAML"));
+    await page.click('[data-persona-decision="approve"]');
+    await page.waitForFunction(() => document.querySelector("#charlesPersonaProposals")?.textContent?.includes("APPLIED"));
+    const personaAfterApproval = readFileSync(personaPath, "utf8");
+    record({
+      feature: "Charles persona edit previews exact old/new YAML before explicit approval",
+      status: unchangedBeforeApproval && personaAfterApproval === personaApproved && readFileSync(briefPath, "utf8") === briefBefore ? "pass" : "fail",
+      detail: unchangedBeforeApproval ? "production stayed unchanged through preview; approval applied the exact reviewed bytes and preserved the verbatim brief" : "production changed before approval",
+    });
+
+    const personaRejected = personaApproved.replace('short_name: "Charles E2E Reviewed"', 'short_name: "Charles Must Not Apply"');
+    await page.locator("#charlesPersonaYaml").fill(personaRejected);
+    await page.click("#charlesPersonaProposeBtn");
+    await page.waitForSelector('[data-persona-decision="reject"]');
+    page.once("dialog", (dialog) => dialog.accept("E2E rejects this persona change"));
+    await page.click('[data-persona-decision="reject"]');
+    await page.waitForFunction(() => document.querySelector("#charlesPersonaProposals")?.textContent?.includes("REJECTED"));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await openRoom(page, "charles");
+    await page.waitForFunction(() => (document.querySelector("#charlesPersonaYaml") as HTMLTextAreaElement)?.value.includes("Charles E2E Reviewed"));
+    const personaHistory = await page.locator("#charlesPersonaProposals").innerText();
+    record({
+      feature: "Charles persona rejection and approved state survive reload",
+      status: readFileSync(personaPath, "utf8") === personaApproved && personaHistory.includes("APPLIED") && personaHistory.includes("REJECTED") ? "pass" : "fail",
+      detail: "rejected YAML never became production; applied and rejected decisions reloaded from the append-only ledger",
+    });
+
     await page.click('nav[aria-label="Charles pages"] [data-charles-page="needs-review"]');
     await page.waitForSelector(`#charlesDraftList [data-id="${CHARLES_ID}"]`);
     await page.click(`#charlesDraftList [data-id="${CHARLES_ID}"]`);

@@ -1141,6 +1141,12 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           <div class="sheet-sub" style="margin-top:10px">Muxin's original brief, verbatim, for copying into her other persona tools.</div>
           <button id="charlesBriefCopyBtn" style="margin-top:10px">Copy persona brief</button>
           <textarea id="charlesBriefText" readonly style="width:100%;min-height:140px;margin-top:10px;font:400 11px/1.5 ui-monospace,monospace;padding:10px;border:1px dashed #e0d6c0;border-radius:8px;background:#fcfbf7;resize:vertical;"></textarea>
+          <div class="wb-margin-cap" style="margin-top:22px">PRODUCTION PERSONA YAML</div>
+          <div class="sheet-sub" style="margin-top:8px">This is the persona Charles drafts from. Saving creates an exact old/new proposal. It does not change production until you approve that proposal.</div>
+          <textarea id="charlesPersonaYaml" spellcheck="false" style="width:100%;min-height:300px;margin-top:10px;font:400 11px/1.5 ui-monospace,monospace;padding:10px;border:1px solid #cfc4ad;border-radius:8px;background:#fff;resize:vertical;"></textarea>
+          <button id="charlesPersonaProposeBtn" style="margin-top:10px">Save persona change for review</button>
+          <div id="charlesPersonaDigest" class="src" style="margin-top:8px"></div>
+          <div id="charlesPersonaProposals" style="margin-top:12px"></div>
         </details>
       </div>
       </div>
@@ -4913,6 +4919,7 @@ renderCharlesReplySource();
 $("#charlesDraftBtn").addEventListener("click", draftCharles);
 
 let charlesBriefLoaded = false;
+let CHARLES_PERSONA = null;
 async function loadCharlesBrief(){
   if(charlesBriefLoaded) return;
   const r = await fetch("/api/charles/persona-brief");
@@ -4923,6 +4930,47 @@ async function loadCharlesBrief(){
 $("#charlesBriefCopyBtn").addEventListener("click", async ()=>{
   try{ await navigator.clipboard.writeText($("#charlesBriefText").value); flash("Copied"); }
   catch(e){ $("#charlesBriefText").select(); flash("Select-all + Cmd/Ctrl-C to copy"); }
+});
+function renderCharlesPersona(){
+  if(!CHARLES_PERSONA) return;
+  $("#charlesPersonaYaml").value=CHARLES_PERSONA.yaml;
+  $("#charlesPersonaDigest").textContent="Production digest: "+CHARLES_PERSONA.digest.slice(0,12);
+  const proposals=CHARLES_PERSONA.proposals||[];
+  $("#charlesPersonaProposals").innerHTML=proposals.length ? proposals.map(proposal=>
+    '<details class="lead-details" style="margin-top:10px" '+(proposal.status==="pending"?'open':'')+'>'+
+      '<summary>'+esc(proposal.status.toUpperCase())+' · '+esc(proposal.afterDigest.slice(0,12))+'</summary>'+
+      '<div class="src" style="margin-top:8px">Exact reviewed change: '+esc(proposal.beforeDigest.slice(0,12))+' → '+esc(proposal.afterDigest.slice(0,12))+'</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'+
+        '<label class="src">OLD YAML<textarea readonly style="width:100%;height:150px;font:400 10px/1.4 ui-monospace,monospace">'+esc(proposal.beforeYaml)+'</textarea></label>'+
+        '<label class="src">NEW YAML<textarea readonly style="width:100%;height:150px;font:400 10px/1.4 ui-monospace,monospace">'+esc(proposal.afterYaml)+'</textarea></label>'+
+      '</div>'+
+      ((proposal.status==="pending"||proposal.status==="approved")?'<div class="actions" style="margin-top:8px"><button data-persona-decision="approve" data-proposal-id="'+esc(proposal.id)+'">'+(proposal.status==="approved"?'Finish approved apply':'Approve and apply exact YAML')+'</button>'+(proposal.status==="pending"?'<button data-persona-decision="reject" data-proposal-id="'+esc(proposal.id)+'">Reject</button>':'')+'</div>':'')+
+    '</details>'
+  ).join("") : '<div class="src">No persona changes awaiting review.</div>';
+  $("#charlesPersonaProposals").querySelectorAll("[data-persona-decision]").forEach(button=>button.addEventListener("click",async()=>{
+    const decision=button.dataset.personaDecision;
+    const evidence=window.prompt(decision==="approve" ? "What did you verify in this exact persona change?" : "Why are you rejecting this change?");
+    if(evidence===null) return;
+    button.disabled=true;
+    const result=await post("/api/charles/persona/proposals/"+encodeURIComponent(button.dataset.proposalId)+"/"+decision,{evidence});
+    button.disabled=false;
+    if(!result.ok){ flash(result.error||"Persona decision failed"); return; }
+    CHARLES_PERSONA=result.persona; renderCharlesPersona();
+    flash(decision==="approve"?"Exact reviewed persona is now live for the next Charles draft":"Persona proposal rejected; production was unchanged");
+  }));
+}
+async function loadCharlesPersona(){
+  const r=await fetch("/api/charles/persona");
+  const d=await r.json();
+  if(!d.ok){ flash(d.error||"Could not load production persona"); return; }
+  CHARLES_PERSONA=d.persona; renderCharlesPersona();
+}
+$("#charlesPersonaProposeBtn").addEventListener("click",async()=>{
+  const button=$("#charlesPersonaProposeBtn"); button.disabled=true;
+  const result=await post("/api/charles/persona/proposals",{yaml:$("#charlesPersonaYaml").value});
+  button.disabled=false;
+  if(!result.ok){ flash(result.error||"Persona proposal failed validation"); return; }
+  CHARLES_PERSONA=result.persona; renderCharlesPersona(); flash("Persona change saved for explicit review; production is unchanged");
 });
 
 // ── Charles desk (Build 4) ──
@@ -4951,6 +4999,7 @@ document.querySelectorAll("[data-charles-page]").forEach(button=>button.addEvent
 function typeLabel(t){ return t==="one-liner" ? "One-liner" : t==="essay" ? "Essay" : t==="reply" ? "Reply" : t; }
 async function loadCharles(){
   loadCharlesBrief();
+  loadCharlesPersona();
   const r = await fetch("/api/charles");
   CHARLES_POSTS = (await r.json()).posts || [];
   if(!CHARLES_POSTS.length){
