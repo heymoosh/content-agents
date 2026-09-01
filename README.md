@@ -62,7 +62,12 @@ folder too. One window, one folder, that's the whole system.
 | `/publish <folder>` | Act on `approve` rows only |
 
 Plain scripts (Claude runs these for you, but they work standalone): `npm run ingest`,
+`npm run ingest:outcomes -- --brand <human-inference|charles|fiction> --input <reviewed-facts.json>`,
 `npm run bluesky`, `npm run snapshot`, `npm run resonance`, `npm run render`, `npm run publish:*`.
+Outcome imports accept the documented funnel/business envelope, reject body or PII fields, and append
+validated facts to the canonical operational ledger. Signals then shows landing visits, opt-ins, and
+business-event counts for the selected brand; unassigned historical rows remain excluded. Use
+`--json <json-string>` instead of `--input <file>` when supplying the same envelope inline.
 
 ## Verification and delivery
 

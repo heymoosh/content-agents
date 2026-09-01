@@ -288,7 +288,7 @@ export function buildMetricFactsFromOutcomeLedger(input: OutcomeLedgerMetricInpu
   const variants = new Set(input.variantIds.map((id, index) => requiredText(id, `variantIds[${index}]`)));
   const requested = new Set(input.requestedMetrics.map((item, index) => `${item.family}:${requiredText(item.metric, `requestedMetrics[${index}].metric`)}`));
   const superseded = new Set(input.ledger.rows.map((row) => row.supersedesId).filter((id): id is string => id !== null));
-  const measurableStatuses = new Set(["measured", "observed", "reported", "verified", "current"]);
+  const measurableStatuses = new Set(["measured", "observed", "reported", "verified", "current", "corrected"]);
   const facts: ExperimentMetricFact[] = [];
   for (const row of input.ledger.rows) {
     if (superseded.has(row.id) || !measurableStatuses.has(row.status) || row.value === null || row.value < 0) continue;

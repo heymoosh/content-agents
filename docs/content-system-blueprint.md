@@ -461,8 +461,11 @@ metadata-only boundary visible.
 it preserves unknown attribution and revisions without embedding bodies, model output, ranking, or
 winner inference. `npm run grow:outcome-ledger -- --ledger <path>` reads that append-only JSONL
 directly with line-numbered, fail-closed parse errors; the existing explicit JSON/input forms remain
-available. The Studio's Experiment measurement read uses `data/outcomes.jsonl` as the canonical
-runtime path. It admits a row only when the ledger is ready, its metric exactly matches the declared
+available. `npm run ingest:outcomes -- --brand <brand> --input <file>` validates and atomically appends
+one explicitly reviewed, brand-bound batch to the canonical operational `outcomes.jsonl`; malformed,
+unready, duplicate, or cross-brand batches make no write. The Studio outcome-family read uses this
+same ledger for brand-scoped landing visits, opt-ins, and separate business-event counts. The Studio's
+Experiment measurement read also uses this canonical runtime path. It admits a row only when the ledger is ready, its metric exactly matches the declared
 experiment metric, and one explicit attribution content id exactly matches one live experiment arm.
 Provider metrics follow the same exact-identity rule against `posts.platform_post_id` or the canonical
 URL and use the latest analytics snapshot. Missing semantic-reply or website-visit measurements stay

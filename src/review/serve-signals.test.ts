@@ -11,6 +11,7 @@ import { signalsExperimentRecommendation } from "../grow/experiment-test-fixture
 import { markExperimentContentHandoff, recordExperimentPlan, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
 import { readSignalsVentureProposals, recordSignalsVentureProposal } from "./signals-venture-handoff-store.js";
 import { recordExperimentInterpretation, reviewExperimentInterpretation } from "./signals-experiment-result-store.js";
+import { buildFunnelEvent, appendOutcomeRowsForBrand } from "../grow/outcome-ledger.js";
 
 function harness(method: string, path: string, body: Record<string, unknown> = {}) {
   let response: { code: number; value: unknown } | undefined;
@@ -23,6 +24,85 @@ function harness(method: string, path: string, body: Record<string, unknown> = {
     response: () => response,
   };
 }
+
+test("Signals outcomes route reads the canonical brand-scoped outcome ledger", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-outcomes-"));
+  const ledger = join(root, "outcomes.jsonl");
+  try {
+    appendOutcomeRowsForBrand([buildFunnelEvent({
+      id: "visit-1", eventType: "visit", observedAt: "2026-09-01T10:00:00Z", collectedAt: "2026-09-01T10:05:00Z",
+      metric: "event_count", value: 6, unit: "event", numerator: 6, denominator: null, scope: { channel: "landing-page" },
+      window: { startAt: "2026-09-01T09:00:00Z", endAt: "2026-09-01T10:00:00Z" }, sourceNote: "reviewed export",
+      evidenceRefs: ["export:1"], lineage: [{ recordType: "source_export", id: "export", relation: "measured-from" }], caveats: [], status: "measured",
+      respondentHash: null, attribution: [{ contentItemId: null, touchType: "unknown", touchAt: "2026-09-01T10:00:00Z", confidence: "low", attributionReason: "no UTM" }],
+    })], "human-inference", ledger);
+    const h = harness("GET", "/api/signals/outcomes?brand=human-inference");
+    assert.equal(await handleSignalsRoute({ ...h, res: {} as any, outcomeLedgerPath: ledger }), true);
+    assert.equal(h.response()?.code, 200);
+    assert.deepEqual((h.response()?.value as any).audience.landing_visits, { state: "measured", value: 6, records_measured: 1, records_unmeasured: 0 });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals outcomes route reports a corrupt ledger instead of returning false empty measurements", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-corrupt-outcomes-"));
+  const ledger = join(root, "outcomes.jsonl");
+  try {
+    writeFileSync(ledger, "{not-json}\n");
+    const h = harness("GET", "/api/signals/outcomes?brand=human-inference");
+    assert.equal(await handleSignalsRoute({ ...h, res: {} as any, outcomeLedgerPath: ledger }), true);
+    assert.equal(h.response()?.code, 500);
+    assert.match((h.response()?.value as any).error, /ledger unavailable|line 1/i);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals outcomes route rejects ledger-wide duplicate and cross-brand revision corruption", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-semantic-corrupt-outcomes-"));
+  const ledger = join(root, "outcomes.jsonl");
+  const input = {
+    id: "visit-one", brandId: "human-inference" as const, eventType: "visit" as const,
+    observedAt: "2026-09-01T10:00:00Z", collectedAt: "2026-09-01T10:05:00Z", metric: "event_count", value: 1, unit: "event", numerator: 1, denominator: null,
+    scope: { channel: "landing-page" }, window: { startAt: "2026-09-01T09:00:00Z", endAt: "2026-09-01T10:00:00Z" }, sourceNote: "reviewed export",
+    evidenceRefs: ["export:1"], lineage: [{ recordType: "source_export", id: "export", relation: "measured-from" }], caveats: [], status: "measured",
+    respondentHash: null, attribution: [{ contentItemId: null, touchType: "unknown" as const, touchAt: "2026-09-01T10:00:00Z", confidence: "low" as const, attributionReason: "no UTM" }],
+  };
+  const first = buildFunnelEvent(input);
+  try {
+    writeFileSync(ledger, `${JSON.stringify(first)}\n${JSON.stringify(first)}\n`);
+    const duplicate = harness("GET", "/api/signals/outcomes?brand=human-inference");
+    await handleSignalsRoute({ ...duplicate, res: {} as any, outcomeLedgerPath: ledger });
+    assert.equal(duplicate.response()?.code, 500);
+    assert.match((duplicate.response()?.value as any).error, /duplicate/i);
+
+    const crossBrand = buildFunnelEvent({ ...input, id: "visit-charles", brandId: "charles", supersedesId: first.id });
+    writeFileSync(ledger, `${JSON.stringify(first)}\n${JSON.stringify(crossBrand)}\n`);
+    const revision = harness("GET", "/api/signals/outcomes?brand=human-inference");
+    await handleSignalsRoute({ ...revision, res: {} as any, outcomeLedgerPath: ledger });
+    assert.equal(revision.response()?.code, 500);
+    assert.match((revision.response()?.value as any).error, /different brand/i);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals outcomes route excludes unassigned legacy facts without letting their old lifecycle block a brand", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-legacy-outcomes-"));
+  const ledger = join(root, "outcomes.jsonl");
+  const common = {
+    eventType: "visit" as const, observedAt: "2026-09-01T10:00:00Z", collectedAt: "2026-09-01T10:05:00Z",
+    metric: "event_count", value: 2, unit: "event", numerator: 2, denominator: null, scope: { channel: "landing-page" },
+    window: { startAt: "2026-09-01T09:00:00Z", endAt: "2026-09-01T10:00:00Z" }, sourceNote: "legacy export",
+    evidenceRefs: ["export:legacy"], lineage: [{ recordType: "source_export", id: "legacy", relation: "measured-from" }], caveats: [],
+    respondentHash: null, attribution: [{ contentItemId: null, touchType: "unknown" as const, touchAt: "2026-09-01T10:00:00Z", confidence: "low" as const, attributionReason: "no UTM" }],
+  };
+  try {
+    const assigned = buildFunnelEvent({ ...common, id: "assigned", brandId: "human-inference", status: "measured" });
+    const legacy = buildFunnelEvent({ ...common, id: "legacy", status: "draft" });
+    writeFileSync(ledger, `${JSON.stringify(assigned)}\n${JSON.stringify(legacy)}\n`);
+    const h = harness("GET", "/api/signals/outcomes?brand=human-inference");
+    await handleSignalsRoute({ ...h, res: {} as any, outcomeLedgerPath: ledger });
+    assert.equal(h.response()?.code, 200);
+    assert.equal((h.response()?.value as any).audience.landing_visits.value, 2);
+    assert.equal((h.response()?.value as any).excluded_unassigned.outcomes, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("decline is durably recorded and returned by a later Signals read", async () => {
   const root = mkdtempSync(join(tmpdir(), "serve-signals-"));

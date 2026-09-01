@@ -1,7 +1,6 @@
 import { type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { openDb, repoRoot } from "../db/db.js";
+import { openDb } from "../db/db.js";
 import { readSignals, readOutcomeFamilies, readResearchReport } from "./signals.js";
 import { buildSignalsRecommendationRead } from "./signals-recommendations.js";
 import { appendSignalsDecision, readSignalsDecisions, recommendationKey, type SignalsDecisionKind, type SignalsRecommendationType } from "./signals-decisions.js";
@@ -13,12 +12,13 @@ import { loadExperimentInterpretation, readExperimentInterpretations, recordExpe
 import { isEngine, type Engine } from "./engines.js";
 import { safeFolder } from "./rows.js";
 import { readPublishingStatuses } from "./publishing-status.js";
-import { buildOutcomeLedger, readOutcomeLedger } from "../grow/outcome-ledger.js";
+import { buildOutcomeLedger, outcomeLedgerStructureBlockers, readOutcomeLedger } from "../grow/outcome-ledger.js";
 import type { SignalsExperimentProposalRequest, SignalsExperimentProposalResult } from "./signals-experiment-proposal.js";
 import { isBrandId, type BrandId } from "../identity/brand.js";
 import { readSignalsVentureProposals, recordSignalsVentureDecision, recordSignalsVentureProposal, signalsVentureProposalId, type SignalsVentureDecision } from "./signals-venture-handoff-store.js";
 import { readCanonEvents } from "../venture/canon.js";
 import { computeState } from "../venture/state.js";
+import { migrateLegacyDataFile } from "../runtime/data-root.js";
 
 type SignalsRouteContext = {
   req: IncomingMessage;
@@ -38,7 +38,10 @@ type SignalsRouteContext = {
   interpretExperiment?: (id: string, engine: Engine) => Promise<ExperimentInterpretationInput & { readonly autoWinner?: false }>;
   applyExperimentPlan?: (plan: ExperimentPlan, decision: ExperimentPlanDecision) => Promise<AppliedExperimentContentHandoff>;
   proposeExperiment?: (input: SignalsExperimentProposalRequest) => Promise<SignalsExperimentProposalResult>;
+  outcomeLedgerPath?: string;
 };
+
+function canonicalOutcomeLedgerPath(): string { return migrateLegacyDataFile(["outcomes.jsonl"]); }
 
 function requiredPositiveInteger(value: unknown, field: string): number {
   if (value === undefined || value === null || value === "") throw new Error(`${field} is required`);
@@ -80,7 +83,7 @@ function readLiveExperimentPerformance(experimentPlansPath?: string) {
         AND m.brand_id = p.brand_id
         AND m.provider_account_id = p.provider_account_id
     `).all() as ExperimentAnalyticsObservation[];
-    const outcomePath = join(repoRoot, "data", "outcomes.jsonl");
+    const outcomePath = canonicalOutcomeLedgerPath();
     const outcomeLedger = existsSync(outcomePath) ? buildOutcomeLedger(readOutcomeLedger(outcomePath)) : null;
     return buildLiveSignalsExperimentPerformance({ plans, publications, analytics, outcomeLedger, now: new Date().toISOString() });
   } finally { db.close(); }
@@ -95,7 +98,7 @@ export function prepareLiveExperimentInterpretation(id: string, experimentPlansP
 
 // Signals stays split by its existing response contracts: signal summary, outcome families, and
 // redacted research report remain separate reads; decisions are explicit append-only writes.
-export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, experimentResultsPath, ventureHandoffsPath, readVentureState, readExperimentPerformance, interpretExperiment, applyExperimentPlan, proposeExperiment }: SignalsRouteContext): Promise<boolean> {
+export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, experimentResultsPath, ventureHandoffsPath, readVentureState, readExperimentPerformance, interpretExperiment, applyExperimentPlan, proposeExperiment, outcomeLedgerPath }: SignalsRouteContext): Promise<boolean> {
   // Signals room (design 3e): deterministic brief + durable user decisions. Muxin decides;
   // adoption records intent only and never mutates configuration or the repository backlog.
   if (req.method === "GET" && url.pathname === "/api/signals") {
@@ -295,7 +298,17 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
         json(res, 400, { ok: false, error: "brand must be one of human-inference, charles, fiction" });
         return true;
       }
-      json(res, 200, readOutcomeFamilies(db, { brandId: requested }));
+      const path = outcomeLedgerPath ?? canonicalOutcomeLedgerPath();
+      try {
+        const outcomeRows = existsSync(path) ? readOutcomeLedger(path) : [];
+        const structureBlockers = outcomeLedgerStructureBlockers(outcomeRows);
+        if (structureBlockers.length) throw new Error(`ledger is blocked: ${structureBlockers.join("; ")}`);
+        const ledger = buildOutcomeLedger(outcomeRows.filter((row) => row.brandId === requested));
+        if (ledger.readiness.status !== "ready") throw new Error(`ledger is blocked: ${ledger.readiness.blockers.join("; ")}`);
+        json(res, 200, readOutcomeFamilies(db, { brandId: requested, outcomeRows }));
+      } catch (error) {
+        json(res, 500, { ok: false, error: `Outcome ledger unavailable: ${error instanceof Error ? error.message : String(error)}` });
+      }
     } finally {
       db.close();
     }

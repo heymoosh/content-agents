@@ -16,6 +16,7 @@ import {
   suppressionInputs,
   RESEARCH_COVERAGE_FILENAME,
 } from "./signals.js";
+import { buildBusinessOutcome, buildFunnelEvent } from "../grow/outcome-ledger.js";
 
 const BRIEF = `# Strategy Brief
 
@@ -367,7 +368,7 @@ test("audience splits measured follower growth from unmeasurable visits and opt-
     assert.equal(audience.landing_visits.state, "not_measured");
     assert.equal(audience.opt_ins.state, "not_measured");
     assert.equal(audience.survey_responses.state, "not_measured");
-    assert.match((audience.landing_visits as { reason: string }).reason, /no landing-page analytics ingest/);
+    assert.match((audience.landing_visits as { reason: string }).reason, /no eligible brand-scoped event_count fact/);
     assert.equal("total" in audience, false);
     assert.match(audience.partial_note, /not summed into one audience figure/);
   } finally {
@@ -386,11 +387,87 @@ test("business returns only its empty state, with every sub-metric unmeasured", 
     }
     assert.equal(
       business.empty_state,
-      "Until the landing page is live and taking payment there is nothing to measure here. It stays this way, not a zero."
+      "No eligible reviewed business-outcome facts are recorded for this selected brand. This is unmeasured, not zero."
     );
   } finally {
     db.close();
   }
+});
+
+test("brand-scoped canonical outcome facts measure landing, opt-in, and business families without cross-brand leakage", () => {
+  const db = fixtureDb();
+  try {
+    const common = {
+      observedAt: "2026-08-24T10:00:00Z", collectedAt: "2026-08-24T10:05:00Z",
+      metric: "event_count", value: 1, unit: "event", numerator: 1, denominator: null,
+      scope: { channel: "landing-page" }, window: { startAt: "2026-08-24T09:00:00Z", endAt: "2026-08-24T10:00:00Z" },
+      sourceNote: "reviewed export", evidenceRefs: ["export:row-1"],
+      lineage: [{ recordType: "source_export", id: "export-1", relation: "measured-from" }],
+      caveats: [], status: "measured",
+    } as const;
+    const attribution = [{ contentItemId: null, touchType: "unknown" as const, touchAt: common.observedAt, confidence: "low" as const, attributionReason: "source export had no UTM" }];
+    const rows = [
+      buildFunnelEvent({ ...common, id: "visit-hi", brandId: "human-inference", eventType: "visit", respondentHash: null, value: 7, numerator: 7, attribution }),
+      buildFunnelEvent({ ...common, id: "optin-hi", brandId: "human-inference", eventType: "opt_in", respondentHash: null, value: 2, numerator: 2, attribution }),
+      buildFunnelEvent({ ...common, id: "visit-charles", brandId: "charles", eventType: "visit", respondentHash: null, value: 99, numerator: 99, attribution }),
+      buildBusinessOutcome({ ...common, id: "purchase-hi", brandId: "human-inference", outcomeType: "purchase", value: 49, unit: "USD", currency: "USD", qualification: { status: "confirmed", rule: "checkout receipt" }, contentItemRefs: [], funnelEventRefs: ["optin-hi"], attribution }),
+    ];
+
+    const human = readOutcomeFamilies(db, { brandId: "human-inference", generatedAt: "2026-08-25T00:00:00Z", outcomeRows: rows });
+    assert.deepEqual(human.audience.landing_visits, { state: "measured", value: 7, records_measured: 1, records_unmeasured: 0 });
+    assert.deepEqual(human.audience.opt_ins, { state: "measured", value: 2, records_measured: 1, records_unmeasured: 0 });
+    assert.deepEqual(human.business.purchases, { state: "measured", value: 1, records_measured: 1, records_unmeasured: 0 });
+    assert.equal(human.business.empty_state, null);
+    assert.match(human.audience.partial_note, /separate measurements/i);
+    assert.equal(human.business.qualified_inquiries.state, "not_measured");
+
+    const charles = readOutcomeFamilies(db, { brandId: "charles", generatedAt: "2026-08-25T00:00:00Z", outcomeRows: rows });
+    assert.deepEqual(charles.audience.landing_visits, { state: "measured", value: 99, records_measured: 1, records_unmeasured: 0 });
+    assert.equal(charles.audience.opt_ins.state, "not_measured");
+    assert.equal(charles.business.purchases.state, "not_measured");
+  } finally {
+    db.close();
+  }
+});
+
+test("outcome revisions replace superseded facts and legacy unassigned rows remain excluded", () => {
+  const db = fixtureDb();
+  try {
+    const common = {
+      observedAt: "2026-08-24T10:00:00Z", collectedAt: "2026-08-24T10:05:00Z", metric: "event_count",
+      unit: "event", numerator: null, denominator: null, scope: { channel: "landing-page" },
+      window: { startAt: "2026-08-24T09:00:00Z", endAt: "2026-08-24T10:00:00Z" }, sourceNote: "reviewed export",
+      evidenceRefs: ["export:row-1"], lineage: [{ recordType: "source_export", id: "export-1", relation: "measured-from" }], caveats: [], status: "measured",
+      eventType: "visit" as const, respondentHash: null,
+      attribution: [{ contentItemId: null, touchType: "unknown" as const, touchAt: "2026-08-24T10:00:00Z", confidence: "low" as const, attributionReason: "no UTM" }],
+    };
+    const original = buildFunnelEvent({ ...common, id: "visit-old", brandId: "human-inference", value: 3 });
+    const replacement = buildFunnelEvent({ ...common, id: "visit-new", brandId: "human-inference", value: 5, supersedesId: "visit-old" });
+    const legacy = buildFunnelEvent({ ...common, id: "visit-legacy", value: 100 });
+    const read = readOutcomeFamilies(db, { brandId: "human-inference", outcomeRows: [original, replacement, legacy] });
+    assert.deepEqual(read.audience.landing_visits, { state: "measured", value: 5, records_measured: 1, records_unmeasured: 0 });
+    assert.equal(read.excluded_unassigned.outcomes, 1);
+  } finally {
+    db.close();
+  }
+});
+
+test("Signals count cards ignore exact rate facts retained for Experiment", () => {
+  const db = fixtureDb();
+  try {
+    const rate = buildFunnelEvent({
+      id: "visit-rate", brandId: "human-inference", eventType: "visit", observedAt: "2026-08-24T10:00:00Z", collectedAt: "2026-08-24T10:05:00Z",
+      metric: "visits-per-1000-impressions", value: 4.1, unit: "rate", numerator: 4.1, denominator: 1000,
+      scope: { channel: "landing-page" }, window: { startAt: "2026-08-24T09:00:00Z", endAt: "2026-08-24T10:00:00Z" }, sourceNote: "attributed analytics",
+      evidenceRefs: ["export:rate"], lineage: [{ recordType: "source_export", id: "rate", relation: "measured-from" }], caveats: [], status: "measured", respondentHash: null,
+      attribution: [{ contentItemId: null, touchType: "unknown", touchAt: "2026-08-24T10:00:00Z", confidence: "low", attributionReason: "aggregate rate" }],
+    });
+    const read = readOutcomeFamilies(db, { brandId: "human-inference", outcomeRows: [rate] });
+    assert.equal(read.audience.landing_visits.state, "not_measured");
+    assert.match((read.audience.landing_visits as { reason: string }).reason, /no eligible brand-scoped event_count fact/);
+    assert.match(read.audience.partial_note, /part has no source/i);
+    assert.doesNotMatch(read.audience.partial_note, /landing visits and opt-ins remain separate measurements/i);
+  } finally { db.close(); }
 });
 
 test("the sample rule is the repo's own 4-week INSUFFICIENT bar, stated in the shape", () => {

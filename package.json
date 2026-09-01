@@ -7,6 +7,7 @@
   "scripts": {
     "db": "tsx src/db/db.ts",
     "ingest": "tsx src/ingest/import.ts",
+    "ingest:outcomes": "tsx src/ingest/outcomes.ts",
     "bluesky": "tsx src/ingest/fetch-bluesky.ts",
     "pull": "tsx src/pull/pull.ts",
     "pull:login": "tsx src/pull/login.ts",

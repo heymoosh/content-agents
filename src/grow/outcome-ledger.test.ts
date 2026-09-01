@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   appendOutcomeRow,
+  appendOutcomeRowsForBrand,
   assessOutcomeRow,
   buildBusinessOutcome,
   buildFunnelEvent,
@@ -201,6 +202,29 @@ test("appends revisions without editing or deleting prior rows", () => {
     assert.equal(rows[1].supersedesId, "funnel-1");
     assert.equal(readFileSync(path, "utf8").trim().split("\n").length, 2);
     assert.throws(() => appendOutcomeRow(buildFunnelEvent(funnelInput({ id: "funnel-3", supersedesId: "missing" })), path), /supersedes/i);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("brand-scoped ingestion stamps canonical identity and is atomic across duplicate batches", () => {
+  const directory = mkdtempSync(join(tmpdir(), "outcome-ledger-brand-"));
+  const path = join(directory, "outcomes.jsonl");
+  try {
+    const rows = [buildFunnelEvent(funnelInput({ denominator: null })), buildBusinessOutcome(businessInput())];
+    appendOutcomeRowsForBrand(rows, "human-inference", path);
+    assert.deepEqual(readOutcomeLedger(path).map((row) => row.brandId), ["human-inference", "human-inference"]);
+
+    assert.throws(() => appendOutcomeRowsForBrand(rows, "human-inference", path), /already exists/i);
+    assert.equal(readFileSync(path, "utf8").trim().split("\n").length, 2);
+    assert.throws(
+      () => appendOutcomeRowsForBrand([buildFunnelEvent(funnelInput({ id: "foreign", brandId: "charles", denominator: null }))], "human-inference", path),
+      /brand/i,
+    );
+    assert.throws(
+      () => appendOutcomeRowsForBrand([buildFunnelEvent(funnelInput({ id: "cross-brand-revision", brandId: "charles", supersedesId: "funnel-1", denominator: null }))], "charles", path),
+      /same brand/i,
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

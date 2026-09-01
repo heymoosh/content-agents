@@ -94,6 +94,7 @@ export {
 export {
   appendOutcomeLedger,
   appendOutcomeRow,
+  appendOutcomeRowsForBrand,
   assessOutcomeRow,
   buildBusinessOutcome,
   buildFunnelEvent,
@@ -103,6 +104,7 @@ export {
   normalizeBusinessOutcomeRecord,
   normalizeFunnelEventRecord,
   normalizeOutcomeRow,
+  outcomeLedgerStructureBlockers,
   OUTCOME_LEDGER_VERSION,
   readOutcomeLedger,
   type AttributionConfidence,

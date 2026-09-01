@@ -5638,7 +5638,7 @@ document.getElementById("signalsBrand")?.addEventListener("change", () => {
 
 // ── Signals: the four outcome families + the redacted research read ──
 //
-// GET /api/signals/outcomes groups what data/analytics.db really holds into the four families of
+// GET /api/signals/outcomes groups analytics.db plus the canonical outcome ledger into the four families of
 // docs/venture-schema-contract.md §5.8; GET /api/research/report is the redacted account-level
 // research read. Nothing here adds a family to another one, and nothing here computes a number.
 //
@@ -5725,7 +5725,7 @@ function renderOutcomes(){
   if(OUTCOMES.error){ box.innerHTML = '<div class="empty">Could not read the outcome families: '+esc(OUTCOMES.error)+'</div>'; return; }
   const conf = OUTCOMES.confidence || [];
   const excluded = OUTCOMES.excluded_unassigned || {};
-  const excludedLine = ["posts","metrics","audience","research"].map(k=>k+" "+(Number(excluded[k])||0)).join(", ");
+  const excludedLine = ["posts","metrics","audience","research","outcomes"].map(k=>k+" "+(Number(excluded[k])||0)).join(", ");
   const plats = conf.map(c=>
     '<div class="sig-plat"><span style="font-weight:600">'+esc(c.platform)+'</span>'+
     '<span class="t-'+(c.sufficient?"green":"amber")+'" style="font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace">'+esc(c.sufficient?"enough data":"insufficient")+'</span>'+
