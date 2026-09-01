@@ -103,17 +103,23 @@ export async function reconcileProviderStatuses(
       const reconciliationError = rawObservation && typeof rawObservation === "object"
         && typeof (rawObservation as Record<string, unknown>).reconciliationError === "string"
         ? (rawObservation as Record<string, unknown>).reconciliationError as string : undefined;
+      const observedAccount = observation.providerAccountId;
+      const accountMismatch = Boolean(status.providerAccountId && observedAccount && status.providerAccountId !== observedAccount);
       const next: PublishingStatus = {
         ...status,
         ...observation,
-        state: observation.state,
+        // A provider object seen under a different account is evidence, not terminal proof.
+        state: accountMismatch ? "uncertain" : observation.state,
         at: now().toISOString(),
         providerObjectId: observation.providerObjectId ?? status.providerObjectId ?? status.ref,
-        providerAccountId: observation.providerAccountId ?? status.providerAccountId,
+        // Never let an observation erase or replace the scheduled authoritative identity.
+        providerAccountId: status.providerAccountId ?? observation.providerAccountId,
         canonicalUrl: observation.canonicalUrl ?? status.canonicalUrl,
         schemaVersion: undefined,
         eventId: undefined,
-        error: observation.state === "uncertain"
+        error: accountMismatch
+          ? `observed provider account ${observedAccount} does not match scheduled account ${status.providerAccountId}; uncertain evidence retained`
+          : observation.state === "uncertain"
           ? reconciliationError ?? `authoritative ${status.provider} status is ambiguous; human reconciliation is required`
           : undefined,
       };

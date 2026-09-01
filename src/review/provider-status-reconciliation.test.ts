@@ -44,6 +44,24 @@ test("a missing reader appends explicit uncertain evidence and never retries or 
   assert.equal(readPublishingHistory(path).length, 2);
 });
 
+test("an observation from a different provider account stays uncertain and preserves the scheduled identity", async () => {
+  const root = mkdtempSync(join(tmpdir(), "provider-reconcile-")); roots.push(root);
+  const path = join(root, "events.jsonl");
+  writeFileSync(path, JSON.stringify({
+    slug: "account-bound", rowId: "r-1", provider: "postiz", state: "planned",
+    at: "2026-01-01T00:00:00Z", providerObjectId: "post-1", providerAccountId: "scheduled-account",
+  }) + "\n");
+  const [event] = await reconcileProviderStatuses({
+    postiz: async () => ({
+      id: "post-1", accountId: "different-account", status: "published",
+      url: "https://provider.test/post-1",
+    }),
+  }, path, () => new Date("2026-01-02T00:00:00Z"));
+  assert.equal(event.state, "uncertain");
+  assert.equal(event.providerAccountId, "scheduled-account");
+  assert.match(event.error ?? "", /does not match scheduled account/);
+});
+
 test("Typefully and YouTube list absence is uncertain, never inferred terminal proof", async () => {
   const readers = createDefaultProviderStatusReaders({ fetchTypefully: async () => [], fetchYoutube: async () => [] });
   for (const provider of ["typefully", "youtube"] as const) {

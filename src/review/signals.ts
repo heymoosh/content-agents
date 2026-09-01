@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { repoRoot } from "../db/db.js";
 import { buildResearchReport, type ResearchReport } from "../research/read.js";
+import type { BrandId } from "../identity/brand.js";
 
 export interface ChannelConfidence {
   channel: string;
@@ -239,6 +240,9 @@ export interface OutcomeFamilies {
    * or Signals collapses them into one score."
    */
   never_collapsed: true;
+  /** Rows retained only for audit visibility; legacy rows are never assigned to a brand. */
+  excluded_unassigned: { posts: number; metrics: number; audience: number; research: number };
+  brand_id?: BrandId;
 }
 
 /**
@@ -337,7 +341,7 @@ function tableExists(db: Database.Database, table: string): boolean {
  * matching src/research/read.ts's active semantics. Counts only — redacted reply text stays behind
  * buildResearchReport()'s redacted account-level path and never reaches this aggregate.
  */
-function conversationResearch(db: Database.Database): { total: MetricRead; bySource: Record<string, number> } {
+function conversationResearch(db: Database.Database, brandId?: BrandId): { total: MetricRead; bySource: Record<string, number> } {
   if (!tableExists(db, "research_observations")) {
     return {
       total: {
@@ -353,8 +357,10 @@ function conversationResearch(db: Database.Database): { total: MetricRead; bySou
   // "we never looked", not "nobody replied", and reporting it as a measured zero would be exactly
   // the collapse this read exists to prevent. Once ANY observation exists, capture has run, and a
   // zero conversational count is then a real measurement.
+  const where = brandId ? " WHERE brand_id = ?" : "";
+  const args = brandId ? [brandId] : [];
   const observations = (
-    db.prepare("SELECT COUNT(*) AS count FROM research_observations").get() as { count: number }
+    db.prepare(`SELECT COUNT(*) AS count FROM research_observations${where}`).get(...args) as { count: number }
   ).count;
   if (observations === 0) {
     const configured = Boolean(process.env.RESEARCH_HASH_KEY && process.env.RESEARCH_HASH_KEY.trim());
@@ -372,10 +378,10 @@ function conversationResearch(db: Database.Database): { total: MetricRead; bySou
   const rows = db
     .prepare(
       `SELECT source, COUNT(*) AS count FROM research_observations
-        WHERE source IN (${placeholders}) AND superseded_by IS NULL AND deleted_at IS NULL
+        WHERE source IN (${placeholders}) AND superseded_by IS NULL AND deleted_at IS NULL${brandId ? " AND brand_id = ?" : ""}
         GROUP BY source ORDER BY source`
     )
-    .all(...CONVERSATION_RESEARCH_SOURCES) as { source: string; count: number }[];
+    .all(...CONVERSATION_RESEARCH_SOURCES, ...(brandId ? [brandId] : [])) as { source: string; count: number }[];
   const bySource: Record<string, number> = {};
   let total = 0;
   for (const row of rows) {
@@ -409,25 +415,28 @@ const BUSINESS_EMPTY_STATE =
  * capture per platform (a total is a level, not something to add across captures); `follower_delta`
  * sums the deltas, which is what a delta is for.
  */
-function audienceTotals(db: Database.Database): { followerTotal: MetricRead; followerDelta: MetricRead } {
+function audienceTotals(db: Database.Database, brandId?: BrandId): { followerTotal: MetricRead; followerDelta: MetricRead } {
   if (!tableExists(db, "audience")) {
     const reason = "no audience table in this database, so no follower export has been ingested here";
     return { followerTotal: { state: "not_measured", reason }, followerDelta: { state: "not_measured", reason } };
   }
   const totals = db
     .prepare(
-      `SELECT a.platform, a.value_count FROM audience a
+        `SELECT a.platform, a.value_count FROM audience a
         JOIN (SELECT platform, MAX(captured_at) AS mc FROM audience
-               WHERE metric_type = 'follower_total' GROUP BY platform) la
+               WHERE metric_type = 'follower_total'${brandId ? " AND brand_id = ?" : ""} GROUP BY platform) la
           ON a.platform = la.platform AND a.captured_at = la.mc
-        WHERE a.metric_type = 'follower_total' AND a.dimension IS NULL`
+        WHERE a.metric_type = 'follower_total' AND a.dimension IS NULL${brandId ? " AND a.brand_id = ?" : ""}`
     )
-    .all() as { platform: string; value_count: number | null }[];
+    .all(...(brandId ? [brandId, brandId] : [])) as { platform: string; value_count: number | null }[];
   const deltas = db
-    .prepare(`SELECT value_count FROM audience WHERE metric_type = 'follower_delta' AND dimension IS NULL`)
-    .all() as { value_count: number | null }[];
+    .prepare(`SELECT value_count FROM audience WHERE metric_type = 'follower_delta' AND dimension IS NULL${brandId ? " AND brand_id = ?" : ""}`)
+    .all(...(brandId ? [brandId] : [])) as { value_count: number | null }[];
 
   const roll = (source: { value_count: number | null }[]): MetricRead => {
+    if (brandId && source.length === 0) {
+      return { state: "not_measured", reason: `no assigned audience captures for ${brandId}` };
+    }
     let value = 0;
     let measured = 0;
     for (const row of source) {
@@ -450,20 +459,37 @@ function audienceTotals(db: Database.Database): { followerTotal: MetricRead; fol
  */
 export function readOutcomeFamilies(
   db: Database.Database,
-  opts: { generatedAt?: string; now?: number } = {}
+  opts: { generatedAt?: string; now?: number; brandId?: BrandId } = {}
 ): OutcomeFamilies {
   const generatedAt = opts.generatedAt ?? new Date().toISOString();
   const now = opts.now ?? Date.parse(generatedAt);
   const rows = db
     .prepare(
-      `SELECT p.platform, p.posted_at, m.impressions, m.likes, m.replies, m.reposts, m.new_follows
-         FROM posts p LEFT JOIN (${LATEST_METRICS}) m ON m.post_id = p.id`
+      opts.brandId
+        ? `SELECT p.platform, p.posted_at, m.impressions, m.likes, m.replies, m.reposts, m.new_follows
+             FROM posts p
+             LEFT JOIN metrics m ON m.rowid = (
+               SELECT m2.rowid FROM metrics m2
+                WHERE m2.post_id = p.id
+                  AND m2.brand_id = p.brand_id
+                  AND m2.provider_account_id = p.provider_account_id
+                ORDER BY m2.captured_at DESC, m2.rowid DESC LIMIT 1
+             )
+            WHERE p.brand_id = ?`
+        : `SELECT p.platform, p.posted_at, m.impressions, m.likes, m.replies, m.reposts, m.new_follows
+             FROM posts p LEFT JOIN (${LATEST_METRICS}) m ON m.post_id = p.id`
     )
-    .all() as FamilyPostRow[];
-  const research = conversationResearch(db);
-  const audienceRoll = audienceTotals(db);
+    .all(...(opts.brandId ? [opts.brandId] : [])) as FamilyPostRow[];
+  const research = conversationResearch(db, opts.brandId);
+  const audienceRoll = audienceTotals(db, opts.brandId);
+  const excluded_unassigned = {
+    posts: Number((db.prepare("SELECT COUNT(*) AS count FROM posts WHERE brand_id IS NULL").get() as { count: number }).count),
+    metrics: Number((db.prepare("SELECT COUNT(*) AS count FROM metrics WHERE brand_id IS NULL").get() as { count: number }).count),
+    audience: Number((db.prepare("SELECT COUNT(*) AS count FROM audience WHERE brand_id IS NULL").get() as { count: number }).count),
+    research: tableExists(db, "research_observations") ? Number((db.prepare("SELECT COUNT(*) AS count FROM research_observations WHERE brand_id IS NULL").get() as { count: number }).count) : 0,
+  };
 
-  return {
+  const result: OutcomeFamilies = {
     generated_at: generatedAt,
     attention: {
       family: "attention",
@@ -516,7 +542,21 @@ export function readOutcomeFamilies(
     confidence: platformConfidence(rows, now),
     sample_rule: SAMPLE_RULE,
     never_collapsed: true,
+    excluded_unassigned,
+    ...(opts.brandId ? { brand_id: opts.brandId } : {}),
   };
+  // An explicitly selected brand with no assigned rows is not a measured zero. This is the
+  // honest cold-start state for Charles/Fiction and for any newly-created account.
+  if (opts.brandId && rows.length === 0) {
+    const empty = (reason: string): MetricRead => ({ state: "not_measured", reason });
+    result.attention.impressions = empty(`${opts.brandId} has no assigned posts or provider observations yet; this brand is not measured`);
+    result.conversation.likes = empty("no assigned posts for this brand");
+    result.conversation.replies = empty("no assigned posts for this brand");
+    result.conversation.reposts = empty("no assigned posts for this brand");
+    result.audience.new_follows = empty("no assigned posts for this brand");
+    result.confidence = [];
+  }
+  return result;
 }
 
 // ── The redacted research read, reachable from the GUI ─────────────────────────────────────────
@@ -558,7 +598,7 @@ export type ResearchReportRead =
  */
 export function readResearchReport(
   db: Database.Database,
-  opts: { coveragePath?: string; generatedAt?: string; hashKey?: string | undefined } = {}
+  opts: { coveragePath?: string; generatedAt?: string; hashKey?: string | undefined; brandId?: BrandId } = {}
 ): ResearchReportRead {
   const coveragePath = opts.coveragePath ?? RESEARCH_COVERAGE_PATH;
   const hashKey = "hashKey" in opts ? opts.hashKey : process.env.RESEARCH_HASH_KEY;
@@ -572,21 +612,22 @@ export function readResearchReport(
     };
   }
   const observations = (
-    db.prepare("SELECT COUNT(*) AS count FROM research_observations").get() as { count: number }
+    db.prepare(`SELECT COUNT(*) AS count FROM research_observations${opts.brandId ? " WHERE brand_id = ?" : ""}`)
+      .get(...(opts.brandId ? [opts.brandId] : [])) as { count: number }
   ).count;
   if (observations === 0) {
     return {
       state: "unavailable",
       capture_configured: captureConfigured,
       reason: captureConfigured
-        ? "the research_observations table is empty. Capture is configured but has not recorded anything yet"
-        : "RESEARCH_HASH_KEY is not set, so research capture cannot write observations (src/research/store.ts:26) and the table is empty",
+        ? `${opts.brandId ? `${opts.brandId} has no assigned research observations. ` : "The research_observations table is empty. "}Capture is configured but has not recorded anything yet`
+        : `RESEARCH_HASH_KEY is not set, so research capture cannot write observations (src/research/store.ts:26)${opts.brandId ? ` for ${opts.brandId}` : " and the table is empty"}`,
       report: null,
     };
   }
   return {
     state: "available",
     capture_configured: captureConfigured,
-    report: buildResearchReport(db, coveragePath, opts.generatedAt),
+    report: buildResearchReport(db, coveragePath, opts.generatedAt, opts.brandId),
   };
 }

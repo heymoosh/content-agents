@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { existsSync, readFileSync } from "node:fs";
 import type { CoverageRecord } from "./capture.js";
+import type { BrandId } from "../identity/brand.js";
 
 export interface ResearchMetricSummary {
   latest_value: number | null;
@@ -211,25 +212,29 @@ function readCoverage(path: string): CoverageRecord[] {
 export function buildResearchReport(
   db: Database.Database,
   coveragePath: string,
-  generatedAt = new Date().toISOString()
+  generatedAt = new Date().toISOString(),
+  brandId?: BrandId,
 ): ResearchReport {
+  const brandWhere = brandId ? " WHERE brand_id = ?" : "";
+  const brandAnd = brandId ? " AND brand_id = ?" : "";
+  const brandArgs = brandId ? [brandId] : [];
   const observationCounts = Object.fromEntries(
-    (db.prepare("SELECT source, COUNT(*) AS count FROM research_observations GROUP BY source ORDER BY source").all() as { source: string; count: number }[])
+    (db.prepare(`SELECT source, COUNT(*) AS count FROM research_observations${brandWhere} GROUP BY source ORDER BY source`).all(...brandArgs) as { source: string; count: number }[])
       .map((row) => [row.source, row.count])
   );
   const activeObservationCounts = Object.fromEntries(
     (db.prepare(
-      "SELECT source, COUNT(*) AS count FROM research_observations WHERE superseded_by IS NULL AND deleted_at IS NULL GROUP BY source ORDER BY source"
-    ).all() as { source: string; count: number }[]).map((row) => [row.source, row.count])
+      `SELECT source, COUNT(*) AS count FROM research_observations WHERE superseded_by IS NULL AND deleted_at IS NULL${brandAnd} GROUP BY source ORDER BY source`
+    ).all(...brandArgs) as { source: string; count: number }[]).map((row) => [row.source, row.count])
   );
 
   const allMetricRows = db
     .prepare(
       `SELECT observation_id, source, content_item_id, note_id, metric_name, metric_value, collected_at
        FROM research_observations
-       WHERE source IN ('metric', 'subscriber_movement') AND metric_name IS NOT NULL`
+       WHERE source IN ('metric', 'subscriber_movement') AND metric_name IS NOT NULL${brandAnd}`
     )
-    .all() as MetricRow[];
+    .all(...brandArgs) as MetricRow[];
   const currentMetricRows = latestMetricRows(allMetricRows);
   const metrics: Record<string, ResearchMetricSummary> = {};
   for (const row of currentMetricRows) {
@@ -255,10 +260,10 @@ export function buildResearchReport(
     .prepare(
       `SELECT observation_id, note_id, reply_id, parent_reply_id, published_at, redacted_text, respondent_hash
        FROM research_observations
-       WHERE source = 'reply' AND is_creator_observation = 0 AND superseded_by IS NULL AND deleted_at IS NULL
+       WHERE source = 'reply' AND is_creator_observation = 0 AND superseded_by IS NULL AND deleted_at IS NULL${brandAnd}
        ORDER BY published_at, observation_id`
     )
-    .all() as ResearchReplyRow[];
+    .all(...brandArgs) as ResearchReplyRow[];
   const replyObservations = replyRows.map((row): ResearchReplyRead => ({
     observation_id: row.observation_id,
     note_id: row.note_id,
@@ -270,9 +275,9 @@ export function buildResearchReport(
   const creatorReplyObservations = (
     db
       .prepare(
-        "SELECT COUNT(*) AS count FROM research_observations WHERE source = ? AND is_creator_observation = 1 AND superseded_by IS NULL AND deleted_at IS NULL"
+        `SELECT COUNT(*) AS count FROM research_observations WHERE source = ? AND is_creator_observation = 1 AND superseded_by IS NULL AND deleted_at IS NULL${brandAnd}`
       )
-      .get("reply") as { count: number }
+      .get("reply", ...brandArgs) as { count: number }
   ).count;
 
   return {
@@ -285,7 +290,8 @@ export function buildResearchReport(
     creator_reply_observations: creatorReplyObservations,
     audience_respondent_summary: respondentSummary(replyRows),
     largest_audience_thread: largestThreadSummary(replyRows),
-    coverage: readCoverage(coveragePath),
+    // Existing coverage lines predate brand identity. Do not silently assign them to a brand.
+    coverage: brandId ? [] : readCoverage(coveragePath),
   };
 }
 

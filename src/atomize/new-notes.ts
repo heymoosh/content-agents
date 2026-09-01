@@ -6,6 +6,7 @@ import { openDb, repoRoot } from "../db/db.js";
 import { fetchSubstackNotes, FetchedNote } from "./fetch-notes.js";
 import { scaffoldContentFolder } from "./new-content.js";
 import { readOriginStates, noteReuse } from "./note-reuse.js";
+import { validateMeasurementBinding, type BrandId } from "../identity/brand.js";
 
 // Pull Muxin's own Substack Notes and (a) ingest their engagement into analytics so resonance.ts
 // / snapshot.ts cover Notes, and (b) let him spread chosen ones to other platforms via the normal
@@ -40,32 +41,48 @@ function noteTitle(text: string): string {
 // upsert on (platform, platform_post_id) so re-runs refresh engagement and build a recency series.
 // `substack-note` is a distinct platform from `substack` — note likes/restacks are a different scale
 // from essay open-rates and must not share the Substack engagement baseline.
-function ingestNotes(notes: FetchedNote[]): number {
+export interface NotesMeasurementBinding { brandId: BrandId; providerAccountId: string }
+
+export function humanInferenceSubstackMeasurementBinding(): NotesMeasurementBinding {
+  return validateMeasurementBinding({
+    brandId: "human-inference",
+    providerAccountId: process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID,
+  });
+}
+
+function ingestNotes(notes: FetchedNote[], binding: NotesMeasurementBinding): number {
+  const identity = validateMeasurementBinding(binding);
   const db = openDb();
   const now = new Date().toISOString();
   const upsertPost = db.prepare(`
-    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type, source)
-    VALUES ('substack-note', ?, ?, ?, ?, 'note', 'note', 'organic')
+    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type, source, brand_id, provider_account_id)
+    VALUES ('substack-note', ?, ?, ?, ?, 'note', 'note', 'organic', ?, ?)
     ON CONFLICT(platform, platform_post_id) DO UPDATE SET
       content_text = excluded.content_text,
       media_type = COALESCE(posts.media_type, excluded.media_type),
-      source = COALESCE(posts.source, 'organic')
+      source = COALESCE(posts.source, 'organic'),
+      brand_id = COALESCE(posts.brand_id, excluded.brand_id),
+      provider_account_id = COALESCE(posts.provider_account_id, excluded.provider_account_id)
+    WHERE (posts.brand_id IS NULL OR posts.brand_id = excluded.brand_id)
+      AND (posts.provider_account_id IS NULL OR posts.provider_account_id = excluded.provider_account_id)
     RETURNING id
   `);
   const insertMetrics = db.prepare(`
-    INSERT INTO metrics (post_id, captured_at, impressions, likes, replies, reposts, clicks, new_follows, engagement_rate, raw_json)
-    VALUES (?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, ?)
+    INSERT INTO metrics (post_id, captured_at, impressions, likes, replies, reposts, clicks, new_follows, engagement_rate, raw_json, brand_id, provider_account_id)
+    VALUES (?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?)
   `);
   const tx = db.transaction(() => {
     for (const n of notes) {
-      const { id } = upsertPost.get(n.noteId, n.publishedAt, n.url, n.text) as { id: number };
+      const stored = upsertPost.get(n.noteId, n.publishedAt, n.url, n.text, identity.brandId, identity.providerAccountId) as { id: number } | undefined;
+      if (!stored) throw new Error(`identity conflict for substack-note/${n.noteId}`);
+      const { id } = stored;
       insertMetrics.run(
         id,
         now,
         n.likes,
         n.replies,
         n.reposts,
-        JSON.stringify({ likes: n.likes, replies: n.replies, reposts: n.reposts, url: n.url })
+        JSON.stringify({ likes: n.likes, replies: n.replies, reposts: n.reposts, url: n.url }), identity.brandId, identity.providerAccountId
       );
     }
   });
@@ -84,11 +101,12 @@ export interface AnnotatedNote extends FetchedNote {
 // CLI (below) and the GUI's GET /api/notes.
 export async function fetchNotesList(
   handle: string,
-  limit: number
+  limit: number,
+  binding: NotesMeasurementBinding
 ): Promise<{ handle: string; notes: AnnotatedNote[] }> {
   const h = handle.replace(/^@/, "");
   const notes = await fetchSubstackNotes(handle, { limit });
-  ingestNotes(notes);
+  ingestNotes(notes, binding);
   const states = readOriginStates(join(repoRoot, "content"));
   const now = Date.now();
   const annotated = notes.map((n) => ({ ...n, ...noteReuse(states.get(n.url), now) }));
@@ -97,7 +115,7 @@ export async function fetchNotesList(
 }
 
 async function listAndIngest(handle: string, limit: number, showAll: boolean): Promise<void> {
-  const { handle: h, notes } = await fetchNotesList(handle, limit);
+  const { handle: h, notes } = await fetchNotesList(handle, limit, humanInferenceSubstackMeasurementBinding());
   if (notes.length === 0) {
     console.log(`No original notes found for @${h}.`);
     return;

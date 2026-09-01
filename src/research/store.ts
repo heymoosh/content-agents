@@ -3,6 +3,11 @@ import Database from "better-sqlite3";
 import { createHmac, randomUUID } from "node:crypto";
 import type { FetchedNote } from "../atomize/fetch-notes.js";
 import type { FetchedReply } from "./substack/replies.js";
+import { validateMeasurementBinding, type BrandId } from "../identity/brand.js";
+export type MeasurementBinding = { brandId: BrandId; providerAccountId: string };
+function resolvedBinding(binding: MeasurementBinding): MeasurementBinding {
+  return validateMeasurementBinding(binding);
+}
 
 export interface ReplyObservationResult {
   observationId: string;
@@ -89,6 +94,8 @@ function insertObservation(
     windowStart?: string | null;
     windowEnd?: string | null;
     collectedAt?: string | null;
+    brandId?: BrandId | null;
+    providerAccountId?: string | null;
   }
 ): string {
   const observationId = input.observationId ?? nextObservationId();
@@ -98,11 +105,13 @@ function insertObservation(
       parent_reply_id, published_at, observed_at, captured_at, respondent_hash, exact_text,
       redacted_text, is_creator_observation, privacy_class, post_age_hours, views_at_observation,
       edited_at, metric_name, metric_value, previous_value, delta, window_start, window_end, collected_at
+      ,brand_id, provider_account_id
     ) VALUES (
       @observationId, @source, @sourcePlatform, @surface, @contentItemId, @noteId, @replyId,
       @parentReplyId, @publishedAt, @observedAt, @capturedAt, @respondentHash, @exactText,
       @redactedText, @isCreatorObservation, @privacyClass, @postAgeHours, @viewsAtObservation,
       @editedAt, @metricName, @metricValue, @previousValue, @delta, @windowStart, @windowEnd, @collectedAt
+      ,@brandId, @providerAccountId
     )`
   ).run({
     observationId,
@@ -131,11 +140,13 @@ function insertObservation(
     windowStart: input.windowStart ?? null,
     windowEnd: input.windowEnd ?? null,
     collectedAt: input.collectedAt ?? null,
+    brandId: input.brandId ?? null,
+    providerAccountId: input.providerAccountId ?? null,
   });
   return observationId;
 }
 
-function replyInput(note: FetchedNote, reply: FetchedReply, at: string, key: string) {
+function replyInput(note: FetchedNote, reply: FetchedReply, at: string, key: string, binding: MeasurementBinding) {
   return {
     source: "reply",
     sourcePlatform: "substack",
@@ -155,6 +166,8 @@ function replyInput(note: FetchedNote, reply: FetchedReply, at: string, key: str
     postAgeHours: ageHours(note.publishedAt, at),
     viewsAtObservation: note.views ?? null,
     editedAt: isoOrNull(reply.editedAt),
+    brandId: binding.brandId,
+    providerAccountId: binding.providerAccountId,
   } as const;
 }
 
@@ -163,17 +176,20 @@ export function upsertReplyObservation(
   note: FetchedNote,
   reply: FetchedReply,
   at: string,
-  key = requireResearchHashKey()
+  key: string | undefined,
+  binding: MeasurementBinding,
 ): ReplyObservationResult {
+  const valid = resolvedBinding(binding);
+  const hashKey = key ?? requireResearchHashKey();
   const current = db
     .prepare(
       `SELECT observation_id, exact_text, edited_at, deleted_at, is_creator_observation
        FROM research_observations
-       WHERE source = 'reply' AND source_platform = 'substack' AND note_id = ? AND reply_id = ?
+       WHERE source = 'reply' AND source_platform = 'substack' AND note_id = ? AND reply_id = ? AND brand_id = ? AND provider_account_id = ?
          AND superseded_by IS NULL
        ORDER BY captured_at DESC LIMIT 1`
     )
-    .get(note.noteId, reply.replyId) as
+    .get(note.noteId, reply.replyId, valid.brandId, valid.providerAccountId) as
     | {
         observation_id: string;
         exact_text: string | null;
@@ -182,7 +198,7 @@ export function upsertReplyObservation(
         is_creator_observation: number;
       }
     | undefined;
-  const input = replyInput(note, reply, at, key);
+  const input = replyInput(note, reply, at, hashKey, valid);
 
   if (current && current.exact_text === input.exactText && current.edited_at === input.editedAt) {
     if (current.deleted_at || (note.authorUserId !== undefined && current.is_creator_observation !== (input.isCreatorObservation ? 1 : 0))) {
@@ -210,7 +226,8 @@ export function reconcileReplyObservations(
   replies: FetchedReply[],
   completeness: "complete" | "partial",
   at: string,
-  key = requireResearchHashKey()
+  key: string | undefined,
+  binding: MeasurementBinding,
 ): ReconciliationResult {
   const result: ReconciliationResult = {
     newObservations: 0,
@@ -222,19 +239,20 @@ export function reconcileReplyObservations(
   const transaction = db.transaction(() => {
     for (const reply of replies) {
       seen.add(reply.replyId);
-      const outcome = upsertReplyObservation(db, note, reply, at, key);
+      const outcome = upsertReplyObservation(db, note, reply, at, key, binding);
       if (outcome.action === "new") result.newObservations++;
       else if (outcome.action === "changed") result.changedObservations++;
       else result.unchangedObservations++;
     }
     if (completeness !== "complete") return;
+    const valid = resolvedBinding(binding);
     const rows = db
       .prepare(
         `SELECT observation_id, reply_id
          FROM research_observations
-         WHERE source = 'reply' AND note_id = ? AND superseded_by IS NULL AND deleted_at IS NULL`
+         WHERE source = 'reply' AND note_id = ? AND brand_id = ? AND provider_account_id = ? AND superseded_by IS NULL AND deleted_at IS NULL`
       )
-      .all(note.noteId) as { observation_id: string; reply_id: string }[];
+      .all(note.noteId, valid.brandId, valid.providerAccountId) as { observation_id: string; reply_id: string }[];
     for (const row of rows) {
       if (seen.has(row.reply_id)) continue;
       db.prepare("UPDATE research_observations SET deleted_at = ? WHERE observation_id = ?").run(at, row.observation_id);
@@ -257,8 +275,10 @@ export function writeMetricObservation(
     metricName: string;
     metricValue: number | null;
     at: string;
+    binding: MeasurementBinding;
   }
 ): MetricWriteResult {
+  const valid = resolvedBinding(input.binding);
   const source = input.source ?? "metric";
   const sourcePlatform = input.sourcePlatform ?? "substack";
   const previous = db
@@ -266,10 +286,10 @@ export function writeMetricObservation(
       `SELECT observation_id, metric_value, window_start, window_end
        FROM research_observations
        WHERE source = ? AND metric_name = ?
-         AND ((content_item_id = ?) OR (content_item_id IS NULL AND ? IS NULL))
+         AND ((content_item_id = ?) OR (content_item_id IS NULL AND ? IS NULL)) AND brand_id = ? AND provider_account_id = ?
        ORDER BY collected_at DESC, rowid DESC LIMIT 1`
     )
-    .get(source, input.metricName, input.contentItemId ?? null, input.contentItemId ?? null) as
+    .get(source, input.metricName, input.contentItemId ?? null, input.contentItemId ?? null, valid.brandId, valid.providerAccountId) as
     | { observation_id: string; metric_value: number | null; window_start: string | null; window_end: string | null }
     | undefined;
 
@@ -302,11 +322,13 @@ export function writeMetricObservation(
     windowStart: input.at,
     windowEnd: input.at,
     collectedAt: input.at,
+    brandId: valid.brandId,
+    providerAccountId: valid.providerAccountId,
   });
   return { observationId, created: true, changed: Boolean(previous), measured: input.metricValue !== null };
 }
 
-export function writeNoteMetrics(db: Database.Database, note: FetchedNote, at: string): MetricWriteResult[] {
+export function writeNoteMetrics(db: Database.Database, note: FetchedNote, at: string, binding: MeasurementBinding): MetricWriteResult[] {
   const metrics: Array<[string, number | undefined]> = [
     ["views", note.views],
     ["likes", note.likes],
@@ -323,6 +345,7 @@ export function writeNoteMetrics(db: Database.Database, note: FetchedNote, at: s
         publishedAt: note.publishedAt,
         metricName,
         metricValue,
+        binding,
         at,
       })
     );
@@ -341,7 +364,8 @@ export function installResearchSchema(db: Database.Database): void {
       behavioral_action TEXT, is_creator_observation INTEGER NOT NULL DEFAULT 0,
       privacy_class TEXT NOT NULL, post_age_hours REAL, views_at_observation REAL, edited_at TEXT,
       deleted_at TEXT, superseded_by TEXT, metric_name TEXT, metric_value REAL,
-      previous_value REAL, delta REAL, window_start TEXT, window_end TEXT, collected_at TEXT
+      previous_value REAL, delta REAL, window_start TEXT, window_end TEXT, collected_at TEXT,
+      brand_id TEXT, provider_account_id TEXT
     );
     CREATE TABLE IF NOT EXISTS research_observation_classifications (
       classification_id TEXT PRIMARY KEY, observation_id TEXT NOT NULL,

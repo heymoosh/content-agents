@@ -26,7 +26,7 @@ import { pathToFileURL } from "node:url";
 import { repoRoot, openDb } from "../db/db.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
-import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
+import { fetchNotesList, humanInferenceSubstackMeasurementBinding, scaffoldPicked } from "../atomize/new-notes.js";
 import { scaffoldContentFolder } from "../atomize/new-content.js";
 import { listLeadDetails, readLeadDetail, type LeadDetail } from "../outreach/status.js";
 import { setFrontmatterField } from "../outreach/qualify.js";
@@ -1453,7 +1453,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         json(res, 400, { ok: false, error: "set SUBSTACK_HANDLE in .env first" });
         return;
       }
-      const { notes } = await fetchNotesList(handle, limit);
+      const { notes } = await fetchNotesList(handle, limit, humanInferenceSubstackMeasurementBinding());
       json(res, 200, {
         ok: true,
         notes: notes.map((n, i) => ({

@@ -7,6 +7,8 @@ import { tmpdir } from "node:os";
 import { installResearchSchema, writeMetricObservation } from "./store.js";
 import { buildResearchReport, renderResearchReport } from "./read.js";
 
+const BINDING = { brandId: "human-inference", providerAccountId: "human-inference/substack" } as const;
+
 test("research report exposes redacted observations and current metric summaries only", () => {
   const db = new Database(":memory:");
   installResearchSchema(db);
@@ -54,6 +56,7 @@ test("research report exposes redacted observations and current metric summaries
     metricName: "likes",
     metricValue: 0,
     at: "2026-08-02T00:00:00Z",
+    binding: BINDING,
   });
   writeMetricObservation(db, {
     contentItemId: "note-1",
@@ -62,6 +65,7 @@ test("research report exposes redacted observations and current metric summaries
     metricName: "likes",
     metricValue: 3,
     at: "2026-08-03T00:00:00Z",
+    binding: BINDING,
   });
   writeMetricObservation(db, {
     contentItemId: "note-1",
@@ -70,6 +74,7 @@ test("research report exposes redacted observations and current metric summaries
     metricName: "views",
     metricValue: null,
     at: "2026-08-03T00:00:00Z",
+    binding: BINDING,
   });
 
   const dir = mkdtempSync(join(tmpdir(), "research-report-"));

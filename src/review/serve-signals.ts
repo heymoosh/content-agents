@@ -15,6 +15,7 @@ import { safeFolder } from "./rows.js";
 import { readPublishingStatuses } from "./publishing-status.js";
 import { buildOutcomeLedger, readOutcomeLedger } from "../grow/outcome-ledger.js";
 import type { SignalsExperimentProposalRequest, SignalsExperimentProposalResult } from "./signals-experiment-proposal.js";
+import { isBrandId } from "../identity/brand.js";
 
 type SignalsRouteContext = {
   req: IncomingMessage;
@@ -176,7 +177,16 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
   if (req.method === "GET" && url.pathname === "/api/signals/outcomes") {
     const db = openDb();
     try {
-      json(res, 200, readOutcomeFamilies(db));
+      const requested = url.searchParams.get("brand") ?? url.searchParams.get("brandId") ?? undefined;
+      if (requested === undefined) {
+        json(res, 400, { ok: false, error: "brand is required" });
+        return true;
+      }
+      if (!isBrandId(requested)) {
+        json(res, 400, { ok: false, error: "brand must be one of human-inference, charles, fiction" });
+        return true;
+      }
+      json(res, 200, readOutcomeFamilies(db, { brandId: requested }));
     } finally {
       db.close();
     }
@@ -185,9 +195,18 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
   // The redacted account-level research read (contract §5.4b), until now unreachable from the
   // GUI. Aggregate counts and redacted text only; degrades to an honest empty read, never zeros.
   if (req.method === "GET" && url.pathname === "/api/research/report") {
+    const requested = url.searchParams.get("brand") ?? url.searchParams.get("brandId") ?? undefined;
+    if (requested === undefined) {
+      json(res, 400, { ok: false, error: "brand is required" });
+      return true;
+    }
+    if (!isBrandId(requested)) {
+      json(res, 400, { ok: false, error: "brand must be one of human-inference, charles, fiction" });
+      return true;
+    }
     const db = openDb();
     try {
-      json(res, 200, readResearchReport(db));
+      json(res, 200, readResearchReport(db, { brandId: requested }));
     } finally {
       db.close();
     }

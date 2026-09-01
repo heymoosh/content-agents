@@ -164,6 +164,88 @@ test("attention and conversation read real numbers from the latest metrics captu
   }
 });
 
+test("brand-scoped outcomes never read another brand's posts, metrics, audience, or research", () => {
+  const db = fixtureDb();
+  try {
+    const insertPost = db.prepare(
+      "INSERT INTO posts (id, platform, posted_at, brand_id, provider_account_id) VALUES (?, 'x', ?, ?, ?)"
+    );
+    insertPost.run(1, "2026-07-01T00:00:00Z", "human-inference", "hi/x");
+    insertPost.run(2, "2026-07-02T00:00:00Z", "charles", "charles/x");
+    const insertMetric = db.prepare(
+      `INSERT INTO metrics (post_id, captured_at, impressions, likes, brand_id, provider_account_id)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    insertMetric.run(1, "2026-08-10T00:00:00Z", 100, 4, "human-inference", "hi/x");
+    insertMetric.run(1, "2026-08-11T00:00:00Z", 9999, 99, "charles", "charles/x");
+    insertMetric.run(2, "2026-08-10T00:00:00Z", 25, 2, "charles", "charles/x");
+    db.prepare(
+      `INSERT INTO audience (platform, captured_at, metric_type, value_count, brand_id, provider_account_id)
+       VALUES ('x', ?, 'follower_total', ?, ?, ?)`
+    ).run("2026-08-10T00:00:00Z", 500, "human-inference", "hi/x");
+    const insertResearch = db.prepare(
+      `INSERT INTO research_observations (
+         observation_id, source, source_platform, observed_at, captured_at, privacy_class,
+         brand_id, provider_account_id
+       ) VALUES (?, 'reply', 'substack', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z',
+         'private_non_identifying', ?, ?)`
+    );
+    insertResearch.run("hi-reply", "human-inference", "hi/substack");
+    insertResearch.run("charles-reply", "charles", "charles/substack");
+
+    const human = readOutcomeFamilies(db, {
+      brandId: "human-inference",
+      generatedAt: "2026-08-12T00:00:00Z",
+    });
+    assert.equal(human.attention.impressions.state, "measured");
+    assert.equal(human.attention.impressions.value, 100);
+    assert.equal(human.conversation.likes.state, "measured");
+    assert.equal(human.conversation.likes.value, 4);
+    assert.equal(human.conversation.research_observations.state, "measured");
+    assert.equal(human.conversation.research_observations.value, 1);
+    assert.equal(human.audience.follower_total.state, "measured");
+    assert.equal(human.audience.follower_total.value, 500);
+
+    const charles = readOutcomeFamilies(db, {
+      brandId: "charles",
+      generatedAt: "2026-08-12T00:00:00Z",
+    });
+    assert.equal(charles.attention.impressions.state, "measured");
+    assert.equal(charles.attention.impressions.value, 25);
+    assert.equal(charles.conversation.research_observations.state, "measured");
+    assert.equal(charles.conversation.research_observations.value, 1);
+    assert.equal(charles.audience.follower_total.state, "not_measured");
+  } finally {
+    db.close();
+  }
+});
+
+test("a brand with audience and research but no posts keeps those families measured", () => {
+  const db = fixtureDb();
+  try {
+    db.prepare(
+      `INSERT INTO audience (platform, captured_at, metric_type, value_count, brand_id, provider_account_id)
+       VALUES ('substack', '2026-08-10T00:00:00Z', 'follower_total', 42, 'charles', 'charles/substack')`
+    ).run();
+    db.prepare(
+      `INSERT INTO research_observations (
+         observation_id, source, source_platform, observed_at, captured_at, privacy_class,
+         brand_id, provider_account_id
+       ) VALUES ('charles-only-reply', 'reply', 'substack', '2026-08-10T00:00:00Z',
+         '2026-08-10T00:00:00Z', 'private_non_identifying', 'charles', 'charles/substack')`
+    ).run();
+
+    const read = readOutcomeFamilies(db, { brandId: "charles", generatedAt: "2026-08-12T00:00:00Z" });
+    assert.equal(read.attention.impressions.state, "not_measured");
+    assert.equal(read.conversation.research_observations.state, "measured");
+    assert.equal(read.conversation.research_observations.value, 1);
+    assert.equal(read.audience.follower_total.state, "measured");
+    assert.equal(read.audience.follower_total.value, 42);
+  } finally {
+    db.close();
+  }
+});
+
 test("a post with no metrics row counts as unmeasured rather than as a zero", () => {
   const db = fixtureDb();
   try {
@@ -385,6 +467,31 @@ test("the research report exposes the redacted read once observations exist", ()
   } finally {
     db.close();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the redacted research report is brand-scoped and excludes legacy unassigned observations", () => {
+  const db = fixtureDb();
+  try {
+    const insert = db.prepare(
+      `INSERT INTO research_observations (
+         observation_id, source, source_platform, observed_at, captured_at, privacy_class,
+         redacted_text, brand_id, provider_account_id
+       ) VALUES (?, 'reply', 'substack', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z',
+         'private_non_identifying', ?, ?, ?)`
+    );
+    insert.run("human", "human text", "human-inference", "hi/substack");
+    insert.run("charles", "charles text", "charles", "charles/substack");
+    insert.run("legacy", "legacy text", null, null);
+
+    const read = readResearchReport(db, { brandId: "charles", hashKey: "test-key" });
+    if (read.state !== "available") throw new Error("expected an available read");
+    const serialized = JSON.stringify(read.report);
+    assert.match(serialized, /charles text/);
+    assert.doesNotMatch(serialized, /human text|legacy text/);
+    assert.deepEqual(read.report.coverage, []);
+  } finally {
+    db.close();
   }
 });
 

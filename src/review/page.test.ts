@@ -2636,8 +2636,9 @@ test("familyGate: only attention and conversation may feed a suppression call", 
 
 test("the Signals screen calls both new reads and renders no prototype fixture number", () => {
   const script = emittedScripts().join("\n");
-  assert.ok(script.includes('fetch("/api/signals/outcomes")'), "the outcome families must be fetched");
-  assert.ok(script.includes('fetch("/api/research/report")'), "the research read must be fetched");
+  assert.ok(script.includes('fetch("/api/signals/outcomes"+"?brand="'), "the brand-scoped outcome families must be fetched");
+  assert.ok(script.includes('fetch("/api/research/report"+"?brand="'), "the brand-scoped research read must be fetched");
+  assert.match(script, /Legacy rows excluded from this brand view/);
   // The prototype's Signals numbers and thresholds have no source in this repo (port rules, Rule 2).
   for (const n of ["4,180", "trending up", "home base", "still testing"]) {
     assert.ok(!script.includes(n), "the page must not carry the prototype's fixture value " + n);
