@@ -105,6 +105,48 @@ test("fiction promotion handoff requires an approved promotional final", () => {
   assert.match(source, /text: promotion\.body/);
 });
 
+test("Fiction idea inbox exposes classifier, review, approval, and rejection boundaries", () => {
+  const source = readFileSync(new URL("./serve-fiction.ts", import.meta.url), "utf8");
+  for (const route of ["/api/fiction/inbox", "/api/fiction/inbox/approve", "/api/fiction/inbox/reject"]) {
+    assert.ok(source.includes(`url.pathname === "${route}"`), `missing ${route}`);
+  }
+  assert.match(source, /classifyIdea\(rawText, engine\)/);
+  assert.match(source, /createCleanupProposal/);
+  assert.match(source, /approveIdea/);
+  assert.match(source, /queueChapter:/);
+  assert.match(source, /rejectIdea/);
+});
+
+test("Fiction idea inbox exposes an explicit clarification-turn action", () => {
+  const routeSource = readFileSync(new URL("./serve-fiction.ts", import.meta.url), "utf8");
+  const pageSource = readFileSync(new URL("./page.ts", import.meta.url), "utf8");
+  assert.ok(routeSource.includes('url.pathname === "/api/fiction/inbox/clarify"'));
+  assert.match(routeSource, /appendClarificationTurn/);
+  assert.match(routeSource, /buildIdeaContext/);
+  assert.match(pageSource, /ficClarify/);
+  assert.match(pageSource, /\/api\/fiction\/inbox\/clarify/);
+});
+
+test("Fiction Studio exposes an explicit draft-PR and review-comment bridge", () => {
+  const source = readFileSync(new URL("./serve-fiction.ts", import.meta.url), "utf8");
+  for (const route of ["/api/fiction/pr/create", "/api/fiction/pr/revise"]) {
+    assert.ok(source.includes(`url.pathname === "${route}"`), `missing ${route}`);
+  }
+  assert.match(source, /createStoryDraftPr/);
+  assert.match(source, /listStoryReviewComments/);
+  assert.match(source, /processChapterReviewComments/);
+  assert.match(source, /reviseSpanWithEngine\(span, instruction, engine, repoRoot\)/);
+  assert.match(source, /validateStoryChapter/);
+});
+
+test("Fiction page makes the PR bridge an explicit Studio action", () => {
+  const source = readFileSync(new URL("./page.ts", import.meta.url), "utf8");
+  assert.match(source, /id="ficPrCreate"/);
+  assert.match(source, /id="ficPrRevise"/);
+  assert.match(source, /\/api\/fiction\/pr\/create/);
+  assert.match(source, /\/api\/fiction\/pr\/revise/);
+});
+
 test("Charles promotion has an approved request-only handoff route", () => {
   const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
   assert.ok(source.includes('url.pathname === "/api/charles/handoff"'));

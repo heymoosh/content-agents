@@ -2348,7 +2348,8 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(section.includes('post("/api/captures/start"'), "Content starts the advisor-only action");
   const advanceBody = section.slice(section.indexOf("async function advanceCaptureSafely"), section.indexOf("async function takeCaptureTo"));
   assert.ok(advanceBody.includes('setRoom("content")'), "Content opens the owning room before the advisor-only action");
-  assert.ok(section.includes('beats.value=text'), "Fiction prepares beats without auto-drafting");
+  assert.ok(section.includes('idea.value=text'), "Fiction prepares the inbox idea without auto-classifying");
+  assert.ok(section.includes('ficPage="inbox"'), "Fiction opens its safe front door");
   assert.ok(section.includes('setOutreachSub("leads")'), "Outreach opens the required lead chooser");
   assert.ok(section.includes('$("#ventureRunStepBtn")?.focus()'), "Venture opens its current human-gated step");
   assert.ok(!section.includes('$("#ficDraftBtn").click()'));
@@ -3350,7 +3351,7 @@ test("Fiction keeps input visible and separates draft review from canon links", 
   assert.ok(html.includes("Review history"));
   assert.ok(html.includes('span,replacement'), "the passage editor must submit the exact displayed span");
   assert.ok(html.includes("historyWarning"), "a history-store failure must not masquerade as a failed primary action");
-  assert.ok(html.includes('ficPage = "write"'));
+  assert.ok(html.includes('ficPage = "inbox"'));
   assert.ok(!html.includes('aria-label="Fiction stages"'));
   const loadStart = html.indexOf("async function loadFiction(){");
   const loadEnd = html.indexOf("async function loadFictionPromotion(){", loadStart);

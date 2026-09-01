@@ -61,6 +61,8 @@ export const ENGINE_COMMANDS: Record<Engine, string> = {
   "ollama-gpt-oss": "ollama",
 };
 
+export const GROK_FINAL_TEXT_SYSTEM_PROMPT = "You are a bounded text transformation function. Do not inspect files, use tools, narrate your process, plan aloud, or explain. Follow the user prompt and output only the requested final text.";
+
 export interface EngineSpawnOptions {
   timeoutMs: number;
   permissionMode?: string | null;
@@ -118,4 +120,17 @@ export function buildEngineSpawn(
   if (opts.model !== undefined) args.push("--model", opts.model);
   if (opts.tools !== undefined) args.push("--tools", opts.tools);
   return { command: engine, args };
+}
+
+/** Normalize a completed CLI invocation to the model's final answer only. */
+export function extractEngineText(engine: Engine, stdout: string): string {
+  if (engine !== "grok") return String(stdout ?? "").trim();
+  let parsed: unknown;
+  try { parsed = JSON.parse(String(stdout ?? "")); }
+  catch { throw new Error("Grok did not return valid final-answer JSON"); }
+  const text = parsed && typeof parsed === "object" && "text" in parsed
+    ? (parsed as { text?: unknown }).text
+    : undefined;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Grok final-answer JSON did not contain text");
+  return text.trim();
 }
