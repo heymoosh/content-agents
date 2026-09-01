@@ -1,10 +1,10 @@
 # Content Studio master status
 
-**Last reconciled:** 2026-08-31
-**Repository baseline:** merged `origin/main` commit `0ad0a32` (PR #412), plus the Phase 1
-completion patch recorded by the current branch until that follow-up PR merges. PR #412 contains
-the Phase 0 safety wiring and the core Phase 1 operating-loop implementation; the follow-up closes
-the audited reviewed-image and status-reconciliation gaps.
+**Last reconciled:** 2026-09-01
+**Repository baseline:** merged `origin/main` commit `10e678e` (PR #419), plus the Outreach Phase 5
+patch recorded by the current branch until its held review PR merges. PR #419 contains the audited
+Phase 3 Experiment implementation. The current patch closes Outreach's deterministic discovery and
+weekly Strategy-summary gaps; a live authenticated Scout run remains operationally unverified.
 **Phase 0 status:** operational provenance and policy wiring are complete with deterministic browser
 coverage, and one authenticated Codex generation canary passed; authenticated provider canaries remain.
 **Phase 1 status:** repository implementation and deterministic verification are complete for durable capture and
@@ -200,11 +200,11 @@ history and its “nothing built yet” statement is obsolete.
 |---|---|---|---|---|
 | Fit lifecycle | Source/add, cited research, qualify, pursue/pass, editable draft, lock, approved send, per-person follow-ups. Poor fits never advance. | Implemented for client/platform flows with JSA read-only integration and matchmaker reads. | Extensive deterministic tests; selected historic real research exists. | Model-generated first draft/revision remains unverified end to end. GUI delivery remains incomplete. |
 | Matchmaker read | Show why them, why Muxin, and why now before the yes/no choice. | Implemented and surfaced. | Unit/UI coverage. | Keep sources and current direction editable and visible. |
-| Discovery | Bounded cited scouting with caps and honest downgrade. | A smaller `/scout` implementation exists. | Parser/budget/unit tests; live Scout is unverified. | **Partially wired.** The ratified Phase 5 anchor graph, rolling lens state, fuzzy permanent frontier, pass-reason learning, calibration loop, and rate-limit behavior are not complete. Keep Phase 5 open. |
+| Discovery | Bounded cited scouting rotates a belief, community dialect, modality, and trusted-anchor subset; clients start from a named person's quoted worldview trail. Permanent frontier, pass-reason learning, mid-tail policy, disconfirmation downgrade, calibration, total batch cap, and bounded rate-limit retry fail closed in code. | **Phase 5 deterministic implementation complete on the current branch.** Model query expansion remains bounded by the rotated lens and one-to-two-hop public graph prompt; deterministic gates own what may be written. | Red-green unit/integration coverage exercises lens rotation, graph context, pass feedback, canonical identity, people-first evidence, disconfirmation, mid-tail caps, rate limits, success/failure ledger, cold-profile gating, and a hard five-lead whole-run cap. Final local check passes 3,748/3,748; Grok 4.5's read-only cross-family audit reports no remaining release blocker. | Run one real signed-in Scout sweep and inspect the surfaced candidates, citations, skip reasons, rate-limit behavior, and append-only run ledger. Until then, do not claim live discovery quality or operational completion. |
 | Contact selection | Muxin can use extracted contacts or add one manually. | Implemented manual/research-extracted path. | UI/unit coverage. | Automated contact discovery and public-email harvesting are not implemented. |
 | Draft, edit, lock | Direction input, engine choice, direct edit, revise with model, validation, immutable lock. | Implemented. | Unit/route/UI coverage. | Add deterministic injected-engine browser coverage for draft/revise. |
 | Send | Send a locked message from the Content Agents GUI through the connected email account after Muxin's explicit approval; retain manual/external sending for unsupported channels such as LinkedIn DMs. | **Not implemented** for Gmail GUI sending; no Gmail UI or send route. Manual/external “sent elsewhere” recording remains available. | Browser coverage verifies the manual fallback and approval boundary. | Add authenticated send, provider success/failure reconciliation, and automatic sent-state updates. Keep the fallback for unsupported channels. |
-| Follow-ups | Append-only per-person clocks with origin context; client/platform/inbound/job-search buckets; mark sent/responded/move on; no guilt styling. | Implemented. | Strong tests and browser tracker write coverage. | Drafting support is limited for buckets without lead folders. Actual delivery remains external. Weekly Strategy summary integration remains open. |
+| Follow-ups | Append-only per-person clocks with origin context; client/platform/inbound/job-search buckets; mark sent/responded/move on; no guilt styling. The read-only weekly Strategy summary includes the borrowed-audience target list, every bucket's counts, and honest degraded JSA state. | Implemented, including Strategy integration on the current branch. | Strong tests, browser tracker write coverage, renderer tests, and a successful real local `outreach:strategy-summary` read. | Drafting support is limited for buckets without lead folders. Actual delivery remains external. |
 | Outreach to Content | Locked outreach can become extraction-first Content source. | Existing reuse path. | Deterministic tests around source/lock boundaries. | Exclude cold B2B outreach derivatives from resonance metrics until the open strategy decision is implemented. |
 
 ## Fiction
@@ -349,7 +349,9 @@ until the matrix finishes with terminal cleanup for every created canary object.
 
 1. Finish Fiction's conversational idea router, non-paraphrasing canonical updates, Studio-to-PR
    bridge, and per-comment engine routing.
-2. Finish the ratified Outreach Phase 5 discovery/calibration method and weekly Strategy summary.
+2. Exercise the implemented Outreach Phase 5 discovery/calibration method in one signed-in live
+   Scout run and review its citations and candidate quality; deterministic code and Strategy
+   summary integration are complete in the held Phase 5 patch.
 3. Add a safe Charles persona-edit workflow and keep delivery manual unless the policy changes.
 4. Complete per-brand analytics, Signals, platform, and provider-account separation.
 5. Populate and review pattern/account/baseline/mechanism evidence, then connect it to honest
@@ -386,8 +388,9 @@ These files remain useful sources, but must not be read as current completion le
 - Disposable `e2e/RESULTS.md` reports: point-in-time run artifacts, not cumulative product truth.
 - `docs/content-system-blueprint.md` and `docs/content-system-contracts.md`: target contracts and
   scaffold inventory, not proof of integrated runtime behavior.
-- `docs/outreach-engine-plan.md`: ratified behavior, but not a live status ledger; its full Phase 5
-  remains incomplete despite the smaller `/scout` implementation.
+- `docs/outreach-engine-plan.md`: ratified behavior, not a live status ledger. Its Phase 5
+  deterministic requirements are implemented by the current held patch; live Scout quality and
+  rate-limit behavior remain operational proofs rather than claims.
 
 ## Source map
 
