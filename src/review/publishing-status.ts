@@ -1,6 +1,7 @@
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
+import { repoRoot } from "../db/db.js";
 import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
 import type { QueueRow } from "../publish/queue.js";
@@ -43,6 +44,35 @@ export interface PublishingStatus {
   legacyState?: string;
   evidenceKind?: "provider" | "human";
   evidence?: string;
+}
+
+type DisposableProviderOutcome = { provider: "typefully"; scheduled: unknown; scheduleError: string | null };
+
+/**
+ * Hermetic browser-only provider seam. Both a one-run secret and a matching marker inside the
+ * disposable repository are required, and E2E_REPO_ROOT must resolve to the executing checkout.
+ * A normal server (including one pointed at the real checkout) therefore cannot enter this path.
+ */
+export function disposableProviderOutcome(
+  row: Pick<QueueRow, "id">,
+  env: NodeJS.ProcessEnv = process.env,
+  root: string = repoRoot,
+): DisposableProviderOutcome | null {
+  const token = env.CONTENT_AGENTS_E2E_SCHEDULING_TOKEN;
+  const disposableRoot = env.E2E_REPO_ROOT;
+  if (!token || !disposableRoot) return null;
+  try {
+    if (realpathSync(disposableRoot) !== realpathSync(root)) return null;
+  } catch { return null; }
+  const marker = join(root, ".e2e-scheduling-token");
+  if (!existsSync(marker) || readFileSync(marker, "utf8") !== token) return null;
+  if (row.id === "e2e-provider-success") {
+    return { provider: "typefully", scheduled: { draftId: "e2e-provider-object", when: "Sep 2 at 9:00 AM", plannedFor: "2026-09-02T14:00:00.000Z" }, scheduleError: null };
+  }
+  if (row.id === "e2e-provider-failure") {
+    return { provider: "typefully", scheduled: null, scheduleError: "injected provider timeout" };
+  }
+  return null;
 }
 
 export const PUBLISHING_STATUS_PATH = migrateLegacyDataFile(["publishing-status.jsonl"]);
@@ -268,6 +298,20 @@ export async function scheduleApprovedOnce(
     // UI read and this process acquiring the lock.
     const blocked = publishingRetryBlock(slug, row, path);
     if (blocked) throw new Error(blocked);
+    const injected = disposableProviderOutcome(row);
+    if (injected) {
+      const audit = {
+        policyVersion: "delivery-policy-v1" as const, origin: "human-inference" as const,
+        brand: "human-inference" as const, deliveryMode: "provider" as const,
+        providerAccountId: "e2e/typefully", policyReason: "disposable browser provider outcome",
+      };
+      appendPublishingStatus({ slug, rowId: row.id, provider: injected.provider, state: "uncertain", at: new Date().toISOString(), ...audit }, path);
+      const status: PublishingStatus = injected.scheduleError
+        ? { slug, rowId: row.id, provider: injected.provider, state: "uncertain", at: new Date().toISOString(), error: injected.scheduleError, ...audit }
+        : { slug, rowId: row.id, provider: injected.provider, state: "planned", at: new Date().toISOString(), ...audit, ...details(injected.provider, injected.scheduled) };
+      appendPublishingStatus(status, path);
+      return { scheduled: injected.scheduled, scheduleError: injected.scheduleError, publishing: status };
+    }
     let provider: PublishingProvider;
     try {
       provider = (schedule === scheduleApproved || selectionDeps) && kind !== "outreach-lock"

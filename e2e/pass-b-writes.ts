@@ -10,9 +10,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bootServer, openSession, openRoom, waitLoaded, record, results, ROOT } from "./harness.js";
+import { writeContentRequest } from "../src/review/content-request-store.js";
 
 const PORT = 4793;
 const SLUG = "e2e-probe-venture";
+const CONTENT_SLUG = "2099-09-01-e2e-content-review";
 
 /** Answers 1..25, each distinctive so we can prove they were stored verbatim. */
 function answerFor(n: number): string {
@@ -33,6 +35,26 @@ async function main(): Promise<void> {
     "---", "lead: e2e-manual-send", "channel: email", "status: locked", "locked_at: 2026-08-30", "---", "",
     "Hello from the disposable manual-send fixture.",
   ].join("\n"));
+  const schedulingToken = process.env.CONTENT_AGENTS_E2E_SCHEDULING_TOKEN;
+  if (!schedulingToken || !existsSync(join(ROOT, ".e2e-scheduling-token"))) {
+    throw new Error("combined disposable E2E scheduling token is required");
+  }
+  const contentFixture = join(ROOT, "content", CONTENT_SLUG);
+  mkdirSync(join(contentFixture, "derivatives"), { recursive: true });
+  await writeContentRequest(contentFixture, {
+    id: "e2e-content-review-request", origin: "human-inference", descriptor: "E2E grouped approval request",
+    originalInput: "The exact disposable source for grouped Content review.", treatments: ["summary"],
+    media: ["none"], platforms: ["x"], includeUntreatedControl: true,
+  });
+  writeFileSync(join(contentFixture, "review-queue.md"), [
+    "# Review queue — E2E grouped approval request", "",
+    "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |",
+    "|----|----------|--------|-------|-------------|------------|-----|--------|-------|",
+    "| e2e-provider-success | x | text | derivatives/e2e-provider-success.md | 5 | 5 | no | pending | Untreated control |",
+    "| e2e-provider-failure | x | text | derivatives/e2e-provider-failure.md | 5 | 5 | no | pending | Treatment: summary |",
+  ].join("\n") + "\n");
+  writeFileSync(join(contentFixture, "derivatives", "e2e-provider-success.md"), "---\nplatform: x\nvariant_kind: control\n---\n\nOriginal success draft.\n");
+  writeFileSync(join(contentFixture, "derivatives", "e2e-provider-failure.md"), "---\nplatform: x\nvariant_kind: treated\ntreatment: summary\n---\n\nOriginal failure draft.\n");
   const server = await bootServer({}, PORT);
   let s: Awaited<ReturnType<typeof openSession>> | null = null;
 
@@ -203,29 +225,46 @@ async function main(): Promise<void> {
       detail: `copy controls=${copyControls}; sent-by-hand controls=${manualControls}; Gmail claimed=${/Gmail|Connect Gmail/.test(outreachText)}`,
     });
 
-    // ── Content: the approve write, the one gate rule 2 cares about. ──
+    // ── Content: direct edit + grouped approval + hermetic provider outcomes through the UI. ──
     await openRoom(page, "content");
     await waitLoaded(page, "#reviewMain");
-    const statusWrite = await page.evaluate(async () => {
-      const r = await fetch("/api/queue");
-      const j = (await r.json()) as { pieces: { slug: string; rows: { id: string; status: string }[] }[] };
-      const piece = (j.pieces ?? []).find((p) => (p.rows ?? []).length);
-      const row = piece?.rows?.[0];
-      if (!row) return { ok: false, why: "no reviewable rows in this worktree" };
-      const res = await fetch("/api/status", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: row.id, slug: piece!.slug, status: "hold" }),
-      });
-      return { ok: res.ok, status: res.status, id: row.id, body: (await res.text()).slice(0, 160) };
+    await page.click('#contentWizard [data-step="3"]');
+    await page.fill("#reviewRequestFilter", CONTENT_SLUG);
+    const fixtureSection = page.locator("#reviewMain section.piece", { hasText: "E2E grouped approval request" });
+    await fixtureSection.waitFor({ timeout: 15_000 });
+    const successRow = fixtureSection.locator(".scan-row", { hasText: "e2e-provider-success" });
+    await successRow.getByRole("button", { name: "Open Focus Mode" }).click();
+    const editedBody = "Edited through Focus Mode in the disposable browser.";
+    await page.fill("#reviewFocusEditor", editedBody);
+    await page.click("#reviewFocusSave");
+    await page.waitForFunction((body) => document.body.innerText.includes(body), editedBody, { timeout: 15_000 });
+    const grouped = page.locator("#reviewMain section.piece", { hasText: "E2E grouped approval request" });
+    await grouped.locator(".review-check").nth(0).check();
+    await grouped.locator(".review-check").nth(1).check();
+    await page.click("#reviewApproveSelected");
+    await page.waitForFunction(async (slug) => {
+      const response = await fetch("/api/queue");
+      const data = await response.json();
+      const piece = (data.pieces || []).find((candidate) => candidate.slug === slug);
+      return piece?.rows?.filter((row) => row.id.startsWith("e2e-provider-") && row.status === "approve").length === 2;
+    }, CONTENT_SLUG, { timeout: 20_000, polling: 250 });
+    const queueState = await page.evaluate(async (slug) => {
+      const response = await fetch("/api/queue");
+      const data = await response.json();
+      return (data.pieces || []).find((candidate) => candidate.slug === slug);
+    }, CONTENT_SLUG) as { requestId?: string; rows?: { id: string; status: string; publishingStatus?: { state?: string; error?: string; providerObjectId?: string } }[] };
+    const success = queueState.rows?.find((row) => row.id === "e2e-provider-success");
+    const failure = queueState.rows?.find((row) => row.id === "e2e-provider-failure");
+    const savedBody = readFileSync(join(contentFixture, "derivatives", "e2e-provider-success.md"), "utf8");
+    record({
+      feature: "Content direct edit and grouped approval reach durable files through the real UI",
+      status: queueState.requestId === "e2e-content-review-request" && savedBody.includes(editedBody) && success?.status === "approve" && failure?.status === "approve" ? "pass" : "fail",
+      detail: `request=${queueState.requestId}; edit=${savedBody.includes(editedBody)}; approved=${success?.status}/${failure?.status}`,
     });
     record({
-      feature: "Content review status write reaches review-queue.md",
-      pr: "#341",
-      status: statusWrite.ok ? "pass" : "fail",
-      detail: statusWrite.ok
-        ? `set ${(statusWrite as { id?: string }).id} to hold`
-        : `${JSON.stringify(statusWrite).slice(0, 200)}`,
+      feature: "Content grouped approval reports injected provider success and retained failure separately",
+      status: success?.publishingStatus?.state === "planned" && success.publishingStatus.providerObjectId === "e2e-provider-object" && failure?.publishingStatus?.state === "uncertain" && failure.publishingStatus.error === "injected provider timeout" ? "pass" : "fail",
+      detail: `success=${success?.publishingStatus?.state}/${success?.publishingStatus?.providerObjectId}; failure=${failure?.publishingStatus?.state}/${failure?.publishingStatus?.error}`,
     });
 
     // ── Signals: recommendations are session-local and do not expose a backlog write. ──

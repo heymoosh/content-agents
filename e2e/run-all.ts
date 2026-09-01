@@ -74,6 +74,8 @@ function main(): void {
   };
   const configuredEngineToken = randomUUID();
   writeFileSync(join(disposable.root, ".e2e-configured-engine-token"), configuredEngineToken, { mode: 0o600 });
+  const schedulingToken = randomUUID();
+  writeFileSync(join(disposable.root, ".e2e-scheduling-token"), schedulingToken, { mode: 0o600 });
   const ledger = join(disposable.root, "e2e", "results.jsonl");
   // Invoke Node's tsx loader directly. The .bin/tsx launcher opens an IPC pipe and can exit
   // before a detached child is ready, which makes bootServer report a misleading clean exit.
@@ -103,7 +105,12 @@ function main(): void {
       const r = spawnSync(tsx, [...tsxArgs, join(disposable.root, "e2e", p.script)], {
         cwd: disposable.root,
         stdio: "inherit",
-        env: { ...env, E2E_PASS: p.name, ...(p.name === "D-content-generation" ? { CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: configuredEngineToken } : {}) },
+        env: {
+          ...env,
+          E2E_PASS: p.name,
+          ...(p.name === "B-writes" ? { CONTENT_AGENTS_E2E_SCHEDULING_TOKEN: schedulingToken } : {}),
+          ...(p.name === "D-content-generation" ? { CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: configuredEngineToken } : {}),
+        },
       });
       if (r.status !== 0) anyFailed = true;
     }

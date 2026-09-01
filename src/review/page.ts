@@ -3161,7 +3161,7 @@ $("#contentWizard").addEventListener("click", (e)=>{
   }
   if(t.dataset.step !== undefined){
     const n = Number(t.dataset.step);
-    if(n > 1 && !CW.slug) return;
+    if(n === 2 && !CW.slug) return;
     if(n === 3){ CW.pane = "review"; renderContentWizard(); return; }
     if(n === 4){ CW.pane = "published"; renderContentWizard(); return; }
     CW.step = n; CW.yesErrors = []; CW.pane = "wizard";

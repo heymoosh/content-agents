@@ -3450,6 +3450,12 @@ test("Content step navigation opens approval directly without a duplicate landin
   assert.ok(!html.includes("Back to configuration</button></div></div>"));
 });
 
+test("Content global review and publishing steps do not require a selected source", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes("if(n === 2 && !CW.slug) return;"));
+  assert.ok(!script.includes("if(n > 1 && !CW.slug) return;"));
+});
+
 test("Approve Drafts puts a searchable request filter before the other filters", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const filters = html.slice(html.indexOf('aria-label="Draft filters"'), html.indexOf('id="reviewMain"'));

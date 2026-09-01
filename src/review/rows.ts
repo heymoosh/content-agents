@@ -68,6 +68,9 @@ interface EnrichedRow extends QueueRow {
 export interface Piece {
   slug: string;
   title: string;
+  requestId?: string;
+  descriptor?: string;
+  originalInput?: string;
   rows: EnrichedRow[];
   pending: number;
 }
@@ -336,6 +339,10 @@ export function listRootFolders(root: string): string[] {
 }
 
 export async function listPieces(): Promise<Piece[]> {
+  // Loaded lazily because content-request-store validates approved cuts through develop.ts, which
+  // reads this module's folder helpers. A top-level import would create a rows → store → develop
+  // → rows initialization cycle even though request metadata is only needed at request time.
+  const { readContentRequest } = await import("./content-request-store.js");
   const dirs = [
     ...listRootFolders(CONTENT).map((slug) => ({ slug, folder: join(CONTENT, slug) })),
     ...listRootFolders(OUTREACH_LEADS).map((slug) => ({ slug, folder: join(OUTREACH_LEADS, slug) })),
@@ -350,16 +357,18 @@ export async function listPieces(): Promise<Piece[]> {
   const live: LiveProviderState = anyNeedsReconcile ? liveState : { typefullyDrafts: [], postpeerPosts: [] };
 
   const publishingStatuses = readPublishingStatuses();
-  const pieces = folderRows.map(({ slug, folder, rows }) => {
+  const pieces = await Promise.all(folderRows.map(async ({ slug, folder, rows }) => {
     const publishLog: PublishLogRead = rows.some(needsReconciliation) ? readPublishLogSafe(folder) : { text: "" };
     const enriched = rows.map((r) => enrich(folder, slug, r, publishLog, live, publishingStatuses[publishingKey(slug, r.id)]));
+    const request = await readContentRequest(folder).catch(() => undefined);
     return {
       slug,
       title: firstHeading(folder),
+      ...(request ? { requestId: request.id, descriptor: request.descriptor, originalInput: request.originalInput } : {}),
       rows: enriched,
       pending: enriched.filter((r) => !DECIDED.has(r.status)).length,
     };
-  });
+  }));
   pieces.sort((a, b) => b.slug.localeCompare(a.slug)); // newest (date-prefixed) first
   return pieces;
 }

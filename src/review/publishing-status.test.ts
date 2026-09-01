@@ -5,7 +5,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { after, afterEach, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { publishingRetryBlock, readPublishingHistory, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce } from "./publishing-status.js";
+import { disposableProviderOutcome, publishingRetryBlock, readPublishingHistory, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce } from "./publishing-status.js";
 import type { QueueRow } from "../publish/queue.js";
 
 const roots: string[] = [];
@@ -38,6 +38,22 @@ function contentFolder(origin = "human-inference"): string {
   writeFileSync(join(root, "derivatives", "x-1.md"), "---\nplatform: x\n---\n\nApproved body.\n");
   return root;
 }
+
+test("disposable provider outcomes require the matching token, marker, and repository root", () => {
+  const root = mkdtempSync(join(tmpdir(), "disposable-provider-")); roots.push(root);
+  writeFileSync(join(root, ".e2e-scheduling-token"), "one-run-secret");
+  const env = { CONTENT_AGENTS_E2E_SCHEDULING_TOKEN: "one-run-secret", E2E_REPO_ROOT: root };
+  assert.equal(disposableProviderOutcome({ id: "e2e-provider-success" }, {}, root), null);
+  assert.equal(disposableProviderOutcome({ id: "e2e-provider-success" }, { ...env, CONTENT_AGENTS_E2E_SCHEDULING_TOKEN: "wrong" }, root), null);
+  assert.equal(disposableProviderOutcome({ id: "e2e-provider-success" }, { ...env, E2E_REPO_ROOT: tmpdir() }, root), null);
+  assert.equal(disposableProviderOutcome({ id: "ordinary-row" }, env, root), null);
+  assert.deepEqual(disposableProviderOutcome({ id: "e2e-provider-success" }, env, root), {
+    provider: "typefully", scheduled: { draftId: "e2e-provider-object", when: "Sep 2 at 9:00 AM", plannedFor: "2026-09-02T14:00:00.000Z" }, scheduleError: null,
+  });
+  assert.deepEqual(disposableProviderOutcome({ id: "e2e-provider-failure" }, env, root), {
+    provider: "typefully", scheduled: null, scheduleError: "injected provider timeout",
+  });
+});
 const row: QueueRow = { id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", notes: "", lineIndex: 2 };
 const execFileAsync = promisify(execFile);
 
