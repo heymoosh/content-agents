@@ -8,6 +8,7 @@ import { readContinuityReport } from "../fiction/continuity.js";
 import { addFictionDraftJob, addFictionRepassJob, addFictionCheckJob, generateFictionPromotionText, publicJob } from "./jobs.js";
 import { type Engine } from "./engines.js";
 import { dirname } from "node:path";
+import { repoRoot } from "../db/db.js";
 import { createLockedChapterHandoff } from "./fiction-content-handoff-store.js";
 import {
   applyTargetedRevision, createFictionPromotionDraft, directEdit,
@@ -16,6 +17,14 @@ import {
 import {
   appendReviewCommentSafe, fictionReviewSubject, listReviewCommentsSafe,
 } from "./review-comments.js";
+import {
+  appendClarificationTurn, approveIdea, buildIdeaContext, classifyIdeaWithEngine, cleanupIdeaWithEngine,
+  createCleanupProposal, createIdea, listIdeas, readIdea, rejectIdea, setIdeaClassification, type IdeaClassification,
+} from "../fiction/idea-inbox.js";
+import {
+  createStoryDraftPr, defaultRun, listStoryReviewComments, processChapterReviewComments,
+  replyToStoryReviewComment, reviseSpanWithEngine, validateStoryChapter, verifyStoryReviewPr,
+} from "../fiction/review-pr.js";
 
 type FictionRouteContext = {
   req: IncomingMessage;
@@ -24,6 +33,9 @@ type FictionRouteContext = {
   readBody: (req: IncomingMessage) => Promise<Record<string, unknown>>;
   json: (res: ServerResponse, code: number, obj: unknown) => void;
   requestEngine: (value: unknown) => Engine;
+  classifyIdea?: (rawText: string, engine: Engine) => Promise<IdeaClassification>;
+  cleanupIdea?: (rawText: string, classification: IdeaClassification, engine: Engine) => Promise<string>;
+  currentBranch?: () => Promise<string>;
 };
 
 function promotionId(chapter: number): string { return `chapter-${chapter}`; }
@@ -45,12 +57,149 @@ function promotionPrompt(draft: Pick<FictionPromotionDraft, "request">, currentB
 
 // Fiction desk routes remain walled from the shared content pipeline. Returning true means a
 // Fiction endpoint wrote its response; false lets serve.ts continue its normal dispatch.
-export async function handleFictionRoute({ req, res, url, readBody, json, requestEngine }: FictionRouteContext): Promise<boolean> {
+export async function handleFictionRoute({
+  req, res, url, readBody, json, requestEngine,
+  classifyIdea = classifyIdeaWithEngine,
+  cleanupIdea = cleanupIdeaWithEngine,
+  currentBranch = async () => {
+    const result = await defaultRun("git", ["branch", "--show-current"], repoRoot);
+    if (result.code !== 0) throw new Error(`could not inspect current branch: ${result.stderr.trim() || `exit ${result.code}`}`);
+    return result.stdout.trim();
+  },
+}: FictionRouteContext): Promise<boolean> {
   // Fiction desk (design 3f): canon browse/edit only. Chapters stay in the GitHub /story flow;
   // canon.md is append-only and renders read-only. The Build 2 wall holds — nothing here
   // composes prose or crosses into the content pipeline except by Muxin starting a promo note.
   if (req.method === "GET" && url.pathname === "/api/fiction") {
     json(res, 200, { series: listFictionSeries() });
+    return true;
+  }
+  // Fiction inbox: raw ideas live outside git until Muxin approves a reviewable cleanup proposal.
+  if (req.method === "GET" && url.pathname === "/api/fiction/inbox") {
+    try {
+      const series = String(url.searchParams.get("series") ?? "");
+      json(res, 200, { ok: true, ideas: listIdeas(series) });
+    } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+    return true;
+  }
+  if (req.method === "POST" && url.pathname === "/api/fiction/inbox") {
+    const b = await readBody(req);
+    try {
+      const series = String(b.series ?? "");
+      const rawText = String(b.rawText ?? b.idea ?? "");
+      const engine = requestEngine(b.engine);
+      const prior = listIdeas(series).find((candidate) => candidate.rawText === rawText);
+      if (prior && (prior.status !== "needs-review" || prior.proposal || b.targetPath === undefined)) {
+        json(res, 200, { ok: true, idea: prior, proposal: prior.proposal, needsClarification: prior.classification === "clarify" });
+        return true;
+      }
+      let idea = createIdea(series, rawText, { targetPath: b.targetPath === undefined ? undefined : String(b.targetPath), engine });
+      const classification = await classifyIdea(rawText, engine);
+      idea = setIdeaClassification(idea, classification, b.targetPath === undefined ? undefined : String(b.targetPath));
+      if (classification === "clarify") {
+        json(res, 200, { ok: true, idea, proposal: null, needsClarification: true });
+        return true;
+      }
+      if (classification === "character" && !idea.targetPath) {
+        json(res, 200, { ok: true, idea, proposal: null, needsTarget: true });
+        return true;
+      }
+      const cleaned = classification === "chapter" ? rawText : await cleanupIdea(rawText, classification, engine);
+      const proposal = createCleanupProposal(idea, cleaned, engine);
+      json(res, 200, { ok: true, idea: readIdea(series, idea.id), proposal });
+    } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+    return true;
+  }
+  if (req.method === "POST" && url.pathname === "/api/fiction/inbox/approve") {
+    const b = await readBody(req);
+    try {
+      const series = String(b.series ?? "");
+      const idea = readIdea(series, String(b.id ?? ""));
+      if (!idea?.proposal) throw new Error("no reviewable cleanup proposal");
+      let canonicalWriteAuthorized = false;
+      if (idea.proposal.classification !== "chapter") {
+        if (await currentBranch() !== "main") {
+          throw new Error("switch to main before approving an idea into a canonical Fiction document");
+        }
+        canonicalWriteAuthorized = true;
+      }
+      let queued: ReturnType<typeof addFictionDraftJob>["job"] | null = null;
+      const record = approveIdea(idea.proposal, {
+        canonicalWriteAuthorized,
+        queueChapter: (slug, raw, engine) => { queued = addFictionDraftJob(slug, raw, engine).job; },
+      });
+      json(res, 200, { ok: true, idea: record, job: queued ? publicJob(queued) : null });
+    } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+    return true;
+  }
+  if (req.method === "POST" && url.pathname === "/api/fiction/inbox/reject") {
+    const b = await readBody(req);
+    try {
+      const series = String(b.series ?? "");
+      const idea = readIdea(series, String(b.id ?? ""));
+      if (!idea?.proposal) throw new Error("no reviewable cleanup proposal");
+      json(res, 200, { ok: true, idea: rejectIdea(idea.proposal) });
+    } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+    return true;
+  }
+  if (req.method === "POST" && url.pathname === "/api/fiction/inbox/clarify") {
+    const b = await readBody(req);
+    try {
+      const series = String(b.series ?? "");
+      const id = String(b.id ?? "");
+      const followUp = typeof b.followUp === "string" ? b.followUp : String(b.clarification ?? "");
+      if (!followUp.trim()) throw new Error("clarification follow-up must not be empty");
+      const idea = readIdea(series, id);
+      if (!idea) throw new Error("idea not found");
+      const duplicate = (idea.clarificationTurns ?? []).some((turn) => turn.text === followUp);
+      if (duplicate) {
+        json(res, 200, { ok: true, idea, proposal: idea.proposal, needsClarification: idea.classification === "clarify", needsTarget: idea.classification === "character" && !idea.targetPath });
+        return true;
+      }
+      if ((idea.classification !== "clarify" && !(idea.classification === "character" && !idea.targetPath)) || idea.proposal) throw new Error("only unresolved ideas accept clarification turns");
+      const withTurn = appendClarificationTurn(idea, followUp);
+      const context = buildIdeaContext(withTurn);
+      const classification = await classifyIdea(context, withTurn.engine);
+      const classified = setIdeaClassification(withTurn, classification, b.targetPath === undefined ? undefined : String(b.targetPath));
+      if (classification === "clarify") {
+        json(res, 200, { ok: true, idea: readIdea(series, id), proposal: null, needsClarification: true });
+        return true;
+      }
+      if (classification === "character" && !classified.targetPath) {
+        json(res, 200, { ok: true, idea: readIdea(series, id), proposal: null, needsTarget: true });
+        return true;
+      }
+      const cleaned = classification === "chapter" ? classified.rawText : await cleanupIdea(context, classification, classified.engine);
+      const proposal = createCleanupProposal(classified, cleaned, classified.engine);
+      json(res, 200, { ok: true, idea: readIdea(series, id), proposal });
+    } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+    return true;
+  }
+  if (req.method === "POST" && url.pathname === "/api/fiction/pr/create") {
+    const b = await readBody(req);
+    try {
+      const pr = await createStoryDraftPr({ series: String(b.series ?? ""), chapter: Number(b.chapter ?? 0), repoRoot });
+      json(res, 200, { ok: true, pr });
+    } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+    return true;
+  }
+  if (req.method === "POST" && url.pathname === "/api/fiction/pr/revise") {
+    const b = await readBody(req);
+    try {
+      const series = String(b.series ?? "");
+      const chapter = Number(b.chapter ?? 0);
+      const prNumber = Number(b.prNumber ?? 0);
+      const defaultEngine = requestEngine(b.engine);
+      await verifyStoryReviewPr({ series, chapter, prNumber, repoRoot });
+      const comments = await listStoryReviewComments(prNumber, repoRoot);
+      const result = await processChapterReviewComments({
+        series, chapter, repoRoot, comments, defaultEngine,
+        validate: (slug, number) => validateStoryChapter(slug, number, repoRoot),
+        revise: (span, instruction, engine) => reviseSpanWithEngine(span, instruction, engine, repoRoot),
+        reply: (commentId, body) => replyToStoryReviewComment(prNumber, commentId, body, repoRoot),
+      });
+      json(res, 200, { ok: true, result });
+    } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
     return true;
   }
   if (req.method === "GET" && url.pathname === "/api/fiction/doc") {

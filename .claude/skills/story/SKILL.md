@@ -17,8 +17,9 @@ Unlike Build 0/1 (extraction-first; Muxin is the author, derivatives only quote 
 lines), fiction is **composed**. That is a deliberate, walled-off exception (see CLAUDE.md —
 Build 2), permitted ONLY because **every chapter is reviewed and approved by Muxin on a GitHub
 PR before anything publishes, and nothing auto-publishes.** Fiction is governed by
-`config/fiction/*` (craft + style), NOT `config/voice.yaml` — the nonfiction PM voice and the
-em-dash ban do not apply here. This exception must never bleed back into Build 1 derivatives.
+`config/fiction/*` (craft + style), NOT the nonfiction PM voice in `config/voice.yaml`.
+The repository-wide no-em-dash house rule still applies to fiction. This composed-prose
+exception must never bleed back into Build 1 derivatives.
 
 ## The consistency model
 

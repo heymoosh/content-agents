@@ -3191,13 +3191,16 @@ let ficDocData = null;
 let ficScene = null;      // { beats, chapter, continuity } from /api/fiction/scene
 let ficPassNote = "";
 let ficFixed = {};        // spans fixed in this session, so the rail says "fixed" until the next check
-let ficPage = "write";
+let ficPage = "inbox";
 let ficPromoRequest = "";
 let ficPromoObjective = "Invite readers into the series with a spoiler-light chapter preview.";
 let ficPromoChapter = null;
 let ficPromoDraft = null;
 let ficPromoBusy = false;
 let ficPromoError = "";
+let ficInbox = [];
+let ficPrNumber = "";
+let ficPrError = "";
 // ── Venture room ────────────────────────────────────────────────────────────────────────────────
 //
 // The thread is read-only except for explicit, server-gated controls: the selected-engine analysis
@@ -4555,6 +4558,7 @@ async function loadFiction(){
   ficDocData = await dr.json();
   const sr = await fetch("/api/fiction/scene?series="+encodeURIComponent(ficSeries));
   ficScene = await sr.json();
+  try { const ir = await fetch("/api/fiction/inbox?series="+encodeURIComponent(ficSeries)); const inbox = await ir.json(); ficInbox = inbox.ok ? (inbox.ideas||[]) : []; } catch { ficInbox = []; }
   if(ficPage==="promotion") await loadFictionPromotion();
   renderFiction();
   renderCaptureHandoff();
@@ -4687,6 +4691,17 @@ function renderFiction(){
       engineSelectHtml()+
       '<span class="src" style="max-width:340px">It is written to stories/'+esc(ficSeries)+'/'+esc(chapter.path)+'. A passage edit saves to this draft, but final acceptance and commit history stay in the story PR.</span>'+
     '</div>'+
+    '<div style="margin-top:20px;max-width:600px;border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:15px 17px">'+
+      '<div class="wb-margin-cap">STORY PR · EXPLICIT REVIEW BRIDGE</div>'+
+      '<p class="src" style="margin:8px 0">Open a draft PR for this landed chapter, then apply unresolved line comments after you review them in GitHub. This action never locks or publishes the story.</p>'+
+      '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">'+
+        '<button type="button" class="primary" id="ficPrCreate">Open draft PR</button>'+
+        '<label class="src" for="ficPrNumber">PR #</label><input id="ficPrNumber" inputmode="numeric" value="'+esc(ficPrNumber)+'" placeholder="e.g. 42" style="width:75px">'+
+        engineSelectHtml("ficPrEngine")+
+        '<button type="button" id="ficPrRevise">Apply unresolved comments</button>'+
+      '</div>'+
+      (ficPrError?'<div class="fam-note t-amber" style="margin-top:9px">'+esc(ficPrError)+'</div>':'')+
+    '</div>'+
     '<div style="margin-top:26px;max-width:600px">'+
       '<div class="wb-margin-cap">SECOND PASS · SAY WHAT TO CHANGE</div>'+
       '<div style="display:flex;gap:10px;align-items:center;border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:9px 13px;margin-top:8px">'+
@@ -4700,7 +4715,25 @@ function renderFiction(){
     '</div>'+
     '<div style="margin:38px 0 0;display:flex;align-items:center;gap:12px"><span style="height:1px;flex:1;background:#efe7d6"></span><span style="font:italic 400 14px/1 Georgia,serif;color:#a89a80">the canon underneath it</span><span style="height:1px;flex:1;background:#efe7d6"></span></div>';
 
-  const stageNav='<nav class="room-pages" aria-label="Fiction pages">'+[["write","Write next"],["review","Review drafts"],["promotion","Promotion"]].map(([id,label])=>'<button type="button" class="'+(ficPage===id?'on':'')+'" data-fiction-page="'+id+'">'+label+'</button>').join('')+'</nav>';
+  const stageNav='<nav class="room-pages" aria-label="Fiction pages">'+[["inbox","Idea inbox"],["write","Write next"],["review","Review drafts"],["promotion","Promotion"]].map(([id,label])=>'<button type="button" class="'+(ficPage===id?'on':'')+'" data-fiction-page="'+id+'">'+label+'</button>').join('')+'</nav>';
+  const inboxTargets=series.docs.filter(x=>x.editable).map(x=>'<option value="'+esc(x.path)+'">'+esc(x.label)+'</option>').join('');
+  const inboxCards=(ficInbox||[]).map(idea=>{
+    const proposal=idea.proposal;
+    const turns=(idea.clarificationTurns||[]).map((turn,i)=>'<div class="src" style="margin-top:6px"><strong>'+String(i+1)+'.</strong> '+esc(turn.text)+'</div>').join('');
+    const canClarify=!proposal&&(idea.classification==='clarify'||(idea.classification==='character'&&!idea.targetPath));
+    const clarifyPanel=canClarify
+      ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #efe7d6"><div class="wb-margin-cap">ADD CLARIFICATION</div><textarea id="ficClarify-'+esc(idea.id)+'" rows="3" placeholder="Add the missing context in your own words." style="width:100%;box-sizing:border-box;margin-top:6px"></textarea><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:8px"><select id="ficClarifyTarget-'+esc(idea.id)+'"><option value="">Target only when needed</option>'+inboxTargets+'</select><button type="button" data-inbox-clarify="'+esc(idea.id)+'" class="primary">Continue the conversation</button></div></div>'
+      : '';
+    return '<article style="margin-top:14px;border:1px solid #d8cfbb;border-radius:8px;padding:16px 18px;background:#fffdf8">'+
+      '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><span class="wb-label" style="margin:0">'+esc(idea.classification||'clarify')+'</span><span class="pill">'+esc(idea.status||'needs-review')+'</span>'+(idea.targetPath?'<span class="src">→ '+esc(idea.targetPath)+'</span>':'')+'</div>'+
+      '<div class="wb-margin-cap" style="margin-top:13px">RAW IDEA · NEVER REWRITTEN</div><div style="white-space:pre-wrap;font:400 16px/1.55 Georgia,serif;margin-top:5px">'+esc(idea.rawText||'')+'</div>'+
+      (turns?'<div class="wb-margin-cap" style="margin-top:13px">CLARIFICATION TURNS · AUTHOR SUPPLIED</div>'+turns:'')+
+      (proposal?'<div class="wb-margin-cap" style="margin-top:14px">CLEANUP PROPOSAL · REVIEW BEFORE CANON</div><div style="white-space:pre-wrap;font:400 16px/1.55 Georgia,serif;margin-top:5px">'+esc(proposal.cleanedText||'')+'</div><div class="src" style="margin-top:8px">Provenance: '+esc(proposal.provenance.engine)+' · '+esc(proposal.provenance.targetPath||'default target')+'</div>' : '<div class="src" style="margin-top:10px">The classifier abstained. Clarify the destination before a cleanup proposal can be made.</div>')+
+      clarifyPanel+
+      (proposal&&idea.status==='needs-review'?'<div class="actions" style="margin-top:13px"><button class="primary" data-inbox-approve="'+esc(idea.id)+'">Approve for '+(idea.classification==='chapter'?'chapter drafting':'canonical update')+'</button><button data-inbox-reject="'+esc(idea.id)+'">Reject</button></div>':'')+
+      '</article>';
+  }).join('');
+  const inboxPage='<div class="wb-label" style="margin-top:28px">FICTION INBOX · ONE SAFE FRONT DOOR</div><div style="font:400 27px/1.35 Georgia,serif;margin:2px 0 9px">Where does this belong?</div><p class="src" style="max-width:650px">Your raw idea is stored byte-for-byte outside git. The selected engine classifies it, then proposes a cleanup for your review. Approval is the only action that can update a selected world, plot, or character document. Chapter ideas go to the existing draft flow.</p><div style="max-width:650px;border:1px solid #d8cfbb;border-radius:8px;padding:18px;background:#fffdf8"><textarea id="ficIdea" rows="5" placeholder="Drop in a world, character, plot, chapter, or imagery idea." style="width:100%;box-sizing:border-box;font:400 17px/1.6 Georgia,serif"></textarea><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px"><select id="ficIdeaTarget"><option value="">Choose a target when needed</option>'+inboxTargets+'</select>'+engineSelectHtml("ficIdeaEngine")+'<button class="primary" id="ficIdeaSubmit">Classify and prepare review</button></div></div><div style="max-width:700px;margin-top:23px">'+(inboxCards||'<div class="empty">No ideas in this inbox yet.</div>')+'</div>';
   const chapterOptions=(series.chapters||[]).map(ch=>'<option value="'+ch.chapter+'"'+(Number(ficPromoChapter)===ch.chapter?' selected':'')+'>'+esc(ch.label)+'</option>').join("");
   if(ficPromoChapter==null&&series.chapters&&series.chapters.length) ficPromoChapter=series.chapters[0].chapter;
   const intake='<div style="margin-top:24px"><div class="wb-label">OPTIONAL STORY PROMOTION</div><h3>Promote a finished chapter</h3><p class="src">This is separate from writing the story. Choose a locked chapter and say what the promotion should do; approved copy can then move to Content.</p><label class="wb-label" for="ficPromoChapter">SERIES / CHAPTER</label><select id="ficPromoChapter" style="width:100%;max-width:520px">'+chapterOptions+'</select><label class="wb-label" for="ficPromoRequest" style="display:block;margin-top:18px">WHAT SHOULD THIS PROMOTION DO?</label><textarea id="ficPromoRequest" rows="5" style="width:100%;max-width:600px" placeholder="Describe the launch note, audience, and spoiler boundary.">'+esc(ficPromoRequest)+'</textarea><label class="wb-label" for="ficPromoObjective" style="display:block;margin-top:18px">SUGGESTED OBJECTIVE</label><input id="ficPromoObjective" style="width:100%;max-width:600px" value="'+esc(ficPromoObjective)+'"></div>';
@@ -4732,7 +4765,7 @@ function renderFiction(){
   const promotionPage=intake+promoDraftPanel+(ficPromoDraft&&ficPromoDraft.state==='Approved'?finalPanel:'');
   const reviewPage=head+(hasScene?anchor+failCard+scene:'<div class="empty">No draft yet. Add your direction in Write next, then draft a first pass.</div>')+
     '<div class="src" style="max-width:680px;margin-top:24px;padding-top:16px;border-top:1px solid #efe7d6">Direct line edits and final acceptance happen in the story PR. Use the revision note here to ask for another focused pass; the canonical chapter is never silently overwritten.</div>';
-  $("#fictionMain").innerHTML = stageNav+(ficPage==="write"?head+composer+failCard:ficPage==="review"?reviewPage:ficPage==="canon"?canonPanel:promotionPage);
+  $("#fictionMain").innerHTML = stageNav+(ficPage==="inbox"?inboxPage:ficPage==="write"?head+composer+failCard:ficPage==="review"?reviewPage:ficPage==="canon"?canonPanel:promotionPage);
 
   const rows = [].concat(rep?rep.conflicts||[]:[], rep?rep.holds||[]:[]);
   const checks = rows.length
@@ -4765,6 +4798,23 @@ function renderFiction(){
     ficPage=button.dataset.fictionPage;
     if(ficPage==="promotion") await loadFictionPromotion();
     renderFiction();
+  }));
+  $("#ficIdeaSubmit")?.addEventListener("click",async ()=>{
+    const raw=$("#ficIdea").value; if(!raw){flash("Add the idea first");return;}
+    const button=$("#ficIdeaSubmit"); button.disabled=true; button.textContent="Preparing…";
+    const result=await post("/api/fiction/inbox",{series:ficSeries,rawText:raw,targetPath:$("#ficIdeaTarget")?.value||undefined,engine:$("#ficIdeaEngine")?.value||"claude"});
+    if(result.ok){flash(result.needsClarification?"I need a clearer destination":result.needsTarget?"Choose the character document":"Review proposal ready");await loadFiction();}else{button.disabled=false;button.textContent="Classify and prepare review";flash(result.error||"Could not classify idea");}
+  });
+  document.querySelectorAll("#fictionMain [data-inbox-approve]").forEach(button=>button.addEventListener("click",async ()=>{const result=await post("/api/fiction/inbox/approve",{series:ficSeries,id:button.dataset.inboxApprove});if(result.ok){flash("Approved through the Fiction workflow");await loadFiction();}else flash(result.error||"Could not approve idea");}));
+  document.querySelectorAll("#fictionMain [data-inbox-reject]").forEach(button=>button.addEventListener("click",async ()=>{const result=await post("/api/fiction/inbox/reject",{series:ficSeries,id:button.dataset.inboxReject});if(result.ok){flash("Rejected; canonical documents were untouched");await loadFiction();}else flash(result.error||"Could not reject idea");}));
+  document.querySelectorAll("#fictionMain [data-inbox-clarify]").forEach(button=>button.addEventListener("click",async ()=>{
+    const id=button.dataset.inboxClarify; const followUp=$("#ficClarify-"+id)?.value||"";
+    if(!followUp.trim()){flash("Add the clarification first");return;}
+    button.disabled=true;
+    const target=$("#ficClarifyTarget-"+id)?.value||undefined;
+    const result=await post("/api/fiction/inbox/clarify",{series:ficSeries,id,followUp,targetPath:target});
+    if(result.ok){flash(result.needsClarification?"I still need a clearer destination":result.needsTarget?"Choose the character document":"Review proposal ready");await loadFiction();}
+    else {button.disabled=false;flash(result.error||"Could not continue the conversation");}
   }));
   $("#ficPromoRequest")?.addEventListener("input",e=>{ ficPromoRequest=e.target.value; });
   $("#ficPromoObjective")?.addEventListener("input",e=>{ ficPromoObjective=e.target.value; });
@@ -4840,6 +4890,26 @@ function renderFiction(){
     post("/api/fiction/check",{series:ficSeries, chapter:chapter.number, engine}).then(r=>{
       if(r.ok){ flash("Reading it against your canon with "+engineLabel(engine)); loadFiction(); } else flash(r.error||"Could not start it");
     });
+  });
+  const prCreate = $("#ficPrCreate");
+  if(prCreate) prCreate.addEventListener("click",async ()=>{
+    prCreate.disabled=true; ficPrError="";
+    const result=await post("/api/fiction/pr/create",{series:ficSeries,chapter:chapter.number});
+    if(result.ok){ ficPrNumber=String(result.pr.number); flash("Draft story PR ready · "+result.pr.url); }
+    else ficPrError=result.error||"Could not open the story PR";
+    renderFiction();
+  });
+  const prRevise = $("#ficPrRevise");
+  if(prRevise) prRevise.addEventListener("click",async ()=>{
+    const number=Number($("#ficPrNumber")?.value||ficPrNumber);
+    if(!Number.isSafeInteger(number)||number<1){ficPrError="Enter the GitHub PR number first";renderFiction();return;}
+    ficPrNumber=String(number); ficPrError=""; prRevise.disabled=true;
+    const engine=$("#ficPrEngine")?.value||"claude";
+    const result=await post("/api/fiction/pr/revise",{series:ficSeries,chapter:chapter.number,prNumber:number,engine});
+    if(result.ok&&!result.result.blocked){ flash("Processed "+result.result.processed+" unresolved review comments"); }
+    else if(result.ok) ficPrError=result.result.blockReason||"Review comments were blocked without changing the chapter";
+    else ficPrError=result.error||"Could not apply story PR comments";
+    renderFiction();
   });
   document.querySelectorAll("#fictionSide [data-fix]").forEach(b=>b.addEventListener("click", ()=>{
     const it = rows[Number(b.dataset.fix)];
@@ -6089,10 +6159,10 @@ async function advanceCaptureSafely(room, text){
   await Promise.resolve(setRoom(room.toLowerCase()));
   if(room==="Fiction"){
     await loadFiction();
-    ficPage="write"; renderFiction();
-    const beats=$("#ficBeats"); if(beats&&!beats.value.trim()) beats.value=text;
-    beats?.focus();
-    return "Your beats are in Write next. Review them before drafting.";
+    ficPage="inbox"; renderFiction();
+    const idea=$("#ficIdea"); if(idea&&!idea.value.trim()) idea.value=text;
+    idea?.focus();
+    return "Your idea is in the Fiction inbox. Review it before classification.";
   }
   if(room==="Outreach"){
     setOutreachSub("leads");

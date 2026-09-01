@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Content Studio Fiction P2 review</title>
+  <style type="text/css">
+    :root{--ink:#29251f;--muted:#756b5c;--paper:#fbf8f1;--card:#fffdf8;--line:#ded4c1;--green:#22634a;--amber:#8a5b14;--blue:#2d5575}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#main{width:min(1060px,calc(100% - 32px));margin:40px auto 80px}h1,h2,h3{font-family:Georgia,serif;font-weight:500;line-height:1.15}h1{font-size:44px;margin:5px 0 10px}h2{font-size:27px;margin:42px 0 14px}h3{font-size:20px;margin:0 0 8px}.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);font-weight:700}.lede{font:20px/1.5 Georgia,serif;max-width:790px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px}.wide{grid-column:1/-1}.tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:12px;margin:0 5px 6px 0}.pass{color:var(--green);border-color:#8ab7a3;background:#eef8f3}.hold{color:var(--amber);border-color:#d9bc86;background:#fff8e9}.raw,.output{white-space:pre-wrap;font:17px/1.6 Georgia,serif;background:#f7f1e6;border-left:4px solid #b79c68;padding:15px 17px;margin-top:12px}.output{border-color:#69957f;background:#f0f7f3}.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;align-items:stretch}.step{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;font-size:14px}.step b{display:block;font-family:Georgia,serif;font-size:17px;margin-bottom:6px}.arrow{text-align:center;color:var(--muted);display:none}table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line)}th,td{text-align:left;vertical-align:top;padding:12px 14px;border-bottom:1px solid var(--line)}th{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}code{background:#eee7da;padding:2px 5px;border-radius:4px}.note{color:var(--muted);font-size:14px}.decision{border:2px solid #739783;background:#f3f9f5}.old{color:#8a4b3d}.new{color:var(--green)}@media(max-width:760px){h1{font-size:34px}.grid,.flow{grid-template-columns:1fr}.wide{grid-column:auto}}
+  </style>
+</head>
+<body><div id="main">
+  <div class="eyebrow">Review packet · Fiction P2 · 2026-08-31</div>
+  <h1>One safe front door for fiction ideas</h1>
+  <p class="lede">The Fiction room now opens on an idea inbox. It preserves the author's exact input, asks for clarification when the destination is uncertain, proposes cleanup for review, and connects landed chapters to the existing GitHub review loop.</p>
+  <div><span class="tag pass">Grok 4.5 cross-family audit: PASS</span><span class="tag pass">Authenticated Grok adapter: PASS</span><span class="tag pass">Focused tests: PASS</span><span class="tag hold">Held for judgment review</span></div>
+
+  <h2>What changed</h2>
+  <div class="grid">
+    <div class="card"><h3 class="old">Before</h3><p>Ideas had to be manually placed into Write next or a canonical document. Studio had no conversational router, cleanup proposal, or direct chapter PR bridge.</p></div>
+    <div class="card"><h3 class="new">After</h3><p>Ideas enter one inbox, retain exact author bytes, receive a fail-closed destination, and wait for explicit approval. Chapter review comments can request Claude, Grok, or Codex on exact line ranges.</p></div>
+  </div>
+
+  <h2>The normal path</h2>
+  <div class="flow">
+    <div class="step"><b>1. Capture</b>Store the raw idea outside git, unchanged.</div>
+    <div class="step"><b>2. Classify</b>World, character, plot, chapter, imagery, or clarify.</div>
+    <div class="step"><b>3. Review</b>Show cleanup and provenance beside the original.</div>
+    <div class="step"><b>4. Approve</b>Write one permitted document on main, or queue chapter beats.</div>
+    <div class="step"><b>5. Revise</b>Use exact GitHub comment spans, validate, commit, push, and reply.</div>
+  </div>
+
+  <h2>Representative Grok result</h2>
+  <div class="card wide">
+    <div class="eyebrow">Author input · preserved exactly</div>
+    <div class="raw">The signal does not call people. It changes the weather around anyone who has lied about hearing it.</div>
+    <p><strong>Destination:</strong> <code>world</code> → <code>bible.md</code></p>
+    <div class="eyebrow">Cleanup proposal · authenticated Grok subscription CLI</div>
+    <div class="output">The signal does not call people. It changes the weather around anyone who has lied about hearing it.</div>
+    <p class="note">The exact repository adapter returned the already-clean sentence byte-for-byte. A first canary exposed Grok progress narration; the final-only JSON contract and bounded no-tools mode were added, regression-tested, and the canary then passed.</p>
+  </div>
+
+  <h2>Clarification example</h2>
+  <div class="grid">
+    <div class="card"><div class="eyebrow">Original</div><div class="raw">Build something around the signal.</div></div>
+    <div class="card"><div class="eyebrow">Author follow-up</div><div class="raw">The world: The signal changes the weather.</div></div>
+    <div class="card wide"><h3>Result</h3><p>The original stays unchanged. The follow-up is stored as a separate ordered author turn. The combined, delimited context can now classify to <code>world</code>; only a new cleanup proposal is created. Nothing reaches <code>bible.md</code> until approval.</p></div>
+  </div>
+
+  <h2>Review and safety behavior</h2>
+  <table summary="Fiction P2 safety boundaries and their verification evidence">
+    <thead><tr><th>Boundary</th><th>Behavior</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Model permissions</td><td>Claude and Grok receive no tools or edit permission. Grok also uses an OS read-only sandbox, no web, and no subagents. Codex uses its read-only sandbox.</td><td>Argument-level tests plus live Grok adapter canary</td></tr>
+      <tr><td>Canon writes</td><td>Non-chapter approval requires the actual route to prove the checkout is on <code>main</code>. The domain refuses a missing authorization.</td><td>Domain and route refusal tests</td></tr>
+      <tr><td>PR identity</td><td>The local branch, clean tree, base, head branch, open state, and exact GitHub head SHA must all match.</td><td>Matching and mismatch tests</td></tr>
+      <tr><td>Partial failures</td><td>Validated edits move through <code>validated → pushed → replied</code>. A failed commit, push, or reply resumes without a second model call.</td><td>Commit, push, reply retry tests</td></tr>
+      <tr><td>Surgical changes</td><td>Only unresolved root comments on exact current prose spans are accepted. Overlap, stale ranges, unknown engines, and GPT-OSS writes fail closed.</td><td>Range, byte-preservation, engine, and no-op tests</td></tr>
+      <tr><td>Publishing</td><td>The bridge creates a draft PR only. It never locks a chapter, resolves review threads, or publishes.</td><td>Command-adapter and source-boundary tests</td></tr>
+    </tbody>
+  </table>
+
+  <h2>What remains attended</h2>
+  <div class="grid">
+    <div class="card"><h3>Browser approval canary</h3><p>Submit, clarify, approve, and reject through a disposable Studio browser state.</p></div>
+    <div class="card"><h3>Disposable GitHub PR canary</h3><p>Create one temporary chapter PR, ingest a real line comment, revise, push, reply, and confirm the thread stays unresolved.</p></div>
+    <div class="card"><h3>Other subscription engines</h3><p>Run equivalent attended Claude and Codex inbox calls. Their deterministic arguments and parsing are tested; Grok is the authenticated live engine verified in this slice.</p></div>
+    <div class="card decision"><h3>Decision requested</h3><p>Approve the workflow and safety behavior, or call out changes before the draft PR leaves its review hold.</p></div>
+  </div>
+</div></body></html>
