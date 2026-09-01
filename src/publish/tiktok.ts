@@ -174,11 +174,11 @@ export async function publishTikTok(
     console.log("no approved tiktok rows in the review queue");
     return [];
   }
-  assertProviderDispatch(folder, "postpeer", opts.deliveryPolicy);
+  const deliveryDecision = assertProviderDispatch(folder, "postpeer", opts.deliveryPolicy);
 
   // Reuse guard: skip if this slug was published to TikTok too recently.
   const slug = basename(folder);
-  const reuseCheck = checkReuse(slug, "tiktok");
+  const reuseCheck = checkReuse(slug, "tiktok", undefined, deliveryDecision.brand!);
   if (!reuseCheck.allowed) {
     console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
     console.log("no rows to publish: tiktok blocked by the reuse guard");

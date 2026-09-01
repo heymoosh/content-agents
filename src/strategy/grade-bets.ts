@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { openDb, repoRoot } from "../db/db.js";
+import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext } from "./measurement-context.js";
+import type { BrandId } from "../identity/brand.js";
 
 // Deterministic scoring for the bets ledger — the anti-fossilization backstop.
 //   tsx src/strategy/grade-bets.ts   → markdown report for /strategy to act on
@@ -12,7 +14,9 @@ import { openDb, repoRoot } from "../db/db.js";
 //   SUGGEST_RETIRE — a bet open >6 weeks that still can't reach n>=3 (unresolvable at this cadence)
 // The numbers are the script's; the decision to flip/retire/keep stays Claude's judgment.
 
-const BETS_PATH = join(repoRoot, "briefs", "bets.md");
+function betsPath(brandId: BrandId): string {
+  return process.env.CONTENT_AGENTS_TEST_BETS_PATH ?? join(repoRoot, "briefs", brandId, "bets.md");
+}
 const WEEK = 7 * 24 * 3600 * 1000;
 const STALE_WEEKS = 6;
 const MIN_SAMPLE = 3;
@@ -56,6 +60,8 @@ const eng = (s: Stat) => (s.likes ?? 0) + (s.replies ?? 0) * 3 + (s.reposts ?? 0
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
 function main() {
+  const context = parseStrategyMeasurementContext();
+  const BETS_PATH = betsPath(context.brandId);
   let md = "";
   try {
     md = readFileSync(BETS_PATH, "utf8");
@@ -70,16 +76,15 @@ function main() {
   }
 
   const db = openDb();
+  const latest = latestMetricsJoin(context);
+  const postScope = context.providerAccountId ? "p.brand_id = ? AND p.provider_account_id = ?" : "p.brand_id = ?";
   const rows = db
     .prepare(
       `SELECT p.bet_id, p.platform, m.likes, m.replies, m.reposts, m.impressions
-       FROM posts p LEFT JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id`
+       FROM posts p LEFT JOIN (${latest.sql}) m ON m.post_id = p.id
+       WHERE ${postScope}`
     )
-    .all() as Stat[];
+    .all(...latest.params, context.brandId, ...(context.providerAccountId ? [context.providerAccountId] : [])) as Stat[];
   db.close();
 
   const withMetrics = rows.filter(

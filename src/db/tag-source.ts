@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb, repoRoot } from "./db.js";
 import { CONTROL_RUN_SOURCE, EXPLORATION_SOURCE } from "../strategy/route.js";
+import { isBrandId, type BrandId } from "../identity/brand.js";
 
 // Classify each post's origin so origin-compare.ts can measure whether atomizing earns traction:
 //   'atomized'          — shipped by /publish from a content folder (verbatim extraction-first)
@@ -35,7 +36,13 @@ import { CONTROL_RUN_SOURCE, EXPLORATION_SOURCE } from "../strategy/route.js";
 
 const DISTRIBUTED = new Set(["x", "linkedin", "bluesky"]); // where atomized posts land + analytics exist
 const NATIVE_ONLY = new Set(["substack", "substack-note"]); // always Muxin's own writing → organic
-const BETS_PATH = join(repoRoot, "briefs", "bets.md");
+function betsPath(brandId: BrandId): string { return process.env.CONTENT_AGENTS_TEST_BETS_PATH ?? join(repoRoot, "briefs", brandId, "bets.md"); }
+export function parseBrandArgv(argv: readonly string[]): BrandId {
+  const index = argv.indexOf("--brand");
+  const value = index >= 0 ? argv[index + 1] : argv.find((arg) => arg.startsWith("--brand="))?.slice(8);
+  if (!isBrandId(value)) throw new Error("--brand <brand> is required");
+  return value;
+}
 
 // Unlike CONTROL_RUN_SOURCE/EXPLORATION_SOURCE (defined in route.ts because loadData() EXCLUDES
 // those two from pillar/platform resonance figures), outreach-sourced content isn't excluded from
@@ -84,7 +91,7 @@ export interface Placed {
 // quoted post-text prefix — the quote can itself contain a coincidental "| spin |"/
 // "| control-run |"/"| exploration |"/"| outreach-message |"/"| cta:... |"/"| cadence:... |"
 // substring (Muxin's own post text), and testing the full line would false-positive on that.
-export function readPlaced(path: string = BETS_PATH): Placed[] {
+export function readPlaced(path: string = betsPath("human-inference")): Placed[] {
   let text = "";
   try {
     text = readFileSync(path, "utf8");
@@ -139,11 +146,12 @@ export function classifyHit(hit: Placed | undefined): { value: string; tag: stri
 }
 
 function main() {
-  const placed = readPlaced();
+  const brand = parseBrandArgv(process.argv);
+  const placed = readPlaced(betsPath(brand));
   const db = openDb();
   const posts = db
-    .prepare(`SELECT id, platform, content_text, bet_id, source, cta_destination, cadence_source FROM posts`)
-    .all() as {
+    .prepare(`SELECT id, platform, content_text, bet_id, source, cta_destination, cadence_source FROM posts WHERE brand_id = ?`)
+    .all(brand) as {
     id: number;
     platform: string;
     content_text: string | null;
@@ -153,14 +161,14 @@ function main() {
     cadence_source: string | null;
   }[];
 
-  const update = db.prepare("UPDATE posts SET source = ? WHERE id = ?");
+  const update = db.prepare("UPDATE posts SET source = ? WHERE id = ? AND brand_id = ?");
   // cta_destination is set only from a genuine text-match hit (not a bet_id-only match, which
   // carries no marker) — same posture as spin/control-run/exploration, which also only ride
   // along on a matched Placed row's markers.
-  const updateCta = db.prepare("UPDATE posts SET cta_destination = ? WHERE id = ?");
+  const updateCta = db.prepare("UPDATE posts SET cta_destination = ? WHERE id = ? AND brand_id = ?");
   // cadence_source rides along the same way — only from a genuine text-match hit, never a
   // bet_id-only match (card ed23f712 / lever C follow-through, epic 2ce597d7).
-  const updateCadence = db.prepare("UPDATE posts SET cadence_source = ? WHERE id = ?");
+  const updateCadence = db.prepare("UPDATE posts SET cadence_source = ? WHERE id = ? AND brand_id = ?");
   let atomized = 0;
   let spun = 0;
   let controlled = 0;
@@ -193,16 +201,16 @@ function main() {
         untouched++;
         continue; // unknown platform — leave source as-is
       }
-      if (value !== p.source) update.run(value, p.id);
+      if (value !== p.source) update.run(value, p.id, brand);
       // cta_destination rides along on the same text-match hit (never a bet_id-only match, which
       // carries no marker — same posture as spin/control-run/exploration). A hit carrying no
       // `| cta:<dest> |` marker (posts placed before card d80411bc, or a post whose CTA didn't
       // resolve) leaves the column untouched.
       if (hit?.ctaDestination && hit.ctaDestination !== p.cta_destination) {
-        updateCta.run(hit.ctaDestination, p.id);
+        updateCta.run(hit.ctaDestination, p.id, brand);
       }
       if (hit?.cadenceSource && hit.cadenceSource !== p.cadence_source) {
-        updateCadence.run(hit.cadenceSource, p.id);
+        updateCadence.run(hit.cadenceSource, p.id, brand);
       }
       if (value === "organic") organic++;
       else if (value === "atomized-spin") spun++;

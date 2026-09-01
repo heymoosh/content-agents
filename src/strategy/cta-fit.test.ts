@@ -42,9 +42,9 @@ function insertPost(
   source: string | null = "atomized"
 ): void {
   const info = db
-    .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, source, cta_destination) VALUES (?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, source, cta_destination, brand_id, provider_account_id) VALUES (?, ?, ?, ?, ?, 'human-inference', 'test/account')`)
     .run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, source, ctaDestination);
-  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
+  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts, brand_id, provider_account_id) VALUES (?, ?, ?, 0, 0, 'human-inference', 'test/account')`).run(
     info.lastInsertRowid,
     postedAt,
     likes
@@ -164,7 +164,7 @@ describe("loadRows: scoped to CORE_TEXT platforms with a non-null cta_destinatio
     insertPost(db, "x", "source", "2026-06-01T00:00:00.000Z", 10);
     insertPost(db, "x", "project", "2026-06-08T00:00:00.000Z", 20);
     insertPost(db, "x", null, "2026-06-01T00:00:00.000Z", 999);
-    const rows = loadRows(db);
+    const rows = loadRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 2);
     assert.ok(rows.every((r) => r.likes !== 999));
     db.close();
@@ -175,7 +175,7 @@ describe("loadRows: scoped to CORE_TEXT platforms with a non-null cta_destinatio
     insertPost(db, "x", "source", "2026-06-01T00:00:00.000Z", 10, "atomized");
     insertPost(db, "x", "source", "2026-06-08T00:00:00.000Z", 999, CONTROL_RUN_SOURCE);
     insertPost(db, "x", "source", "2026-06-08T00:00:00.000Z", 999, EXPLORATION_SOURCE);
-    const rows = loadRows(db);
+    const rows = loadRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 1);
     assert.equal(rows[0].likes, 10);
     db.close();
@@ -185,7 +185,7 @@ describe("loadRows: scoped to CORE_TEXT platforms with a non-null cta_destinatio
     const db = freshDb();
     insertPost(db, "x", "source", "2026-06-01T00:00:00.000Z", 10);
     insertPost(db, "community:democratic-resilience", "source", "2026-06-01T00:00:00.000Z", 10);
-    const rows = loadRows(db);
+    const rows = loadRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 1);
     assert.equal(rows[0].platform, "x");
     db.close();

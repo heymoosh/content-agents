@@ -28,6 +28,25 @@ function proposal(id: string, confidence: "low" | "medium" | "high" = "high") {
 }
 
 describe("Signals experiment plan store", () => {
+  test("binds a plan to the Content origin brand and leaves Studio legacy plans unassigned", async () => {
+    const root = await mkdtemp(join(tmpdir(), "signals-experiment-brand-")); roots.push(root); const path = join(root, "plans.jsonl");
+    const plan = proposal("brand-bound");
+    assert.equal(plan.brandId, "human-inference");
+    recordExperimentPlan(plan, path);
+    const legacy = structuredClone(plan) as any;
+    legacy.recommendation.id = "studio-legacy";
+    legacy.contentRequest.id = "studio-legacy";
+    legacy.contentRequest.origin = "studio";
+    delete legacy.brandId;
+    recordExperimentPlan(legacy, path);
+    const rows = readExperimentPlans(path);
+    assert.equal(rows.find((row) => row.contentRequestId === "brand-bound")?.brandId, "human-inference");
+    assert.equal(rows.find((row) => row.contentRequestId === "studio-legacy")?.brandId, null);
+    const decision = approveExperimentPlan(plan, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" });
+    reviewExperimentPlan(plan.recommendation.id, decision, path);
+    markExperimentContentHandoff(plan.recommendation.id, { experimentId: plan.recommendation.id, generatedIds: ["x"], copyApproval: "pending-in-content" }, path);
+    assert.deepEqual((planStoreSubject as any).readExperimentPlansForPerformance(path).map((item: any) => item.recommendation.id), [plan.recommendation.id]);
+  });
   test("persists concurrent plans and returns high confidence first without source or draft bodies", async () => {
     const root = await mkdtemp(join(tmpdir(), "signals-experiment-store-")); roots.push(root); const path = join(root, "plans.jsonl");
     recordExperimentPlan(proposal("medium", "medium"), path);

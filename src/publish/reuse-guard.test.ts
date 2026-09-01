@@ -12,14 +12,15 @@
 
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkReuse } from "./reuse-guard.js";
 
 // Compute repo root the same way db.ts does: dirname(this file) = src/publish → ../.. = repo root
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BETS_PATH = join(repoRoot, "briefs", "bets.md");
+const BETS_PATH = join(mkdtempSync(join(tmpdir(), "reuse-guard-brand-")), "human-inference-bets.md");
 
 // Unique test slugs — chosen to be impossible to collide with real placed-log entries.
 const SLUG_WINDOW = "test-fixture-9999-rg-window";
@@ -42,12 +43,14 @@ let savedBets: string | null = null;
 
 describe("reuse-guard: checkReuse window math", () => {
   before(() => {
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = BETS_PATH;
     savedBets = existsSync(BETS_PATH) ? readFileSync(BETS_PATH, "utf8") : null;
     // Append fixture lines so real bets data is undisturbed (avoids test-vs-reality bleed).
     writeFileSync(BETS_PATH, (savedBets ?? "") + "\n" + FIXTURE_LINES);
   });
 
   after(() => {
+    delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
     // Restore exactly what was there (or remove if bets.md didn't exist).
     if (savedBets === null) {
       // file didn't exist before — but briefs/bets.md always exists in this repo, leave it as-is

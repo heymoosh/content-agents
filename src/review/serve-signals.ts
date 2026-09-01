@@ -15,7 +15,7 @@ import { safeFolder } from "./rows.js";
 import { readPublishingStatuses } from "./publishing-status.js";
 import { buildOutcomeLedger, readOutcomeLedger } from "../grow/outcome-ledger.js";
 import type { SignalsExperimentProposalRequest, SignalsExperimentProposalResult } from "./signals-experiment-proposal.js";
-import { isBrandId } from "../identity/brand.js";
+import { isBrandId, type BrandId } from "../identity/brand.js";
 import { readSignalsVentureProposals, recordSignalsVentureDecision, recordSignalsVentureProposal, signalsVentureProposalId, type SignalsVentureDecision } from "./signals-venture-handoff-store.js";
 import { readCanonEvents } from "../venture/canon.js";
 import { computeState } from "../venture/state.js";
@@ -47,23 +47,38 @@ function requiredPositiveInteger(value: unknown, field: string): number {
   return parsed;
 }
 
+function requestedBrand(url: URL): BrandId | null {
+  const value = url.searchParams.get("brand") ?? url.searchParams.get("brandId");
+  return isBrandId(value) ? value : null;
+}
+
+function bodyBrand(body: Record<string, unknown>): BrandId {
+  const value = body.brand ?? body.brandId;
+  if (!isBrandId(value)) throw new Error("brand is required and must be one of human-inference, charles, fiction");
+  return value;
+}
+
 function readLiveExperimentPerformance(experimentPlansPath?: string) {
   const plans = readExperimentPlansForPerformance(experimentPlansPath);
   if (plans.length === 0) return {
     kind: "signals_experiment_performance" as const, version: "signals-experiment-performance-v1" as const,
     experiments: [], autoWinner: false as const, sideEffects: "none" as const,
   };
+  const planBrands = new Map(plans.map((plan) => [plan.contentRequest.id, plan.brandId]));
   const publications = Object.values(readPublishingStatuses()).map((status) => ({
-    slug: status.slug, rowId: status.rowId, state: status.state, providerObjectId: status.providerObjectId ?? status.ref ?? null,
+    slug: status.slug, rowId: status.rowId, state: status.state, brandId: planBrands.get(status.slug) ?? null, providerObjectId: status.providerObjectId ?? status.ref ?? null, providerAccountId: status.providerAccountId ?? null,
     canonicalUrl: status.canonicalUrl ?? null, providerPublishedAt: status.providerPublishedAt ?? null,
     at: status.at, eventId: status.eventId ?? `legacy:${status.slug}/${status.rowId}:${status.at}`,
   }));
   const db = openDb();
   try {
     const analytics = db.prepare(`
-      SELECT m.id, p.platform_post_id AS platformPostId, p.url, m.captured_at AS capturedAt,
+      SELECT m.id, p.platform_post_id AS platformPostId, p.url, p.brand_id AS brandId, p.provider_account_id AS providerAccountId, m.captured_at AS capturedAt,
              m.impressions, m.replies, m.clicks, m.new_follows AS newFollows
       FROM metrics m JOIN posts p ON p.id = m.post_id
+      WHERE p.brand_id IS NOT NULL
+        AND m.brand_id = p.brand_id
+        AND m.provider_account_id = p.provider_account_id
     `).all() as ExperimentAnalyticsObservation[];
     const outcomePath = join(repoRoot, "data", "outcomes.jsonl");
     const outcomeLedger = existsSync(outcomePath) ? buildOutcomeLedger(readOutcomeLedger(outcomePath)) : null;
@@ -84,21 +99,23 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
   // Signals room (design 3e): deterministic brief + durable user decisions. Muxin decides;
   // adoption records intent only and never mutates configuration or the repository backlog.
   if (req.method === "GET" && url.pathname === "/api/signals") {
+    const brand = requestedBrand(url);
+    if (!brand) { json(res, 400, { ok: false, error: "brand is required and must be one of human-inference, charles, fiction" }); return true; }
     reconcileSignalsApplyIntents({ root: configRoot, path: proposalsPath });
-    const decisions = readSignalsDecisions(decisionsPath);
-    const signals = readSignals();
+    const decisions = Object.fromEntries(Object.entries(readSignalsDecisions(decisionsPath)).filter(([, decision]) => decision.brandId === brand));
+    const signals = readSignals(brand);
     json(res, 200, {
       ...signals,
-      ...buildSignalsRecommendationRead(),
+      ...buildSignalsRecommendationRead(brand),
       decisions,
       recommendations: signals.recommendations.map((recommendation) => ({
         ...recommendation,
-        decision: decisions[recommendationKey(recommendation.type, recommendation.title)]?.decision ?? null,
+        decision: decisions[recommendationKey(recommendation.type, recommendation.title, brand)]?.decision ?? null,
       })),
-      changeProposals: readSignalsProposals(proposalsPath),
-      experimentPlans: readExperimentPlans(experimentPlansPath),
-      experimentPerformance: readExperimentPerformance?.() ?? readLiveExperimentPerformance(experimentPlansPath),
-      experimentInterpretations: readExperimentInterpretations(experimentResultsPath),
+      changeProposals: readSignalsProposals(proposalsPath).filter((proposal) => proposal.brandId === brand),
+      experimentPlans: readExperimentPlans(experimentPlansPath).filter((plan) => plan.brandId === brand),
+      experimentPerformance: (() => { const value = (readExperimentPerformance?.() ?? readLiveExperimentPerformance(experimentPlansPath)) as { experiments?: readonly { brandId?: BrandId | null }[]; [key: string]: unknown }; return { ...value, experiments: (value.experiments ?? []).filter((item) => item.brandId === brand) }; })(),
+      experimentInterpretations: readExperimentInterpretations(experimentResultsPath).filter((item) => item.brandId === brand),
       // A missing/unavailable optional handoff ledger is an honest empty read, like the other
       // Signals projections. It must not make the core Signals room fail to load.
       ventureHandoffs: readSignalsVentureProposals(ventureHandoffsPath).map((proposal) => {
@@ -126,11 +143,14 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
     const id = decodeURIComponent(encodedId);
     const body = await readBody(req);
     try {
+      const brand = bodyBrand(body);
       const engine = isEngine(body.engine) ? body.engine : "codex";
       if (!interpretExperiment) throw new Error("Signals experiment interpretation runner is unavailable");
       const result = await interpretExperiment(id, engine);
       if (result.experimentId !== id) throw new Error("Signals interpretation returned a different experiment id");
-      const interpretation = recordExperimentInterpretation({ ...result, engine }, experimentResultsPath);
+      const plan = loadExperimentPlan(id, experimentPlansPath);
+      if (plan.brandId !== brand) throw new Error("Signals interpretation brand does not match the experiment Content request");
+      const interpretation = recordExperimentInterpretation({ ...result, engine, brandId: plan.brandId ?? undefined }, experimentResultsPath);
       json(res, 200, { ok: true, interpretation });
     } catch (e) {
       json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -140,6 +160,7 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
   if (req.method === "POST" && url.pathname === "/api/signals/experiments/propose") {
     const body = await readBody(req);
     try {
+      const brand = bodyBrand(body);
       if (!proposeExperiment) throw new Error("Signals experiment proposal runner is unavailable");
       const engine = body.engine === "claude" || body.engine === "grok" || body.engine === "codex" ? body.engine : "codex";
       const result = await proposeExperiment({
@@ -150,7 +171,10 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
         availablePublishingUnits: requiredPositiveInteger(body.availablePublishingUnits, "availablePublishingUnits"),
         availableDays: requiredPositiveInteger(body.availableDays, "availableDays"),
       });
-      if (result.status === "recommended") recordExperimentPlan(result.plan, experimentPlansPath);
+      if (result.status === "recommended") {
+        if (result.plan.brandId !== brand) throw new Error("Signals experiment brand does not match the Content request");
+        recordExperimentPlan(result.plan, experimentPlansPath);
+      }
       json(res, 200, { ok: true, result: result.status === "recommended" ? { status: result.status, experimentId: result.plan.recommendation.id } : result, experimentPlans: readExperimentPlans(experimentPlansPath) });
     } catch (e) {
       json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e), experimentPlans: readExperimentPlans(experimentPlansPath) });
@@ -219,7 +243,9 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
     const id = decodeURIComponent(encodedId);
     const body = await readBody(req);
     try {
+      const brand = bodyBrand(body);
       const interpretation = reviewExperimentInterpretation(id, action === "accept" ? "accepted" : "rejected", String(body.rationale ?? ""), experimentResultsPath);
+      if (interpretation.brandId !== brand) throw new Error("Signals interpretation brand does not match caller scope");
       json(res, 200, { ok: true, interpretation });
     } catch (e) {
       json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -231,7 +257,9 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
     const id = decodeURIComponent(encodedId);
     const body = await readBody(req);
     try {
+      const brand = bodyBrand(body);
       const plan = loadExperimentPlan(id, experimentPlansPath);
+      if (plan.brandId !== brand) throw new Error("Signals experiment brand does not match the Content request");
       let decision = loadExperimentPlanDecision(id, experimentPlansPath);
       if (action === "approve" || action === "decline") {
         if (decision) throw new Error(`experiment plan ${id} was already reviewed`);
@@ -295,6 +323,8 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
   }
   if (req.method === "POST" && (url.pathname === "/api/signals/decision" || url.pathname === "/api/signals/decisions")) {
     const b = await readBody(req);
+    let brand: BrandId;
+    try { brand = bodyBrand(b); } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); return true; }
     const decision = String(b.decision ?? b.action ?? "").trim() as SignalsDecisionKind;
     const type = String(b.type ?? "").trim() as SignalsRecommendationType;
     const title = String(b.title ?? "").trim();
@@ -304,13 +334,13 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
       return true;
     }
     const date = new Date().toISOString();
-    const recorded = { decision, type, title, rationale, date };
+    const recorded = { decision, type, title, rationale, date, brandId: brand };
     try {
       // Adoption is durable intent, not permission to mutate config or the repository backlog.
       // The append-only decision ledger is the source for later, explicitly authorized work.
       (appendDecision ?? appendSignalsDecision)(recorded, decisionsPath);
       const proposal = decision === "adopt"
-        ? proposeSignalsChange({ type, title, rationale, actor: "muxin" }, { root: configRoot, path: proposalsPath })
+        ? proposeSignalsChange({ type, title, rationale, actor: "muxin", brandId: brand }, { root: configRoot, path: proposalsPath })
         : null;
       json(res, 200, { ok: true, decision: recorded, proposal });
     } catch (e) {
@@ -322,6 +352,9 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
     const [, , , , id, action] = url.pathname.split("/");
     const b = await readBody(req);
     try {
+      const brand = bodyBrand(b);
+      const existing = readSignalsProposals(proposalsPath).find((item) => item.id === id);
+      if (!existing || existing.brandId !== brand) throw new Error("Signals proposal brand does not match caller scope");
       const proposal = action === "approve" || action === "reject"
         ? reviewSignalsProposal(id, action, String(b.evidence ?? ""), "muxin", { path: proposalsPath })
         : action === "apply"

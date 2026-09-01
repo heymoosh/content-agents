@@ -2667,8 +2667,12 @@ test("familyGate: only attention and conversation may feed a suppression call", 
 
 test("the Signals screen calls both new reads and renders no prototype fixture number", () => {
   const script = emittedScripts().join("\n");
+  assert.ok(script.includes('fetch("/api/signals"+"?brand="'), "the strategy, decision, and experiment read must use the selected brand");
   assert.ok(script.includes('fetch("/api/signals/outcomes"+"?brand="'), "the brand-scoped outcome families must be fetched");
   assert.ok(script.includes('fetch("/api/research/report"+"?brand="'), "the brand-scoped research read must be fetched");
+  assert.ok(script.includes('function signalsBrand(){'), "the page must have one canonical selected-brand read");
+  assert.ok(script.includes('brand:signalsBrand()'), "Signals writes must carry the selected brand for server-side lineage checks");
+  assert.ok(!script.includes("Briefs, recommendations, and experiments are not yet brand-scoped"), "the completed brand boundary must not retain the old partial-scope warning");
   assert.match(script, /Legacy rows excluded from this brand view/);
   // The prototype's Signals numbers and thresholds have no source in this repo (port rules, Rule 2).
   for (const n of ["4,180", "trending up", "home base", "still testing"]) {

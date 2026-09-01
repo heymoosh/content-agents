@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { openDb } from "../db/db.js";
 import { CORE_TEXT, CONTROL_RUN_SOURCE, loadConfig, type RoutingConfig } from "./route.js";
 import { loadStrategyConfig, type StrategyConfig } from "./platform-fit.js";
+import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 
 // Strategy lever D (card a4c5b42b, epic 2ce597d7 "Close the loop"): a RECOMMENDATION, not an
 // auto-gate — same posture as levers A/B. The card as originally worded ("weight spin angles by
@@ -37,22 +38,20 @@ export interface Row {
 // exclude CONTROL_RUN_SOURCE, because that's exactly the spin-off side of the comparison. Rows
 // with any other source (organic, exploration-probe, atomized-outreach, NULL/untagged) are left
 // out here since neither bucket claims them.
-export function loadRows(injectedDb?: ReturnType<typeof openDb>): Row[] {
+export function loadRows(injectedDb?: ReturnType<typeof openDb>, context?: StrategyMeasurementContext): Row[] {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const db = injectedDb ?? openDb();
+  const latest = latestMetricsJoin(context);
+  const scope = measurementScope(context, "p", "m");
   const sources = [...SPIN_ON_SOURCES, CONTROL_RUN_SOURCE];
   const rows = db
     .prepare(
       `SELECT p.platform, p.source, p.posted_at, m.likes, m.replies, m.reposts
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
+       FROM posts p JOIN (${latest.sql}) m ON m.post_id = p.id
        WHERE p.platform IN (${CORE_TEXT.map(() => "?").join(",")})
-         AND p.source IN (${sources.map(() => "?").join(",")})`
+         AND ${scope.sql} AND p.source IN (${sources.map(() => "?").join(",")})`
     )
-    .all(...CORE_TEXT, ...sources) as Row[];
+    .all(...latest.params, ...CORE_TEXT, ...scope.params, ...sources) as Row[];
   if (!injectedDb) db.close();
   return rows;
 }
@@ -152,7 +151,7 @@ function labelText(label: FrameLabel): string {
 function main() {
   const cfg = loadConfig();
   const strategyCfg = loadStrategyConfig();
-  const rows = loadRows();
+  const rows = loadRows(undefined, parseStrategyMeasurementContext());
   const ranked = rankFrameFit(rows, cfg, strategyCfg);
 
   console.log(`# Spin-frame fit, ${new Date().toISOString().slice(0, 10)}\n`);

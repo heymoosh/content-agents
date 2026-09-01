@@ -1,6 +1,8 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
 import { repoRoot } from "../db/db.js";
+import { readFileSync as readText } from "node:fs";
+import { brandForOrigin, type BrandId } from "../identity/brand.js";
 
 // Parse and update the review-queue.md markdown table.
 // Columns: | id | platform | format | asset | native | brand | cta | status | notes | origin |
@@ -208,8 +210,20 @@ export function appendPublishLog(folder: string, entry: string): void {
 // CONTENT_AGENTS_TEST_BETS_PATH before exercising appendBetPlacement, instead of writing into the
 // real, shared briefs/bets.md — same isolation mechanism as slots.ts's ledgerPath()/
 // CONTENT_AGENTS_TEST_LEDGER.
-function betsPath(): string {
-  return process.env.CONTENT_AGENTS_TEST_BETS_PATH ?? join(repoRoot, "briefs", "bets.md");
+function betsPath(brandId: BrandId): string {
+  return process.env.CONTENT_AGENTS_TEST_BETS_PATH ?? join(repoRoot, "briefs", brandId, "bets.md");
+}
+
+function brandForQueueFolder(folder: string): BrandId {
+  // Focused publisher tests use an isolated ledger and synthetic folders. Production calls must
+  // still resolve from content-request.json below; the override never selects a production path.
+  if (process.env.CONTENT_AGENTS_TEST_BETS_PATH) return "human-inference";
+  try {
+    const request = JSON.parse(readText(join(folder, "content-request.json"), "utf8")) as { origin?: unknown };
+    const brand = brandForOrigin(request.origin);
+    if (brand) return brand;
+  } catch { /* legacy/manual queues have no server-owned origin */ }
+  throw new Error("publish placement requires a server-owned Content origin with a canonical brand");
 }
 
 const BETS_HEADER = `# Bets ledger
@@ -253,7 +267,9 @@ export function appendBetPlacement(
   ctaDestination: string | null = null,
   cadenceSource: string | null = null
 ): void {
-  const path = betsPath();
+  const brandId = brandForQueueFolder(folder);
+  if (brandId === "fiction") throw new Error("Fiction publishing is blocked; no bets ledger placement recorded");
+  const path = betsPath(brandId);
   mkdirSync(dirname(path), { recursive: true });
   let existing = "";
   try {

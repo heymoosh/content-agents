@@ -1,5 +1,6 @@
 import { openDb } from "../db/db.js";
 import { CONTROL_RUN_SOURCE, CORE_TEXT, computeFit, loadData, type LoadedData, type RoutingConfig, type WindowRange } from "./route.js";
+import { parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 
 // Routing drift flags: does a pillar/platform pair's fit score PERSISTENTLY diverge from
 // config/routing.yaml's defaults list? decideForPillar (route.ts) is now always defaults-driven
@@ -81,19 +82,15 @@ export function detectDrift(
 // always-on default, so a stray old 'atomized' post is a pre-Spin artifact, not evidence of a
 // live baseline; only the periodic --no-spin control run counts. Scoped to `range` like any other
 // lookback here, so an ancient control run ages out and stops counting too.
-export function hasNoSpinControl(
-  db: ReturnType<typeof openDb>,
-  pillar: string,
-  platform: string,
-  range: WindowRange
-): boolean {
+export function hasNoSpinControl(db: ReturnType<typeof openDb>, pillar: string, platform: string, range: WindowRange, context?: StrategyMeasurementContext): boolean {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const row = db
     .prepare(
       `SELECT COUNT(*) AS c FROM posts
-       WHERE platform = ? AND pillar = ? AND source = ?
+       WHERE platform = ? AND pillar = ? AND source = ? AND brand_id = ?${context.providerAccountId ? " AND provider_account_id = ?" : ""}
          AND posted_at >= ? AND posted_at < ?`
     )
-    .get(platform, pillar, CONTROL_RUN_SOURCE, new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()) as {
+    .get(platform, pillar, CONTROL_RUN_SOURCE, context.brandId, ...(context.providerAccountId ? [context.providerAccountId] : []), new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()) as {
     c: number;
   };
   return row.c > 0;
@@ -124,13 +121,14 @@ export function formatDriftFlags(flags: DriftFlag[]): string {
 // CLI-facing entry point for route.ts's `--flags` mode: loads config + two windows of data
 // (through loadData, never duplicated), runs detectDrift, and looks up no-spin-control
 // availability over the combined lookback (both windows together).
-export function runDriftCheck(pillars: string[], cfg: RoutingConfig): { flags: DriftFlag[]; report: string } {
+export function runDriftCheck(pillars: string[], cfg: RoutingConfig, context?: StrategyMeasurementContext): { flags: DriftFlag[]; report: string } {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const db = openDb();
   try {
     const windows = driftWindows();
-    const windowData = windows.map((w) => loadData(w, db));
+    const windowData = windows.map((w) => loadData(w, db, context));
     const lookback: WindowRange = { startMs: windows[1].startMs, endMs: windows[0].endMs };
-    const flags = detectDrift(pillars, cfg, windowData, (pillar, platform) => hasNoSpinControl(db, pillar, platform, lookback));
+    const flags = detectDrift(pillars, cfg, windowData, (pillar, platform) => hasNoSpinControl(db, pillar, platform, lookback, context));
     return { flags, report: formatDriftFlags(flags) };
   } finally {
     db.close();

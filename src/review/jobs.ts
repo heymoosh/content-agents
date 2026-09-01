@@ -25,6 +25,7 @@ import { briefRevisePrompt, latestBriefPath } from "./serve.js";
 import { logCost } from "../util/cost-log.js";
 import { buildEngineSpawn, enginePrompt, ENGINE_COMMANDS, ENGINE_LABELS, type Engine, type EngineSpawnOptions } from "./engines.js";
 import type { ContentRequest, ContentVariant } from "./content-request.js";
+import type { BrandId } from "../identity/brand.js";
 import { configuredMediaPlan, configuredMediaStage, type ConfiguredMediaPlan, type ConfiguredMediaSourceInputs, type ConfiguredMediaStage } from "./configured-media.js";
 import { acquireJobExecutionLease, readDurableJobs, recoverAbandonedJobs, removeDurableJobs, upsertDurableJob } from "../runtime/durable-jobs.js";
 import { processAlive, type FileLease } from "../runtime/file-lock.js";
@@ -292,8 +293,8 @@ export async function reviseDerivative(slug: string, id: string, instruction: st
 // Same "revise with Claude" pattern as reviseDerivative, but for the latest strategy brief instead
 // of a derivative — briefRevisePrompt/latestBriefPath stay in serve.ts (part of the Strategy/
 // Analytics block), imported back here since this is the one place that spawns the subprocess.
-export async function reviseBrief(instruction: string, engine: Engine = "claude"): Promise<{ path: string; content: string }> {
-  const abs = latestBriefPath();
+export async function reviseBrief(instruction: string, engine: Engine = "claude", brandId: BrandId): Promise<{ path: string; content: string }> {
+  const abs = latestBriefPath(brandId);
   if (!abs) throw new Error("no strategy brief exists yet. Run /strategy first");
   if (!instruction.trim()) throw new Error("tell Claude what to change first");
   const relPath = abs.slice(repoRoot.length + 1);

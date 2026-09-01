@@ -28,6 +28,7 @@ import {
   computeFreshness,
   parseBriefDate,
   extractSection,
+  latestBriefPath,
   type SchedulerDeps,
   appendLeadContact,
   ventureAnalysisPrompt,
@@ -41,6 +42,23 @@ import {
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
 import { approveConfiguredMediaStage } from "./configured-media-runtime.js";
+
+test("strategy brief lookup is brand-scoped and leaves top-level legacy briefs unassigned", () => {
+  const root = mkdtempSync(join(tmpdir(), "strategy-brand-briefs-"));
+  try {
+    mkdirSync(join(root, "human-inference"), { recursive: true });
+    mkdirSync(join(root, "charles"), { recursive: true });
+    writeFileSync(join(root, "2026-08-31-strategy-brief.md"), "legacy global");
+    writeFileSync(join(root, "human-inference", "2026-08-30-strategy-brief.md"), "hi");
+    writeFileSync(join(root, "charles", "2026-08-29-strategy-brief.md"), "charles");
+
+    assert.equal(latestBriefPath("human-inference", root), join(root, "human-inference", "2026-08-30-strategy-brief.md"));
+    assert.equal(latestBriefPath("charles", root), join(root, "charles", "2026-08-29-strategy-brief.md"));
+    assert.equal(latestBriefPath("fiction", root), null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("engine availability requires the exact GPT-OSS model, not merely an Ollama binary", () => {
   const missing = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\nllama3.2:latest\n" : "");

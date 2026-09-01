@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { loadPlatforms } from "../config/platforms.js";
+import type { BrandId } from "../identity/brand.js";
 
 // Reuse-frequency guard: prevents re-publishing the same content slug to the same platform
 // too soon after its last placement. Reads the bets.md Placed log (briefs/bets.md), which is
@@ -11,7 +12,9 @@ import { loadPlatforms } from "../config/platforms.js";
 //   const result = checkReuse("2026-06-25-my-essay", "linkedin");
 //   if (!result.allowed) console.warn(result.reason);
 
-const BETS_PATH = join(repoRoot, "briefs", "bets.md");
+function betsPath(brandId: BrandId): string {
+  return process.env.CONTENT_AGENTS_TEST_BETS_PATH ?? join(repoRoot, "briefs", brandId, "bets.md");
+}
 const FALLBACK_MIN_DAYS = 30;
 
 export interface ReuseCheckResult {
@@ -41,9 +44,10 @@ function escapeRegex(s: string): string {
 // Scan the Placed log in briefs/bets.md for lines that match this slug+platform.
 // Lines look like:
 //   - placed 2026-06-25T12:00:00.000Z [slug/rowId] platform → ref ...
-function findLastPlacement(slug: string, platform: string): { iso: string; ms: number } | null {
-  if (!existsSync(BETS_PATH)) return null;
-  const content = readFileSync(BETS_PATH, "utf8");
+function findLastPlacement(slug: string, platform: string, brandId: BrandId): { iso: string; ms: number } | null {
+  const path = betsPath(brandId);
+  if (!existsSync(path)) return null;
+  const content = readFileSync(path, "utf8");
 
   // Match every placed line for this slug (any derivative row ID).
   const linePattern = new RegExp(
@@ -73,12 +77,13 @@ function findLastPlacement(slug: string, platform: string): { iso: string; ms: n
 export function checkReuse(
   slug: string,
   platform: string,
-  minDaysOverride?: number
+  minDaysOverride?: number,
+  brandId: BrandId = "human-inference"
 ): ReuseCheckResult {
   const { global, perPlatform } = loadMinDays();
   const minDays = minDaysOverride ?? perPlatform[platform] ?? global;
 
-  const last = findLastPlacement(slug, platform);
+  const last = findLastPlacement(slug, platform, brandId);
   if (!last) return { allowed: true, minDays };
 
   const daysSince = (Date.now() - last.ms) / (1000 * 86_400);

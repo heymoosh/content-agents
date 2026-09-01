@@ -1,11 +1,22 @@
 ---
 name: strategy
-description: Build 0 — produce the weekly strategy brief from analytics data. Run after ingesting fresh analytics (or via /cycle).
+description: Build 0 — produce a brand-scoped weekly strategy brief from analytics data. Usage - /strategy --brand <human-inference|charles|fiction> [--account <provider/account>]. Run after ingesting fresh analytics (or via /cycle).
 ---
 
 # /strategy — generate the weekly strategy brief
 
-Produce `briefs/<today>-strategy-brief.md` from the analytics DB + community log. You (Claude)
+At entry, require exactly one canonical brand: `human-inference`, `charles`, or `fiction`.
+Reject a missing, unknown, inferred, or non-canonical brand; there is no Human Inference
+fallback. Accept an optional `--account <provider/account>` to narrow the read to one configured
+provider account. Every strategy command in this flow receives the same explicit `--brand` and,
+when supplied, `--account` arguments.
+This applies to every DB-backed report command below (`snapshot`, `resonance`, `platform-fit`,
+`media-fit`, `cadence-fit`, `frame-fit`, `cta-fit`, `lever-effectiveness`, `tag-source`,
+`origin-compare`, `audience`, `route`, `spin-control`, `explore`, `grade-bets`, and `link-bet`):
+pass `--brand <brand>` explicitly and pass `--account <provider/account>` when supplied. Never
+run a report against an implicit global/default brand.
+
+Produce `briefs/<brand>/<today>-strategy-brief.md` from the analytics DB + community log. You (Claude)
 do the judgment; scripts do the numbers. Never invent metrics — every claim must cite a real
 post or number from the script output.
 
@@ -14,42 +25,47 @@ em dashes, no "here's the thing", no thought-leader filler. Plain and direct. Th
 Muxin to read, so it should sound like a sharp analyst talking, not a content machine.
 
 **This brief is one turn of a loop, not a fresh start.** Before recommending anything new, you
-grade whether last cycle's bets paid off (Step 0). The `briefs/bets.md` ledger is the memory that
-makes `/cycle` compound instead of restarting every week.
+grade whether last cycle's bets paid off (Step 0). The `briefs/<brand>/bets.md` ledger is the
+memory that makes `/cycle` compound instead of restarting every week. Legacy top-level
+`briefs/` files, including `briefs/bets.md`, are unassigned and must not be read or imported.
 
 ## Steps
 
-0. **Grade the last cycle** (skip only if `briefs/` is empty — the very first run).
-   - Read the most recent prior brief in `briefs/` AND `briefs/bets.md`.
-   - Run `npm run grade-bets`. It scores every `open`/`carried` bet from analytics linked via
+0. **Grade the last cycle** (skip only if `briefs/<brand>/` is empty — the very first run for this brand).
+   - Read the most recent prior brief in `briefs/<brand>/` AND `briefs/<brand>/bets.md`.
+     Charles and Fiction must have their own strategy state; never borrow Human Inference state.
+     A missing brand ledger means first run for that brand, not fallback.
+   - Run `npm run grade-bets -- --brand <brand>` (plus `--account <provider/account>` when supplied). It scores every `open`/`carried` bet from analytics linked via
      `posts.bet_id`: sample size, avg engagement vs. the platform reference, weeks open, a verdict,
      and `SUGGEST_FLIP` / `SUGGEST_RETIRE` flags.
    - **Match published posts to bets first if needed.** For bets whose `Placed log` rows aren't yet
      reflected in the analytics (a post shipped last cycle now has metrics), find the analytics row
      for each placed derivative — match by the placed row's text prefix + platform + approximate
-     date against `npm run snapshot` output. Write the matches back with
-     `npm run link-bet -- '<json [{id, bet_id}]>'`, then re-run `npm run grade-bets`.
-   - In `briefs/bets.md`, append a `grade:` line (with today's date + the cited numbers) under each
+     date against `npm run snapshot -- --brand <brand>` output. Write the matches back with
+    `npm run link-bet -- --brand <brand> '<json [{id, bet_id}]>', then re-run `npm run grade-bets -- --brand <brand>` with the same scope.
+   - In `briefs/<brand>/bets.md`, append a `grade:` line (with today's date + the cited numbers) under each
      graded bet, update its `status` (`confirmed` / `failed` / `carried`), apply the
      `underperform_streak` updates the script prints, and **act on every flag** (flip/retire it, or
      write one sentence defending why you're keeping it — silence is not allowed).
 
-1. **Freshness check.** Run `npm run ingest` if `data/inbox/` has files. If `.env` has Bluesky
+1. **Freshness check.** Run `npm run pull -- --brand <brand> --ingest` if fresh browser exports are
+   needed, or run `npm run ingest -- --brand <brand> --account <configured measurement_account>`
+   for an existing inbox. Never run bare `npm run ingest`. If `.env` has Bluesky
    creds, run `npm run bluesky`. If `.env` has `SUBSTACK_HANDLE`, run `npm run new-notes` to pull
    the latest Substack Notes and refresh their engagement (Notes are Muxin's highest-engagement
    surface and appear in no export). If the DB is empty, stop and tell Muxin which exports to drop
    (see `docs/analytics-export-howto.md`).
 
-2. **Tag untagged posts.** Run `npm run snapshot -- --untagged`. If any posts are returned,
+2. **Tag untagged posts.** Run `npm run snapshot -- --brand <brand> --untagged` (plus account when supplied). If any posts are returned,
    assign each a pillar using the rubric in `config/pillars.yaml` (use `other` when unsure —
    don't force-fit), then write back:
-   `tsx src/db/tag-posts.ts '<json array of {id, pillar}>'`
+   `tsx src/db/tag-posts.ts --brand <brand> '<json array of {id, pillar}>'`
    For large batches, write the array to a temp file and pass the path.
 
 3. **Run the numbers.**
-   - `npm run snapshot` → channel performance + data-confidence table
-   - `npm run resonance` → pillar × platform map
-   - `npm run platform-fit` → strategy lever A (card c7638362, epic 2ce597d7): a ranked
+   - `npm run snapshot -- --brand <brand>` → channel performance + data-confidence table
+   - `npm run resonance -- --brand <brand>` → pillar × platform map
+   - `npm run platform-fit -- --brand <brand>` → strategy lever A (card c7638362, epic 2ce597d7): a ranked
      topic-platform fit RECOMMENDATION (lean in / steady / consider easing off / insufficient
      data), same underlying numbers as resonance + route's fit score, plus Muxin's seed priors
      from `config/strategy.yaml`. Recommendation only — it never changes what `/atomize` drafts;
@@ -58,7 +74,7 @@ makes `/cycle` compound instead of restarting every week.
      early signal into a directive. Fold the ranked table into the brief; where a read disagrees
      with `config/routing.yaml`'s defaults, surface it as a suggestion for Muxin to consider by
      hand, same posture as Routing drift flags below — never edit `config/routing.yaml` yourself.
-   - `npm run media-fit` → strategy lever B (card 27dc7d2d, epic 2ce597d7): a per-platform
+   - `npm run media-fit -- --brand <brand>` → strategy lever B (card 27dc7d2d, epic 2ce597d7): a per-platform
      RECOMMENDATION comparing text engagement against quote-card/video engagement (recency-weighted,
      `config/strategy.yaml`'s `media_thresholds`), labeled lean toward `<media>` / steady /
      insufficient data. Recommendation only — `/atomize`'s generation contract (always text +
@@ -70,39 +86,39 @@ makes `/cycle` compound instead of restarting every week.
      (e.g. "bluesky: video resonance running 2.1x text — flag `/video` as a strong option when
      atomizing bluesky-routed pieces") — `/atomize` step 2 already reads and applies these
      directives. `insufficient-data`/`steady` reads get no `media_mix` entry — don't manufacture one.
-   - `npm run cadence-fit` → strategy lever C (card ed23f712, epic 2ce597d7): per-platform
+   - `npm run cadence-fit -- --brand <brand>` → strategy lever C (card ed23f712, epic 2ce597d7): per-platform
      engagement TREND (climbing / steady / declining, recent 4wk vs prior 4wk) + peak posting
      HOUR (PT). Unlike lever A this one CAN reach `/publish`'s live scheduler, but only through
      `config/schedule-overrides.yaml` — `src/publish/slots.ts` ignores it entirely while
-     `approved: false` there. Run `npm run cadence-fit -- --write` to also propose numbers into
+     `approved: false` there. Run `npm run cadence-fit -- --brand <brand> --write` to also propose numbers into
      that file (still inert); Muxin reviews them and sets `approved: true` herself when she wants
      them live. Same overfitting guard as lever A: a thin window (n<3) or a synthetic/date-only
      timestamp platform (true today of X and LinkedIn — their analytics don't capture posting
      hour, only the date) always reads insufficient-data, never a forced trend/peak-hour read.
      Fold the ranked tables into the brief.
-   - `npm run frame-fit` → strategy lever D (card a4c5b42b, epic 2ce597d7): the card's original ask
+   - `npm run frame-fit -- --brand <brand>` → strategy lever D (card a4c5b42b, epic 2ce597d7): the card's original ask
      ("weight spin angles by conversion performance") isn't buildable today — angle is 1:1 with
      platform (no menu of angles to weight) and no conversion metric exists in the analytics DB —
      so this instead compares the always-on spin frame against the verbatim control baseline
-     (`npm run spin-control`), by engagement, per platform: frame-winning / even / frame-losing /
+     (`npm run spin-control -- --brand <brand>`), by engagement, per platform: frame-winning / even / frame-losing /
      insufficient data. Recommendation only — `src/atomize/spin.ts`'s per-platform angle is
      untouched. Because `posts.source` is untagged on most distributed posts until `tag-source`
      runs, and control coverage accrues slowly (one pick per calendar month), expect mostly
      insufficient-data today — that's the honest read, not a bug. Fold the ranked table into the
      brief; case-skeleton/directive-level angle weighting is deferred until those tags are
      persisted to the DB (see the follow-up card filed alongside this lever).
-   - `npm run cta-fit` → strategy lever E (card d80411bc, epic 2ce597d7): SCAFFOLD, not a live
+   - `npm run cta-fit -- --brand <brand>` → strategy lever E (card d80411bc, epic 2ce597d7): SCAFFOLD, not a live
      signal yet. The card's original ask ("score CTA click-through + lead-gen effectiveness per
      platform") isn't buildable today — no click/conversion metric survives ingest, same wall
      lever D hit — and which CTA destination a post used was never persisted before this card. It
-     now rides along on the bets.md Placed-log (`| cta:<dest>` marker, read back by `tag-source`
+     now rides along on this brand's `briefs/<brand>/bets.md` Placed-log (`| cta:<dest>` marker, read back by `tag-source`
      onto `posts.cta_destination`), so future CTA-tagged posts accumulate real data. Compares
      per-platform engagement across the three CTA destinations (source/project/work_with_me):
      clear-winner / even / insufficient-data, same overfitting guard as lever D. Expect
      insufficient-data on every platform until enough CTA-tagged posts ship — that's the honest
      state, not a bug. Recommendation only — `src/publish/cta.ts`'s resolution is untouched. Fold
      the ranked table into the brief.
-   - `npm run lever-effectiveness` → strategy-lever validation (card 83166c51, epic 2ce597d7):
+   - `npm run lever-effectiveness -- --brand <brand>` → strategy-lever validation (card 83166c51, epic 2ce597d7):
      answers "do the 5 levers this epic built actually measure something?" by combining lever C's,
      D's, and E's real computed deltas (the same reads `npm run cadence-fit`/`npm run frame-fit`/
      `npm run cta-fit` print, reused not recomputed) into one report, plus an explicit
@@ -117,29 +133,29 @@ makes `/cycle` compound instead of restarting every week.
      on demand — not required every cycle; when run, fold its three tables + A/B tracking-gap note
      into a `## Lever effectiveness` brief section if Muxin wants it in that cycle's brief,
      otherwise just show it to her directly.
-   - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
+   - `npm run tag-source -- --brand <brand>` → classify each post's origin: atomized (shipped by /publish from a
      content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
      `Placed log` + `posts.bet_id`. Also stamps `posts.cta_destination` from the same Placed-log
      rows' `| cta:<dest>` marker (card d80411bc, lever E).
-   - `npm run origin-compare` → verbatim-atomized vs spin vs organic engagement per platform.
+   - `npm run origin-compare -- --brand <brand>` → verbatim-atomized vs spin vs organic engagement per platform.
      Answers "is atomizing earning traction, or is Muxin better off posting natively?" Observational;
      flags INSUFFICIENT groups — don't over-read a gap. It also prints a **Spin control readiness**
      line: spin is the always-on default now, so the verbatim `--no-spin` control is what gets rare.
      If it flags **Spin lift not yet measurable**, the verbatim control is too thin (< n=10) on a
      platform where spin has volume — surface a nudge to run occasional `/atomize --no-spin` controls
      (see Step 4). If control is adequate, just read the comparison off the table.
-   - `npm run audience` → who follows you: LinkedIn demographics + follower/subscriber totals &
+   - `npm run audience -- --brand <brand>` → who follows you: LinkedIn demographics + follower/subscriber totals &
      growth (demographics are LinkedIn-only; X/Bluesky give counts, Substack free/paid)
-   - `npm run route -- --all` → routing map (where each pillar should post; the include/skip
+   - `npm run route -- --brand <brand> --all` → routing map (where each pillar should post; the include/skip
      gate `/atomize` applies, from this data + `config/routing.yaml`). Decisions are always
      defaults-driven now (score never overrides `config/routing.yaml`'s defaults list, in either
      direction) — see the next line for how a persistent data/defaults mismatch surfaces instead.
-   - `npm run route -- --flags` → routing drift flags: pillar/platform pairs where the fit score
+   - `npm run route -- --brand <brand> --flags` → routing drift flags: pillar/platform pairs where the fit score
      persistently diverges from `config/routing.yaml`'s defaults across two independent ~4-week
      windows (not one noisy snapshot). Computed/printed only — never writes to
      `config/routing.yaml` or `config/platforms.yaml`. A flag is a prompt for Muxin to reconsider
      the defaults by hand, not an auto-change.
-   - `npm run spin-control` → spin-control run (card f444f440): picks and records this month's due
+   - `npm run spin-control -- --brand <brand>` → spin-control run (card f444f440): picks and records this month's due
      verbatim control run for whichever already-assigned pillar/platform pair
      (`config/routing.yaml` defaults) has gone longest without one (idempotent, a control run
      already picked this calendar month just prints a skip line). When it prints a pick, add a
@@ -151,12 +167,12 @@ makes `/cycle` compound instead of restarting every week.
      no-spin-control availability permanently reads false, since Spin's always-on default means a
      plain verbatim post no longer happens on its own. `/strategy` only surfaces the pick, it
      never drafts content itself.
-   - `npm run spin-control -- --coverage` → accumulated spin-control engagement (card f444f440):
+   - `npm run spin-control -- --brand <brand> --coverage` → accumulated spin-control engagement (card f444f440):
      per already-assigned pillar/platform pair with a deliberate control run, tracked separately
      from the pillar/platform resonance figures and the routing drift flag above — a control run's
      engagement never feeds either. Prints nothing until a pair reaches n>=3 control runs; a bare
      "no pair has reached n>=3" needs no brief section.
-   - `npm run explore` → exploration budget (card 92bb2ae6): picks and records this month's due
+   - `npm run explore -- --brand <brand>` → exploration budget (card 92bb2ae6): picks and records this month's due
      off-assignment probe for LinkedIn and for Bluesky (idempotent, a platform already probed
      this calendar month just prints a skip line). When it prints a pick, add a [TEST]
      recommendation in Step 4 naming the platform + pillar: next time Muxin atomizes a piece,
@@ -165,15 +181,15 @@ makes `/cycle` compound instead of restarting every week.
      stamp that derivative's frontmatter `exploration_probe: true` before it reaches
      `review-queue.md` (see `.claude/skills/atomize/SKILL.md` step 3.5). `/strategy` only
      surfaces the pick, it never drafts content itself.
-   - `npm run explore -- --coverage` → exploration-budget coverage (card 92bb2ae6): accumulated
-     engagement (n, avg) per off-assignment pillar/platform pair probed by `npm run explore`
+   - `npm run explore -- --brand <brand> --coverage` → exploration-budget coverage (card 92bb2ae6): accumulated
+   engagement (n, avg) per off-assignment pillar/platform pair probed by `npm run explore -- --brand <brand>`
      (LinkedIn/Bluesky's untested pillars, derived live from `config/routing.yaml`'s defaults).
      This is a SEPARATE bucket from the topic resonance map and routing drift flags above — an
      exploration probe's engagement never feeds either. Prints nothing until an untested pillar
      reaches n>=3 probes; a bare "no untested pillar has reached n>=3" needs no brief section.
    - Read `data/community-log.md` (manual observations — treat as qualitative signal)
 
-4. **Write the brief** to `briefs/YYYY-MM-DD-strategy-brief.md`:
+4. **Write the brief** to `briefs/<brand>/YYYY-MM-DD-strategy-brief.md`:
 
    ```markdown
    # Strategy Brief — YYYY-MM-DD
@@ -249,7 +265,7 @@ makes `/cycle` compound instead of restarting every week.
     lever that can actually reach the live scheduler — but only via config/schedule-overrides.yaml,
     and only once Muxin sets `approved: true` there herself. Always end this section with: "To
     activate: review the proposed values in config/schedule-overrides.yaml (run
-    `npm run cadence-fit -- --write` to refresh them first), set approved: true, commit. Nothing
+    `npm run cadence-fit -- --brand <brand> --write` to refresh them first), set approved: true, commit. Nothing
     changes your posting cadence or times until you do.">
 
    ## Frame-fit signal (lever D)
@@ -270,7 +286,7 @@ makes `/cycle` compound instead of restarting every week.
     that platform, not an instruction to do so automatically (live consumption is a follow-up).>
 
    ## Spin-control coverage
-   <only include this section if `npm run spin-control -- --coverage` printed at least one row
+   <only include this section if `npm run spin-control -- --brand <brand> --coverage` printed at least one row
     (some already-assigned pillar/platform pair reached n>=3 control runs) — omit the section
     entirely otherwise, don't manufacture a placeholder. When present: the coverage table verbatim
     + 1-2 sentences on whether the control runs show the spin angle is landing or not for that
@@ -278,7 +294,7 @@ makes `/cycle` compound instead of restarting every week.
     never folded into, the Topic resonance map or Routing drift flags above.>
 
    ## Exploration coverage
-   <only include this section if `npm run explore -- --coverage` printed at least one row (some
+   <only include this section if `npm run explore -- --brand <brand> --coverage` printed at least one row (some
     untested pillar reached n>=3 probes) — omit the section entirely otherwise, don't manufacture
     a placeholder. When present: the coverage table verbatim + 1-2 sentences on whether an
     off-assignment pillar/platform pair is worth promoting into config/routing.yaml's defaults
@@ -311,11 +327,13 @@ makes `/cycle` compound instead of restarting every week.
    its existing quote+image-variant and `/video`-suggestion judgment calls, never a rule.
 
 5. **Record this cycle's bets.** For each new recommendation, append a bet block to the `## Bets`
-   section of `briefs/bets.md` so next cycle can grade it:
+   section of `briefs/<brand>/bets.md` so next cycle can grade it. Create that brand directory and
+   ledger when needed. Never create or read the legacy top-level `briefs/bets.md`:
 
    ```markdown
    ## bet:YYYY-MM-DD-NNN
-   brief: briefs/YYYY-MM-DD-strategy-brief.md
+   brand: <brand>
+   brief: briefs/<brand>/YYYY-MM-DD-strategy-brief.md
    type: DO_MORE | TEST | DO_LESS
    claim: "<the recommendation in one line>"
    hypothesis_metric: <the measurable bar, e.g. "avg replies per claude-code X post > 4">
@@ -345,10 +363,10 @@ makes `/cycle` compound instead of restarting every week.
      array to a temp file and pass the path rather than inlining it as a single-quoted shell arg —
      an apostrophe in the text ("doesn't", "Muxin's") would otherwise break the shell command:
      ```
-     npm run angle-refresh -- /tmp/angle-candidates.json
+     npm run angle-refresh -- /tmp/angle-candidates.json --brand <brand>
      ```
    - Show the printed report to Muxin, and append it verbatim under a `## Angle drift check` section
-     at the end of this cycle's `briefs/YYYY-MM-DD-strategy-brief.md` (or a one-line "skipped — no
+     at the end of this cycle's `briefs/<brand>/YYYY-MM-DD-strategy-brief.md` (or a one-line "skipped — no
      content-ideas notes this cycle" if this step didn't run) so a later read of the brief file shows
      whether the check ran and what it found, not just the chat transcript. A "no drift" result needs
      no follow-up. A drifted channel is a suggestion for Muxin's own re-approval, same posture as the
