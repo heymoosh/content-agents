@@ -61,11 +61,15 @@ export async function createStoryDraftPr(input: StoryPrInput): Promise<StoryPull
   if (!/(?:^|@)github\.com[:/][^/]+\/[^/]+(?:\.git)?$/i.test(remote)) throw new Error("origin is not a GitHub repository; refusing to create story PR");
   const existing = await run("gh", ["pr", "list", "--state", "open", "--head", branch, "--json", "number,url,title,isDraft,headRefName"]);
   if (existing.code === 0) {
+    let rows: Array<{ number: number; url: string; title?: string; isDraft?: boolean; headRefName?: string }>;
     try {
-      const rows = JSON.parse(existing.stdout) as Array<{ number: number; url: string; title?: string; isDraft?: boolean; headRefName?: string }>;
-      const found = rows.find((row) => row.headRefName === undefined || row.headRefName === branch);
-      if (found) return { number: found.number, url: found.url, title: found.title, branch, isDraft: found.isDraft !== false };
+      rows = JSON.parse(existing.stdout) as typeof rows;
     } catch { throw new Error("gh returned malformed PR list; refusing to create a duplicate"); }
+    const found = rows.find((row) => row.headRefName === undefined || row.headRefName === branch);
+    if (found) {
+      if (found.isDraft !== true) throw new Error(`an open non-draft PR already exists for ${branch}; refusing to use it for fiction review`);
+      return { number: found.number, url: found.url, title: found.title, branch, isDraft: true };
+    }
   } else if (!/no pull requests found/i.test(existing.stderr)) {
     throw new Error(`gh pr list failed: ${existing.stderr.trim() || `exit ${existing.code}`}`);
   }
@@ -116,13 +120,13 @@ export async function verifyStoryReviewPr(input: VerifyStoryReviewPrInput): Prom
   const output = required(await run("gh", ["pr", "view", String(input.prNumber), "--json", "number,url,state,isDraft,headRefName,headRefOid,baseRefName"]), "gh pr view");
   let pr: { number: number; url: string; state: string; isDraft?: boolean; headRefName: string; headRefOid: string; baseRefName: string };
   try { pr = JSON.parse(output); } catch { throw new Error("gh returned malformed PR metadata"); }
-  if (pr.state !== "OPEN" || pr.headRefName !== branch || pr.baseRefName !== base) {
+  if (pr.state !== "OPEN" || pr.isDraft !== true || pr.headRefName !== branch || pr.baseRefName !== base) {
     throw new Error(`pull request ${input.prNumber} does not review ${branch} into ${base}`);
   }
   if (!pr.headRefOid || pr.headRefOid !== localHead) {
     throw new Error("local HEAD does not match the pull request head; pull the review branch before applying comments");
   }
-  return { number: pr.number, url: pr.url, branch, title: undefined, isDraft: pr.isDraft !== false };
+  return { number: pr.number, url: pr.url, branch, title: undefined, isDraft: true };
 }
 
 export async function listStoryReviewComments(prNumber: number, repoRoot = process.cwd(), run?: CommandRunner): Promise<ReviewComment[]> {

@@ -35,6 +35,8 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { handleVentureRead } from "./venture-reads.js";
 import { handleVentureWrite } from "./venture-writes.js";
 import { buildFollowups, markResponded, markContacted, markSent, moveOn, isBucket, type TrackerEvent } from "../outreach/tracker.js";
+import { deliverLockedGmailMessage, reconcileLockedGmailMessage } from "../outreach/gmail-delivery.js";
+import type { GmailSendRequest, GmailSendResult } from "../providers/email/gmail.js";
 import {
   enrich,
   listPieces,
@@ -773,6 +775,18 @@ export function isValidMessageFile(file: string): boolean {
   return /^messages\/message-\d+\.md$/.test(file);
 }
 
+export function outreachGmailAvailability(env: NodeJS.ProcessEnv = process.env): { configured: boolean; account: string } {
+  const clientId = env.GMAIL_CLIENT_ID ?? env.GOOGLE_CLIENT_ID;
+  const clientSecret = env.GMAIL_CLIENT_SECRET ?? env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = env.GMAIL_REFRESH_TOKEN ?? env.GOOGLE_REFRESH_TOKEN;
+  return { configured: Boolean(clientId && clientSecret && refreshToken), account: "muxin.li.pro@gmail.com" };
+}
+
+export function outreachGmailConnection(env: NodeJS.ProcessEnv = process.env): { account: string; authenticated: boolean; sendPermission: boolean } {
+  const availability = outreachGmailAvailability(env);
+  return { account: availability.account, authenticated: availability.configured, sendPermission: availability.configured };
+}
+
 /** Record the first manual send from server-owned lead/message facts; this never transmits data. */
 export function recordOutreachInitialSend(
   dir: string,
@@ -789,6 +803,65 @@ export function recordOutreachInitialSend(
     message: message.file || undefined,
     note: "Sent by hand from the Outreach composer",
   });
+}
+
+export function recordOutreachGmailSend(
+  dir: string,
+  detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
+  providerMessageId: string | undefined,
+  record: (bucket: "client" | "platform", lead: string, opts: { person?: string; channel?: string; message?: string; note?: string }) => TrackerEvent = markSent,
+): TrackerEvent {
+  if (!isValidLeadDir(dir)) throw new Error("not a valid outreach lead folder");
+  if (detail.kind !== "client" && detail.kind !== "platform") throw new Error("this item is not an outreach lead");
+  const message = detail.latestMessage;
+  if (!message || message.status !== "locked") throw new Error("lock the outreach message before sending it");
+  return record(detail.kind, basename(dir), {
+    person: message.recipient || detail.contacts[0]?.name || undefined,
+    channel: "email",
+    message: message.file,
+    note: providerMessageId ? `Delivered by Gmail (${providerMessageId})` : "Delivered by Gmail",
+  });
+}
+
+type GmailDeliveryResult = GmailSendResult | { status: "already_delivered" | "uncertain" };
+
+function lockedGmailRequest(dir: string, detail: Pick<LeadDetail, "latestMessage">, input: { to: string; subject: string }): GmailSendRequest {
+  const message = detail.latestMessage;
+  if (!message || message.status !== "locked") throw new Error("lock the outreach message before sending it");
+  return { to: input.to.trim(), subject: input.subject.trim(), body: message.body, messageId: `${basename(dir)}:${message.file}` };
+}
+
+export async function sendLockedOutreachEmail(
+  dir: string,
+  detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
+  input: { to: string; subject: string },
+  deliver: (request: GmailSendRequest) => Promise<GmailDeliveryResult> = deliverLockedGmailMessage,
+  record: Parameters<typeof recordOutreachGmailSend>[3] = markSent,
+): Promise<{ delivery: GmailDeliveryResult; event: TrackerEvent | null }> {
+  if (!isValidLeadDir(dir)) throw new Error("not a valid outreach lead folder");
+  const message = detail.latestMessage;
+  if (!message || message.status !== "locked") throw new Error("lock the outreach message before sending it");
+  if (message.channel.toLowerCase() !== "email") throw new Error("Gmail delivery is available only for email messages");
+  const to = input.to.trim();
+  const subject = input.subject.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error("enter a valid recipient email address");
+  if (!subject) throw new Error("enter an email subject");
+  const delivery = await deliver(lockedGmailRequest(dir, detail, { to, subject }));
+  if ("status" in delivery && delivery.status === "uncertain") return { delivery, event: null };
+  const providerMessageId = "providerMessageId" in delivery ? delivery.providerMessageId : undefined;
+  return { delivery, event: recordOutreachGmailSend(dir, detail, providerMessageId, record) };
+}
+
+export async function reconcileLockedOutreachEmail(
+  dir: string,
+  detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
+  input: { to: string; subject: string },
+  reconcile: (request: GmailSendRequest) => Promise<GmailSendResult | { status: "uncertain" }> = reconcileLockedGmailMessage,
+  record: Parameters<typeof recordOutreachGmailSend>[3] = markSent,
+): Promise<{ delivery: GmailSendResult | { status: "uncertain" }; event: TrackerEvent | null }> {
+  const delivery = await reconcile(lockedGmailRequest(dir, detail, input));
+  if ("status" in delivery) return { delivery, event: null };
+  return { delivery, event: recordOutreachGmailSend(dir, detail, delivery.providerMessageId, record) };
 }
 
 // A typed direction is a sentence or two about what she wants said, not a pasted document. The cap
@@ -1708,7 +1781,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     // CLI-only (`/outreach` skill, `npm run outreach:*`, `/scout` for discovery) -- this endpoint
     // only reads; the two POST endpoints below are the entire write surface this tab gets.
     if (req.method === "GET" && url.pathname === "/api/outreach/leads") {
-      json(res, 200, { ok: true, leads: listLeadDetails() });
+      json(res, 200, { ok: true, leads: listLeadDetails(), gmail: outreachGmailConnection() });
       return;
     }
     // Muxin's own pursue/pass call on a lead -- the token-spend gate: nothing downstream (a draft
@@ -1866,6 +1939,38 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         json(res, 200, { ok: true, event });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/outreach/send-gmail") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      if (!isValidLeadDir(dir)) {
+        json(res, 400, { ok: false, error: "not a valid outreach lead folder" });
+        return;
+      }
+      if (b.confirm !== true) {
+        json(res, 400, { ok: false, error: "explicit Gmail send confirmation is required" });
+        return;
+      }
+      if (!outreachGmailAvailability().configured) {
+        json(res, 503, { ok: false, error: "Gmail is not configured. Use the manual send fallback." });
+        return;
+      }
+      try {
+        const result = await sendLockedOutreachEmail(dir, readLeadDetail(dir), { to: String(b.to ?? ""), subject: String(b.subject ?? "") });
+        if ("status" in result.delivery && result.delivery.status === "uncertain") {
+          const reconciled = await reconcileLockedOutreachEmail(dir, readLeadDetail(dir), { to: String(b.to ?? ""), subject: String(b.subject ?? "") });
+          if (!("status" in reconciled.delivery)) {
+            json(res, 200, { ok: true, reconciled: true, delivery: reconciled.delivery, event: reconciled.event });
+            return;
+          }
+          json(res, 202, { ok: false, uncertain: true, error: "Gmail delivery is uncertain. Sent mail has no authoritative match yet. Do not retry; use this same control later to reconcile again." });
+          return;
+        }
+        json(res, 200, { ok: true, delivery: result.delivery, event: result.event });
+      } catch (e) {
+        json(res, 502, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
       return;
     }

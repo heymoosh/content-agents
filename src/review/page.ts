@@ -2162,6 +2162,7 @@ $("#rawPullBtn").addEventListener("click", pullFresh);
 // tell the page you sent it by hand. Nothing here contacts anyone.
 // The helpers below mirror the exported ones in page.ts; keep both sides in step by hand.
 let OUTREACH_LEADS = null;
+let OUTREACH_GMAIL = null;
 let OUTREACH_TOUCH = {};       // lead dir → newest tracker lastTouch, from /api/followups
 let activeLeadDir = null;      // null = the triage queue; a dir = that lead's thread
 let scoutInFlight = false;
@@ -2412,7 +2413,10 @@ function sendStepsHtml(l){
   if(state === "draft"){
     return '<div class="send-steps"><button class="primary out-lock" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'"'+(pending?" disabled":"")+'>'+(pending?"Locking…":"Lock this message")+'</button>'+note+'</div>';
   }
-  return '<div class="send-steps"><button type="button" class="out-copy" data-dir="'+esc(l.dir)+'">Copy message</button><button type="button" class="primary out-mark-sent" data-dir="'+esc(l.dir)+'">I sent this by hand</button>'+note+'</div>';
+  const gmail = OUTREACH_GMAIL && OUTREACH_GMAIL.account === "muxin.li.pro@gmail.com" && OUTREACH_GMAIL.authenticated === true && OUTREACH_GMAIL.sendPermission === true && String(msg.channel||"").toLowerCase() === "email"
+    ? '<div class="gmail-send"><input class="gmail-to" type="email" autocomplete="off" placeholder="recipient@example.com" aria-label="Recipient email"><input class="gmail-subject" autocomplete="off" placeholder="Subject" aria-label="Email subject"><button type="button" class="primary out-send-gmail" data-dir="'+esc(l.dir)+'">Send with Gmail</button><span class="send-note">Sends from muxin.li.pro@gmail.com only after confirmation.</span></div>'
+    : "";
+  return '<div class="send-steps"><button type="button" class="out-copy" data-dir="'+esc(l.dir)+'">Copy message</button><button type="button" class="primary out-mark-sent" data-dir="'+esc(l.dir)+'">I sent this by hand</button>'+gmail+note+'</div>';
 }
 
 function whoBoxHtml(l){
@@ -2496,6 +2500,7 @@ function renderOutreachBox(){
   box.querySelectorAll("button.out-lock").forEach(b=>b.addEventListener("click", ()=>outreachLock(b.dataset.dir, b.dataset.file)));
   box.querySelectorAll("button.out-copy").forEach(b=>b.addEventListener("click", ()=>outreachCopy(b.dataset.dir)));
   box.querySelectorAll("button.out-mark-sent").forEach(b=>b.addEventListener("click", ()=>outreachMarkSent(b.dataset.dir, b)));
+  box.querySelectorAll("button.out-send-gmail").forEach(b=>b.addEventListener("click", ()=>outreachSendGmail(b.dataset.dir, b)));
   box.querySelectorAll("button.lead-note-save").forEach(b=>b.addEventListener("click", ()=>outreachSaveNote(b)));
   box.querySelectorAll("button.msg-save").forEach(b=>b.addEventListener("click", ()=>outreachMsgSave(b)));
   box.querySelectorAll("button.msg-revise").forEach(b=>b.addEventListener("click", ()=>{
@@ -2529,6 +2534,26 @@ async function outreachMarkSent(dir, button){
     const r = await post("/api/outreach/mark-sent", {dir:lead.dir});
     if(!r.ok){ button.disabled=false; flash(r.error||"Could not record the send"); return; }
     flash("Send recorded. Follow-ups will remind you when it is time to check back.");
+    await loadOutreach();
+  } catch (e) {
+    button.disabled=false;
+    flash(e instanceof Error ? e.message : String(e));
+  }
+}
+
+async function outreachSendGmail(dir, button){
+  const lead = (OUTREACH_LEADS||[]).find(l=>l.dir===dir);
+  const wrap = button.closest(".gmail-send");
+  const to = wrap ? wrap.querySelector(".gmail-to").value.trim() : "";
+  const subject = wrap ? wrap.querySelector(".gmail-subject").value.trim() : "";
+  if(!lead || !lead.latestMessage){ flash("No locked email to send"); return; }
+  if(!to || !subject){ flash("Enter the recipient email and subject"); return; }
+  if(!window.confirm("Send this locked message now from muxin.li.pro@gmail.com to "+to+"?")) return;
+  button.disabled = true;
+  try {
+    const r = await post("/api/outreach/send-gmail", {dir:lead.dir, to, subject, confirm:true});
+    if(!r.ok){ button.disabled=false; flash(r.error||"Could not send with Gmail"); return; }
+    flash("Sent with Gmail. Follow-ups now reflect the confirmed send.");
     await loadOutreach();
   } catch (e) {
     button.disabled=false;
@@ -2643,6 +2668,7 @@ async function loadOutreach(){
     if(!leadsRes.ok) throw new Error("outreach "+leadsRes.status);
     const d = await leadsRes.json();
     OUTREACH_LEADS = d.leads || [];
+    OUTREACH_GMAIL = d.gmail || null;
     OUTREACH_TOUCH = {};
     if(fuRes && fuRes.ok){
       try {
@@ -3041,7 +3067,7 @@ async function cwLoadTreatment(){
   try {
     const [r, signals] = await Promise.all([
       fetch("/api/content/treatment?slug="+encodeURIComponent(slug)),
-      fetch("/api/signals").then(x=>x.json()).catch(()=>null),
+      fetch("/api/signals?brand=human-inference").then(x=>x.json()).catch(()=>null),
     ]);
     const d = await r.json();
     CW.signalDefaults = signals && signals.contentDefaults || null;
@@ -3396,7 +3422,7 @@ async function loadVenture(){
   const requestedSlug = ventureSlug;
   showRoomLoading("ventureThread");
   try {
-    const [r, signalsResponse, learningResponse, sourceResponse] = await Promise.all([fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread"), fetch("/api/signals").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-evaluations").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-sources").catch(()=>null)]);
+    const [r, signalsResponse, learningResponse, sourceResponse] = await Promise.all([fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread"), fetch("/api/signals?brand=human-inference").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-evaluations").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-sources").catch(()=>null)]);
     if(!r.ok) throw new Error("venture "+r.status);
     const j = await r.json();
     if(requestedSlug !== ventureSlug){ hideRoomLoading("ventureThread"); return; }

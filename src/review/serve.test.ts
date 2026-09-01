@@ -37,6 +37,9 @@ import {
   requestAnalysisEngine,
   requestInteractiveAnalysisEngine,
   recordOutreachInitialSend,
+  recordOutreachGmailSend,
+  sendLockedOutreachEmail,
+  reconcileLockedOutreachEmail,
   reviewRequestHandler,
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
@@ -92,6 +95,84 @@ test("manual initial outreach sends use the folder slug and contacted event meta
   assert.throws(() => recordOutreachInitialSend("outreach/leads/platform-moral-ambition", {
     kind: "platform", latestMessage: { file: "messages/message-01.md", channel: "email", status: "draft", recipient: "", body: "Hello" }, contacts: [],
   }, (() => ({}) as never)), /lock/i);
+});
+
+test("Gmail sends require a locked email and record confirmed provider delivery", async () => {
+  const detail = {
+    kind: "client" as const,
+    latestMessage: { file: "messages/message-01.md", channel: "email", status: "locked", recipient: "Jane Doe", body: "Hello" },
+    contacts: [],
+  };
+  let request: unknown;
+  let recorded: unknown;
+  const result = await sendLockedOutreachEmail(
+    "outreach/leads/client-example",
+    detail,
+    { to: "jane@example.com", subject: "A quick note" },
+    async (value) => { request = value; return { provider: "gmail", account: "muxin.li.pro@gmail.com", providerMessageId: "gmail-1" }; },
+    (bucket, lead, opts) => {
+      recorded = { bucket, lead, opts };
+      return { ts: "2026-09-01T00:00:00.000Z", bucket, lead, event: "contacted", ...opts } as never;
+    },
+  );
+  assert.deepEqual(request, { to: "jane@example.com", subject: "A quick note", body: "Hello", messageId: "client-example:messages/message-01.md" });
+  assert.equal(result.event?.event, "contacted");
+  assert.deepEqual(recorded, { bucket: "client", lead: "client-example", opts: { person: "Jane Doe", channel: "email", message: "messages/message-01.md", note: "Delivered by Gmail (gmail-1)" } });
+  await assert.rejects(() => sendLockedOutreachEmail("outreach/leads/client-example", { ...detail, latestMessage: { ...detail.latestMessage, status: "draft" } }, { to: "jane@example.com", subject: "Hi" }, async () => ({ status: "already_delivered" })), /lock/i);
+});
+
+test("uncertain Gmail delivery never advances the follow-up clock", async () => {
+  let recorded = false;
+  const result = await sendLockedOutreachEmail(
+    "outreach/leads/platform-example",
+    { kind: "platform", latestMessage: { file: "messages/message-01.md", channel: "email", status: "locked", recipient: "", body: "Hello" }, contacts: [] },
+    { to: "jane@example.com", subject: "Hi" },
+    async () => ({ status: "uncertain" }),
+    (() => { recorded = true; return {} as never; }),
+  );
+  assert.equal(result.event, null);
+  assert.equal(recorded, false);
+});
+
+test("reconciled Gmail delivery advances the follow-up clock only after a Sent-mail match", async () => {
+  let recorded = false;
+  const detail = { kind: "client" as const, latestMessage: { file: "messages/message-01.md", channel: "email", status: "locked", recipient: "Jane", body: "Hello" }, contacts: [] };
+  const uncertain = await reconcileLockedOutreachEmail("outreach/leads/client-example", detail, { to: "jane@example.com", subject: "Hi" }, async () => ({ status: "uncertain" }), (() => { recorded = true; return {} as never; }));
+  assert.equal(uncertain.event, null);
+  assert.equal(recorded, false);
+  const confirmed = await reconcileLockedOutreachEmail("outreach/leads/client-example", detail, { to: "jane@example.com", subject: "Hi" }, async () => ({ provider: "gmail", account: "muxin.li.pro@gmail.com", providerMessageId: "found-1" }), (() => { recorded = true; return { event: "contacted" } as never; }));
+  assert.equal(confirmed.event?.event, "contacted");
+  assert.equal(recorded, true);
+});
+
+test("Outreach Gmail browser path requires confirmation and preserves the manual fallback", () => {
+  const server = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const page = readFileSync(new URL("./page.ts", import.meta.url), "utf8");
+  assert.ok(server.includes('url.pathname === "/api/outreach/send-gmail"'));
+  assert.match(server, /b\.confirm !== true/);
+  assert.match(server, /reconcileLockedOutreachEmail/);
+  assert.match(page, /window\.confirm\("Send this locked message now/);
+  assert.match(page, /\/api\/outreach\/send-gmail/);
+  assert.match(page, /I sent this by hand/);
+});
+
+test("Outreach Gmail HTTP route rejects a request without explicit confirmation before dispatch", async () => {
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/outreach/send-gmail`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dir: "outreach/leads/client-example", to: "person@example.com", subject: "Hello" }),
+    });
+    const body = await response.json() as { ok?: boolean; error?: string };
+    assert.equal(response.status, 400);
+    assert.equal(body.ok, false);
+    assert.match(body.error ?? "", /confirmation/i);
+  } finally {
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+  }
 });
 
 test("fiction promotion handoff requires an approved promotional final", () => {

@@ -144,7 +144,7 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
     const body = await readBody(req);
     try {
       const brand = bodyBrand(body);
-      const engine = isEngine(body.engine) ? body.engine : "codex";
+      const engine = body.engine === "claude" || body.engine === "grok" || body.engine === "codex" ? body.engine : "codex";
       if (!interpretExperiment) throw new Error("Signals experiment interpretation runner is unavailable");
       const result = await interpretExperiment(id, engine);
       if (result.experimentId !== id) throw new Error("Signals interpretation returned a different experiment id");

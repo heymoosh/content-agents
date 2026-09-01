@@ -149,7 +149,7 @@ export function recordExperimentInterpretation(
   const experimentId = text(input.experimentId, "experimentId");
   if (!["keep", "revise", "reject"].includes(input.recommendation)) throw new Error("interpretation recommendation is invalid");
   if (!["low", "medium", "high"].includes(input.confidence)) throw new Error("interpretation confidence is invalid");
-  if (!["claude", "grok", "codex", "ollama-gpt-oss"].includes(input.engine)) throw new Error("interpretation engine is invalid");
+  if (!["claude", "grok", "codex"].includes(input.engine)) throw new Error("GPT-OSS is read-only and cannot interpret or persist experiment results");
   const identity = {
     kind: "signals_experiment_interpretation" as const,
     version: SIGNALS_EXPERIMENT_INTERPRETATION_VERSION,

@@ -48,7 +48,7 @@ test("Signals Venture handoff decision returns the named Venture and never write
     assert.equal(h.response()?.code, 200);
     assert.deepEqual((h.response()?.value as any).openVenture, "venture-a");
     assert.equal((h.response()?.value as any).proposal.status, "adopted");
-    const read = harness("GET", "/api/signals");
+    const read = harness("GET", "/api/signals?brand=human-inference");
     await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), ventureHandoffsPath: handoffs, proposalsPath: join(root, "changes"), experimentPlansPath: join(root, "plans") });
     assert.equal((read.response()?.value as any).ventureHandoffs[0].status, "adopted");
     assert.equal((read.response()?.value as any).ventureHandoffs[0].ventureGate, "blocked");
@@ -154,7 +154,7 @@ test("Signals read fails closed on a corrupt Venture handoff ledger", async () =
   const path = join(root, "handoffs.jsonl");
   try {
     writeFileSync(path, "{not-json}\n");
-    const read = harness("GET", "/api/signals");
+    const read = harness("GET", "/api/signals?brand=human-inference");
     await assert.rejects(() => handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), proposalsPath: join(root, "changes"), experimentPlansPath: join(root, "plans"), ventureHandoffsPath: path }));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

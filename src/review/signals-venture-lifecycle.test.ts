@@ -70,7 +70,7 @@ test("measured Signals proposal can be adopted and accepted without changing Ven
     appendCanonEvent(SLUG, "kickoff", `${SLUG}/kickoff`, { rules_version: loadRules().rules_version }, AT);
     mkdirSync(briefsPath, { recursive: true });
     const stateBefore = computeState(SLUG);
-    const signalsBefore = readSignals(briefsPath);
+    const signalsBefore = readSignals("human-inference", briefsPath);
     const winnerBefore = { interpretation: loadExperimentInterpretation(EXPERIMENT, resultsPath).winner, autoWinner: loadExperimentInterpretation(EXPERIMENT, resultsPath).autoWinner };
 
     const proposalRequest = harness("POST", `/api/signals/experiments/${EXPERIMENT}/venture-handoff/propose`, { ventureSlug: SLUG, phase: 1 });
@@ -99,7 +99,7 @@ test("measured Signals proposal can be adopted and accepted without changing Ven
     assert.equal(readArtifacts(SLUG).length, 1);
     assert.equal(readCanonEvents(SLUG).filter((event) => event.type === "signals-input-decision").length, 1);
     assert.deepEqual(computeState(SLUG), stateBefore);
-    assert.deepEqual(readSignals(briefsPath), signalsBefore);
+    assert.deepEqual(readSignals("human-inference", briefsPath), signalsBefore);
     assert.deepEqual({ interpretation: loadExperimentInterpretation(EXPERIMENT, resultsPath).winner, autoWinner: loadExperimentInterpretation(EXPERIMENT, resultsPath).autoWinner }, winnerBefore);
   } finally {
     clearTempVentureRoot();
