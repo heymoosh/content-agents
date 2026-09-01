@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import { buildContentRequest, mergeContentConfiguration, type ContentRequest, type ContentRequestInput, type RecommendationEvidence } from "./content-request.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { extractSourceLines } from "./develop.js";
+import { readReviewedMechanismRecommendations } from "./reviewed-mechanism-recommendations.js";
 
 const FILE_NAME = "content-request.json";
 
@@ -52,6 +53,34 @@ function inputFromStored(request: ContentRequest): ContentRequestInput {
   };
 }
 
+function withServerMechanismEvidence(candidate: ContentRequestInput, authoritativeBody: string, allowReviewedMechanisms: boolean): ContentRequestInput {
+  const clientEvidence = (candidate.recommendationEvidence ?? []).filter((item) => !item.source.trim().toLowerCase().startsWith("research-dossier:"));
+  const reviewed = allowReviewedMechanisms ? readReviewedMechanismRecommendations(authoritativeBody) : [];
+  if ((candidate.treatments ?? []).includes("belief-shift") && !reviewed.some((item) => item.option === "belief-shift")) {
+    throw new Error("belief-shift treatment requires a reviewed mechanism match against the authoritative approved cut");
+  }
+  return { ...candidate, recommendationEvidence: [...clientEvidence, ...reviewed] };
+}
+
+export async function readAuthoritativeApprovedCut(contentRoot: string, lens: string): Promise<{
+  readonly body: string;
+  readonly sourceLines: readonly (number | string)[];
+  readonly canonicalUrl: string;
+}> {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(lens)) throw new Error("approved cut lens is invalid");
+  const { root } = await targetPath(contentRoot);
+  const source = splitFrontmatter(await readFile(join(root, "source.md"), "utf8"));
+  const canonicalUrl = String(source.fm.canonical_url ?? "").trim();
+  const cutPath = join(root, "cuts", lens, "cut.md");
+  if (!existsSync(cutPath)) throw new Error("approved advisor cut does not exist");
+  const cut = splitFrontmatter(await readFile(cutPath, "utf8"));
+  const refs = Array.isArray(cut.fm.source_lines) ? cut.fm.source_lines as (number | string)[] : [];
+  if (!refs.length) throw new Error("approved cut has no server-owned source_lines");
+  const resolved = extractSourceLines(root, refs);
+  if (cut.body.trim() !== resolved.trim()) throw new Error("approved cut body does not match its cited source_lines");
+  return { body: cut.body.trim(), sourceLines: refs, canonicalUrl };
+}
+
 /** Validate and atomically persist one request in an existing content folder. */
 export async function writeContentRequest(contentRoot: string, input: ContentRequestInput): Promise<ContentRequest> {
   const { root, target } = await targetPath(contentRoot);
@@ -86,8 +115,8 @@ export async function authorizeGuiContentRequest(contentRoot: string, input: Con
   // Cross-room handoffs establish their authority in their owning route. Preserve that authority
   // when the Content room changes configuration, but do not let ordinary Content requests use
   // this shortcut: every ordinary save must still revalidate its approved advisor cut on disk.
-  if (existing && (existing.sourceContext || existing.ventureSource)) return candidate;
-  if (existing && existing.origin === "charles" && existing.sourceProvenance) return candidate;
+  if (existing && (existing.sourceContext || existing.ventureSource)) return withServerMechanismEvidence(candidate, existing.originalInput, false);
+  if (existing && existing.origin === "charles" && existing.sourceProvenance) return withServerMechanismEvidence(candidate, existing.originalInput, false);
   if (existing && existing.origin !== "studio" && existing.origin !== "human-inference") {
     throw new Error(`existing ${existing.origin} request has no server-owned source authority`);
   }
@@ -96,7 +125,6 @@ export async function authorizeGuiContentRequest(contentRoot: string, input: Con
   const { fm } = splitFrontmatter(raw);
   const storedOrigin = String(fm.origin ?? "").trim().toLowerCase();
   const sourceKind = String(fm.source_kind ?? "").trim().toLowerCase();
-  const canonicalUrl = String(fm.canonical_url ?? "").trim();
   const crossRoom = ["fiction-promotion", "charles", "venture"].includes(sourceKind)
     || /^(fiction|charles|venture):/.test(storedOrigin);
   if (crossRoom) {
@@ -110,24 +138,17 @@ export async function authorizeGuiContentRequest(contentRoot: string, input: Con
     : candidate.sourceProvenance?.kind === "approved-cut" ? candidate.sourceProvenance : null;
   if (!requested) throw new Error("an approved advisor cut is required before Content configuration");
   const lens = requested.lens?.trim() ?? "";
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(lens)) throw new Error("approved cut lens is invalid");
-  const cutPath = join(root, "cuts", lens, "cut.md");
-  if (!existsSync(cutPath)) throw new Error("approved advisor cut does not exist");
-  const cut = splitFrontmatter(await readFile(cutPath, "utf8"));
-  const refs = Array.isArray(cut.fm.source_lines) ? cut.fm.source_lines as (number | string)[] : [];
-  if (!refs.length) throw new Error("approved cut has no server-owned source_lines");
-  const resolved = extractSourceLines(root, refs);
-  if (cut.body.trim() !== resolved.trim()) throw new Error("approved cut body does not match its cited source_lines");
-  if (candidate.originalInput.trim() !== cut.body.trim()) throw new Error("content request body does not match the approved cut");
-  return {
+  const cut = await readAuthoritativeApprovedCut(root, lens);
+  if (candidate.originalInput.trim() !== cut.body) throw new Error("content request body does not match the approved cut");
+  return withServerMechanismEvidence({
     ...candidate,
     origin: "human-inference",
-    originalInput: cut.body.trim(),
+    originalInput: cut.body,
     ventureId: null,
     ventureSource: null,
-    sourceProvenance: { kind: "approved-cut", lens, sourceLines: refs, ...(canonicalUrl ? { canonicalUrl } : {}) },
+    sourceProvenance: { kind: "approved-cut", lens, sourceLines: cut.sourceLines, ...(cut.canonicalUrl ? { canonicalUrl: cut.canonicalUrl } : {}) },
     sourceContext: null,
-  };
+  }, cut.body, true);
 }
 
 /** Read and rebuild a persisted request, applying the same domain validation as writes. */

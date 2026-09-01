@@ -2841,7 +2841,7 @@ const CONTENT_CONFIG_OPTIONS = {
   treatment: [
     ["cta","CTA"],["viral-rewrite","Viral rewrite"],["platform-framing","Platform-specific framing"],
     ["shorter-version","Shorter version"],["thread","Thread"],["counterpoint","Counterpoint"],
-    ["summary","Summary"],["hook-variants","Hook variants"],
+    ["summary","Summary"],["hook-variants","Hook variants"],["belief-shift","Belief shift"],
   ],
   media: [
     ["static-quote-card","Static quote card"],["animated-quote-card","Animated quote card"],
@@ -2871,7 +2871,8 @@ function cwEnsureConfig(){
   const defaults = CW.signalDefaults || {};
   const sourceDistribution = CW.treat && CW.treat.distribution || {platforms:[],media:[]};
   const recommended = key => (defaults[key]||[]).filter(x=>x.recommended).map(x=>x.option);
-  const treatments = recommended("treatments").filter(x=>CONTENT_CONFIG_OPTIONS.treatment.some(o=>o[0]===x));
+  const mechanismTreatments = (CW.treat&&CW.treat.mechanismRecommendations||[]).filter(x=>x.recommended&&x.kind==="treatment").map(x=>x.option);
+  const treatments = [...new Set([...mechanismTreatments,...recommended("treatments")])].filter(x=>CONTENT_CONFIG_OPTIONS.treatment.some(o=>o[0]===x));
   const sourceMedia = (sourceDistribution.media||[]).map(x=>x.option).filter(x=>CONTENT_CONFIG_OPTIONS.media.some(o=>o[0]===x));
   const sourcePlatforms = (sourceDistribution.platforms||[]).map(x=>x.option).filter(x=>supported.includes(x));
   const platformRequiredMedia = (sourceDistribution.platforms||[]).filter(x=>sourcePlatforms.includes(x.option) && x.requiredMedia).map(x=>x.requiredMedia);
@@ -3059,7 +3060,8 @@ function cwStep2Html(){
   const dist=CW.treat.distribution||{platforms:[],media:[],mediaRationale:""};
   const platformWhy=(dist.platforms||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
   const mediaWhy=(dist.media||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
-  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these platforms and media?</summary><div style="margin-top:8px;max-width:680px">'+platformWhy+(mediaWhy||'<div class="src" style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<div class="src" style="margin-top:10px">Source fit supplies the cold-start recommendation. Existing routing and measured performance evidence remain stronger when available. Every checkbox remains yours to change.</div></div></details>';
+  const mechanismWhy=(CW.treat.mechanismRecommendations||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div><div class="src">'+esc(x.source)+'</div></div>').join('');
+  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these recommendations?</summary><div style="margin-top:8px;max-width:680px">'+mechanismWhy+platformWhy+(mediaWhy||'<div class="src" style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<div class="src" style="margin-top:10px">Reviewed mechanisms are hypotheses matched to this source, never winner claims. Source fit supplies the cold-start distribution recommendation. Existing measured performance evidence remains stronger when available. Every checkbox remains yours to change.</div></div></details>';
   return cwPickedHtml(s)+crossContext+
     '<div class="src" style="margin-top:18px;max-width:640px">Choose treatments, media, and platforms independently. Recommendations preselect a starting point; they never remove your control.</div>'+
     cwConfigSectionHtml("treatment","TREATMENTS",CONTENT_CONFIG_OPTIONS.treatment,s)+
@@ -3098,7 +3100,7 @@ async function cwLoadTreatment(){
   CW.loading = true; CW.treatErr = null;
   try {
     const [r, signals, requestResult] = await Promise.all([
-      fetch("/api/content/treatment?slug="+encodeURIComponent(slug)),
+      fetch("/api/content/treatment?slug="+encodeURIComponent(slug)+(CW.approvedLens?"&lens="+encodeURIComponent(CW.approvedLens):"")),
       fetch("/api/signals?brand=human-inference").then(x=>x.json()).catch(()=>null),
       fetch("/api/content/request?slug="+encodeURIComponent(slug)).then(x=>x.json()).catch(()=>null),
     ]);
@@ -3133,7 +3135,11 @@ async function cwSaveConfig(){
     ...((CW.treat&&CW.treat.distribution&&CW.treat.distribution.platforms)||[]).map(x=>({option:x.option,kind:"platform",reason:x.reason,source:"source-fit",recommended:true})),
     ...((CW.treat&&CW.treat.distribution&&CW.treat.distribution.media)||[]).map(x=>({option:x.option,kind:"media",reason:x.reason,source:"source-fit",recommended:true})),
   ];
+  const mechanismEvidence = (CW.treat&&CW.treat.mechanismRecommendations||[]).filter(x=>x.recommended).map(x=>({
+    option:x.option,kind:x.kind,reason:x.reason,source:x.source,recommended:true,
+  }));
   const evidence = [
+    ...mechanismEvidence,
     ...distributionEvidence,
     ...signalEvidence,
     ...recommendedPlatforms.map(option=>({option,kind:"platform",reason:"Current routing includes this platform",source:"routing",recommended:true})),

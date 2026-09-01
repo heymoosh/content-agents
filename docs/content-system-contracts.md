@@ -933,6 +933,29 @@ around Muxin's original claim, experience, example, evidence, and point of
 view. The template supplies a structure, not a creator's body or signature
 wording.
 
+### Reviewed mechanism recommendation boundary
+
+The first Content recommendation consumer is deliberately narrower than
+general pattern readiness. `src/review/reviewed-mechanism-recommendations.ts`
+recognizes the retained used-to-think/now `research-dossier-v2` hypothesis only
+after `validateUsableResearchDossier` replays its canonical, digest-bound Muxin
+review. It emits a `belief-shift` recommendation only when the exact approved
+cut contains a first-person prior belief before a first-person current belief.
+
+`authorizeGuiContentRequest` removes every client-supplied
+`research-dossier:` row, recomputes canonical evidence from that authoritative
+cut, and refuses `belief-shift` when no match exists. Whole-source text, a
+browser claim, an unrelated cross-room source, a tampered digest, or a
+non-hypothesis disposition cannot authorize the treatment. The persisted
+reason retains the hypothesis and no-winner boundary. It is never evidence
+that the mechanism improves performance, and every eligible selection remains
+Muxin-overridable. Generation independently replays the canonical dossier and
+requires the persisted evidence to match before starting a job or writing an
+artifact. Draft parsing additionally requires every output sentence to be an
+exact sentence from the cited approved source lines and requires the old belief
+to precede the current belief. The blind cold-feed pass must return that
+body byte-for-byte, so prompt compliance is not the output authority.
+
 ### `platform-treatment-blueprint-v1` (scaffolded; explicit body-free overlay)
 
 `src/patterns/platform-treatment-blueprint.ts` validates and projects an

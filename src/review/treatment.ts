@@ -30,6 +30,8 @@ import { claimSlots as realClaimSlots } from "../publish/slots.js";
 import { parseRoutingDecisions } from "../atomize/validate.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { recommendSourceDistribution, type SourceDistributionRecommendation } from "./source-distribution.js";
+import { readReviewedMechanismRecommendations } from "./reviewed-mechanism-recommendations.js";
+import type { RecommendationEvidence } from "./content-request.js";
 import {
   CORE_TEXT,
   PILLARS,
@@ -175,6 +177,7 @@ export interface Treatment {
   // an exclusion — see honesty rule 2 at the top of this file.
   scoredBelowFloorButEnabled: string[];
   distribution: SourceDistributionRecommendation;
+  mechanismRecommendations: RecommendationEvidence[];
 }
 
 export interface TreatmentDeps {
@@ -185,6 +188,9 @@ export interface TreatmentDeps {
   claimSlots?: typeof realClaimSlots;
   schedule?: Parameters<typeof realClaimSlots>[0]["schedule"]; // passed through to claimSlots
   now?: Date; // passed through to claimSlots
+  recommendMechanisms?: (body: string) => RecommendationEvidence[];
+  /** Server-read approved cut body. Whole-source text must never authorize a mechanism treatment. */
+  mechanismBody?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +248,9 @@ export function readTreatment(slug: string, deps: TreatmentDeps = {}): Treatment
     : { fm: {}, body: "" };
   const sourceKind = typeof source.fm.source_kind === "string" ? source.fm.source_kind.trim() : "";
   const distribution = recommendSourceDistribution({ body: source.body, sourceKind });
+  const mechanismRecommendations = deps.mechanismBody == null
+    ? []
+    : (deps.recommendMechanisms ?? readReviewedMechanismRecommendations)(deps.mechanismBody);
   const routingMd = existsSync(routingPath) ? readFileSync(routingPath, "utf8") : "";
   const pillars = parsePillars(routingMd);
   const recorded = routingMd ? parseRoutingDecisions(routingMd) : new Map<string, "include" | "skip">();
@@ -324,5 +333,6 @@ export function readTreatment(slug: string, deps: TreatmentDeps = {}): Treatment
     channels,
     scoredBelowFloorButEnabled: channels.filter((c) => c.belowFloor).map((c) => c.channel),
     distribution,
+    mechanismRecommendations,
   };
 }

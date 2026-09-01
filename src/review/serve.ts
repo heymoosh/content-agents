@@ -104,7 +104,7 @@ import { proposeSignalsExperiment, type SignalsExperimentProposalRequest } from 
 import { createApprovedVentureHandoff, findExistingVentureContentFolder } from "./venture-content-handoff-store.js";
 import { toContentRequestInput as ventureToContentRequestInput } from "./venture-content-handoff.js";
 import { isOutreachEngine, type OutreachEngine } from "./page-outreach.js";
-import { authorizeGuiContentRequest, readContentRequest, writeContentRequest } from "./content-request-store.js";
+import { authorizeGuiContentRequest, readAuthoritativeApprovedCut, readContentRequest, writeContentRequest } from "./content-request-store.js";
 import type { ContentRequestInput } from "./content-request.js";
 import { createLockedChapterHandoff } from "./fiction-content-handoff-store.js";
 import { toContentRequestInput } from "./fiction-content-handoff.js";
@@ -1367,7 +1367,13 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     if (req.method === "GET" && url.pathname === "/api/content/treatment") {
       const slug = (url.searchParams.get("slug") ?? "").trim();
       try {
-        json(res, 200, readTreatment(slug, { folder: safeFolder(slug) }));
+        const folder = safeFolder(slug);
+        const lens = (url.searchParams.get("lens") ?? "").trim();
+        let mechanismBody: string | null = null;
+        if (lens) {
+          mechanismBody = (await readAuthoritativeApprovedCut(folder, lens)).body;
+        }
+        json(res, 200, readTreatment(slug, { folder, mechanismBody }));
       } catch (e) {
         json(res, 400, { error: String((e as Error)?.message ?? e) });
       }

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Reviewed mechanism recommendation: old vs new</title>
+  <style>
+    body { margin: 0; font: 16px/1.55 system-ui, sans-serif; color: #26231f; background: #f6f1e7; }
+    main { max-width: 980px; margin: 40px auto; padding: 0 24px 48px; }
+    h1, h2 { line-height: 1.2; }
+    .note, article { background: #fffdf8; border: 1px solid #d8cebc; border-radius: 10px; padding: 18px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; margin-top: 18px; }
+    .reject { border-color: #bd6e61; }
+    .candidate { border-color: #5d8a68; }
+    .label { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Reviewed mechanism recommendation: old vs new</h1>
+  <p class="note"><strong>Review status:</strong> This is content-generation-logic review evidence, not copy approval or publication authorization. Both samples used Claude Haiku through the subscription CLI on 2026-09-01. No tools or file-writing permissions were available to the model.</p>
+
+  <h2>Approved source</h2>
+  <article>
+    <p>I used to think reach was the goal. Now I believe replies are the useful signal. Repeated useful contact tells me more than a large silent audience.</p>
+  </article>
+
+  <div class="grid">
+    <article class="reject">
+      <div class="label">Old generic summary treatment: rejected sample</div>
+      <p>Reach was the goal. Then I noticed something: replies matter more.</p>
+      <p>A large silent audience tells you almost nothing. Repeated useful contact tells you everything. The people who come back, engage, ask follow-ups, they’re the signal. They’re the audience that actually exists.</p>
+      <p>This changes what you track and what you build for.</p>
+      <p><strong>Why rejected:</strong> It invented noticing, returning people, follow-ups, audience-existence, and downstream tracking/build claims. It also converted bounded comparisons into absolutes.</p>
+    </article>
+
+    <article class="candidate">
+      <div class="label">New reviewed belief-shift treatment: candidate sample</div>
+      <p>I used to think reach was the goal. Now I believe replies are the useful signal. Repeated useful contact tells me more than a large silent audience.</p>
+      <p><strong>Why this is the candidate:</strong> The old-belief and current-belief clauses remain verbatim, the support sentence remains source-exact, and no causal or performance claim was added.</p>
+    </article>
+  </div>
+
+  <h2>Mechanism authority</h2>
+  <article>
+    <p>The recommendation comes from <code>docs/reviews/content-studio-phase2-used-to-think-final-dossier.json</code>. Its disposition is <code>hypothesis</code>, its digest is <code>sha256:eab59aff9411365842a03776499907fdc7de36fa7e5984f3ae8f11ec90c850bb</code>, and it explicitly forbids winner claims.</p>
+    <p>The UI may preselect <code>belief-shift</code> only when the exact server-read approved cut contains both sides of a first-person belief change. The save boundary recomputes this evidence and rejects forged or ineligible uses.</p>
+  </article>
+
+  <h2>Reproduction record</h2>
+  <article>
+    <p>The subscription CLI did not emit stable invocation IDs. The complete prompts and raw responses are retained below so the comparison can be rerun. Both commands used <code>claude -p</code>, <code>--model haiku</code>, <code>--tools ""</code>, and <code>--permission-mode dontAsk</code>.</p>
+    <details>
+      <summary>Old prompt and raw response</summary>
+      <pre>Return only one LinkedIn post, no markdown fence. Source: I used to think reach was the goal. Now I believe replies are the useful signal. Repeated useful contact tells me more than a large silent audience. Apply the old summary treatment: preserve the central argument and practical direction as one coherent standalone post. Do not invent facts, examples, experiences, or claims. No em dashes.</pre>
+      <pre>Reach was the goal. Then I noticed something: replies matter more.
+
+A large silent audience tells you almost nothing. Repeated useful contact tells you everything. The people who come back, engage, ask follow-ups&#8212;they're the signal. They're the audience that actually exists.
+
+This changes what you track and what you build for.</pre>
+    </details>
+    <details>
+      <summary>New prompt and raw response</summary>
+      <pre>Return only one LinkedIn post, no markdown fence. Approved source lines: I used to think reach was the goal. Now I believe replies are the useful signal. Repeated useful contact tells me more than a large silent audience. Write a source-grounded rewrite. You may add connective language, re-hook, reorder, trim, and clarify, but may not invent a factual claim, example, experience, metaphor, or worldview position. Apply this treatment materially: Use a first-person belief reversal only because the approved source lines explicitly contain both the old and current belief. Keep those old-belief and current-belief clauses verbatim. Do not invent a prior belief, a new belief, a conclusion beyond the approved lines, or a causal performance claim. No em dashes.</pre>
+      <pre>I used to think reach was the goal. Now I believe replies are the useful signal. Repeated useful contact tells me more than a large silent audience.</pre>
+    </details>
+    <p>Production does not trust these samples as enforcement. Generation-time canonical dossier replay, exact approved-source sentence checks, ordered belief clauses, and byte-exact cold-feed preservation are executable gates.</p>
+  </article>
+</main>
+</body>
+</html>

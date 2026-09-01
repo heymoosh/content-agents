@@ -2932,7 +2932,7 @@ test("Content configuration exposes independent treatments, media, platforms, an
   }
   for (const option of [
     "CTA", "Viral rewrite", "Platform-specific framing", "Shorter version", "Thread",
-    "Counterpoint", "Summary", "Hook variants", "Static quote card", "Animated quote card",
+    "Counterpoint", "Summary", "Hook variants", "Belief shift", "Static quote card", "Animated quote card",
     "Image carousel", "Short-video script", "Video transcript / caption package",
   ]) assert.ok(script.includes(option), `configuration option missing: ${option}`);
   for (const kind of ["treatment", "media", "platform"]) {
@@ -2944,8 +2944,11 @@ test("Content configuration exposes independent treatments, media, platforms, an
   assert.ok(script.includes('engineSelectHtml("contentTreatmentEngine")'), "AI treatments need a nearby model selector");
   assert.ok(script.includes('id="contentControlEnabled"'), "the untreated control must be explicit and disable-able");
   assert.ok(script.includes("Untreated control"));
-  assert.ok(script.includes("Why these platforms and media?"), "recommendations need a source-specific explanation on request");
+  assert.ok(script.includes("Why these recommendations?"), "recommendations need a source-specific explanation on request");
   assert.ok(script.includes("source-fit"), "saved recommendation evidence must preserve source-fit provenance");
+  assert.ok(script.includes("mechanismRecommendations"), "reviewed mechanism evidence must reach preselection and the saved request");
+  assert.ok(script.includes("source:x.source"), "saved mechanism evidence must retain its reviewed dossier provenance");
+  assert.ok(script.includes('"&lens="+encodeURIComponent(CW.approvedLens)'), "mechanism matching must use the selected server-read cut, not the whole source");
   assert.ok(!script.includes("CHOOSE CUTS TO FORMAT"), "Cuts must not remain the primary configuration concept");
   assert.ok(!script.includes("CHANNELS · READ, NOT CHOSEN HERE"), "the routing diagnostic must not remain the selector");
   assert.ok(html.includes('id="contentConfigSave"') || script.includes('id="contentConfigSave"'),

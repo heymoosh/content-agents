@@ -25,6 +25,7 @@ import { briefRevisePrompt, latestBriefPath } from "./serve.js";
 import { logCost } from "../util/cost-log.js";
 import { buildEngineSpawn, enginePrompt, ENGINE_COMMANDS, ENGINE_LABELS, type Engine, type EngineSpawnOptions } from "./engines.js";
 import type { ContentRequest, ContentVariant } from "./content-request.js";
+import { assertReviewedMechanismGenerationAuthorization, containsPersonalBeliefReversal } from "./reviewed-mechanism-recommendations.js";
 import type { BrandId } from "../identity/brand.js";
 import { configuredMediaPlan, configuredMediaStage, type ConfiguredMediaPlan, type ConfiguredMediaSourceInputs, type ConfiguredMediaStage } from "./configured-media.js";
 import { acquireJobExecutionLease, readDurableJobs, recoverAbandonedJobs, removeDurableJobs, upsertDurableJob } from "../runtime/durable-jobs.js";
@@ -370,8 +371,22 @@ function configuredTreatmentInstruction(treatment: string): string {
     counterpoint: "Make Muxin's clearest qualification, tension, or correction of an easy assumption the post's standalone point.",
     summary: "Preserve the essay's central argument and practical direction as one coherent standalone post.",
     "hook-variants": "Use the strongest source-grounded opening, then complete the thought so the post works without prior context.",
+    "belief-shift": "Use a first-person belief reversal only because the approved source lines explicitly contain both the old and current belief. Keep those old-belief and current-belief clauses verbatim. Do not invent a prior belief, a new belief, a conclusion beyond the approved lines, or a causal performance claim.",
   };
   return instructions[treatment] ?? "Apply the named treatment as a source-grounded rewrite with one clear standalone point.";
+}
+
+function exactSourceSentences(text: string): string[] {
+  return (text.match(/[^.!?]+(?:[.!?]+|$)/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean);
+}
+
+function assertBeliefShiftBody(body: string, segments: readonly ConfiguredSourceSegment[], label: string): void {
+  if (!containsPersonalBeliefReversal(body)) throw new Error(`${label} must retain both explicit first-person belief clauses`);
+  const allowed = new Set(segments.flatMap((segment) => exactSourceSentences(segment.text)));
+  const output = exactSourceSentences(body);
+  if (!output.length || output.some((sentence) => !allowed.has(sentence))) {
+    throw new Error(`${label} may contain only exact sentences from its approved source_lines`);
+  }
 }
 
 export function configuredContentPrompt(request: ContentRequest, variants: readonly ContentVariant[], sourceSegments: readonly ConfiguredSourceSegment[] = []): string {
@@ -426,6 +441,10 @@ export function parseConfiguredVariantBodies(output: string, variants: readonly 
     // Resolve every cited range against the authoritative file. The body may be rewritten, but
     // its factual authorization boundary must remain inspectable and real.
     extractSourceLines(folder, sourceLines);
+    const variant = variants.find((candidate) => candidate.identity.id === id)!;
+    if (variant.treatments.includes("belief-shift")) {
+      assertBeliefShiftBody(body, configuredSourceSegments(folder, sourceLines), `selected engine belief-shift variant ${id}`);
+    }
     const voiceFindings = configuredVoiceFindings(body);
     if (voiceFindings.length) throw new Error(`selected engine returned treated variant ${id} with source_lines [${sourceLines.join(", ")}] that failed the voice check: ${voiceFindings.join("; ")}`);
     const normalized = body.trim().replace(/\s+/g, " ").toLowerCase();
@@ -455,6 +474,7 @@ export function configuredColdFeedEditorPrompt(variants: readonly ContentVariant
       id: variant.identity.id,
       platform: variant.platform,
       max_characters: CONFIGURED_PLATFORM_LIMITS[variant.platform] ?? null,
+      editing_constraint: variant.treatments.includes("belief-shift") ? "Return this body byte-for-byte; the reviewed mechanism requires exact approved-source sentences." : null,
       body: bodies.get(variant.identity.id)?.body ?? "",
     }))),
   ].join("\n\n");
@@ -485,6 +505,9 @@ export function parseConfiguredEditorBodies(
     if (limit && body.length > limit) throw new Error(`selected editor exceeded the ${variant.platform} character limit`);
     const voiceFindings = configuredVoiceFindings(body);
     if (voiceFindings.length) throw new Error(`selected editor returned variant ${id} that failed the voice check: ${voiceFindings.join("; ")}`);
+    if (variant.treatments.includes("belief-shift") && body !== original.body) {
+      throw new Error(`selected editor must preserve belief-shift variant ${id} byte-for-byte`);
+    }
     const normalized = body.trim().replace(/\s+/g, " ").toLowerCase();
     if (normalizedBodies.has(normalized)) throw new Error("selected editor returned a duplicate cold-feed body");
     normalizedBodies.add(normalized);
@@ -591,6 +614,9 @@ export function parseVentureConfiguredBodies(output: string, variants: readonly 
 }
 
 export function assertConfiguredTreatmentPolicy(request: ContentRequest, treated: readonly ContentVariant[]): void {
+  if (treated.some((variant) => variant.treatments.includes("belief-shift")) && request.origin !== "studio" && request.origin !== "human-inference") {
+    throw new Error("belief-shift treatment is available only for an authorized Human Inference approved cut");
+  }
   if (treated.length && (request.origin === "fiction" || request.origin === "charles")) {
     throw new Error(`configured ${request.origin} treatments are unavailable: no enforceable restricted transformation exists; request an untreated control only`);
   }
@@ -643,6 +669,17 @@ export function resolveConfiguredAuthoritative(folder: string, request: ContentR
     return { body: context.authoritativeBody, sourceLines: [], contextKind: context.kind, restrictionRefs };
   }
   return null;
+}
+
+export function preflightConfiguredGeneration(
+  folder: string,
+  request: ContentRequest,
+  treated: readonly ContentVariant[],
+): ConfiguredAuthoritativeBody | null {
+  assertConfiguredTreatmentPolicy(request, treated);
+  const authoritative = resolveConfiguredAuthoritative(folder, request);
+  if (authoritative) assertReviewedMechanismGenerationAuthorization(request, authoritative.body);
+  return authoritative;
 }
 
 export function resolveConfiguredProvenance(folder: string, request: ContentRequest): { body: string; sourceLines: (number | string)[] } {
@@ -762,8 +799,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
   const treated = request.variants.filter((variant) => variant.identity.kind === "treated");
   // This policy gate deliberately precedes runQueued and every mkdir/write/append: a refused
   // origin-specific treatment leaves zero jobs, files, and review rows behind.
-  assertConfiguredTreatmentPolicy(request, treated);
-  const authoritative = resolveConfiguredAuthoritative(folder, request);
+  const authoritative = preflightConfiguredGeneration(folder, request, treated);
   return runQueued("content-generate", `Create configured drafts: ${slug}`, async (job) => {
     let bodies = new Map<string, { body: string; sourceLines: (number | string)[] }>();
     let engineExecution: "disposable-injected" | undefined;

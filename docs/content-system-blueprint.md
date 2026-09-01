@@ -755,8 +755,16 @@ denominators, dates, baseline matches, citations, selection coverage, reviewed o
 Muxin authority fail closed. The artifact is body-free and never permits winner claims. This
 vertical slice completed the Phase 2 ship predicate on 2026-08-31 with a real question-scoped
 dossier, populated reviewed evidence, and Muxin's recorded `hypothesis` disposition. Broader
-account/baseline coverage remains incomplete and is continuing evidence expansion, not a reason to
-misstate the completed vertical slice as an integrated recommendation engine.
+account/baseline coverage remains incomplete and is continuing evidence expansion. The retained
+used-to-think/now dossier now drives one narrow Content configuration recommendation: a
+`belief-shift` treatment is eligible only when the exact server-read approved cut contains the
+prior first-person belief before the current first-person belief. The Content save boundary drops browser-asserted
+`research-dossier:` evidence, replays the canonical dossier, and refuses an ineligible treatment.
+Generation independently replays the persisted canonical evidence before starting a job or writing
+an artifact. The draft may contain only exact sentences from its cited approved source lines and
+must retain the belief clauses in order; the cold-feed editor must preserve that body byte-for-byte. The recommendation
+remains an overridable hypothesis with its digest and no-winner caveat, not a causal performance
+claim or a general integrated recommendation engine.
 
 For this increment, the Phase 2 comparison predicate is explicit: every comparison must name its
 source/post-level evidence rows, explicit pool membership, popularity and sample scopes, baseline
