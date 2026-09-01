@@ -5236,7 +5236,9 @@ function renderCharles(){
   }
   charlesId=post.id;
   const engineProvenance=post.engine ? "Drafted with "+engineLabel(post.engine) : "Engine not recorded (legacy draft)";
-  const reviewHistory=(post.comments||[]).length
+  const reviewHistory=post.historyWarning
+    ? '<div class="aierr" role="status" style="margin-top:14px">'+esc(post.historyWarning)+'</div>'
+    : (post.comments||[]).length
     ? '<details class="lead-details" open style="margin-top:18px"><summary>Review history · '+post.comments.length+'</summary>'+post.comments.map(item=>'<div class="src" style="margin-top:9px"><strong>'+esc(String(item.createdAt||"").slice(0,16).replace("T"," "))+'</strong><br>'+esc(item.body)+'</div>').join("")+'</details>'
     : '<div class="src" style="margin-top:14px">Review history starts when you save a revision note.</div>';
   $("#charlesMain").innerHTML =

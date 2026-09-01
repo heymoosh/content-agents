@@ -105,6 +105,17 @@ export function listReviewCommentsSafe(
   subject: string,
   path: string = REVIEW_COMMENTS_PATH,
 ): ReviewComment[] {
-  try { return listReviewComments(domain, subject, path); }
-  catch { return []; }
+  return listReviewCommentsWithHealth(domain, subject, path).comments;
+}
+
+export function listReviewCommentsWithHealth(
+  domain: ReviewCommentDomain,
+  subject: string,
+  path: string = REVIEW_COMMENTS_PATH,
+): { comments: ReviewComment[]; warning?: string } {
+  try { return { comments: listReviewComments(domain, subject, path) }; }
+  catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { comments: [], warning: `Review history is unavailable: ${detail}` };
+  }
 }

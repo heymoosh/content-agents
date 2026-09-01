@@ -3,7 +3,7 @@ import { listCharlesPosts, readCharlesPost, saveCharlesPost, setCharlesStatus, r
 import { enqueueCharlesDraft } from "./jobs.js";
 import { type Engine } from "./engines.js";
 import {
-  appendReviewCommentSafe, charlesReviewSubject, listReviewCommentsSafe,
+  appendReviewCommentSafe, charlesReviewSubject, listReviewCommentsWithHealth,
 } from "./review-comments.js";
 import {
   approveCharlesPersonaProposal, proposeCharlesPersonaEdit, readCharlesPersona,
@@ -19,6 +19,7 @@ type CharlesRouteContext = {
   requestEngine: (value: unknown) => Engine;
   charlesRoot?: string;
   personaProposalsPath?: string;
+  reviewCommentsPath?: string;
 };
 
 function assertOnly(body: Record<string, unknown>, allowed: readonly string[]): void {
@@ -27,14 +28,15 @@ function assertOnly(body: Record<string, unknown>, allowed: readonly string[]): 
 }
 
 // Charles room routes preserve the review-only contract: no endpoint here posts a draft.
-export async function handleCharlesRoute({ req, res, url, readBody, json, requestEngine, charlesRoot, personaProposalsPath }: CharlesRouteContext): Promise<boolean> {
+export async function handleCharlesRoute({ req, res, url, readBody, json, requestEngine, charlesRoot, personaProposalsPath, reviewCommentsPath }: CharlesRouteContext): Promise<boolean> {
   // Charles room (Build 4): charles/review-queue.md + the drafts it points at. Same review
   // contract as everywhere else — approve/revise/discard just flips a status cell here, nothing
   // posts (see charles/CLAUDE.md).
   if (req.method === "GET" && url.pathname === "/api/charles") {
-    json(res, 200, { posts: listCharlesPosts().map((post) => ({
-      ...post, comments: listReviewCommentsSafe("charles", charlesReviewSubject(post.id)),
-    })) });
+    json(res, 200, { posts: listCharlesPosts(charlesRoot).map((post) => {
+      const history = listReviewCommentsWithHealth("charles", charlesReviewSubject(post.id), reviewCommentsPath);
+      return { ...post, comments: history.comments, historyWarning: history.warning };
+    }) });
     return true;
   }
   if (req.method === "GET" && url.pathname === "/api/charles/persona-brief") {
@@ -91,10 +93,12 @@ export async function handleCharlesRoute({ req, res, url, readBody, json, reques
         historyWarning = appendReviewCommentSafe({
           domain: "charles", subject: charlesReviewSubject(id), body: notes,
           operationId: b.operationId === undefined ? undefined : String(b.operationId),
-        }).warning;
+        }, reviewCommentsPath).warning;
       }
+      const history = listReviewCommentsWithHealth("charles", charlesReviewSubject(id), reviewCommentsPath);
+      historyWarning = [historyWarning, history.warning].filter(Boolean).join(" ") || undefined;
       json(res, 200, { ok: true, post: {
-        ...readCharlesPost(id), comments: listReviewCommentsSafe("charles", charlesReviewSubject(id)),
+        ...readCharlesPost(id, charlesRoot), comments: history.comments, historyWarning: history.warning,
       }, historyWarning });
     } catch (e) {
       json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });

@@ -52,6 +52,13 @@ test("Charles review names the producing engine and labels legacy drafts honestl
   assert.match(script, /p\.engine \? "Drafted with "\+engineLabel\(p\.engine\)/);
 });
 
+test("Charles review shows history-store failures instead of a false empty-history state", () => {
+  const script = emittedScripts().join("\n");
+  assert.match(script, /post\.historyWarning/);
+  assert.match(script, /role="status"/);
+  assert.match(script, /Review history starts when you save a revision note/);
+});
+
 test("fictionEditableSpans keeps exact chapter bytes for surgical in-app edits", () => {
   assert.deepEqual(fictionEditableSpans("First sentence.\nSecond sentence.\n\nAnother paragraph."), [
     "First sentence.\nSecond sentence.", "Another paragraph.",

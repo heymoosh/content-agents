@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   appendReviewComment, appendReviewCommentSafe, charlesReviewSubject, fictionReviewSubject, listReviewComments,
+  listReviewCommentsSafe, listReviewCommentsWithHealth,
 } from "./review-comments.js";
 
 test("review subjects are stable and reject invalid resource identities", () => {
@@ -74,5 +75,17 @@ test("safe history writes report a warning without turning a completed primary a
     );
     assert.equal(result.comment, null);
     assert.match(result.warning ?? "", /history/i);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("safe history reads distinguish a healthy empty file from an unavailable store", () => {
+  const root = mkdtempSync(join(tmpdir(), "review-comments-"));
+  try {
+    const missing = join(root, "missing.jsonl");
+    assert.deepEqual(listReviewCommentsWithHealth("charles", "draft-1", missing), { comments: [] });
+    const unavailable = listReviewCommentsWithHealth("charles", "draft-1", root);
+    assert.deepEqual(unavailable.comments, []);
+    assert.match(unavailable.warning ?? "", /Review history is unavailable/);
+    assert.deepEqual(listReviewCommentsSafe("charles", "draft-1", root), [], "legacy callers retain the safe empty-array contract");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

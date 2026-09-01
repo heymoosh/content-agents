@@ -10,8 +10,11 @@ const productionPersona = readFileSync(new URL("../../charles/config/persona.yam
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "serve-charles-persona-"));
   mkdirSync(join(root, "config"), { recursive: true });
+  mkdirSync(join(root, "posts", "one-liners"), { recursive: true });
   writeFileSync(join(root, "config", "persona.yaml"), productionPersona);
   writeFileSync(join(root, "config", "persona-brief.md"), "brief bytes\n");
+  writeFileSync(join(root, "posts", "one-liners", "dapper.md"), "---\ntype: one-liner\n---\n\nDapper.\n");
+  writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n|----|------|------|--------|-------|\n| dapper | one-liner | posts/one-liners/dapper.md | pending | |\n");
   return { root, proposalsPath: join(root, "state", "proposals.jsonl") };
 }
 
@@ -76,5 +79,17 @@ test("production persona and verbatim brief have separate read endpoints", async
     await handleCharlesRoute({ ...brief, charlesRoot: f.root, personaProposalsPath: f.proposalsPath });
     assert.equal(brief.response()?.value.text, "brief bytes\n");
     assert.equal(readFileSync(join(f.root, "config", "persona-brief.md"), "utf8"), "brief bytes\n");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("Charles read route exposes review-history failure without hiding the draft", async () => {
+  const f = fixture();
+  try {
+    const request = harness("GET", "/api/charles");
+    await handleCharlesRoute({ ...request, charlesRoot: f.root, reviewCommentsPath: f.root });
+    assert.equal(request.response()?.code, 200);
+    assert.equal(request.response()?.value.posts[0].id, "dapper");
+    assert.deepEqual(request.response()?.value.posts[0].comments, []);
+    assert.match(request.response()?.value.posts[0].historyWarning, /Review history is unavailable/);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
