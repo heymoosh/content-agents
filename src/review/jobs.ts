@@ -522,21 +522,34 @@ export function configuredQueueNote(request: ContentRequest, kind: "control" | "
  * a direct browser pass, and the caller's real checkout therefore always fall through to the real
  * selected CLI engine.
  */
-export function disposableConfiguredEngineOutput(request: ContentRequest, variants: readonly ContentVariant[]): string | null {
+function disposableConfiguredEngineAuthorized(): boolean {
   const token = process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
   const disposableRoot = process.env.E2E_REPO_ROOT;
-  if (!token || !disposableRoot) return null;
+  if (!token || !disposableRoot) return false;
   try {
-    if (realpathSync(disposableRoot) !== realpathSync(repoRoot)) return null;
-  } catch { return null; }
+    if (realpathSync(disposableRoot) !== realpathSync(repoRoot)) return false;
+  } catch { return false; }
   const marker = join(repoRoot, ".e2e-configured-engine-token");
-  if (!existsSync(marker) || readFileSync(marker, "utf8") !== token) return null;
+  return existsSync(marker) && readFileSync(marker, "utf8") === token;
+}
+
+export function disposableConfiguredEngineOutput(request: ContentRequest, variants: readonly ContentVariant[]): string | null {
+  if (!disposableConfiguredEngineAuthorized()) return null;
   const refs = request.sourceProvenance?.sourceLines;
   if (!refs?.length) throw new Error("disposable configured engine requires authoritative source provenance");
   return JSON.stringify(variants.map((variant, index) => ({
     id: variant.identity.id,
     body: `Fixture standalone point ${index + 1}.`,
     source_lines: [refs[0]],
+  })));
+}
+
+export function disposableVentureEngineOutput(request: ContentRequest, variants: readonly ContentVariant[]): string | null {
+  if (!disposableConfiguredEngineAuthorized()) return null;
+  if (request.origin !== "venture" || !request.ventureSource) throw new Error("disposable Venture engine requires approved Venture source provenance");
+  return JSON.stringify(variants.map((variant, index) => ({
+    id: variant.identity.id,
+    body: `Approved Venture premise, composed for ${variant.platform} as variant ${index + 1}.`,
   })));
 }
 
@@ -756,10 +769,16 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
     let engineExecution: "disposable-injected" | undefined;
     let coldFeedEditorApplied = false;
     if (treated.length && request.origin === "venture") {
-      const result = await runClaudeSpawn(job, ventureConfiguredContentPrompt(request, treated), { timeoutMs: ATOMIZE_TIMEOUT_MS });
-      const failure = decodeSpawnFailure(result, job.id, { timeoutVerb: "Venture configured drafting", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`, exitVerb: "Venture configured drafting" });
-      if (failure) throw new Error(failure.replace(/Claude/g, engineName(job)));
-      bodies = parseVentureConfiguredBodies(result.stdout, treated);
+      const injected = disposableVentureEngineOutput(request, treated);
+      if (injected !== null) {
+        engineExecution = "disposable-injected";
+        bodies = parseVentureConfiguredBodies(injected, treated);
+      } else {
+        const result = await runClaudeSpawn(job, ventureConfiguredContentPrompt(request, treated), { timeoutMs: ATOMIZE_TIMEOUT_MS });
+        const failure = decodeSpawnFailure(result, job.id, { timeoutVerb: "Venture configured drafting", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`, exitVerb: "Venture configured drafting" });
+        if (failure) throw new Error(failure.replace(/Claude/g, engineName(job)));
+        bodies = parseVentureConfiguredBodies(result.stdout, treated);
+      }
     } else if (treated.length && authoritative?.sourceLines.length) {
       const injected = disposableConfiguredEngineOutput(request, treated);
       if (injected !== null) {

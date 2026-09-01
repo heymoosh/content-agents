@@ -3456,6 +3456,17 @@ test("Content global review and publishing steps do not require a selected sourc
   assert.ok(!script.includes("if(n > 1 && !CW.slug) return;"));
 });
 
+test("Content configuration displays server-owned cross-room authority", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("APPROVED CROSS-ROOM SOURCE"));
+  assert.ok(html.includes("Content preserves this owning-room authority. Configuration cannot replace it."));
+  for (const label of ["Locked passage:", "Canon:", "Provenance:", "Persona source:", "Approved artifact:", "Claim authority:"]) {
+    assert.ok(html.includes(label), `cross-room context must include ${label}`);
+  }
+  assert.ok(html.includes('fetch("/api/content/request?slug="+encodeURIComponent(slug))'));
+  assert.ok(html.includes('if(contentRequestOrigin(cwSession())!=="human-inference") cwLoadTreatment();'));
+});
+
 test("Approve Drafts puts a searchable request filter before the other filters", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const filters = html.slice(html.indexOf('aria-label="Draft filters"'), html.indexOf('id="reviewMain"'));

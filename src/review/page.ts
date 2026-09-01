@@ -2758,7 +2758,7 @@ async function loadContent(){
 //     Nothing in src/ clusters Muxin's own audience, so none of it has a source.
 //   * the VENTURE source tag. Nothing hands a Venture artifact to content/. See develop.ts.
 // CW.pane picks either the configuration wizard or the grouped review surface.
-let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, signalDefaults:null, launching:false, loading:false, yesErrors:[], pane:"wizard", config:null, approvedLens:null };
+let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, request:null, requestFor:null, signalDefaults:null, launching:false, loading:false, yesErrors:[], pane:"wizard", config:null, approvedLens:null };
 
 // ── begin the treatment mirror ──
 // Rule 5: written twice, once exported from page.ts for DOM-free tests and once here. Keep both.
@@ -2992,6 +2992,26 @@ function cwPickedHtml(s){
     '<span class="src">'+esc(cwSourceMeta(s))+'</span></span>'+
     '<button class="cw-back" data-step="1">Pick a different one</button></div>';
 }
+function cwCrossRoomContextHtml(){
+  const request=CW.requestFor===CW.slug ? CW.request : null;
+  if(!request||request.origin==="studio"||request.origin==="human-inference") return "";
+  const context=request.sourceContext||null, venture=request.ventureSource||null;
+  let facts=[];
+  if(context&&context.kind==="fiction-approved-promotion"){
+    facts=["Series: "+context.series.title+" · chapter "+context.chapter.number+" · "+context.chapter.title]
+      .concat((context.sourcePassages||[]).map(p=>"Locked passage: "+p.ref))
+      .concat((context.restrictions&&context.restrictions.canon||[]).map(x=>"Canon: "+x))
+      .concat((context.restrictions&&context.restrictions.provenance||[]).map(x=>"Provenance: "+x));
+  } else if(context&&context.kind==="charles-approved-post"){
+    facts=["Persona: "+context.identity,"Persona source: "+context.personaRef].concat((context.restrictions||[]).map(x=>"Restriction: "+x));
+  } else if(venture){
+    facts=["Venture: "+request.ventureId,"Approved artifact: "+venture.artifactId+" · "+venture.artifactKind,"Body path: "+venture.bodyPath,"Approval: "+venture.approval.editorialStatus+" · "+venture.approval.provenance]
+      .concat((venture.claimRefs||[]).map(x=>"Claim authority: "+x.claim+" · "+x.ref));
+  }
+  if(!facts.length) return "";
+  const body=String(context&&context.authoritativeBody||request.originalInput||"");
+  return '<section class="cw-cross-context" style="margin-top:18px;padding:16px;border:1px solid #d8cfbb;border-radius:8px;background:#fffdf8"><div class="fam-ask">APPROVED CROSS-ROOM SOURCE</div><div class="src" style="margin-top:6px">Content preserves this owning-room authority. Configuration cannot replace it.</div><pre style="white-space:pre-wrap;font:14px/1.55 Georgia,serif">'+esc(body)+'</pre><ul class="src">'+facts.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></section>';
+}
 function cwChannelHtml(c){
   const fit = fitLine(c, CW.treat.floor);
   const reuse = reuseLine(c);
@@ -3032,14 +3052,15 @@ function cwStep2Html(){
   // Fiction, Charles, or Venture.
   if(contentRequestOrigin(s)!=="human-inference"){ const crossCfg=cwEnsureConfig(); crossCfg.open=true; }
   if(!CW.config || !CW.config.open) return cwAdvisorHtml(s);
-  if(CW.treatErr) return cwPickedHtml(s)+'<div class="fam-note t-amber" style="margin-top:16px">Could not read recommendations for this piece: '+esc(CW.treatErr)+'</div>';
-  if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+'<div class="empty">Reading recommendations…</div>';
+  const crossContext=cwCrossRoomContextHtml();
+  if(CW.treatErr) return cwPickedHtml(s)+crossContext+'<div class="fam-note t-amber" style="margin-top:16px">Could not read recommendations for this piece: '+esc(CW.treatErr)+'</div>';
+  if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+crossContext+'<div class="empty">Reading recommendations…</div>';
   const cfg = cwEnsureConfig();
   const dist=CW.treat.distribution||{platforms:[],media:[],mediaRationale:""};
   const platformWhy=(dist.platforms||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
   const mediaWhy=(dist.media||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
   const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these platforms and media?</summary><div style="margin-top:8px;max-width:680px">'+platformWhy+(mediaWhy||'<div class="src" style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<div class="src" style="margin-top:10px">Source fit supplies the cold-start recommendation. Existing routing and measured performance evidence remain stronger when available. Every checkbox remains yours to change.</div></div></details>';
-  return cwPickedHtml(s)+
+  return cwPickedHtml(s)+crossContext+
     '<div class="src" style="margin-top:18px;max-width:640px">Choose treatments, media, and platforms independently. Recommendations preselect a starting point; they never remove your control.</div>'+
     cwConfigSectionHtml("treatment","TREATMENTS",CONTENT_CONFIG_OPTIONS.treatment,s)+
     cwConfigSectionHtml("media","MEDIA",CONTENT_CONFIG_OPTIONS.media,s)+
@@ -3076,12 +3097,14 @@ async function cwLoadTreatment(){
   if(!slug) return;
   CW.loading = true; CW.treatErr = null;
   try {
-    const [r, signals] = await Promise.all([
+    const [r, signals, requestResult] = await Promise.all([
       fetch("/api/content/treatment?slug="+encodeURIComponent(slug)),
       fetch("/api/signals?brand=human-inference").then(x=>x.json()).catch(()=>null),
+      fetch("/api/content/request?slug="+encodeURIComponent(slug)).then(x=>x.json()).catch(()=>null),
     ]);
     const d = await r.json();
     CW.signalDefaults = signals && signals.contentDefaults || null;
+    CW.request = requestResult&&requestResult.ok ? requestResult.request : null; CW.requestFor=slug;
     if(d && d.error){ CW.treat = null; CW.treatFor = null; CW.treatErr = d.error; }
     else { CW.treat = d; CW.treatFor = slug; CW.treatErr = null; }
   } catch(e){
@@ -3156,8 +3179,10 @@ $("#contentWizard").addEventListener("click", (e)=>{
     return;
   }
   if(t.dataset.slug !== undefined){
-    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = []; CW.pane = "wizard"; CW.config = null; CW.approvedLens=null;
-    renderContentWizard(); return;
+    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.request=null; CW.requestFor=null; CW.yesErrors = []; CW.pane = "wizard"; CW.config = null; CW.approvedLens=null;
+    renderContentWizard();
+    if(contentRequestOrigin(cwSession())!=="human-inference") cwLoadTreatment();
+    return;
   }
   if(t.dataset.step !== undefined){
     const n = Number(t.dataset.step);

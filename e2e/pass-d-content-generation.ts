@@ -10,6 +10,8 @@ import { buildContentRequest } from "../src/review/content-request.js";
 const PORT = 4796;
 const SLUG = "e2e-configured-generation";
 const FICTION_SLUG = "e2e-fiction-treatment-refusal";
+const CHARLES_SLUG = "e2e-charles-approved-source";
+const VENTURE_SLUG = "e2e-venture-composition";
 
 function seedSource(): void {
   const folder = join(ROOT, "content", SLUG);
@@ -68,10 +70,40 @@ function seedFictionRefusal(): void {
   writeFileSync(join(folder, "content-request.json"), JSON.stringify(request, null, 2) + "\n");
 }
 
+function seedCrossRoomSources(): void {
+  const charlesFolder = join(ROOT, "content", CHARLES_SLUG);
+  mkdirSync(join(charlesFolder, "derivatives"), { recursive: true });
+  writeFileSync(join(charlesFolder, "source.md"), "---\ntitle: E2E approved Charles post\norigin: charles:lord-featherbottom\nsource_kind: charles\n---\n\nApproved Charles observation.\n");
+  writeFileSync(join(charlesFolder, "review-queue.md"), "# Review queue — E2E approved Charles post\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n");
+  writeFileSync(join(charlesFolder, "content-request.json"), JSON.stringify(buildContentRequest({
+    id: CHARLES_SLUG, origin: "charles", ventureId: "charles", descriptor: "Approved Charles post",
+    originalInput: "Unapproved Charles prompt wording.", treatments: [], media: [], platforms: ["substack"], includeUntreatedControl: true,
+    sourceContext: {
+      kind: "charles-approved-post", authoritativeBody: "Approved Charles observation.", personaRef: "charles/config/persona.yaml",
+      identity: "charles-lord-featherbottom", restrictions: ["Preserve Charles voice.", "Delivery is manual and ready-to-paste only."],
+    },
+  }), null, 2) + "\n");
+
+  const ventureFolder = join(ROOT, "content", VENTURE_SLUG);
+  mkdirSync(join(ventureFolder, "derivatives"), { recursive: true });
+  writeFileSync(join(ventureFolder, "source.md"), "---\ntitle: E2E approved Venture artifact\norigin: venture:e2e-venture:artifact-1\nsource_kind: venture\n---\n\nThe approved Venture premise is that careful operators need a smaller first step.\n");
+  writeFileSync(join(ventureFolder, "review-queue.md"), "# Review queue — E2E approved Venture artifact\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n");
+  writeFileSync(join(ventureFolder, "content-request.json"), JSON.stringify(buildContentRequest({
+    id: VENTURE_SLUG, origin: "venture", ventureId: "e2e-venture", descriptor: "Approved Venture artifact",
+    originalInput: "The approved Venture premise is that careful operators need a smaller first step.", treatments: ["summary"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
+    ventureSource: {
+      artifactId: "artifact-1", phase: 1, artifactKind: "text-post-note", messageId: "message-1",
+      bodyPath: "phase-1-attention/artifact-1.md", claimRefs: [{ claim: "Careful operators need a smaller first step.", ref: "intake:q7" }],
+      approval: { editorialStatus: "approved", provenance: "muxin-editorial-approval" },
+    },
+  }), null, 2) + "\n");
+}
+
 async function main(): Promise<void> {
   console.log("\n=== Pass D: configured Content generation, disposable injected engine ===\n");
   seedSource();
   seedFictionRefusal();
+  seedCrossRoomSources();
   const token = process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
   if (!token || !existsSync(join(ROOT, ".e2e-configured-engine-token"))) throw new Error("combined disposable E2E runner token is required");
   const server = await bootServer({ CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: token }, PORT);
@@ -166,6 +198,45 @@ async function main(): Promise<void> {
       feature: "Configured-generation browser pass cannot invoke a real model or provider",
       status: payload.engineExecution === "disposable-injected" && session.blockedCalls.length === 0 ? "pass" : "fail",
       detail: `server execution=${payload.engineExecution ?? "missing"}; browser-aborted calls=${session.blockedCalls.join(", ") || "none"}`,
+    });
+
+    const crossRoomCases = [
+      { slug: FICTION_SLUG, expected: ["Approved fiction promotion.", "Locked passage: chapters/001.md#L1", "Canon: No new canon.", "Provenance: Use the approved promotion only."] },
+      { slug: CHARLES_SLUG, expected: ["Approved Charles observation.", "Persona: charles-lord-featherbottom", "Persona source: charles/config/persona.yaml", "Delivery is manual and ready-to-paste only."] },
+      { slug: VENTURE_SLUG, expected: ["The approved Venture premise", "Approved artifact: artifact-1", "Approval: approved · muxin-editorial-approval", "Claim authority: Careful operators need a smaller first step. · intake:q7"] },
+    ];
+    let crossRoomDisplay = true;
+    const crossDetails: string[] = [];
+    for (const item of crossRoomCases) {
+      await page.locator('[data-step="1"]:visible').first().click();
+      await page.click(`#cwBody .cw-src[data-slug="${item.slug}"]`);
+      await page.waitForSelector("#cwBody .cw-cross-context", { timeout: 15_000 });
+      const text = (await page.locator("#cwBody .cw-cross-context").innerText()).replace(/\s+/g, " ");
+      const found = item.expected.every((expected) => text.includes(expected));
+      crossRoomDisplay = crossRoomDisplay && found;
+      crossDetails.push(`${item.slug}=${found}`);
+    }
+    record({
+      feature: "Content displays approved Fiction, Charles, and Venture authority before configuration",
+      status: crossRoomDisplay ? "pass" : "fail",
+      detail: crossDetails.join("; "),
+    });
+
+    await page.waitForSelector("#contentConfigSave", { timeout: 15_000 });
+    await page.click('[data-config-none="media"]');
+    const ventureGeneratedResponse = page.waitForResponse((candidate) => new URL(candidate.url()).pathname === "/api/content/generate");
+    await page.click("#contentConfigSave");
+    const ventureResponse = await ventureGeneratedResponse;
+    const venturePayload = await ventureResponse.json() as { ok?: boolean; ids?: string[]; engineExecution?: string; error?: string };
+    const ventureFolder = join(ROOT, "content", VENTURE_SLUG);
+    const ventureBodies = (venturePayload.ids ?? []).map((id) => readFileSync(join(ventureFolder, "derivatives", `${id}.md`), "utf8"));
+    const ventureQueue = readFileSync(join(ventureFolder, "review-queue.md"), "utf8");
+    const ventureComposed = ventureBodies.some((body) => /variant_kind:\s*["']?treated/.test(body) && body.includes("Approved Venture premise, composed for"));
+    const venturePending = (venturePayload.ids ?? []).every((id) => new RegExp(`\\| ${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\|[^\\n]+\\| pending \\|`).test(ventureQueue));
+    record({
+      feature: "Approved Venture authority composes treated pending Content through the real GUI",
+      status: ventureResponse.ok() && venturePayload.ok === true && venturePayload.engineExecution === "disposable-injected" && ventureComposed && venturePending ? "pass" : "fail",
+      detail: `HTTP ${ventureResponse.status()}; injected=${venturePayload.engineExecution}; outputs=${ventureBodies.length}; composed=${ventureComposed}; pending=${venturePending}; blocked calls=${session.blockedCalls.join(", ") || "none"}${venturePayload.error ? `; error=${venturePayload.error}` : ""}`,
     });
 
     const fictionResult = await page.evaluate(async (slug) => {
