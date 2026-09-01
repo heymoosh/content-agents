@@ -1095,11 +1095,11 @@ test("Signals Venture inputs stay in the Signals surface and keep the Venture ga
   }
 });
 
-test("GPT-OSS is selectable for read-only Signals analysis but not file-writing strategy runs", () => {
+test("GPT-OSS is paused in both analysis and file-writing product choices", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const analysis = html.slice(html.indexOf('id="signalsAnalysisEngine"') - 120, html.indexOf('id="signalsAnalysisEngine"') + 500);
   const strategy = html.slice(html.indexOf('id="strategyEngine"') - 120, html.indexOf('id="strategyEngine"') + 500);
-  assert.ok(analysis.includes('value="ollama-gpt-oss"'));
+  assert.ok(!analysis.includes('value="ollama-gpt-oss"'));
   assert.ok(!strategy.includes('value="ollama-gpt-oss"'));
   assert.ok(html.includes('$("#signalsAnalysisEngine").value'));
   assert.ok(html.includes('$("#strategyEngine").value'));
@@ -2478,6 +2478,15 @@ test("Fiction drafting and second passes expose a local engine selector and send
   assert.ok(script.includes('const engine = draftBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";'));
   assert.ok(script.includes('const engine = passBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";'));
   assert.ok(script.includes('refreshEngineControls($("#fictionMain"));'));
+});
+
+test("GPT-OSS is paused in product choices and Fiction exposes durable engine provenance", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(!html.includes('<option value="ollama-gpt-oss">'), "a locally installed model must not reopen a paused product choice");
+  assert.ok(script.includes("drafted with "));
+  assert.ok(script.includes("revised with "));
+  assert.ok(script.includes('rep.engine?" with "+engineLabel(rep.engine)'));
 });
 
 test("Studio polish keeps engine choices, capture submits, and room loads understandable", () => {

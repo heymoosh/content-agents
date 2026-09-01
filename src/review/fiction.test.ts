@@ -139,8 +139,19 @@ test("scene beats survive a reload, and starting a different scene drops the anc
     assert.equal(readSceneBeats("the-least-of-us", root), null);
     saveSceneBeats("the-least-of-us", "  Eli finds the cut line.  ", null, root);
     assert.equal(readSceneBeats("the-least-of-us", root)?.beats, "Eli finds the cut line.");
-    saveSceneBeats("the-least-of-us", "Eli finds the cut line.", 2, root);
-    assert.equal(readSceneBeats("the-least-of-us", root)?.chapter, 2);
+    assert.equal(readSceneBeats("the-least-of-us", root)?.initialEngine, null, "legacy/unstamped anchors stay honest");
+    saveSceneBeats("the-least-of-us", "Eli finds the cut line.", 2, root, "codex");
+    assert.deepEqual(readSceneBeats("the-least-of-us", root), {
+      beats: "Eli finds the cut line.", chapter: 2, initialEngine: "codex", revisionHistory: [],
+      savedAt: readSceneBeats("the-least-of-us", root)?.savedAt,
+    });
+    saveSceneBeats("the-least-of-us", "Eli finds the cut line.", 2, root, "grok", "repass-job-1");
+    saveSceneBeats("the-least-of-us", "Eli finds the cut line.", 2, root, "grok", "repass-job-1");
+    const provenance = readSceneBeats("the-least-of-us", root)!;
+    assert.equal(provenance.initialEngine, "codex");
+    assert.deepEqual(provenance.revisionHistory.map(({ operationId, engine }) => ({ operationId, engine })), [
+      { operationId: "repass-job-1", engine: "grok" },
+    ], "a repass preserves the initial engine and records its own engine idempotently");
     clearSceneBeats("the-least-of-us", root);
     assert.equal(readSceneBeats("the-least-of-us", root), null);
     assert.throws(() => saveSceneBeats("the-least-of-us", "   ", null, root), /say the beats/);

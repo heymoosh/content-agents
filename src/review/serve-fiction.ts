@@ -318,6 +318,8 @@ export async function handleFictionRoute({
       json(res, 200, {
         ok: true,
         beats: beats?.beats ?? "",
+        initialEngine: beats?.initialEngine ?? null,
+        revisionHistory: beats?.revisionHistory ?? [],
         chapter,
         continuity: n ? readContinuityReport(slug, n) : null,
         comments: n ? listReviewCommentsSafe("fiction", fictionReviewSubject(slug, n)) : [],
@@ -340,7 +342,7 @@ export async function handleFictionRoute({
       // for a run that actually queued: a deduped press returns the draft already in flight, and
       // moving the anchor to beats that run never received would show Muxin one set of beats
       // above prose written from another.
-      if (queued) saveSceneBeats(slug, beats);
+      if (queued) saveSceneBeats(slug, beats, null, undefined, job.engine ?? "claude");
       json(res, 200, { ok: true, job: publicJob(job) });
     } catch (e) {
       json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });

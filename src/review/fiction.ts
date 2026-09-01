@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import type { Engine } from "./engines.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { repoRoot } from "../db/db.js";
@@ -164,7 +165,13 @@ export const BEATS_ROOT = join(homedir(), ".content-agents", "fiction-beats");
 export interface SceneBeats {
   beats: string;
   chapter: number | null; // filled in once the draft job produced a chapter
+  initialEngine: Engine | null;
+  revisionHistory: { operationId: string; engine: Engine; recordedAt: string }[];
   savedAt: string;
+}
+
+function storedEngine(value: unknown): Engine | null {
+  return value === "claude" || value === "grok" || value === "codex" || value === "ollama-gpt-oss" ? value : null;
 }
 
 function beatsPath(slug: string, root: string): string {
@@ -178,6 +185,13 @@ export function readSceneBeats(slug: string, root: string = BEATS_ROOT): SceneBe
     return {
       beats: raw.beats,
       chapter: typeof raw.chapter === "number" ? raw.chapter : null,
+      initialEngine: storedEngine(raw.initialEngine ?? (raw as { engine?: unknown }).engine),
+      revisionHistory: Array.isArray(raw.revisionHistory) ? raw.revisionHistory.flatMap((entry) => {
+        const item = entry as { operationId?: unknown; engine?: unknown; recordedAt?: unknown };
+        const engine = storedEngine(item.engine);
+        return typeof item.operationId === "string" && engine && typeof item.recordedAt === "string"
+          ? [{ operationId: item.operationId, engine, recordedAt: item.recordedAt }] : [];
+      }) : [],
       savedAt: typeof raw.savedAt === "string" ? raw.savedAt : "",
     };
   } catch {
@@ -185,12 +199,24 @@ export function readSceneBeats(slug: string, root: string = BEATS_ROOT): SceneBe
   }
 }
 
-export function saveSceneBeats(slug: string, beats: string, chapter: number | null = null, root: string = BEATS_ROOT): SceneBeats {
+export function saveSceneBeats(slug: string, beats: string, chapter: number | null = null, root: string = BEATS_ROOT, engine: Engine | null = null, revisionOperationId?: string): SceneBeats {
   const text = beats.trim();
   if (!text) throw new Error("say the beats first");
   const p = beatsPath(slug, root);
   mkdirSync(join(p, ".."), { recursive: true });
-  const saved: SceneBeats = { beats: text, chapter, savedAt: new Date().toISOString() };
+  const existing = readSceneBeats(slug, root);
+  const savedAt = new Date().toISOString();
+  const priorRevisions = existing?.revisionHistory ?? [];
+  const revisionHistory = revisionOperationId && engine && !priorRevisions.some((entry) => entry.operationId === revisionOperationId)
+    ? [...priorRevisions, { operationId: revisionOperationId, engine, recordedAt: savedAt }]
+    : priorRevisions;
+  const saved: SceneBeats = {
+    beats: text,
+    chapter,
+    initialEngine: revisionOperationId ? existing?.initialEngine ?? null : engine,
+    revisionHistory: chapter === null && !revisionOperationId ? [] : revisionHistory,
+    savedAt,
+  };
   writeFileSync(p, JSON.stringify(saved, null, 2) + "\n");
   return saved;
 }

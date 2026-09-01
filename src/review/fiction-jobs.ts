@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import { execFileSync } from "node:child_process";
 import { repoRoot } from "../db/db.js";
-import { saveSceneBeats } from "./fiction.js";
+import { readSceneBeats, saveSceneBeats } from "./fiction.js";
 import { resolveSeriesDir, chapterNumbers, readChapter } from "../fiction/_series.js";
 import { continuityReportPath, readContinuityReport } from "../fiction/continuity.js";
 import { ENGINE_LABELS, type Engine } from "./engines.js";
@@ -248,11 +248,20 @@ async function runFictionDraftJob(job: FictionJob, deps: FictionJobDependencies)
   }
   const chapter: number = produced;
   job.payload = { ...p, chapter };
-  // Keep the anchor pointing at the scene it produced, so a reload still shows her beats above it.
+  // Keep the anchor pointing at the scene and durably attribute each model-written operation.
+  // A chapter without that receipt stays visible on disk, but the job must not claim complete.
   try {
-    if (mode === "draft" && p.beats) saveSceneBeats(p.series ?? job.arg, p.beats, chapter);
-  } catch {
-    /* the anchor is a convenience; a scene that exists is still a scene */
+    if (mode === "draft" && p.beats) {
+      saveSceneBeats(p.series ?? job.arg, p.beats, chapter, undefined, job.engine ?? "claude");
+    } else if (mode === "repass") {
+      const anchor = readSceneBeats(p.series ?? job.arg);
+      if (!anchor?.beats) throw new Error("the scene anchor is missing");
+      saveSceneBeats(p.series ?? job.arg, anchor.beats, chapter, undefined, job.engine ?? "claude", job.id);
+    }
+  } catch (error) {
+    job.status = "failed";
+    job.error = `chapter ${chapter} was written, but its engine provenance could not be recorded: ${error instanceof Error ? error.message : String(error)}`;
+    return;
   }
   // "It writes a first pass and checks the canon while it goes." The queue is serial, so this
   // simply runs next, on the same engine the draft ran on unless she picks a different one for the

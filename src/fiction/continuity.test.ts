@@ -273,6 +273,8 @@ test("runContinuityCheck takes an engine option without requiring callModel to c
     // `engine` alongside `callModel` is accepted and does not change the report shape.
     const report = await runContinuityCheck(dir, 1, { root, engine: "codex", callModel: async () => wellFormed() });
     assert.equal(report.conflicts.length, 1);
+    assert.equal(report.engine, "codex");
+    assert.equal(readContinuityReport("a-series", 1, root)?.engine, "codex");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -63,18 +63,19 @@ test("strategy brief lookup is brand-scoped and leaves top-level legacy briefs u
   }
 });
 
-test("engine availability requires the exact GPT-OSS model, not merely an Ollama binary", () => {
+test("GPT-OSS stays paused even when Ollama reports the exact model", () => {
   const missing = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\nllama3.2:latest\n" : "");
   assert.equal(missing.find((e) => e.id === "ollama-gpt-oss")?.installed, false);
   const ready = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\ngpt-oss:20b\n" : "");
-  assert.equal(ready.find((e) => e.id === "ollama-gpt-oss")?.installed, true);
+  assert.equal(ready.find((e) => e.id === "ollama-gpt-oss")?.installed, false);
+  assert.match(ready.find((e) => e.id === "ollama-gpt-oss")?.note ?? "", /paused/i);
 });
 
-test("GPT-OSS is accepted only by read-only analysis routes", () => {
-  assert.equal(requestAnalysisEngine("ollama-gpt-oss"), "ollama-gpt-oss");
-  assert.throws(() => requestEngine("ollama-gpt-oss"), /read-only|agentic|file/i);
+test("GPT-OSS is refused by every product route while paused", () => {
+  assert.throws(() => requestAnalysisEngine("ollama-gpt-oss"), /paused/i);
+  assert.throws(() => requestEngine("ollama-gpt-oss"), /paused/i);
   assert.equal(requestEngine("codex"), "codex");
-  assert.throws(() => requestInteractiveAnalysisEngine("ollama-gpt-oss"), /self-contained|follow-up/i);
+  assert.throws(() => requestInteractiveAnalysisEngine("ollama-gpt-oss"), /paused/i);
 });
 
 test("manual initial outreach sends use the folder slug and contacted event metadata", () => {

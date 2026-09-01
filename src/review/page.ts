@@ -1215,7 +1215,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
     <div class="strategy" style="max-width:none;margin-top:14px">
       <div class="strategy-actions">
-        <label class="engine-choice"><span>Run analysis with</span><select class="engine-select" id="signalsAnalysisEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option><option value="ollama-gpt-oss">GPT-OSS (local)</option></select></label>
+        <label class="engine-choice"><span>Run analysis with</span><select class="engine-select" id="signalsAnalysisEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
         <button class="primary" id="insightsBtn">Generate insights</button>
         <span class="hint">Runs the analytics reports live, then asks your selected engine for a short skim. Nothing here writes data or publishes anything.</span>
       </div>
@@ -4721,7 +4721,7 @@ function ficCheckRow(item, fixed){
 function ficCanonStamp(rep){
   if(!rep) return "";
   const holds = (rep.holds||[]).length, conflicts = (rep.conflicts||[]).length;
-  return "checked "+(rep.checkedAt||"").slice(0,10)+" · "+holds+" holding · "+conflicts+" breaking";
+  return "checked "+(rep.checkedAt||"").slice(0,10)+(rep.engine?" with "+engineLabel(rep.engine):"")+" · "+holds+" holding · "+conflicts+" breaking";
 }
 function ficParagraphs(body){
   return String(body||"").replace(/\\r\\n/g,"\\n").trim().split(/\\n\\s*\\n/)
@@ -4797,7 +4797,7 @@ function renderFiction(){
   const scene = !hasScene ? '' :
     '<div style="display:flex;align-items:baseline;gap:10px;margin:32px 0 11px">'+
       '<span style="font:600 13px/1 Georgia,serif;color:'+JC.ai+'">The scene, from your beats</span>'+
-      '<span class="src" style="font-style:italic">chapter '+chapter.number+(chapter.title?' · '+esc(chapter.title):'')+' · your beats, its prose</span>'+
+      '<span class="src" style="font-style:italic">chapter '+chapter.number+(chapter.title?' · '+esc(chapter.title):'')+' · your beats, its prose'+(sc.initialEngine?' · drafted with '+esc(engineLabel(sc.initialEngine)):'')+((sc.revisionHistory||[]).length?' · revised with '+(sc.revisionHistory||[]).map(x=>esc(engineLabel(x.engine))).join(", "):'')+'</span>'+
     '</div>'+
     '<div style="max-width:600px;display:flex;flex-direction:column;gap:15px;padding-left:18px;border-left:2px solid '+JC.ai+'">'+
       spans.map((t,i)=>'<div data-passage="'+i+'"><div style="font:400 18px/1.8 Georgia,serif;color:'+JC.ai+';white-space:pre-wrap">'+esc(t)+'</div><button type="button" data-edit-passage="'+i+'" style="margin-top:5px;border:none;background:none;padding:0;color:#756b9a;font-size:12px;cursor:pointer">Edit passage</button></div>').join("")+

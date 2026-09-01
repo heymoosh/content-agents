@@ -53,6 +53,7 @@ export interface ContinuityItem {
 export interface ContinuityReport {
   series: string;
   chapter: number;
+  engine: Engine | null;
   checkedAt: string;
   rulesRead: number;
   holds: ContinuityItem[];
@@ -67,7 +68,8 @@ export function readContinuityReport(slug: string, chapter: number, root: string
   const p = continuityReportPath(slug, chapter, root);
   if (!existsSync(p)) return null;
   try {
-    return JSON.parse(readFileSync(p, "utf8")) as ContinuityReport;
+    const report = JSON.parse(readFileSync(p, "utf8")) as ContinuityReport;
+    return { ...report, engine: isEngine(report.engine) ? report.engine : null };
   } catch {
     return null; // a half-written or hand-mangled report reads as "not checked yet", never a crash
   }
@@ -300,6 +302,7 @@ export async function runContinuityCheck(seriesArg: string, chapter: number, opt
   const report: ContinuityReport = {
     series: slug,
     chapter,
+    engine,
     checkedAt: new Date().toISOString(),
     // The model's own count is a claim, not a measurement. Fall back to what this repo can
     // actually count (the character sheets it was handed) rather than showing an invented number.

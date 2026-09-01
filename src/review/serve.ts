@@ -87,7 +87,7 @@ import { listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyB
 import { renderPage } from "./page.js";
 import { fixturesEnabled, FIXTURE_ENV_VAR, FIXTURE_WRITE_REFUSAL } from "./fixtures.js";
 import { buildStudioHome } from "./studio.js";
-import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, ollamaAvailability, type Engine } from "./engines.js";
+import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, type Engine } from "./engines.js";
 import { readTreatment } from "./treatment.js";
 import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts, saveIntakeSectionDraft, readIntakeSections, clearIntakeDrafts } from "./intake-draft.js";
 import { enqueueVentureStep } from "./venture-runner.js";
@@ -131,17 +131,18 @@ const PORT = Number(process.env.REVIEW_PORT ?? 4600);
 
 /** File-writing and tool-using routes deliberately exclude the plain local Ollama runner. */
 export function requestEngine(value: unknown): Engine {
-  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is read-only and cannot run an agentic or file-writing route");
+  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is paused; choose Claude, Grok, or GPT (Codex)");
   return isEngine(value) ? value : "claude";
 }
 
-/** Read-only, self-contained analysis can use every installed engine, including local GPT-OSS. */
+/** Read-only analysis still honors the product pause; an installed local model is not authorization. */
 export function requestAnalysisEngine(value: unknown): Engine {
+  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is paused; choose Claude, Grok, or GPT (Codex)");
   return isEngine(value) ? value : "claude";
 }
 
 export function requestInteractiveAnalysisEngine(value: unknown): Engine {
-  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is limited to the self-contained initial analysis; choose another engine for report-reading follow-up questions");
+  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is paused; choose Claude, Grok, or GPT (Codex)");
   return requestEngine(value);
 }
 
@@ -222,20 +223,11 @@ type SyncEngineProbe = (file: string, args: readonly string[], options: { encodi
 export function availableEngines(probe: SyncEngineProbe = execFileSync as SyncEngineProbe) {
   return ENGINES.map((engine) => {
     if (engine === "ollama-gpt-oss") {
-      try {
-        const availability = ollamaAvailability({ listOutput: String(probe("ollama", ["list"], { encoding: "utf8", stdio: "pipe", timeout: 2_000 })) });
-        return {
-          id: engine, label: ENGINE_LABELS[engine], description: ENGINE_METADATA[engine].description,
-          roleHint: ENGINE_METADATA[engine].roleHint, installed: availability.state === "ready",
-          note: availability.state === "ready" ? `${availability.model} is available locally.` : `${availability.model} is not installed in Ollama.`,
-        };
-      } catch {
-        return {
-          id: engine, label: ENGINE_LABELS[engine], description: ENGINE_METADATA[engine].description,
-          roleHint: ENGINE_METADATA[engine].roleHint, installed: false,
-          note: "Ollama is not reachable on this server.",
-        };
-      }
+      return {
+        id: engine, label: ENGINE_LABELS[engine], description: ENGINE_METADATA[engine].description,
+        roleHint: ENGINE_METADATA[engine].roleHint, installed: false,
+        note: "Paused by product decision. Choose Claude, Grok, or GPT (Codex).",
+      };
     }
     let installed = false;
     try {
