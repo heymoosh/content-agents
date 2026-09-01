@@ -132,6 +132,43 @@ async function main(): Promise<void> {
       detail: `durable Content captures=${captures.captures?.filter((capture) => capture.room === "Content").length ?? 0}; advisor job=${contentCapture?.jobId ?? "missing"}; approval and publishing remain separate`,
     });
 
+    const firstCharlesIdea = "Charles should reply to this absurd certainty without publishing anything.";
+    const secondCharlesIdea = "Featherbottom should panic about this offer without replacing my first idea.";
+    await openRoom(page, "studio");
+    await page.fill("#src", firstCharlesIdea);
+    await page.click("#routeBtn");
+    await page.waitForSelector("#captureVerdict:not([hidden]) .cap-go", { timeout: 10_000 });
+    const charlesVerdict = (await page.locator("#captureVerdict").innerText()).replace(/\s+/g, " ");
+    await page.click("#captureVerdict .cap-go");
+    await page.waitForSelector("#roomCharles:not([hidden]) #charlesInput", { timeout: 10_000 });
+    await page.waitForFunction((expected) => (document.querySelector("#charlesInput") as HTMLTextAreaElement | null)?.value === expected, firstCharlesIdea, { timeout: 10_000 });
+    const firstInput = await page.inputValue("#charlesInput");
+
+    await openRoom(page, "studio");
+    await page.fill("#src", secondCharlesIdea);
+    await page.click("#routeBtn");
+    await page.waitForSelector("#captureVerdict:not([hidden]) .cap-go", { timeout: 10_000 });
+    await page.click("#captureVerdict .cap-go");
+    await page.waitForSelector("#roomCharles:not([hidden]) #charlesInput", { timeout: 10_000 });
+    await page.waitForFunction(async (expected) => {
+      const response = await fetch("/api/captures");
+      const body = await response.json() as { captures?: { room?: string; text?: string }[] };
+      return body.captures?.some((capture) => capture.room === "Charles" && capture.text === expected) === true;
+    }, secondCharlesIdea, { timeout: 10_000 });
+    const preservedInput = await page.inputValue("#charlesInput");
+    const charlesCaptures = await page.evaluate(async () => {
+      const response = await fetch("/api/captures");
+      return await response.json() as { ok?: boolean; captures?: { room?: string; text?: string; jobId?: string | null }[] };
+    });
+    const capturedIdeas = charlesCaptures.captures?.filter((capture) => capture.room === "Charles") ?? [];
+    const durable = [firstCharlesIdea, secondCharlesIdea].every((idea) => capturedIdeas.some((capture) => capture.text === idea && !capture.jobId));
+    record({
+      feature: "Studio capture opens Charles Input without drafting or overwriting an unsaved idea",
+      status: charlesVerdict.includes("Charles") && firstInput === firstCharlesIdea && preservedInput === firstCharlesIdea && durable ? "pass" : "fail",
+      detail: `verdict=${charlesVerdict.includes("Charles")}; first exact=${firstInput === firstCharlesIdea}; unsaved preserved=${preservedInput === firstCharlesIdea}; durable body-only captures=${capturedIdeas.length}; jobs=${capturedIdeas.filter((capture) => capture.jobId).length}`,
+    });
+    await page.fill("#charlesInput", "");
+
     await openRoom(page, "content");
     await waitLoaded(page, "#contentWizard");
     const seededSession = await page.evaluate(async (slug) => {

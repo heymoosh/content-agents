@@ -57,6 +57,7 @@ import {
   BOOT_ROOM,
   CAPTURE_RAIL_ASKING,
   CAPTURE_RAIL_IDLE,
+  captureVerdict as sharedCaptureVerdict,
 } from "./page-capture.js";
 export * from "./page-outreach.js";
 export * from "./page-fiction.js";
@@ -188,13 +189,10 @@ export function captureHandoffSummary(capture: CaptureHandoff | null): {
 }
 
 // Start on it saves first, then advances to the safest real next action each build can accept.
-export function captureHandoffVerdict(room: "Content" | "Fiction" | "Outreach" | "Venture"): {
+export function captureHandoffVerdict(room: "Content" | "Fiction" | "Outreach" | "Venture" | "Charles"): {
   room: string; line: string; actionLabel: string | null;
 } {
-  if (room === "Content") return { room, line: "I read this as Content. Start on it opens an advisor round. Approval and publishing stay separate.", actionLabel: "Start on it" };
-  if (room === "Fiction") return { room, line: "I read this as Fiction. Start on it puts these beats in Write next for you to review before drafting.", actionLabel: "Start on it" };
-  if (room === "Outreach") return { room, line: "I read this as Outreach. Start on it opens the lead chooser; you still choose the person before any draft.", actionLabel: "Start on it" };
-  return { room, line: "I read this as Venture. Start on it opens the current human-gated venture step. It does not run or approve it.", actionLabel: "Start on it" };
+  return sharedCaptureVerdict(room);
 }
 
 
@@ -6367,6 +6365,7 @@ function classifyCapture(text){
   const t = String(text==null?"":text).trim();
   if(!t) return {kind:"empty"};
   const low = t.toLowerCase();
+  if(/\\bcharles\\b|\\bfeatherbottom\\b/.test(low)) return {kind:"room", room:"Charles"};
   if(/follow up|reply to|email|intro|reach out|met /.test(low)) return {kind:"room", room:"Outreach"};
   if(/chapter|scene|elias|character|plot/.test(low)) return {kind:"room", room:"Fiction"};
   if(/price|offer|landing|magnet|survey|venture|phase|response|repl/.test(low)) return {kind:"room", room:"Venture"};
@@ -6377,7 +6376,9 @@ function captureVerdict(room){
   if(room==="Content") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Content").line)}, actionLabel:"Start on it"};
   if(room==="Fiction") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Fiction").line)}, actionLabel:"Start on it"};
   if(room==="Outreach") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Outreach").line)}, actionLabel:"Start on it"};
-  return {room:room, line:${JSON.stringify(captureHandoffVerdict("Venture").line)}, actionLabel:"Start on it"};
+  if(room==="Venture") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Venture").line)}, actionLabel:"Start on it"};
+  if(room==="Charles") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Charles").line)}, actionLabel:"Start on it"};
+  throw new Error("Unsupported capture room: "+room);
 }
 // ── end of the capture mirror ──
 
@@ -6428,7 +6429,7 @@ function closeLinkAsk(clearText){
 function showCaptureVerdict(room){
   const v = captureVerdict(room);
   const box = $("#captureVerdict");
-  const others = ["Content","Fiction","Outreach","Venture"].filter(r=>r!==room);
+  const others = ["Content","Fiction","Outreach","Venture","Charles"].filter(r=>r!==room);
   box.innerHTML = '<div>'+esc(v.line)+'</div>'+
       '<div class="cv-row"><button class="primary cap-go">Start on it</button></div>'+
     '<div class="cv-row"><span>Wrong room?</span>'+
@@ -6461,9 +6462,25 @@ async function advanceCaptureSafely(room, text){
     $("#outreachList button, #outreachList [tabindex]")?.focus();
     return "Choose the lead this belongs to before drafting.";
   }
-  await loadVenture();
-  $("#ventureRunStepBtn")?.focus();
-  return "The current venture step is open. Review its human gate before running it.";
+  if(room==="Charles"){
+    await loadCharles();
+    charlesPage="input"; renderCharlesPages();
+    const input=$("#charlesInput");
+    if(!input) throw new Error("Charles Input is unavailable");
+    if(input.value.trim()&&input.value!==text){
+      input.focus();
+      throw new Error("Charles Input already has an unsaved idea. Clear it, then start this saved capture again.");
+    }
+    input.value=text;
+    input?.focus();
+    return "Your exact idea is in Charles Input. Review it before drafting.";
+  }
+  if(room==="Venture"){
+    await loadVenture();
+    $("#ventureRunStepBtn")?.focus();
+    return "The current venture step is open. Review its human gate before running it.";
+  }
+  throw new Error("Unsupported capture room: "+room);
 }
 async function takeCaptureTo(room){
   const t = captureText();

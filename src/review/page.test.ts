@@ -2194,6 +2194,7 @@ function captureMirror(): { classifyCapture: CaptureFn; captureVerdict: VerdictF
 
 // [text, expected room]. The precedence cases are the point: each one matches more than one rule.
 const CAPTURE_ROOM_VECTORS: [string, string][] = [
+  ["Charles should reply to this absurd claim", "Charles"], // explicit persona beats Outreach's "reply to"
   ["follow up with Jamie R. about the pitch", "Outreach"],
   ["met Dana at the meetup, she runs the fund", "Outreach"],
   ["reply to https://someplace.com", "Outreach"],       // a keyword beats the bare-URL branch
@@ -2202,6 +2203,8 @@ const CAPTURE_ROOM_VECTORS: [string, string][] = [
   ["chapter 4 needs a colder open", "Fiction"],
   ["elias finally says it out loud", "Fiction"],
   ["a scene where the offer lands badly", "Fiction"],    // rule 2 beats Venture's "offer"
+  ["Charles should panic about this result", "Charles"],
+  ["a Featherbottom note about the offer", "Charles"],   // explicit persona beats Venture's "offer"
   ["what should the price be", "Venture"],
   ["survey answers are coming in faster than I thought", "Venture"],
   ["a thought about how atomization actually scales", "Content"],
@@ -2272,14 +2275,18 @@ test("classifyCapture mirror: the browser copy answers identically on every vect
 
 test("durable capture verdict: every routed capture names the room it chose, and its browser mirror agrees", () => {
   const mirror = captureMirror().captureVerdict;
-  for (const room of ["Content", "Fiction", "Outreach", "Venture"] as const) {
+  for (const room of ["Content", "Fiction", "Outreach", "Venture", "Charles"] as const) {
     const v = captureHandoffVerdict(room);
     assert.ok(v.line.includes(room), "the verdict must name the room it picked: " + room);
+    assert.deepEqual(captureVerdict(room), v, "the exported verdict must match the durable handoff verdict: " + room);
     assert.deepEqual(mirror(room), v, "the browser copy of captureVerdict must match: " + room);
   }
-  for (const room of ["Content", "Fiction", "Outreach", "Venture"] as const) {
+  for (const room of ["Content", "Fiction", "Outreach", "Venture", "Charles"] as const) {
     assert.equal(captureHandoffVerdict(room).actionLabel, "Start on it");
   }
+  assert.throws(() => mirror("Signals"), /Unsupported capture room: Signals/);
+  assert.throws(() => captureVerdict("Signals" as "Content"), /Unsupported capture room: Signals/);
+  assert.throws(() => captureHandoffVerdict("Signals" as "Content"), /Unsupported capture room: Signals/);
 });
 
 test("Studio capture: the rendered durable-handoff verdict makes no stale routing promise", () => {
@@ -2289,6 +2296,7 @@ test("Studio capture: the rendered durable-handoff verdict makes no stale routin
     "I read this as Fiction. Start on it puts these beats in Write next for you to review before drafting.",
     "I read this as Outreach. Start on it opens the lead chooser; you still choose the person before any draft.",
     "I read this as Venture. Start on it opens the current human-gated venture step. It does not run or approve it.",
+    "I read this as Charles. Start on it places the exact idea in Charles Input for you to review before drafting.",
   ]) assert.ok(script.includes(JSON.stringify(line)), line);
   for (const stale of [
     "I can put it in the composer as your beats",
@@ -2405,7 +2413,14 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(section.includes('idea.value=text'), "Fiction prepares the inbox idea without auto-classifying");
   assert.ok(section.includes('ficPage="inbox"'), "Fiction opens its safe front door");
   assert.ok(section.includes('setOutreachSub("leads")'), "Outreach opens the required lead chooser");
+  assert.ok(section.includes('charlesPage="input"'), "Charles opens its safe Input page");
+  assert.ok(section.includes("renderCharlesPages()"), "Charles renders the existing Input page helper");
+  assert.ok(section.includes("await loadCharles()"), "Charles waits for its room read before copying into Input");
+  assert.ok(section.includes('input.value=text'), "Charles copies the exact capture without drafting it");
+  assert.ok(section.includes("Charles Input already has an unsaved idea"), "Charles refuses to overwrite a different unsaved idea");
   assert.ok(section.includes('$("#ventureRunStepBtn")?.focus()'), "Venture opens its current human-gated step");
+  assert.ok(section.includes('throw new Error("Unsupported capture room: "+room)'), "unknown rooms fail closed instead of falling through to Venture");
+  assert.ok(!section.includes('$("#charlesDraftBtn").click()'));
   assert.ok(!section.includes('$("#ficDraftBtn").click()'));
   assert.ok(!section.includes('$("#ventureRunStepBtn").click()'));
   for (const id of ["contentCaptureHandoff", "fictionCaptureHandoff", "outreachCaptureHandoff", "ventureCaptureHandoff", "signalsCaptureHandoff", "charlesCaptureHandoff"]) {
@@ -2421,13 +2436,14 @@ test("Studio capture: top-level Start on it advances every classified build to i
 test("Studio capture copy: no em dashes and every classified build names its safe next gate", () => {
   const strings = [
     CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING, LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE,
-    ...(["Content", "Fiction", "Outreach", "Venture"] as const).map((r) => captureHandoffVerdict(r).line),
+    ...(["Content", "Fiction", "Outreach", "Venture", "Charles"] as const).map((r) => captureHandoffVerdict(r).line),
   ];
   for (const s of strings) assert.ok(!s.includes("—"), "em dash in capture copy: " + s);
   assert.match(captureHandoffVerdict("Content").line, /advisor round/);
   assert.match(captureHandoffVerdict("Fiction").line, /review before drafting/);
   assert.match(captureHandoffVerdict("Outreach").line, /choose the person/);
   assert.match(captureHandoffVerdict("Venture").line, /does not run or approve/);
+  assert.match(captureHandoffVerdict("Charles").line, /review before drafting/);
 });
 
 test("Studio keeps obsolete director attribution out of the visible capture workflow", () => {
