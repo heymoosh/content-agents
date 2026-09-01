@@ -26,6 +26,8 @@ describe("buildClientPlatformDiscoveryPrompt", () => {
     assert.match(prompt, /RUBRIC TEXT/);
     assert.match(prompt, /PERSON FIT TEXT/);
     assert.match(prompt, /No em dashes anywhere/);
+    assert.match(prompt, /Start with reflective founders or executives/i);
+    assert.match(prompt, /research the company only after/i);
   });
 
   test("platform kind: mentions strong/partial/weak vocabulary, no person-fit step", () => {
@@ -43,6 +45,30 @@ describe("buildClientPlatformDiscoveryPrompt", () => {
     assert.match(prompt, /None on file yet -- propose freely\./);
     assert.doesNotMatch(prompt, /Person-fit pass/);
     assert.match(prompt, /SPIN ANGLES TEXT/);
+  });
+
+  test("grounds each run in its rotated lens, anchor graph, pass feedback, and calibration", () => {
+    const prompt = buildClientPlatformDiscoveryPrompt({
+      kind: "platform",
+      theme: "participatory technology",
+      maxCandidates: 2,
+      rubric: "platform rubric",
+      worldviewMap: "worldview map",
+      extraContext: "positioning",
+      excludeNames: [],
+      searchBudgetPerSignal: 2,
+      lens: { belief: "systems should distribute agency", dialect: "civic tech", modality: "podcast" },
+      anchorContext: "Anchor: Audrey Tang. Expand 1-2 public hops through co-appearance.",
+      antiExamples: ["Big Generic Show: audience too large."],
+      calibration: "platform pursue rate 10% (cold; tighten fit before searching)",
+    });
+    assert.match(prompt, /ACTIVE DISCOVERY LENS/);
+    assert.match(prompt, /systems should distribute agency/);
+    assert.match(prompt, /civic tech/);
+    assert.match(prompt, /podcast/);
+    assert.match(prompt, /Audrey Tang/);
+    assert.match(prompt, /Big Generic Show: audience too large/);
+    assert.match(prompt, /pursue rate 10%/);
   });
 });
 

@@ -1,9 +1,8 @@
 # Anchors
 
-People and orgs Muxin already trusts (docs/outreach-engine-plan.md §3, §9c). Phase 1 scope: a
-seed list only, read as reference material during qualify. Anchor-graph expansion (co-appearance,
-collaboration, engagement, alumni graphs, 1-2 hops out from each anchor) is Phase 5 (`discover.ts`),
-not built here.
+People and orgs Muxin already trusts (docs/outreach-engine-plan.md §3, §9c). Qualify can add
+evidenced people here, and Phase 5 Scout rotates small subsets through one-to-two-hop public graph
+expansion across co-appearance, collaboration, engagement, and alumni networks.
 
 Every entry carries a one-line "why this anchor" note. This file grows three ways: Muxin adding a
 name herself, the two-key jobsearch gate (`qualify.ts`) recording a named, evidenced like-minded

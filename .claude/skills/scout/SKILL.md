@@ -38,16 +38,21 @@ Three kinds, one run:
    (`qualify.ts` enforces this in code, downgrade-only, same as any other lead -- see
    `.claude/skills/outreach/SKILL.md` rule 2). A candidate the model can't back with a real
    citation within its search budget gets dropped, never invented.
-3. **Bounded cost.** One `claude -p` call per kind (at most 3 per run), each capped at
-   `--limit` candidates (default 3, hard max 5) and a computed search-budget ceiling enforced by
+3. **Bounded cost.** One subscription CLI call per selected kind, with the entire run capped by
+   `config/outreach.yaml` `batch_cap` (default and hard ceiling 5) and a computed search-budget ceiling enforced by
    the same `search-budget-hook.ts` PreToolUse hook `/outreach research` uses (reused unmodified).
    $0 marginal -- Muxin's Claude Code subscription (CLAUDE.md rule 6), logged to
-   `data/cost-log.csv` and `data/discovery/run-log.jsonl`.
-4. **Exact-slug dedup only.** A candidate whose `outreach/leads/<kind>-<slug>` already exists is
-   skipped, not overwritten. This is NOT fuzzy/semantic dedup (that's `idea-scout`'s domain) --
-   re-running `/scout` with the same theme may occasionally re-propose something close to an
-   existing lead under a different name; that's an acceptable, expected gap in v1.
-5. **`src/discovery/prompt.ts` and `discover.ts` are content-generation-adjacent** (CLAUDE.md rule
+   `data/cost-log.csv` and `data/outreach/run-log.jsonl`.
+4. **Permanent frontier.** Every previously surfaced lead, pursued or passed, is excluded at the
+   write gate across kinds. Names, legal suffixes, leading “The,” and URL/domain variants share a
+   canonical identity. A pass requires a short reason in the GUI; later runs receive those reasons
+   as negative examples so rejected lookalikes stop resurfacing.
+5. **Rotated methodology.** Each successful run persists one belief × community dialect × modality
+   lens and a small trusted-anchor subset. The subscription model generates fresh bounded queries,
+   expands anchors one to two public graph hops, and performs quote-required fit plus a separate
+   disconfirmation pass. Client discovery starts from a named person's quoted worldview trail.
+   Missing person-first evidence is not surfaced; missing disconfirmation forces a downgrade.
+6. **`src/discovery/prompt.ts` and `discover.ts` are content-generation-adjacent** (CLAUDE.md rule
    7): they don't compose prose in Muxin's voice, but they DO decide which companies/examples get
    surfaced and how. A PR changing the discovery prompts or writer logic should be reviewed like
    any other prompt change, even though this particular skill's own commits shipped self-vetted
@@ -59,7 +64,7 @@ Three kinds, one run:
 /scout                                          # all 3 kinds, theme = every pillar's signals
 /scout --kinds client,platform                  # skip content-example this run
 /scout --theme "AI-era career strategy"          # focus the search instead of the full pillar list
-/scout --limit 5                                 # up to 5 candidates per kind (hard cap 5)
+/scout --limit 5                                 # request up to 5 per kind; whole run still caps at 5
 ```
 
 Runs `npm run scout -- <args>` (`src/discovery/discover.ts`). Review results in

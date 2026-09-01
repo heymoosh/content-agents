@@ -172,6 +172,10 @@ makes `/cycle` compound instead of restarting every week.
      exploration probe's engagement never feeds either. Prints nothing until an untested pillar
      reaches n>=3 probes; a bare "no untested pillar has reached n>=3" needs no brief section.
    - Read `data/community-log.md` (manual observations — treat as qualitative signal)
+   - `npm run outreach:strategy-summary` → the current borrowed-audience target list plus
+     follow-up counts for every bucket. Fold its output into the brief verbatim. This command is
+     read-only: it does not research, draft, contact, or publish anything. If job-search data is
+     unavailable, preserve the command's degraded-state note instead of hiding the missing input.
 
 4. **Write the brief** to `briefs/YYYY-MM-DD-strategy-brief.md`:
 
@@ -287,6 +291,11 @@ makes `/cycle` compound instead of restarting every week.
 
    ## Community signals
    <synthesis of community-log.md: what sparked conversation vs silence, per community>
+
+   ## Outreach and follow-ups
+   <outreach:strategy-summary output verbatim: the platform target list, per-bucket total/due/
+    overdue/responded table, and any honest degraded-state note. Use this as a weekly action view,
+    not an urgency score. It never authorizes contact or publishing.>
 
    ## Recommendations
    1. [DO MORE] <pillar/format/channel> — evidence: <specific posts + metrics>

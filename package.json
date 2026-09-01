@@ -83,6 +83,7 @@
     "outreach:validate": "tsx src/outreach/validate.ts",
     "outreach:lock": "tsx src/outreach/lock.ts",
     "outreach:status": "tsx src/outreach/status.ts",
+    "outreach:strategy-summary": "tsx src/outreach/strategy-summary.ts",
     "scout": "tsx src/discovery/discover.ts",
     "patterns:collect": "tsx src/patterns/collect.ts",
     "patterns:review-status": "tsx src/patterns/review-status.ts",
