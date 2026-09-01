@@ -1350,6 +1350,21 @@ function rememberEngine(value){
 }
 function engineSelectHtml(id){ return '<label class="engine-choice"><span>Run with</span><select class="engine-select"'+(id?' id="'+id+'"':'')+'>'+ENGINE_OPTIONS+'</select></label>'; }
 function outreachEngineSelectHtml(){ return '<label class="engine-choice"><span>Draft with</span><select class="engine-select outreach-engine">'+OUTREACH_ENGINE_OPTIONS+'</select></label>'; }
+// ── begin Outreach request mirror ──
+// Browser code cannot import page-outreach.ts. Keep these executable mirrors aligned with its
+// strict engine-aware request builders; page.test.ts evaluates this exact emitted block.
+function requireOutreachEngine(engine){
+  if(engine===undefined) return "codex";
+  if(engine!=="codex"&&engine!=="grok") throw new Error("Outreach engine must be ChatGPT or Grok; received "+String(engine));
+  return engine;
+}
+function outreachDraftRequest(dir,direction,recipient,engine){
+  return {dir:dir,direction:direction,...(recipient?{recipient:recipient}:{}),engine:requireOutreachEngine(engine)};
+}
+function outreachMessageReviseRequest(dir,file,instruction,engine){
+  return {dir:dir,file:file,instruction:instruction,engine:requireOutreachEngine(engine)};
+}
+// ── end Outreach request mirror ──
 function refreshEngineControls(root=document){
   const preferred = preferredEngine();
   root.querySelectorAll(".engine-select").forEach(sel=>{

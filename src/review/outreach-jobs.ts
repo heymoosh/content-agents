@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { runDraft, draftModel, type DraftResult } from "../outreach/draft.js";
@@ -9,6 +9,32 @@ import { decodeSpawnFailure, logTailSuffix, runClaudeSpawn, runQueued } from "./
 
 const REVISE_TIMEOUT_MS = 180_000;
 const DRAFT_TIMEOUT_MS = 120_000;
+const DISPOSABLE_OUTREACH_BODY = "Fixture outreach draft grounded in the reviewed lead evidence.";
+const DISPOSABLE_OUTREACH_REVISION = "Fixture revised outreach message, shorter and warmer.";
+
+/** Available only to the combined E2E runner inside its private disposable repository copy. */
+export function disposableOutreachEngineAuthorized(
+  env: NodeJS.ProcessEnv = process.env,
+  root: string = repoRoot,
+): boolean {
+  const token = env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
+  const disposableRoot = env.E2E_REPO_ROOT;
+  if (!token || !disposableRoot) return false;
+  try {
+    if (realpathSync(disposableRoot) !== realpathSync(root)) return false;
+  } catch { return false; }
+  const marker = join(root, ".e2e-configured-engine-token");
+  return existsSync(marker) && readFileSync(marker, "utf8") === token;
+}
+
+function requireValidDisposableOutreachAuthorization(): boolean {
+  const requested = Boolean(process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN);
+  const authorized = disposableOutreachEngineAuthorized();
+  if (requested && !authorized) {
+    throw new Error("disposable Outreach engine token was present but marker/root authorization failed");
+  }
+  return authorized;
+}
 
 function engineName(job: { engine?: Engine }): string {
   return ENGINE_LABELS[job.engine ?? "claude"];
@@ -60,11 +86,15 @@ export async function reviseOutreachMessage(dir: string, file: string, instructi
   // the Outreach strip idle and post the Connector's work under Content as the Formatter. Content
   // derivative revises still use "revise" and still belong in Content.
   return runQueued("outreach-revise", `Revise outreach message: ${dir}/${file}`, async (job) => {
-    const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
-    const failure = decodeSpawnFailure(result, job.id, {
-      timeoutVerb: "Claude", timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`, exitVerb: "Claude revise",
-    });
-    if (failure) throw new Error(failure);
+    if (requireValidDisposableOutreachAuthorization()) {
+      writeFileSync(abs, `${before.header}\n${DISPOSABLE_OUTREACH_REVISION}\n`);
+    } else {
+      const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
+      const failure = decodeSpawnFailure(result, job.id, {
+        timeoutVerb: "Claude", timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`, exitVerb: "Claude revise",
+      });
+      if (failure) throw new Error(failure);
+    }
     const after = splitFrontmatter(readFileSync(abs, "utf8")).body;
     if (after === before.body) {
       throw new Error(`${engineName(job)} ran but didn't change anything. Try a more specific instruction`);
@@ -112,7 +142,9 @@ export function enqueueOutreachDraft(
 ): Promise<DraftResult> {
   const outreachEngine = requireOutreachEngine(engine);
   const draft = deps.runDraft ?? runDraft;
-  const spawn = deps.spawn ?? runClaudeSpawn;
+  const spawn = deps.spawn ?? (requireValidDisposableOutreachAuthorization()
+    ? async () => ({ code: 0, timedOut: false, enoent: false, stdout: DISPOSABLE_OUTREACH_BODY })
+    : runClaudeSpawn);
   return runQueued("draft-follow-up", label, (job) =>
     draft(dir, {
       channel: opts.channel,

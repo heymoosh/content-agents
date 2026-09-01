@@ -2508,6 +2508,23 @@ test("Outreach directed drafts and revisions expose one engine picker and send i
   assert.ok(script.includes('engine:engine || "codex"'), "Outreach defaults to ChatGPT when no selector is available");
 });
 
+test("Outreach request builders execute identically in the emitted browser script", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── begin Outreach request mirror ──");
+  const end = script.indexOf("// ── end Outreach request mirror ──");
+  assert.ok(start > -1 && end > start, "the executable Outreach request mirror must reach the browser");
+  const browser = new Function(script.slice(start, end) + "\nreturn {outreachDraftRequest,outreachMessageReviseRequest};")() as {
+    outreachDraftRequest: typeof outreachDraftRequest;
+    outreachMessageReviseRequest: typeof outreachMessageReviseRequest;
+  };
+  const draftArgs = ["outreach/leads/acme", "keep it warm", "Rae", "grok"] as const;
+  const reviseArgs = ["outreach/leads/acme", "messages/message-01.md", "shorter", "codex"] as const;
+  assert.deepEqual(browser.outreachDraftRequest(...draftArgs), outreachDraftRequest(...draftArgs));
+  assert.deepEqual(browser.outreachMessageReviseRequest(...reviseArgs), outreachMessageReviseRequest(...reviseArgs));
+  assert.deepEqual(browser.outreachDraftRequest("outreach/leads/acme", "hello"), outreachDraftRequest("outreach/leads/acme", "hello"));
+  assert.throws(() => browser.outreachDraftRequest("outreach/leads/acme", "hello", undefined, "claude"), /Outreach engine/);
+});
+
 test("Notes picker sends the selected engine", () => {
   assert.deepEqual(notesPickRequest([1, 3], "grok"), { indices: [1, 3], engine: "grok" });
   assert.deepEqual(notesPickRequest([2]), { indices: [2], engine: "claude" });
