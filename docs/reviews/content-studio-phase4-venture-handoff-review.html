@@ -21,13 +21,13 @@
   <p class="lede">This review shows the behavior change, the two human gates, and what the system deliberately refuses. It contains no generated private content.</p>
   <div class="grid">
     <section class="card old"><h3>Before</h3><p>The handoff was a read-only readiness view. Legacy callers could omit an explicit bundle, measured Content outcomes were not mandatory, and nothing created a durable Venture-owned receipt.</p></section>
-    <section class="card new"><h3>Now</h3><p>A handoff requires exact experiment lineage, both measured arms, an accepted Signals interpretation, and an attributed funnel or business outcome. Acceptance creates one internal, non-publishable Venture artifact and one canon decision.</p></section>
+    <section class="card new"><h3>Now</h3><p>A handoff requires exact experiment lineage, both measured arms, an accepted Signals interpretation, and an attributed funnel or business outcome. Decision state is derived only from append-only decision events. Acceptance creates one internal, non-publishable Venture artifact and one canon decision.</p></section>
   </div>
 
   <h2>Normal path</h2>
   <ol>
     <li>Content publishes approved treatment and control variants with exact lineage.</li>
-    <li>Signals reads measured outcomes, keeps attention, conversation, audience, and business families separate, and proposes a named Venture input.</li>
+    <li>Signals reads measured outcomes, keeps attention, conversation, audience, and business families separate, and proposes a named Venture input. Both review rooms show its scope, treatment and control samples, provenance, caveats, qualification, evidence status, and exact lineage.</li>
     <li>Muxin chooses <strong>adopt</strong>, <strong>decline</strong>, or <strong>request more evidence</strong> in Signals.</li>
     <li>Only an adopted proposal appears inside the named Venture's existing room.</li>
     <li>Muxin separately chooses <strong>accept</strong>, <strong>reject</strong>, or <strong>request more evidence</strong> in Venture.</li>
@@ -38,6 +38,7 @@
   <section class="card">
     <p><strong>Hypothesis:</strong> A specific opening produces more qualified lead-magnet signups than the control opening.</p>
     <p><strong>Measured evidence:</strong> Both planned variants reached the minimum sample; an attributed outcome-ledger record links the treatment to qualified funnel outcomes.</p>
+    <p><strong>Review context:</strong> Scope, treatment/control samples, plan digest, interpretation id, caveats, qualification, evidence status, named Venture and phase, and exact source/variant/experiment/content lineage remain visible at both gates.</p>
     <p><strong>Signals recommendation:</strong> Adopt as a bounded input for Venture <code>example-venture</code>, current phase. Confidence and caveats remain visible.</p>
     <p><strong>Venture effect after acceptance:</strong> Store the evidence-linked receipt for the next Venture judgment. Do not infer demand or change the offer.</p>
   </section>
@@ -46,9 +47,10 @@
   <ul>
     <li><span class="blocked">Blocked:</span> Replies, likes, impressions, follows, or provider-only clicks with no attributed outcome record.</li>
     <li><span class="blocked">Blocked:</span> Missing control arm, wrong variant IDs, stale phase/rules, changed proposal bytes, or rejected Signals interpretation.</li>
+    <li><span class="blocked">Blocked:</span> A proposal line that tries to claim it was adopted without a separate Signals decision event, or a handoff with no exact Content item references.</li>
     <li><span class="blocked">Blocked:</span> A client request that tries to supply its own authority, evidence, approval identity, or gate reference.</li>
     <li><span class="blocked">Blocked:</span> Concurrent or repeated writes that drift from the original identity. Exact retries collapse to the same artifact.</li>
   </ul>
-  <p class="meta">Implementation evidence: Focused contract, route, store, Venture acceptance, rules-parity, idempotency, crash-recovery, and concurrency tests. Full local check and browser suite are recorded in the PR.</p>
+  <p class="meta">Implementation evidence: Focused contract, full-lifecycle route, store-tamper, Venture acceptance, rules-parity, idempotency, crash-recovery, and concurrency tests. The final local check and browser-suite results are recorded in the PR; a real measured two-room handoff remains operational proof.</p>
 </main></body>
 </html>

@@ -154,6 +154,13 @@ describe("Venture Signals input acceptance", () => {
     assert.throws(() => acceptSignalsInput(SLUG, handoff({ evidence_status: "unmeasured" }), { outcome: "accept", decided_by: "muxin", decision_ref: "x", reason: "x" }, "t"), /measured/i);
   });
 
+  test("rejects a handoff with no Content item refs", () => {
+    assert.throws(
+      () => acceptSignalsInput(SLUG, handoff({ content_item_refs: [] }), { outcome: "accept", decided_by: "muxin", decision_ref: "x", reason: "x" }, "t"),
+      /content_item_refs.*non-empty refs/i,
+    );
+  });
+
   test("accepts the same internal artifact kind in the Venture's current Phase 2", () => {
     appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "2026-08-30T00:10:00.000Z");
     const result = acceptSignalsInput(SLUG, handoff({ phase: 2, pointer_id: "phase-2" }), { outcome: "accept", decided_by: "muxin", decision_ref: "muxin-phase-2", reason: "Use this qualified input in Phase 2." }, "2026-08-30T01:00:00.000Z");

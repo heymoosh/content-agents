@@ -3966,7 +3966,7 @@ function renderVenture(){
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
   $("#ventureDay").textContent = vDayLine(t.elapsedDays);
   const signals = (VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).filter(p=>p.ventureSlug===ventureSlug&&p.status==="adopted");
-  const signalsHtml = signals.map(p=>'<div class="vblock" data-signals-input="'+esc(p.id)+'"><div class="vmono">SIGNALS INPUT · '+(p.ventureDecision?'DECIDED IN VENTURE':'ADOPTED IN SIGNALS')+'</div><div class="vtitle" style="font-size:20px">'+esc(p.title)+'</div><div class="vnote" style="margin-top:8px">'+esc(p.proposedInput)+' · measured '+esc(p.evidenceStatus)+' evidence · phase '+esc(p.phase)+(p.ventureDecision?' · Venture decision: '+esc(p.ventureDecision.outcome):'')+'</div>'+(p.ventureDecision?'':'<div class="vacts"><button class="primary" data-signals-input-action="accept" data-signals-input-id="'+esc(p.id)+'">Accept in Venture</button><button data-signals-input-action="request-more-evidence" data-signals-input-id="'+esc(p.id)+'">Request more evidence</button><button data-signals-input-action="reject" data-signals-input-id="'+esc(p.id)+'">Reject</button></div>')+'</div>').join('');
+  const signalsHtml = signals.map(p=>'<div class="vblock" data-signals-input="'+esc(p.id)+'"><div class="vmono">SIGNALS INPUT · '+(p.ventureDecision?'DECIDED IN VENTURE':'ADOPTED IN SIGNALS')+'</div><div class="vtitle" style="font-size:20px">'+esc(p.title)+'</div><div class="vnote" style="margin-top:8px">'+esc(p.proposedInput)+' · measured '+esc(p.evidenceStatus)+' evidence · phase '+esc(p.phase)+(p.ventureDecision?' · Venture decision: '+esc(p.ventureDecision.outcome):'')+'</div>'+signalsHandoffMetaHtml(p, null, null)+'<div class="vnote" style="margin-top:6px"><strong>Venture:</strong> '+esc(p.ventureSlug)+' · <strong>Phase:</strong> '+esc(p.phase)+'</div>'+(p.ventureDecision?'':'<div class="vacts"><button class="primary" data-signals-input-action="accept" data-signals-input-id="'+esc(p.id)+'">Accept in Venture</button><button data-signals-input-action="request-more-evidence" data-signals-input-id="'+esc(p.id)+'">Request more evidence</button><button data-signals-input-action="reject" data-signals-input-id="'+esc(p.id)+'">Reject</button></div>')+'</div>').join('');
   $("#ventureThread").innerHTML = signalsHtml + t.messages.map(m=>{
     if(m.kind==="rail") return '<div class="vmono">'+esc(m.text)+'</div>';
     if(m.kind==="said") return '<div class="vsaid">'+esc(m.text)+'</div>';
@@ -5101,6 +5101,43 @@ function displayLabel(value){
   const normalized=String(value||"").replaceAll("-"," ");
   return normalized ? normalized[0].toUpperCase()+normalized.slice(1) : "";
 }
+// Handoff cards are deliberately metadata-only. Keep this renderer shared between the Signals
+// experiment card and the Venture room's projected Signals input so neither surface can silently
+// drop the scope, measured arms, provenance, caveats, qualification, or exact lineage needed to
+// review a handoff. Every value is escaped here; in particular, never render a draft body.
+function signalsHandoffMetaHtml(p, perf, interpretation){
+  const sample=(p&&p.sampleSize)||{};
+  const comparison=perf&&perf.primaryComparison;
+  const treatment=sample.treatment ?? (comparison&&comparison.treatment&&comparison.treatment.sample);
+  const control=sample.control ?? (comparison&&comparison.control&&comparison.control.sample);
+  const provenance=(p&&p.provenance)||{};
+  const lineage=(p&&p.lineage)||{};
+  const caveats=(p&&p.caveats)||((interpretation&&interpretation.caveats)||[]);
+  const qualification=p&&p.qualification || (interpretation&&interpretation.qualification) || "not recorded";
+  const evidenceStatus=p&&p.evidenceStatus || (interpretation&&interpretation.evidenceStatus) || "not recorded";
+  const scope=p&&p.scope || (p&&p.contentRequestId) || "not recorded";
+  const sourceId=p&&p.sourceId || (lineage&&lineage.sourceId) || "not recorded";
+  const variantId=p&&p.variantId || (lineage&&lineage.variantId) || "not recorded";
+  const experimentId=p&&p.experimentId || (lineage&&lineage.experimentId) || "not recorded";
+  return '<div class="src handoff-meta">'+
+    '<strong>Scope:</strong> '+esc(scope)+
+    ' · <strong>Sample:</strong> treatment '+esc(treatment==null?"not measured":treatment)+' · control '+esc(control==null?"not measured":control)+
+    ' · <strong>Qualification:</strong> '+esc(qualification)+
+    ' · <strong>Evidence:</strong> '+esc(evidenceStatus)+
+    '<br><strong>Provenance:</strong> plan digest '+esc(provenance.planDigest||(p&&p.digest)||"not recorded")+' · interpretation '+esc(provenance.interpretationId||(interpretation&&interpretation.id)||"not recorded")+
+    '<br><strong>Caveats:</strong> '+esc(caveats.length?caveats.join("; "):"none recorded")+
+    '<br><strong>Lineage:</strong> source '+esc(sourceId)+' · variant '+esc(variantId)+' · experiment '+esc(experimentId)+
+    (((p&&p.contentItemRefs)||[]).length?' · content '+((p.contentItemRefs||[]).map(esc).join(", ")):'')+
+    '</div>';
+}
+function experimentCanProposeVenture(perf, interpretation){
+  const family=perf&&perf.primaryMetric&&perf.primaryMetric.family;
+  const refs=perf&&perf.primaryOutcomeRefs;
+  return !!(interpretation&&interpretation.reviewStatus==="accepted"&&interpretation.recommendation!=="reject"&&
+    perf&&perf.analysisStatus==="ready"&&(family==="audience"||family==="business")&&
+    refs&&Array.isArray(refs.treatment)&&refs.treatment.some(ref=>String(ref).startsWith("outcome:"))&&
+    Array.isArray(refs.control)&&refs.control.some(ref=>String(ref).startsWith("outcome:")));
+}
 function signalsExperimentsHtml(){
   const plans=(SIGNALS&&SIGNALS.experimentPlans)||[];
   const propose='<div class="actions"><button class="sig-experiment-propose primary">Ask Signals to evaluate a Content request</button><span class="src">Uses reviewed evidence and body-free Content metadata. It may honestly recommend no experiment.</span></div>';
@@ -5138,7 +5175,7 @@ function signalsExperimentsHtml(){
         '<div class="src">Confidence: '+esc(displayLabel(interpretation.confidence))+' · Evidence: '+(interpretation.evidenceRefs||[]).map(esc).join(', ')+'</div>'+
         ((interpretation.caveats||[]).length?'<div class="src">Caveats: '+interpretation.caveats.map(esc).join('; ')+'</div>':'')+
         (reviewStatus==="pending"?'<div class="actions"><button class="sig-experiment-interpret-review primary" data-id="'+esc(p.experimentId)+'" data-action="accept">Accept interpretation</button><button class="sig-experiment-interpret-review" data-id="'+esc(p.experimentId)+'" data-action="reject">Reject analysis</button><span class="src">Your review records the learning. It does not change routing or select a winner.</span></div>'
-          : '<div class="src">Interpretation review: '+esc(reviewStatus)+' by Muxin. Winner remains unset.</div>'+(reviewStatus==="accepted"?'<div class="actions"><button class="sig-venture-propose primary" data-id="'+esc(p.experimentId)+'">Propose as Venture input</button><span class="src">Requires a named Venture and phase. Signals records the proposal only.</span></div>':'') );
+          : '<div class="src">Interpretation review: '+esc(reviewStatus)+' by Muxin. Winner remains unset.</div>'+(experimentCanProposeVenture(perf, interpretation)?'<div class="actions"><button class="sig-venture-propose primary" data-id="'+esc(p.experimentId)+'">Propose as Venture input</button><span class="src">Requires a named Venture and phase. Signals records the proposal only.</span></div>':'') );
     }
     return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(confidence)+' confidence</span><span style="font-weight:600;font-size:14px;">'+esc(p.hypothesis)+'</span></div>'+
       '<div class="dev-summary"><strong>Observation:</strong> '+esc(p.observation)+'</div>'+
@@ -5155,6 +5192,7 @@ function signalsExperimentsHtml(){
       '<div class="src"><strong>Capacity:</strong> '+esc(p.capacityRationale)+(p.capacity?' · '+esc(p.capacity.availablePublishingUnits)+' units / '+esc(p.capacity.availableDays)+' days declared':'')+'</div>'+
       ((p.caveats||[]).length?'<div class="src"><strong>Caveats:</strong> '+p.caveats.map(esc).join('; ')+'</div>':'')+
       (p.planDecision&&p.planDecision.rationale?'<div class="src"><strong>Decision rationale:</strong> '+esc(p.planDecision.rationale)+'</div>':'')+
+      signalsHandoffMetaHtml(p, perf, interpretation)+
       '<div class="actions">'+controls+'</div>'+measurement+'</div>';
   }).join('')+'</section>';
 }
@@ -5166,7 +5204,7 @@ function signalsVentureHandoffsHtml(){
     const controls=status==="pending"
       ? '<button class="sig-venture-decision primary" data-id="'+esc(p.id)+'" data-action="adopt">Adopt for Venture</button><button class="sig-venture-decision" data-id="'+esc(p.id)+'" data-action="request-more-evidence">Request more evidence</button><button class="sig-venture-decision" data-id="'+esc(p.id)+'" data-action="decline">Decline</button>'
       : status==="adopted" ? '<button class="sig-venture-open primary" data-slug="'+esc(p.ventureSlug)+'">Open '+esc(p.ventureSlug)+'</button>' : '<span class="src">'+esc(status.replaceAll("-"," "))+'</span>';
-    return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(p.confidence)+' confidence</span><span style="font-weight:600;font-size:14px;">'+esc(p.title)+'</span></div><div class="dev-summary"><strong>Observed:</strong> '+esc(p.factualSummary)+'</div><div class="dev-summary"><strong>Proposed Venture input:</strong> '+esc(p.proposedInput)+'</div><div class="src"><strong>Evidence:</strong> '+p.evidenceRefs.map(esc).join(', ')+' · '+esc(p.sourceId)+' / '+esc(p.variantId)+' / '+esc(p.experimentId)+'</div>'+ (p.muxinRationale?'<div class="src"><strong>Your decision:</strong> '+esc(p.muxinRationale)+'</div>':'') +'<div class="actions">'+controls+'</div></div>';
+    return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(p.confidence)+' confidence</span><span style="font-weight:600;font-size:14px;">'+esc(p.title)+'</span></div><div class="dev-summary"><strong>Observed:</strong> '+esc(p.factualSummary)+'</div><div class="dev-summary"><strong>Proposed Venture input:</strong> '+esc(p.proposedInput)+'</div>'+signalsHandoffMetaHtml(p, null, null)+'<div class="src"><strong>Evidence refs:</strong> '+p.evidenceRefs.map(esc).join(', ')+'</div>'+ (p.muxinRationale?'<div class="src"><strong>Your decision:</strong> '+esc(p.muxinRationale)+'</div>':'') +'<div class="src"><strong>Venture:</strong> '+esc(p.ventureSlug)+' · <strong>Phase:</strong> '+esc(p.phase)+'</div><div class="actions">'+controls+'</div></div>';
   }).join('')+'</section>';
 }
 function renderSignals(){

@@ -70,3 +70,22 @@ test("persisted proposals are revalidated and fail closed when their bytes or di
     assert.throws(() => readSignalsVentureProposals(path), /digest|invalid/i);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("proposal event cannot forge an adopted Signals decision outside the append-only decision log", () => {
+  const root = mkdtempSync(join(tmpdir(), "signals-venture-forged-state-"));
+  const path = join(root, "handoffs.jsonl");
+  try {
+    recordSignalsVentureProposal(proposal(), path);
+    const event = JSON.parse(readFileSync(path, "utf8"));
+    event.proposal.status = "adopted";
+    event.proposal.muxinRationale = "forged adoption";
+    event.proposal.decidedAt = "2026-08-31T00:00:00.000Z";
+    event.proposal.ventureGate = "ready";
+    writeFileSync(path, `${JSON.stringify(event)}\n`);
+    const read = readSignalsVentureProposals(path)[0]!;
+    assert.equal(read.status, "pending");
+    assert.equal(read.muxinRationale, null);
+    assert.equal(read.decidedAt, null);
+    assert.equal(read.ventureGate, "blocked");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

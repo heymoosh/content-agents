@@ -20,6 +20,20 @@ import {
   type MetricReadView, type ChannelTreatmentView, type TreatmentView, type FitBasisView,
 } from "./page.js";
 
+test("Signals and Venture handoff cards expose complete escaped metadata and stay body-free", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  for (const label of ["Scope:", "Sample:", "plan digest", "interpretation", "Caveats:", "Qualification:", "Evidence:", "Lineage:", "Venture:", "Phase:"]) {
+    assert.ok(script.includes(label), `handoff metadata must render ${label}`);
+  }
+  assert.ok(script.includes("esc(scope)"), "scope must be escaped");
+  assert.ok(script.includes("esc(provenance.planDigest"), "plan digest must be escaped");
+  assert.ok(script.includes("esc(caveats"), "caveats must be escaped");
+  assert.ok(script.includes("signalsHandoffMetaHtml(p, perf, interpretation)"), "Signals cards use the shared metadata renderer");
+  assert.ok(script.includes("signalsHandoffMetaHtml(p, null, null)"), "Venture cards use the shared metadata renderer");
+  assert.ok(!html.includes("must never render"), "handoff metadata must not render body text");
+});
+
 test("Charles pages separate work needing review from approved and historical drafts", () => {
   const posts = [
     { id: "p", status: "pending" }, { id: "r", status: "revise" },
@@ -3469,6 +3483,11 @@ test("Signals experiments expose collecting or ready evidence and keep interpret
   assert.match(html, /This never selects a winner/);
   assert.match(html, /displayLabel\(analysisStatus\)/);
   assert.match(html, /displayLabel\(interpretation\.confidence\)/);
+  assert.match(html, /experimentCanProposeVenture\(perf, interpretation\)/);
+  assert.match(html, /interpretation\.recommendation!=="reject"/);
+  assert.match(html, /family==="audience"\|\|family==="business"/);
+  assert.match(html, /refs\.treatment.*startsWith\("outcome:"\)/s);
+  assert.match(html, /refs\.control.*startsWith\("outcome:"\)/s);
 });
 
 test("Venture Signals inputs stop offering decision buttons after the durable Venture decision projects back", () => {

@@ -64,7 +64,17 @@ function fold(path: string): Map<string, SignalsVentureProposal> {
       if (e.proposal.digest !== expectedDigest) throw new Error(`invalid Signals Venture proposal digest ${e.proposal.id}`);
       const prior = out.get(clean.id);
       if (prior && prior.digest !== expectedDigest) throw new Error(`conflicting Signals Venture proposal ${clean.id}`);
-      if (!prior) out.set(clean.id, { ...e.proposal, ...clean, evidenceRefs: [...clean.evidenceRefs] });
+      // Proposal events contain immutable input only. Never trust their projected decision fields:
+      // adopted/declined state exists solely when a later append-only decision event derives it.
+      if (!prior) out.set(clean.id, {
+        ...clean,
+        digest: expectedDigest,
+        status: "pending",
+        muxinRationale: null,
+        decidedAt: null,
+        ventureGate: "blocked",
+        evidenceRefs: [...clean.evidenceRefs],
+      });
     }
     else { const p = out.get(e.id); if (!p) throw new Error(`decision precedes proposal ${e.id}`); if (p.status !== "pending") throw new Error(`proposal ${e.id} was already decided`); p.status = e.decision === "adopt" ? "adopted" : e.decision === "decline" ? "declined" : "more-evidence"; p.muxinRationale = e.rationale; p.decidedAt = e.at; p.ventureGate = "blocked"; }
   }

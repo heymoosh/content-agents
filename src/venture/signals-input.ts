@@ -64,8 +64,7 @@ function validateHandoff(value: SignalsInputHandoff, slug: string): SignalsInput
   if (!Number.isInteger(value.phase) || value.phase < 1 || value.phase > 4) fail("phase must be an integer from 1 through 4");
   if (!Number.isInteger(value.sample_size) || value.sample_size < 1) fail("sample_size must be a positive integer");
   refs(value.source_record_refs, "source_record_refs"); refs(value.evidence_refs, "evidence_refs");
-  if (!Array.isArray(value.content_item_refs)) fail("content_item_refs must be an array");
-  refs(value.content_item_refs.length ? value.content_item_refs : ["_empty_"], "content_item_refs");
+  refs(value.content_item_refs, "content_item_refs");
   if (!Array.isArray(value.caveats) || value.caveats.some((v) => typeof v !== "string")) fail("caveats must be an array of strings");
   if (value.qualification !== "qualified") fail("qualification must be qualified");
   if (value.evidence_status !== "measured") fail("evidence_status must be measured");
