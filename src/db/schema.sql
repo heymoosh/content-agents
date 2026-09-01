@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS posts (
   source TEXT,                         -- 'atomized' (verbatim, shipped by /publish from a content folder) | 'atomized-spin' (audience-reframed variant, docs/spin-experiment.md) | 'spin-control-run' (deliberate --no-spin control run, card f444f440, src/strategy/spin-control.ts) | 'exploration-probe' (off-assignment pillar/platform probe, card 92bb2ae6 -- excluded from route.ts's resonance figures, see src/strategy/exploration.ts) | 'organic' (posted natively / a note Muxin wrote) | NULL = unclassified; set by tag-source.ts
   cta_destination TEXT,                -- 'source' | 'project' | 'work_with_me' (src/publish/cta.ts CtaDestination) | NULL = no CTA resolved, or unclassified (a literal-url override); read back from the bets.md Placed-log `| cta:<dest>` marker by tag-source.ts (card d80411bc, strategy lever E scaffold -- src/strategy/cta-fit.ts)
   cadence_source TEXT,                 -- 'override' | 'default' | NULL = not determined (only stamped for CORE_TEXT (x/linkedin/bluesky) publishes via src/publish/typefully.ts; card/TikTok/YouTube/Substack claims use a cadence window config/schedule-overrides.yaml never targets, so they're left NULL rather than a trivially-always-'default' value). Records whether THIS post's publish slot came from an active config/schedule-overrides.yaml entry or the static config/platforms.yaml default (strategy lever C follow-through, epic 2ce597d7); read back from the bets.md Placed-log `| cadence:<source>` marker by tag-source.ts
+  brand_id TEXT,                         -- canonical measurement brand; NULL means legacy/unassigned
+  provider_account_id TEXT,              -- non-secret provider account identity, NULL when unassigned
   UNIQUE(platform, platform_post_id)
 );
 
@@ -27,6 +29,8 @@ CREATE TABLE IF NOT EXISTS metrics (
   new_follows INTEGER,
   engagement_rate REAL,
   raw_json TEXT                        -- full source row; parser gaps never lose data
+  ,brand_id TEXT
+  ,provider_account_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS imports (
@@ -36,6 +40,8 @@ CREATE TABLE IF NOT EXISTS imports (
   platform TEXT,
   imported_at TEXT,
   row_count INTEGER
+  ,brand_id TEXT
+  ,provider_account_id TEXT
 );
 
 -- Audience-level data (who follows you), separate from per-post metrics. One long/EAV-style
@@ -55,7 +61,8 @@ CREATE TABLE IF NOT EXISTS audience (
   value_pct REAL,                      -- demographic share (0–100); NULL when source says "< 1%"
   source_file TEXT,                    -- export filename / 'atproto:getProfile' for provenance
   raw_json TEXT,
-  UNIQUE(platform, captured_at, metric_type, dimension, value_label)
+  brand_id TEXT,
+  provider_account_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_audience_platform ON audience(platform, metric_type);
@@ -105,6 +112,8 @@ CREATE TABLE IF NOT EXISTS research_observations (
   window_start TEXT,
   window_end TEXT,
   collected_at TEXT,
+  brand_id TEXT,
+  provider_account_id TEXT,
   CHECK ((source IN ('metric', 'subscriber_movement')) = (metric_name IS NOT NULL)),
   CHECK (source NOT IN ('metric', 'subscriber_movement') OR collected_at IS NOT NULL)
 );

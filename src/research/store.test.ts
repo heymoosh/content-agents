@@ -14,6 +14,7 @@ import type { FetchedReply } from "./substack/replies.js";
 
 const dbs: Database.Database[] = [];
 const originalKey = process.env.RESEARCH_HASH_KEY;
+const BINDING = { brandId: "human-inference", providerAccountId: "human-inference/substack" } as const;
 
 afterEach(() => {
   for (const db of dbs.splice(0)) db.close();
@@ -60,14 +61,14 @@ test("respondent hashes are keyed and fail closed without the local key", () => 
 test("reply reconciliation is idempotent, append-only for edits, and tombstones only complete absences", () => {
   const value = db();
   const key = "test-only-research-key";
-  const first = reconcileReplyObservations(value, note, [reply("first")], "complete", "2026-08-02T00:00:00Z", key);
+  const first = reconcileReplyObservations(value, note, [reply("first")], "complete", "2026-08-02T00:00:00Z", key, BINDING);
   assert.deepEqual(first, {
     newObservations: 1,
     changedObservations: 0,
     unchangedObservations: 0,
     tombstonedObservations: 0,
   } satisfies ReconciliationResult);
-  const unchanged = reconcileReplyObservations(value, note, [reply("first")], "complete", "2026-08-02T01:00:00Z", key);
+  const unchanged = reconcileReplyObservations(value, note, [reply("first")], "complete", "2026-08-02T01:00:00Z", key, BINDING);
   assert.equal(unchanged.unchangedObservations, 1);
   assert.equal((value.prepare("SELECT COUNT(*) AS count FROM research_observations").get() as { count: number }).count, 1);
 
@@ -77,7 +78,8 @@ test("reply reconciliation is idempotent, append-only for edits, and tombstones 
     [reply("edited", "2026-08-02T02:00:00Z")],
     "complete",
     "2026-08-02T03:00:00Z",
-    key
+    key,
+    BINDING,
   );
   assert.equal(edited.changedObservations, 1);
   const rows = value.prepare("SELECT observation_id, exact_text, superseded_by FROM research_observations ORDER BY rowid").all() as {
@@ -89,9 +91,9 @@ test("reply reconciliation is idempotent, append-only for edits, and tombstones 
   assert.equal(rows[0].exact_text, "first");
   assert.equal(rows[0].superseded_by, rows[1].observation_id);
 
-  const partial = reconcileReplyObservations(value, note, [], "partial", "2026-08-02T04:00:00Z", key);
+  const partial = reconcileReplyObservations(value, note, [], "partial", "2026-08-02T04:00:00Z", key, BINDING);
   assert.equal(partial.tombstonedObservations, 0);
-  const complete = reconcileReplyObservations(value, note, [], "complete", "2026-08-02T05:00:00Z", key);
+  const complete = reconcileReplyObservations(value, note, [], "complete", "2026-08-02T05:00:00Z", key, BINDING);
   assert.equal(complete.tombstonedObservations, 1);
   const current = value.prepare("SELECT deleted_at FROM research_observations WHERE superseded_by IS NULL").get() as { deleted_at: string | null };
   assert.ok(current.deleted_at);
@@ -100,7 +102,7 @@ test("reply reconciliation is idempotent, append-only for edits, and tombstones 
 test("reply observations identify creator replies when the Note author is known", () => {
   const value = db();
   const creatorNote = { ...note, authorUserId: "99" };
-  reconcileReplyObservations(value, creatorNote, [reply("creator reply")], "complete", "2026-08-02T00:00:00Z", "test-key");
+  reconcileReplyObservations(value, creatorNote, [reply("creator reply")], "complete", "2026-08-02T00:00:00Z", "test-key", BINDING);
 
   const row = value.prepare("SELECT is_creator_observation FROM research_observations WHERE source = 'reply'").get() as {
     is_creator_observation: number;
@@ -110,7 +112,7 @@ test("reply observations identify creator replies when the Note author is known"
 
 test("metric observations preserve measured zeroes and only append when values change", () => {
   const value = db();
-  const first = writeNoteMetrics(value, note, "2026-08-02T00:00:00Z");
+  const first = writeNoteMetrics(value, note, "2026-08-02T00:00:00Z", BINDING);
   assert.equal(first.length, 4);
   assert.equal((value.prepare("SELECT COUNT(*) AS count FROM research_observations WHERE source = 'metric'").get() as { count: number }).count, 4);
   assert.equal(
@@ -118,7 +120,7 @@ test("metric observations preserve measured zeroes and only append when values c
     0
   );
 
-  writeNoteMetrics(value, note, "2026-08-03T00:00:00Z");
+  writeNoteMetrics(value, note, "2026-08-03T00:00:00Z", BINDING);
   assert.equal((value.prepare("SELECT COUNT(*) AS count FROM research_observations WHERE source = 'metric'").get() as { count: number }).count, 4);
   const changed = writeMetricObservation(value, {
     contentItemId: note.noteId,
@@ -127,6 +129,7 @@ test("metric observations preserve measured zeroes and only append when values c
     metricName: "likes",
     metricValue: 2,
     at: "2026-08-04T00:00:00Z",
+    binding: BINDING,
   });
   assert.equal(changed.changed, true);
   assert.equal((value.prepare("SELECT COUNT(*) AS count FROM research_observations WHERE metric_name = 'likes'").get() as { count: number }).count, 2);

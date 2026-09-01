@@ -9,6 +9,7 @@ import { installResearchSchema } from "./store.js";
 import type { FetchedNote } from "../atomize/fetch-notes.js";
 
 const dirs: string[] = [];
+const BINDING = { brandId: "human-inference", providerAccountId: "human-inference/substack" } as const;
 const dbs: Database.Database[] = [];
 
 afterEach(() => {
@@ -78,6 +79,7 @@ test("backfill checkpoints raw capture and ledger state, then resumes without re
     handle: "muxin",
     db,
     key: "test-key",
+    binding: BINDING,
     now: () => new Date("2026-08-02T00:00:00Z"),
     fetchNotes: async () => [note],
     launchContext: launchContext(calls),
@@ -108,6 +110,7 @@ test("a forbidden reply walk reports an error and never marks the Note complete"
     handle: "muxin",
     db,
     key: "test-key",
+    binding: BINDING,
     now: () => new Date("2026-08-02T00:00:00Z"),
     fetchNotes: async () => [note],
     launchContext: async () => ({

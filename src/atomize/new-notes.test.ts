@@ -23,14 +23,20 @@ const schema = readFileSync(join(repoRoot, "src", "db", "schema.sql"), "utf8");
 
 // The exact INSERT that ingestNotes() in src/atomize/new-notes.ts executes:
 const UPSERT_SQL = `
-  INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type, source)
-  VALUES ('substack-note', ?, ?, ?, ?, 'note', 'note', 'organic')
+  INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type, source, brand_id, provider_account_id)
+  VALUES ('substack-note', ?, ?, ?, ?, 'note', 'note', 'organic', ?, ?)
   ON CONFLICT(platform, platform_post_id) DO UPDATE SET
     content_text = excluded.content_text,
     media_type = COALESCE(posts.media_type, excluded.media_type),
-    source = COALESCE(posts.source, 'organic')
+    source = COALESCE(posts.source, 'organic'),
+    brand_id = COALESCE(posts.brand_id, excluded.brand_id),
+    provider_account_id = COALESCE(posts.provider_account_id, excluded.provider_account_id)
+  WHERE (posts.brand_id IS NULL OR posts.brand_id = excluded.brand_id)
+    AND (posts.provider_account_id IS NULL OR posts.provider_account_id = excluded.provider_account_id)
   RETURNING id
 `;
+
+const BINDING = ["human-inference", "human-inference/substack"] as const;
 
 function freshDb(): Database.Database {
   const db = new Database(":memory:");
@@ -46,7 +52,8 @@ describe("new-notes.ts upsert path: media_type='note' (#46)", () => {
       "note-test-123",
       "2026-06-25T12:00:00.000Z",
       "https://substack.com/@test/note/123",
-      "This is a test note body."
+      "This is a test note body.",
+      ...BINDING,
     ) as { id: number };
 
     assert.ok(row?.id, "RETURNING id should give a valid row id");
@@ -69,7 +76,8 @@ describe("new-notes.ts upsert path: media_type='note' (#46)", () => {
       "note-test-456",
       "2026-06-25T12:00:00.000Z",
       "https://substack.com/@test/note/456",
-      "Original text."
+      "Original text.",
+      ...BINDING,
     ) as { id: number };
 
     // Simulate a row that already has media_type set to something (e.g. from an older run
@@ -82,7 +90,8 @@ describe("new-notes.ts upsert path: media_type='note' (#46)", () => {
       "note-test-456",
       "2026-06-25T12:00:00.000Z",
       "https://substack.com/@test/note/456",
-      "Updated text."
+      "Updated text.",
+      ...BINDING,
     );
 
     const stored = db.prepare("SELECT media_type, content_text FROM posts WHERE id = ?").get(first.id) as {
@@ -101,11 +110,30 @@ describe("new-notes.ts upsert path: media_type='note' (#46)", () => {
       "note-test-789",
       "2026-06-25T14:00:00.000Z",
       "https://substack.com/@test/note/789",
-      "Another note."
+      "Another note.",
+      ...BINDING,
     ) as { id: number };
 
     const stored = db.prepare("SELECT format FROM posts WHERE id = ?").get(row.id) as { format: string };
     assert.equal(stored.format, "note", "format column should be 'note' to match media_type");
+    db.close();
+  });
+
+  test("a reviewed bound re-ingest promotes a legacy row, while a conflicting identity is refused", () => {
+    const db = freshDb();
+    db.prepare(
+      `INSERT INTO posts (platform, platform_post_id, content_text)
+       VALUES ('substack-note', 'legacy-note', 'legacy')`
+    ).run();
+    const stmt = db.prepare(UPSERT_SQL);
+    const promoted = stmt.get("legacy-note", null, null, "updated", ...BINDING) as { id: number } | undefined;
+    assert.ok(promoted);
+    assert.deepEqual(
+      db.prepare("SELECT brand_id, provider_account_id FROM posts WHERE id = ?").get(promoted.id),
+      { brand_id: BINDING[0], provider_account_id: BINDING[1] },
+    );
+    const conflict = stmt.get("legacy-note", null, null, "wrong", "charles", "charles/substack");
+    assert.equal(conflict, undefined);
     db.close();
   });
 });

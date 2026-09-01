@@ -3,11 +3,12 @@ import { basename, isAbsolute, join } from "node:path";
 import type { ContentOrigin } from "../review/content-request.js";
 import type { QueueRow } from "./queue.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { brandForOrigin, type BrandId } from "../identity/brand.js";
 
 export const DELIVERY_POLICY_VERSION = "delivery-policy-v1" as const;
 
 export type DeliveryProvider = "postiz" | "typefully" | "postpeer" | "youtube" | "substack" | "manual";
-export type DeliveryBrand = "human-inference" | "fiction" | "charles";
+export type DeliveryBrand = BrandId;
 export type DeliveryMode = "provider" | "manual" | "blocked";
 
 export interface DeliveryPolicyDecision {
@@ -35,13 +36,14 @@ const HUMAN_INFERENCE_ACCOUNTS: Readonly<Record<Exclude<DeliveryProvider, "manua
  */
 export function decideDeliveryPolicy(origin: ContentOrigin | "missing" | "unknown", provider: DeliveryProvider): DeliveryPolicyDecision {
   const base = { policyVersion: DELIVERY_POLICY_VERSION, origin, provider } as const;
-  if (origin === "charles") {
-    return { ...base, brand: "charles", providerAccountId: null, mode: "manual", reason: "Charles delivery is always ready-to-paste; provider dispatch is prohibited" };
+  const brand = brandForOrigin(origin);
+  if (brand === "charles") {
+    return { ...base, brand, providerAccountId: null, mode: "manual", reason: "Charles delivery is always ready-to-paste; provider dispatch is prohibited" };
   }
-  if (origin === "fiction") {
-    return { ...base, brand: "fiction", providerAccountId: null, mode: "blocked", reason: "Fiction has no separately configured provider account; refusing to reuse the Human Inference identity" };
+  if (brand === "fiction") {
+    return { ...base, brand, providerAccountId: null, mode: "blocked", reason: "Fiction has no separately configured provider account; refusing to reuse the Human Inference identity" };
   }
-  if (origin === "human-inference" || origin === "venture") {
+  if (brand === "human-inference") {
     if (provider === "manual") return { ...base, brand: "human-inference", providerAccountId: null, mode: "manual", reason: "destination is intentionally manual" };
     return { ...base, brand: "human-inference", providerAccountId: HUMAN_INFERENCE_ACCOUNTS[provider], mode: "provider", reason: `${origin} is explicitly bound to the Human Inference ${provider} account` };
   }

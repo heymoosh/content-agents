@@ -12,6 +12,7 @@ import {
   isSubstackSummaryFile,
 } from "./parse-substack.js";
 import { parseLinkedIn, parseLinkedInAudience } from "./parse-linkedin.js";
+import { validateMeasurementBinding, type BrandId } from "../identity/brand.js";
 
 const INBOX = join(repoRoot, "data", "inbox");
 const PROCESSED = join(repoRoot, "data", "processed");
@@ -65,32 +66,39 @@ async function parseAudienceFor(platform: string, path: string, isDir: boolean):
   return [];
 }
 
-export async function runImport(): Promise<void> {
+export interface ImportMeasurementBinding { brandId: BrandId; providerAccountId: string }
+
+export async function runImport(binding: ImportMeasurementBinding): Promise<void> {
+  const identity = validateMeasurementBinding(binding);
   const db = openDb();
   const now = new Date().toISOString();
 
   const upsertPost = db.prepare(`
-    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type)
-    VALUES (@platform, @platformPostId, @postedAt, @url, @contentText, @format, @mediaType)
+    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type, brand_id, provider_account_id)
+    VALUES (@platform, @platformPostId, @postedAt, @url, @contentText, @format, @mediaType, @brandId, @providerAccountId)
     ON CONFLICT(platform, platform_post_id) DO UPDATE SET
       posted_at = COALESCE(excluded.posted_at, posts.posted_at),
       url = COALESCE(excluded.url, posts.url),
       content_text = COALESCE(excluded.content_text, posts.content_text),
       format = COALESCE(excluded.format, posts.format),
-      media_type = COALESCE(excluded.media_type, posts.media_type)
+      media_type = COALESCE(excluded.media_type, posts.media_type),
+      brand_id = COALESCE(posts.brand_id, excluded.brand_id),
+      provider_account_id = COALESCE(posts.provider_account_id, excluded.provider_account_id)
+    WHERE (posts.brand_id IS NULL OR posts.brand_id = excluded.brand_id)
+      AND (posts.provider_account_id IS NULL OR posts.provider_account_id = excluded.provider_account_id)
     RETURNING id
   `);
   const insertMetrics = db.prepare(`
-    INSERT INTO metrics (post_id, captured_at, impressions, likes, replies, reposts, clicks, new_follows, engagement_rate, raw_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO metrics (post_id, captured_at, impressions, likes, replies, reposts, clicks, new_follows, engagement_rate, raw_json, brand_id, provider_account_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertAudience = db.prepare(`
-    INSERT OR IGNORE INTO audience (platform, captured_at, as_of_date, metric_type, dimension, value_label, value_count, value_pct, source_file, raw_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO audience (platform, captured_at, as_of_date, metric_type, dimension, value_label, value_count, value_pct, source_file, raw_json, brand_id, provider_account_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const seenImport = db.prepare("SELECT 1 FROM imports WHERE sha256 = ?");
   const insertImport = db.prepare(
-    "INSERT INTO imports (sha256, file_name, platform, imported_at, row_count) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO imports (sha256, file_name, platform, imported_at, row_count, brand_id, provider_account_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
   );
 
   let totalFiles = 0;
@@ -120,7 +128,9 @@ export async function runImport(): Promise<void> {
         const audienceRows = await parseAudienceFor(platform, path, isDir);
         const tx = db.transaction(() => {
           for (const row of rows) {
-            const { id } = upsertPost.get({ ...row, mediaType: toMediaType(row.format) }) as { id: number };
+            const stored = upsertPost.get({ ...row, mediaType: toMediaType(row.format), brandId: identity.brandId, providerAccountId: identity.providerAccountId }) as { id: number } | undefined;
+            if (!stored) throw new Error(`identity conflict for ${row.platform}/${row.platformPostId}`);
+            const { id } = stored;
             insertMetrics.run(
               id,
               now,
@@ -131,7 +141,7 @@ export async function runImport(): Promise<void> {
               row.metrics.clicks,
               row.metrics.newFollows,
               row.metrics.engagementRate,
-              JSON.stringify(row.raw)
+              JSON.stringify(row.raw), identity.brandId, identity.providerAccountId
             );
           }
           for (const a of audienceRows) {
@@ -145,10 +155,10 @@ export async function runImport(): Promise<void> {
               a.valueCount,
               a.valuePct,
               a.sourceFile,
-              JSON.stringify(a.raw)
+              JSON.stringify(a.raw), identity.brandId, identity.providerAccountId
             );
           }
-          insertImport.run(hash, file, platform, now, rows.length);
+          insertImport.run(hash, file, platform, now, rows.length, identity.brandId, identity.providerAccountId);
         });
         tx();
         mkdirSync(PROCESSED, { recursive: true });
@@ -172,7 +182,21 @@ export async function runImport(): Promise<void> {
   db.close();
 }
 
-runImport().catch((e) => {
+async function main(): Promise<void> {
+  const cliArgs = process.argv.slice(2);
+  const cliValue = (flag: string): string | undefined => {
+    const index = cliArgs.indexOf(flag);
+    return index >= 0 ? cliArgs[index + 1] : undefined;
+  };
+  const brandId = cliValue("--brand");
+  const providerAccountId = cliValue("--account");
+  if (!brandId || !providerAccountId) {
+    throw new Error("analytics import requires --brand <human-inference|charles|fiction> and --account <non-secret-provider-account-id>");
+  }
+  await runImport(validateMeasurementBinding({ brandId, providerAccountId }));
+}
+
+main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 });

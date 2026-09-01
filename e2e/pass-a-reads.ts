@@ -87,6 +87,24 @@ async function main(): Promise<void> {
       detail: fam.length > 40 ? `${fam.trim().slice(0, 120).replace(/\s+/g, " ")}…` : `family pane nearly empty: "${fam.trim()}"`,
     });
 
+    // P2.4a: Switching brands stays in the ordinary Signals read and an empty brand is rendered
+    // as not measured, never as a measured zero. Fixture mode intercepts every request locally.
+    await applyScenario(s.page, "signals-outcomes-pre-launch");
+    const brandStates: string[] = [];
+    for (const brand of ["charles", "fiction"] as const) {
+      await s.page.locator("#signalsBrand").selectOption(brand);
+      await s.page.waitForFunction(() => document.querySelector("#signalsFamilies")?.textContent?.includes("not measured"));
+      brandStates.push(`${brand}:${await s.page.locator("#signalsBrand").inputValue()}`);
+    }
+    const scopedText = await textOf(s.page, "#signalsReads");
+    record({
+      feature: "Signals switches brand scope without turning missing evidence into zero",
+      pr: "P2.4a",
+      status: brandStates.every((state) => !state.endsWith(":")) && /not measured/i.test(scopedText)
+        && /Briefs, recommendations, and experiments are not yet brand-scoped/.test(scopedText) ? "pass" : "fail",
+      detail: `${brandStates.join(", ")}; ${scopedText.replace(/\s+/g, " ").slice(0, 140)}…`,
+    });
+
     // #375: the Content wizard is a step surface, not a static sheet.
     await openRoom(s.page, "content");
     const steps = await s.page.locator("#cwSteps .cw-step, #cwSteps [data-step]").count();

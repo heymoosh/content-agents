@@ -1196,8 +1196,9 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" id="signalsCaptureHandoff" hidden></div>
     <div class="sheet" id="stripSignals" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet" id="signalsReads">
-    <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><span class="src" id="signalsBriefDate"></span></div>
+    <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><label class="src">Brand <select id="signalsBrand"><option value="human-inference">Human Inference</option><option value="charles">Charles</option><option value="fiction">Fiction</option></select></label><span class="src" id="signalsBriefDate"></span></div>
     <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
+    <div class="src" style="margin-top:8px">Brand scope applies to measured outcome families and the redacted research read. Briefs, recommendations, and experiments are not yet brand-scoped for Charles or Fiction.</div>
     <div id="signalsTop"><div class="empty">Loading…</div></div>
     <details style="margin-top:26px"><summary class="wb-label">Measurement inventory</summary><div style="margin-top:18px">
       <div style="font:italic 400 14px/1.5 Georgia,serif;color:#a89a80">This read</div>
@@ -5283,6 +5284,7 @@ async function loadSignals(){
   renderSignals();
   await loadOutcomes();
 }
+document.getElementById("signalsBrand")?.addEventListener("change", () => { loadOutcomes(); });
 
 // ── Signals: the four outcome families + the redacted research read ──
 //
@@ -5372,6 +5374,8 @@ function renderOutcomes(){
   if(!OUTCOMES){ box.innerHTML = '<div class="empty">Loading…</div>'; return; }
   if(OUTCOMES.error){ box.innerHTML = '<div class="empty">Could not read the outcome families: '+esc(OUTCOMES.error)+'</div>'; return; }
   const conf = OUTCOMES.confidence || [];
+  const excluded = OUTCOMES.excluded_unassigned || {};
+  const excludedLine = ["posts","metrics","audience","research"].map(k=>k+" "+(Number(excluded[k])||0)).join(", ");
   const plats = conf.map(c=>
     '<div class="sig-plat"><span style="font-weight:600">'+esc(c.platform)+'</span>'+
     '<span class="t-'+(c.sufficient?"green":"amber")+'" style="font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace">'+esc(c.sufficient?"enough data":"insufficient")+'</span>'+
@@ -5379,6 +5383,7 @@ function renderOutcomes(){
   ).join("");
   box.innerHTML =
     '<div class="sig-sample">'+esc(sampleNote(conf, OUTCOMES.sample_rule))+'</div>'+
+    '<div class="src" style="margin-top:4px">Legacy rows excluded from this brand view: '+esc(excludedLine)+'. They remain unassigned, never silently attributed.</div>'+
     '<div class="src" style="margin-top:4px">Sample rule: '+esc(OUTCOMES.sample_rule ? OUTCOMES.sample_rule.source : "")+'</div>'+
     FAMILY_METRICS.map(pair=>OUTCOMES[pair[0]] ? familyHtml(OUTCOMES[pair[0]], pair[1]) : "").join("")+
     (plats?'<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:2px;">How much data is behind this</div>'+
@@ -5417,9 +5422,10 @@ function renderResearch(){
     (replies?'<div class="src" style="margin-top:10px">A few redacted lines, as stored:</div>'+replies:"");
 }
 async function loadOutcomes(){
+  const brand = document.getElementById("signalsBrand")?.value || "human-inference";
   const [o, rr] = await Promise.all([
-    fetch("/api/signals/outcomes").then(r=>r.json()).catch(e=>({error:String(e)})),
-    fetch("/api/research/report").then(r=>r.json()).catch(()=>null),
+    fetch("/api/signals/outcomes"+"?brand="+encodeURIComponent(brand)).then(r=>r.json()).catch(e=>({error:String(e)})),
+    fetch("/api/research/report"+"?brand="+encodeURIComponent(brand)).then(r=>r.json()).catch(()=>null),
   ]);
   OUTCOMES = o; RESEARCH = rr;
   renderOutcomes(); renderResearch();

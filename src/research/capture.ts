@@ -11,7 +11,9 @@ import {
   requireResearchHashKey,
   writeMetricObservation,
   writeNoteMetrics,
+  type MeasurementBinding,
 } from "./store.js";
+import { validateMeasurementBinding } from "../identity/brand.js";
 import { appendResearchLedger, readResearchLedger, shouldCheckNote, type NoteCompleteness, type SubstackNotesLedgerEntry } from "./ledger.js";
 
 export const RESEARCH_DIR = join(repoRoot, "data", "research");
@@ -61,6 +63,7 @@ export interface CaptureRunOptions {
   launchContext?: () => Promise<CaptureRequestContext>;
   sleep?: (milliseconds: number) => Promise<void>;
   politenessDelayMs?: number;
+  binding?: MeasurementBinding;
 }
 
 function writeRawCapture(dir: string, note: FetchedNote, value: unknown): string {
@@ -134,6 +137,10 @@ function emptyCoverage(windowStart: string, windowEnd: string): CoverageRecord[]
 export async function runResearchCapture(options: CaptureRunOptions): Promise<CaptureRunResult> {
   const hashKey = options.key ?? requireResearchHashKey();
   requireResearchHashKey(hashKey);
+  const binding = options.binding ?? validateMeasurementBinding({
+    brandId: "human-inference",
+    providerAccountId: process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID,
+  });
   const now = options.now ?? (() => new Date());
   const ledgerPath = options.ledgerPath ?? LEDGER_PATH;
   const rawNotesDir = options.rawNotesDir ?? RAW_NOTES_DIR;
@@ -195,7 +202,7 @@ export async function runResearchCapture(options: CaptureRunOptions): Promise<Ca
       let rawPath: string | null = null;
       let lastError: string | null = null;
       try {
-        const metricWrites = writeNoteMetrics(db, note, at);
+        const metricWrites = writeNoteMetrics(db, note, at, binding);
         metricRows += metricWrites.length;
         metricObservationsCreated += metricWrites.filter((write) => write.created).length;
         if (metricWrites.length < 4 || metricWrites.some((write) => !write.measured)) metricGap = true;
@@ -208,7 +215,7 @@ export async function runResearchCapture(options: CaptureRunOptions): Promise<Ca
         branchCount = tree.replyBranchCountCaptured;
         observationCount = tree.replyObservationCountCaptured;
         completeness = branchCount === note.replies ? "complete" : "partial";
-        const reconciliation = reconcileReplyObservations(db, note, tree.flattenedReplies, completeness, at, hashKey);
+        const reconciliation = reconcileReplyObservations(db, note, tree.flattenedReplies, completeness, at, hashKey, binding);
         replyObservationsCreated += reconciliation.newObservations;
         replyObservationsChanged += reconciliation.changedObservations;
         capturedReplyObservations += observationCount;
@@ -256,6 +263,7 @@ export async function runResearchCapture(options: CaptureRunOptions): Promise<Ca
         metricName: "subscribers_total",
         metricValue: subscriberTotal,
         at: now().toISOString(),
+        binding,
       });
       subscriberRows += 1;
       if (total.created) metricObservationsCreated += 1;
@@ -263,15 +271,17 @@ export async function runResearchCapture(options: CaptureRunOptions): Promise<Ca
         .prepare(
           `SELECT metric_value FROM research_observations
            WHERE source = 'subscriber_movement' AND metric_name = 'subscribers_total'
+             AND brand_id = ? AND provider_account_id = ?
            ORDER BY collected_at DESC, rowid DESC LIMIT 2`
         )
-        .all() as { metric_value: number }[];
+        .all(binding.brandId, binding.providerAccountId) as { metric_value: number }[];
       if (previousTotal.length > 1) {
         const delta = writeMetricObservation(db, {
           source: "subscriber_movement",
           metricName: "subscribers_delta",
           metricValue: subscriberTotal - previousTotal[1].metric_value,
           at: now().toISOString(),
+          binding,
         });
         subscriberRows += 1;
         if (delta.created) metricObservationsCreated += 1;
