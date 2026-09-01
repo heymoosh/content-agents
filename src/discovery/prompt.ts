@@ -23,6 +23,10 @@ export interface ClientPlatformDiscoveryOpts {
   extraContext: string; // person-fit rubric (client) or spin_angles text (platform)
   excludeNames: string[]; // names of leads already on file, so the model doesn't re-propose them
   searchBudgetPerSignal: number;
+  lens?: { belief: string; dialect: string; modality: string };
+  anchorContext?: string;
+  antiExamples?: string[];
+  calibration?: string;
 }
 
 const CLASSIFICATION_VALUES: Record<"client" | "platform", string> = {
@@ -47,6 +51,26 @@ export function buildClientPlatformDiscoveryPrompt(opts: ClientPlatformDiscovery
     opts.kind === "client"
       ? `the specific, honest angle a pitch to this company would use, naming the real match found`
       : `whichever per-channel positioning entry above has the closest audience match to this candidate's actual audience -- use its "angle" text as the core material, do not invent a new worldview framing from scratch when an already-approved one fits`;
+  const lensBlock = opts.lens
+    ? [
+        `--- ACTIVE DISCOVERY LENS (rotate this run; do not broaden back to generic search) ---`,
+        `Belief: ${opts.lens.belief}`,
+        `Community dialect: ${opts.lens.dialect}`,
+        `Modality: ${opts.lens.modality}`,
+        opts.anchorContext?.trim() || "No trusted anchor subset selected for this run.",
+        `Generate fresh search queries from this belief x dialect x modality. Treat anchors as graph entry points, not as candidates to repeat.`,
+      ]
+    : [];
+  const feedbackBlock = [
+    `--- DISCOVERY FEEDBACK ---`,
+    opts.calibration?.trim() || "No pursue/pass calibration is available yet. Keep classifications conservative.",
+    opts.antiExamples?.length
+      ? `Prior pass reasons are negative examples. Do not surface lookalikes:\n${opts.antiExamples.map((item) => `- ${item}`).join("\n")}`
+      : "No prior pass reasons are available yet.",
+  ];
+  const peopleFirstInstruction = opts.kind === "client"
+    ? `Start with reflective founders or executives whose public words show openness to changing direction. Establish a named person's worldview fit with a direct quote first, then research the company only after that person qualifies. The company is the eventual lead record, but its marketing voice is not the discovery starting point.`
+    : `Start with platforms whose actual recent audience and contributor path match the rubric.`;
 
   return [
     `You are running the DISCOVERY stage of a client/platform-fit outreach engine for Muxin Li (docs/outreach-engine-plan.md), a new stage upstream of the existing RESEARCH stage.`,
@@ -62,7 +86,12 @@ export function buildClientPlatformDiscoveryPrompt(opts: ClientPlatformDiscovery
     `--- ${extraLabel} ---`,
     opts.extraContext.trim(),
     ``,
+    ...lensBlock,
+    ...(lensBlock.length ? [``] : []),
+    ...feedbackBlock,
+    ``,
     `--- YOUR TASK ---`,
+    peopleFirstInstruction,
     `Search the web and propose up to ${opts.maxCandidates} real, specific ${opts.kind === "client" ? "companies" : "platforms"} that plausibly fit the theme and rubric above. Each must be a real, currently-operating entity you can find live evidence for -- never invent one.`,
     `For EACH candidate you propose, walk the SAME closed-checklist research the engine's normal research stage runs:`,
     `1. Walk the ${SIGNAL_CATEGORIES[opts.kind]} from the rubric above, one at a time. For each signal, search at most ${opts.searchBudgetPerSignal} times. If nothing turns up within that budget, record "no evidence found" and move on.`,

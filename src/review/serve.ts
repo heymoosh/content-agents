@@ -1721,8 +1721,17 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       const b = await readBody(req);
       const dir = String(b.dir ?? "");
       const decision = String(b.decision ?? "");
+      const reason = String(b.reason ?? "").trim().replace(/\s+/g, " ");
       if (!isValidLeadDir(dir) || (decision !== "pursue" && decision !== "pass")) {
         json(res, 400, { ok: false, error: "dir must be a valid lead folder and decision must be pursue|pass" });
+        return;
+      }
+      if (decision === "pass" && !reason) {
+        json(res, 400, { ok: false, error: "A short pass reason is required so Scout can avoid similar leads next time." });
+        return;
+      }
+      if (reason.length > 240) {
+        json(res, 400, { ok: false, error: "The decision reason must be 240 characters or fewer." });
         return;
       }
       try {
@@ -1732,7 +1741,8 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         const status = decision === "pursue" ? "pursue" : "passed";
         const newHeader = setFrontmatterField(header, "status", status);
         const date = new Date().toISOString().slice(0, 10);
-        const newBody = `${body.replace(/\n+$/, "")}\n- ${date}: Muxin decided ${decision} (manual, review GUI)\n`;
+        const reasonSuffix = decision === "pass" ? `: ${reason}` : "";
+        const newBody = `${body.replace(/\n+$/, "")}\n- ${date}: Muxin decided ${decision} (manual, review GUI)${reasonSuffix}\n`;
         writeFileSync(leadPath, `${newHeader}\n${newBody}`);
         json(res, 200, { ok: true, dir, status });
       } catch (e) {

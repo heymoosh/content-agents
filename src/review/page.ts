@@ -2436,8 +2436,8 @@ function threadHtml(l){
   const outreachEngine = l.kind!=="content-example" ? outreachEngineSelectHtml() : "";
   const decideBtns = l.kind==="content-example" ? "" :
     '<div class="wb-handoff" style="margin-top:18px">'+
-      (undecided ? '<button class="primary out-pursue" data-dir="'+esc(l.dir)+'">Interested</button><button class="out-pass" data-dir="'+esc(l.dir)+'">Not for me</button>' : '<span class="pill">'+esc(l.status)+'</span>')+
-      '<span class="note">This only records your yes or no.</span>'+
+      (undecided ? '<button class="primary out-pursue" data-dir="'+esc(l.dir)+'">Interested</button><input class="out-pass-reason" maxlength="240" placeholder="Why not? Scout learns from this" aria-label="Reason for passing" /><button class="out-pass" data-dir="'+esc(l.dir)+'">Not for me</button>' : '<span class="pill">'+esc(l.status)+'</span>')+
+      '<span class="note">This records your decision and, when passing, a brief reason.</span>'+
     '</div>';
   const recommendation = l.kind==="content-example" ? "" :
     '<div class="outreach-recommendation" style="margin-top:18px;padding:14px 16px;border-left:2px solid var(--green);background:#f5f9f4">'+
@@ -2485,8 +2485,8 @@ function renderOutreachBox(){
     const btn = wrap ? wrap.querySelector("button.dir-send") : null;
     if(btn) btn.disabled = !t.value.trim();
   }));
-  box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue")));
-  box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass")));
+  box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue","")));
+  box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass",b.closest(".wb-handoff")?.querySelector(".out-pass-reason")?.value||"")));
   box.querySelectorAll("button.out-lock").forEach(b=>b.addEventListener("click", ()=>outreachLock(b.dataset.dir, b.dataset.file)));
   box.querySelectorAll("button.out-copy").forEach(b=>b.addEventListener("click", ()=>outreachCopy(b.dataset.dir)));
   box.querySelectorAll("button.out-mark-sent").forEach(b=>b.addEventListener("click", ()=>outreachMarkSent(b.dataset.dir, b)));
@@ -3172,8 +3172,8 @@ async function outreachDraft(dir, btn, engine){
   }
 }
 
-async function outreachDecide(dir, decision){
-  const r = await post("/api/outreach/decide", {dir, decision});
+async function outreachDecide(dir, decision, reason){
+  const r = await post("/api/outreach/decide", {dir, decision, reason});
   if(r.ok){ flash(decision==="pursue" ? "Marked worth pursuing" : "Passed"); loadOutreach(); }
   else flash(r.error || "Failed");
 }
