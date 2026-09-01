@@ -42,9 +42,9 @@ function insertPost(
   likes: number
 ): void {
   const info = db
-    .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, media_type, source) VALUES (?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, media_type, source, brand_id, provider_account_id) VALUES (?, ?, ?, ?, ?, 'human-inference', 'test/account')`)
     .run(platform, `${platform}-${mediaType}-${postedAt}-${Math.random()}`, postedAt, mediaType, source);
-  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
+  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts, brand_id, provider_account_id) VALUES (?, ?, ?, 0, 0, 'human-inference', 'test/account')`).run(
     info.lastInsertRowid,
     postedAt,
     likes
@@ -196,7 +196,7 @@ describe("loadRows: excludes deliberate spin-control-run and exploration-probe r
     insertPost(db, "x", "video", "organic", "2026-06-01T00:00:00.000Z", 10);
     insertPost(db, "x", "video", CONTROL_RUN_SOURCE, "2026-06-08T00:00:00.000Z", 1000);
     insertPost(db, "x", "video", EXPLORATION_SOURCE, "2026-06-15T00:00:00.000Z", 1000);
-    const rows = loadRows(db);
+    const rows = loadRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 1);
     assert.equal(rows[0].likes, 10);
     db.close();
@@ -206,7 +206,7 @@ describe("loadRows: excludes deliberate spin-control-run and exploration-probe r
     const db = freshDb();
     insertPost(db, "x", "unknown", "organic", "2026-06-01T00:00:00.000Z", 10);
     insertPost(db, "x", "text", "organic", "2026-06-01T00:00:00.000Z", 10);
-    const rows = loadRows(db);
+    const rows = loadRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 1);
     assert.equal(rows[0].media_type, "text");
     db.close();

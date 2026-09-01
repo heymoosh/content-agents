@@ -176,9 +176,9 @@ describe("loadControlData: reads ONLY source='spin-control-run' rows, into their
     likes: number
   ): void {
     const info = db
-      .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, pillar, source) VALUES (?, ?, ?, ?, ?)`)
+      .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, pillar, source, brand_id, provider_account_id) VALUES (?, ?, ?, ?, ?, 'human-inference', 'test/account')`)
       .run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, pillar, source);
-    db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
+    db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts, brand_id, provider_account_id) VALUES (?, ?, ?, 0, 0, 'human-inference', 'test/account')`).run(
       info.lastInsertRowid,
       postedAt,
       likes
@@ -191,7 +191,7 @@ describe("loadControlData: reads ONLY source='spin-control-run' rows, into their
     insertPost(db, "x", "human-ai", "spin-control-run", "2026-06-10T00:00:00.000Z", 4);
     insertPost(db, "x", "human-ai", "spin-control-run", "2026-06-20T00:00:00.000Z", 6);
 
-    const cells = loadControlData(db);
+    const cells = loadControlData(db, undefined, { brandId: "human-inference" });
     const cell = cells.get("x|human-ai")!;
     assert.equal(cell.n, 2, "only the two control-run posts count");
     assert.equal(cell.avg_eng, 5, "avg of the two control posts (4, 6) -> 5, the organic 999 must not leak in");

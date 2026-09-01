@@ -70,12 +70,13 @@ export function parseBriefSignals(text: string): { confidence: ChannelConfidence
   return { confidence, recommendations };
 }
 
-export function readSignals(briefsDir: string = join(repoRoot, "briefs")): SignalsRead {
+export function readSignals(brandId: BrandId, briefsRoot: string = join(repoRoot, "briefs")): SignalsRead {
+  const briefsDir = join(briefsRoot, brandId);
   const file = latestBriefFile(briefsDir);
   if (!file) return { briefPath: null, briefDate: null, confidence: [], recommendations: [] };
   const parsed = parseBriefSignals(readFileSync(join(briefsDir, file), "utf8"));
   return {
-    briefPath: `briefs/${file}`,
+    briefPath: `briefs/${brandId}/${file}`,
     briefDate: file.slice(0, 10),
     ...parsed,
   };

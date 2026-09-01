@@ -1,8 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { launchPlatform } from "./browser.js";
 import { DEFAULT_PULL_PLATFORMS, PULLERS } from "./registry.js";
 import { PullError, classifyUnknown, CULPRIT, type PullFailureKind } from "./errors.js";
 import type { PullPlatform } from "./types.js";
+import { isBrandId, type BrandId } from "../identity/brand.js";
+import { measurementAccountForBrand } from "../config/brand-accounts.js";
 
 // Headless: reuse the saved session, download the export into data/inbox/<platform>/,
 // then (with --ingest) run the existing importer so the DB updates in one shot.
@@ -10,7 +13,20 @@ import type { PullPlatform } from "./types.js";
 //   npm run pull -- linkedin            # download the export
 //   npm run pull -- linkedin --ingest   # download, then npm run ingest
 //   npm run pull -- linkedin --headed   # watch the browser to triage a failure
-//   npm run pull                        # every configured platform
+//   npm run pull -- --brand human-inference --ingest  # pull + explicitly bound ingest
+
+export function parsePullBrand(args: readonly string[]): BrandId {
+  const i = args.indexOf("--brand");
+  const value = i >= 0 ? args[i + 1] : undefined;
+  if (!isBrandId(value)) throw new Error("pull requires explicit --brand human-inference|charles|fiction");
+  return value;
+}
+
+export function measurementIngestArgs(brand: BrandId): string[] {
+  const account = measurementAccountForBrand(brand);
+  if (!account) throw new Error(`no measurement account configured for ${brand}; refusing unbound pull/ingest`);
+  return ["--brand", brand, "--account", account];
+}
 
 async function pullOne(platform: PullPlatform, headed: boolean): Promise<string[]> {
   const puller = PULLERS[platform];
@@ -47,7 +63,8 @@ async function main() {
   const args = process.argv.slice(2);
   const headed = args.includes("--headed");
   const runIngest = args.includes("--ingest");
-  const targets = args.filter((a) => !a.startsWith("--")) as PullPlatform[];
+  const brand = parsePullBrand(args);
+  const targets = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--brand" && !isBrandId(a)) as PullPlatform[];
   const platforms = targets.length ? targets : DEFAULT_PULL_PLATFORMS;
 
   let pulled = 0;
@@ -65,7 +82,8 @@ async function main() {
 
   if (runIngest && pulled) {
     console.log("\nrunning ingest…");
-    spawnSync("npm", ["run", "ingest"], { stdio: "inherit" });
+    const result = spawnSync("npm", ["run", "ingest", "--", ...measurementIngestArgs(brand)], { stdio: "inherit" });
+    if (result.status !== 0) process.exitCode = result.status ?? 1;
   }
 
   console.log(`\n─ done: ${pulled} file(s) pulled, ${failures.length} platform(s) failed ─`);
@@ -76,7 +94,9 @@ async function main() {
   if (failures.length) process.exitCode = 1;
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}

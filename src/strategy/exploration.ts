@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb, repoRoot } from "../db/db.js";
 import { EXPLORATION_SOURCE, PILLARS, loadConfig, type Cell, type RoutingConfig, type WindowRange } from "./route.js";
+import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 
 // Same PT anchor as the unified publish scheduler (src/publish/slots.ts's TZ) — the "calendar
 // month" a probe counts against is Muxin's local month, not UTC's.
@@ -128,7 +129,10 @@ export function nextExplorationProbe(
 // EXPLORATION_SOURCE rows only — the mirror image of loadData()'s exclusion, so a probe's
 // engagement is trackable as its own bucket without ever touching the main pillar/platform cells.
 // `db` is injectable for tests (see routing-drift.ts's hasNoSpinControl for the same pattern).
-export function loadExplorationData(db: ReturnType<typeof openDb>, range?: WindowRange): Map<string, Cell> {
+export function loadExplorationData(db: ReturnType<typeof openDb>, range?: WindowRange, context?: StrategyMeasurementContext): Map<string, Cell> {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
+  const latest = latestMetricsJoin(context);
+  const scope = measurementScope(context, "p", "m");
   const dateClause = range ? `AND p.posted_at >= ? AND p.posted_at < ?` : "";
   const dateParams = range ? [new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()] : [];
   const rows = db
@@ -136,16 +140,11 @@ export function loadExplorationData(db: ReturnType<typeof openDb>, range?: Windo
       `SELECT p.platform, p.pillar,
               COUNT(*) AS n,
               AVG(COALESCE(m.likes,0) + 3*COALESCE(m.replies,0) + 2*COALESCE(m.reposts,0)) AS avg_eng
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
-       WHERE p.pillar IS NOT NULL AND p.source = ? ${dateClause}
+       FROM posts p JOIN (${latest.sql}) m ON m.post_id = p.id
+       WHERE p.pillar IS NOT NULL AND p.source = ? AND ${scope.sql} ${dateClause}
        GROUP BY p.platform, p.pillar`
     )
-    .all(EXPLORATION_SOURCE, ...dateParams) as { platform: string; pillar: string; n: number; avg_eng: number }[];
+    .all(...latest.params, EXPLORATION_SOURCE, ...scope.params, ...dateParams) as { platform: string; pillar: string; n: number; avg_eng: number }[];
 
   const cells = new Map<string, Cell>();
   for (const r of rows) cells.set(`${r.platform}|${r.pillar}`, { n: r.n, avg_eng: r.avg_eng });
@@ -190,7 +189,7 @@ function main() {
   if (args.includes("--coverage")) {
     const db = openDb();
     try {
-      const cells = loadExplorationData(db);
+      const cells = loadExplorationData(db, undefined, parseStrategyMeasurementContext());
       console.log(formatExplorationCoverage(cells, cfg));
     } finally {
       db.close();

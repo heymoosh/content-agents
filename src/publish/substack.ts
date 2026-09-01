@@ -178,12 +178,12 @@ export async function publishSubstack(
     console.log("no approved substack rows in the review queue");
     return [];
   }
-  assertProviderDispatch(folder, "substack", opts.deliveryPolicy);
+  const deliveryDecision = assertProviderDispatch(folder, "substack", opts.deliveryPolicy);
 
   // Reuse guard: skip if this slug was published to Substack too recently (config/platforms.yaml
   // substack.min_reuse_days). Checked even on a dry run, so --dry-run honestly reports a block.
   const slug = basename(folder);
-  const reuseCheck = checkReuse(slug, "substack");
+  const reuseCheck = checkReuse(slug, "substack", undefined, deliveryDecision.brand!);
   if (!reuseCheck.allowed) {
     console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
     console.log("no rows to publish: substack blocked by the reuse guard");

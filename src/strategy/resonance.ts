@@ -1,4 +1,5 @@
 import { openDb } from "../db/db.js";
+import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext } from "./measurement-context.js";
 import { CONTROL_RUN_SOURCE } from "./route.js";
 
 // Topic resonance map: pillar × platform. Requires posts to be tagged first.
@@ -18,20 +19,18 @@ interface Row {
 }
 
 function main() {
+  const context = parseStrategyMeasurementContext();
   const db = openDb();
+  const latest = latestMetricsJoin(context);
+  const scope = measurementScope(context, "p", "m");
   const rows = db
     .prepare(
       `SELECT p.platform, p.pillar, p.posted_at,
               m.likes, m.replies, m.reposts
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
-       WHERE p.pillar IS NOT NULL AND (p.source IS NULL OR p.source != ?)`
+       FROM posts p JOIN (${latest.sql}) m ON m.post_id = p.id
+       WHERE p.pillar IS NOT NULL AND ${scope.sql} AND (p.source IS NULL OR p.source != ?)`
     )
-    .all(CONTROL_RUN_SOURCE) as Row[];
+    .all(...latest.params, ...scope.params, CONTROL_RUN_SOURCE) as Row[];
   db.close();
 
   if (rows.length === 0) {

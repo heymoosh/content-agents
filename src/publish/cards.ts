@@ -165,7 +165,7 @@ export async function publishCards(
     console.log("no approved quote-card rows in the review queue");
     return [];
   }
-  assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
+  const deliveryDecision = assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
 
   // Reuse guard: per TARGET platform (like publishText's checkReuse(slug, r.platform)), not a
   // shared "quote-card" bucket — bets.md Placed rows are keyed by the row's real destination
@@ -214,7 +214,7 @@ export async function publishCards(
       }
 
       if (!forceReuse) {
-        if (!reuseByTarget.has(target)) reuseByTarget.set(target, checkReuse(slug, target));
+        if (!reuseByTarget.has(target)) reuseByTarget.set(target, checkReuse(slug, target, undefined, deliveryDecision.brand!));
         const reuseResult = reuseByTarget.get(target)!;
         if (!reuseResult.allowed) {
           console.warn(`reuse guard: ${reuseResult.reason} — skipping ${row.id}`);

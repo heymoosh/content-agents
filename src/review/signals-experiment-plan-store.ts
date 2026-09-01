@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
 import type { AppliedExperimentContentHandoff, ExperimentPlan, ExperimentPlanDecision } from "../grow/experiment-content-handoff.js";
+import { brandForOrigin, isBrandId, type BrandId } from "../identity/brand.js";
 
 export const SIGNALS_EXPERIMENT_PLANS_PATH = migrateLegacyDataFile(["signals-experiment-plans.jsonl"]);
 
@@ -20,6 +21,7 @@ interface FoldedExperimentPlan {
 export interface SignalsExperimentPlanRead {
   readonly experimentId: string;
   readonly contentRequestId: string;
+  readonly brandId: BrandId | null;
   readonly confidence: ExperimentPlan["recommendation"]["confidence"];
   readonly evidenceRefs: string[];
   readonly observation: string;
@@ -58,6 +60,12 @@ function fold(path: string): Map<string, FoldedExperimentPlan> {
   const result = new Map<string, FoldedExperimentPlan>();
   for (const event of readEvents(path)) {
     if (event.kind === "proposal") {
+      // Old ledgers predate brand binding. Recover only a durable origin; generic Studio
+      // records remain unassigned and are never eligible for measurement/actions.
+      if (!isBrandId((event.plan as Partial<ExperimentPlan>).brandId)) {
+        const recovered = brandForOrigin(event.plan.contentRequest?.origin);
+        event.plan = { ...event.plan, brandId: recovered } as ExperimentPlan;
+      }
       const prior = result.get(event.id);
       if (prior && prior.plan.digest !== event.plan.digest) throw new Error(`conflicting experiment plan ${event.id}`);
       if (!prior) result.set(event.id, { plan: event.plan, decision: null, handoff: null });
@@ -148,6 +156,7 @@ export function readExperimentPlans(path: string = SIGNALS_EXPERIMENT_PLANS_PATH
     return {
       experimentId: row.plan.recommendation.id,
       contentRequestId: row.plan.contentRequest.id,
+      brandId: row.plan.brandId ?? brandForOrigin(row.plan.contentRequest.origin),
       confidence: row.plan.recommendation.confidence,
       evidenceRefs: [...row.plan.recommendation.evidenceRefs],
       observation: row.plan.recommendation.observation,
@@ -187,7 +196,7 @@ export function readExperimentPlans(path: string = SIGNALS_EXPERIMENT_PLANS_PATH
 export function readExperimentPlansForPerformance(path: string = SIGNALS_EXPERIMENT_PLANS_PATH): ExperimentPlan[] {
   if (!existsSync(path)) return [];
   return withFileLock(`${path}.lock`, () => [...fold(path).values()]
-    .filter((row) => row.decision?.status === "approved" && row.handoff !== null)
+    .filter((row) => row.decision?.status === "approved" && row.handoff !== null && row.plan.brandId !== null)
     .map((row) => row.plan)
     .sort((left, right) => left.recommendation.id.localeCompare(right.recommendation.id)));
 }

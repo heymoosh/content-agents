@@ -1198,7 +1198,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" id="signalsReads">
     <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><label class="src">Brand <select id="signalsBrand"><option value="human-inference">Human Inference</option><option value="charles">Charles</option><option value="fiction">Fiction</option></select></label><span class="src" id="signalsBriefDate"></span></div>
     <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
-    <div class="src" style="margin-top:8px">Brand scope applies to measured outcome families and the redacted research read. Briefs, recommendations, and experiments are not yet brand-scoped for Charles or Fiction.</div>
+    <div class="src" style="margin-top:8px">The selected brand scopes measurements, strategy recommendations, decisions, and experiments. Unassigned legacy records stay excluded.</div>
     <div id="signalsTop"><div class="empty">Loading…</div></div>
     <details style="margin-top:26px"><summary class="wb-label">Measurement inventory</summary><div style="margin-top:18px">
       <div style="font:italic 400 14px/1.5 Georgia,serif;color:#a89a80">This read</div>
@@ -1968,7 +1968,7 @@ function openSignalsBrief(){
 }
 async function loadBrief(){
   briefLoaded = true;
-  const r = await fetch("/api/strategy/brief"); const d = await r.json();
+  const r = await fetch("/api/strategy/brief?brand="+encodeURIComponent(signalsBrand())); const d = await r.json();
   if(!d.ok){ $("#briefBody").textContent = d.error; $("#briefPath").textContent = ""; return; }
   $("#briefBody").innerHTML = mdToHtml(d.content);
   $("#briefPath").textContent = d.path;
@@ -2001,7 +2001,7 @@ async function askBrief(){
   const prevHtml = $("#briefBody").innerHTML;
   const engine = $("#strategyEngine").value;
   $("#briefBody").textContent = engineLabel(engine)+" is revising the brief. The room strip carries the live clock.";
-  const r = await post("/api/strategy/ask", {instruction, engine});
+  const r = await post("/api/strategy/ask", {instruction, engine, brand:signalsBrand()});
   $("#briefAskBtn").disabled = false;
   if(r.ok){ $("#briefBody").innerHTML = mdToHtml(r.content); $("#briefPath").textContent = r.path; inp.value = ""; flash("Brief revised with "+engineLabel(engine)); }
   else { $("#briefBody").innerHTML = prevHtml; flash("Revise failed: "+(r.error||"error")); }
@@ -2023,7 +2023,7 @@ async function refreshBriefRun(){
   body.innerHTML = '<p class="thinking">Running /strategy with '+esc(engineLabel(engine))+'. It grades your bets and writes a new dated brief. The room strip carries the live clock.</p>';
   loadJobs(); // make the strategy job visible in the Studio room right away
   try {
-    const r = await post("/api/strategy/refresh-brief", {engine});
+    const r = await post("/api/strategy/refresh-brief", {engine, brand:signalsBrand()});
     if(r.ok){ flash("Brief refreshed: "+(r.path||"")); await loadBrief(); }
     else { body.innerHTML = prevHtml; flash(r.error || "Refresh failed: see the job log"); }
   } catch (e) {
@@ -2066,7 +2066,7 @@ async function generateInsights(){
   const engine = $("#signalsAnalysisEngine").value;
   const intro = engine === "claude" ? "Running the reports, then asking Claude for a synthesis." : "Running the reports, then asking "+engineLabel(engine)+" for a synthesis.";
   $("#insightsOut").innerHTML = '<p class="hint">'+esc(intro)+' The room strip carries the live clock.</p>';
-  const r = await post("/api/strategy/insights", {engine});
+  const r = await post("/api/strategy/insights", {engine, brand:signalsBrand()});
   $("#insightsBtn").disabled = false;
   if(r.ok){ $("#insightsOut").innerHTML = renderInsightsMeta(r) + mdToHtml(r.summary); insightsHistory = [{role:"assistant", content:r.summary}]; }
   else { $("#insightsOut").innerHTML = "<p>Failed: "+esc(r.error||"error")+"</p>"; }
@@ -2098,7 +2098,7 @@ async function askInsights(){
   const engine = $("#signalsAnalysisEngine").value;
   thinking.innerHTML = esc(engineLabel(engine))+' is looking into it. It may re-run a report first. The room strip carries the live clock.';
   $("#insightsThread").appendChild(thinking);
-  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory, engine});
+  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory, engine, brand:signalsBrand()});
   $("#insightsAskBtn").disabled = false;
   insightsHistory.push({role:"assistant", content: r.ok ? r.answer : "Failed: "+(r.error||"error")});
   renderThread();
@@ -2141,7 +2141,7 @@ async function pullFresh(){
   const box = $("#rawList");
   const prevHtml = box.innerHTML;
   box.innerHTML = '<div class="empty">Pulling fresh analytics through real Chrome. It can take a few minutes. The strip at the top of this room carries the clock.</div>';
-  const r = await post("/api/strategy/pull", {});
+  const r = await post("/api/strategy/pull", {brand: signalsBrand()});
   btn.disabled = false; $("#rawRefreshBtn").disabled = false;
   if(r.ok){ flash("Pull complete"); await loadRaw(); }
   else { box.innerHTML = prevHtml; flash("Pull failed: "+(r.error||"error")); await loadRaw(); }
@@ -5048,6 +5048,7 @@ async function onCharlesAction(act, item){
 // foot controls and the insights "Brief:" link share one switch. The last two sheets are
 // pre-prototype developer surfaces relocated behind those controls so the room opens on the reads.
 let SIGNALS = null;
+function signalsBrand(){ return document.getElementById("signalsBrand")?.value || "human-inference"; }
 // The server returns the latest append-only decision for each recommendation. A reload therefore
 // keeps the user's choice without changing routing, configuration, or the repository backlog.
 function signalKey(r){ return r.type+":"+r.title; }
@@ -5215,7 +5216,7 @@ async function proposeSignalsExperiment(button){
   const selected=$("#signalsAnalysisEngine").value||"codex";
   if(selected==="ollama-gpt-oss"){flash("Choose Claude, Grok, or Codex for experiment proposals.");return;}
   button.disabled=true;
-  const result=await post("/api/signals/experiments/propose",{contentRequestId,evidenceDossierPath,evidenceFamily,minimumSample,minimumDays,availablePublishingUnits,availableDays,engine:selected});
+  const result=await post("/api/signals/experiments/propose",{contentRequestId,evidenceDossierPath,evidenceFamily,minimumSample,minimumDays,availablePublishingUnits,availableDays,engine:selected,brand:signalsBrand()});
   if(!result.ok){button.disabled=false;flash(result.error||"Could not evaluate the experiment.");return;}
   flash(result.result&&result.result.status==="no-experiment"?"Signals found no experiment worth the capacity.":"Signals experiment proposal is ready for review.");
   await loadSignals();
@@ -5224,14 +5225,14 @@ async function actOnSignalsExperiment(id,action,button){
   let rationale="";
   if(action==="decline") rationale=prompt("Why decline this experiment?")||"";
   button.disabled=true;
-  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/"+action,{approvedBy:"muxin",rationale});
+  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/"+action,{approvedBy:"muxin",rationale,brand:signalsBrand()});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not update experiment"); await loadSignals(); return; }
   flash(action==="decline"?"Experiment declined.":"Experiment drafts are pending review in Content.");
   await loadSignals();
 }
 async function interpretSignalsExperiment(id,button){
   button.disabled=true;
-  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/interpret",{engine:$("#signalsAnalysisEngine").value||"codex"});
+  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/interpret",{engine:$("#signalsAnalysisEngine").value||"codex",brand:signalsBrand()});
   if(!result.ok){button.disabled=false;flash(result.error||"Could not interpret experiment");return;}
   flash("Signals interpretation is ready for your review.");
   await loadSignals();
@@ -5240,7 +5241,7 @@ async function reviewSignalsExperimentInterpretation(id,action,button){
   const rationale=prompt(action==="accept"?"Why accept this interpretation?":"Why reject this analysis?")||"";
   if(!rationale.trim()) return;
   button.disabled=true;
-  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/interpretation/"+action,{rationale});
+  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/interpretation/"+action,{rationale,brand:signalsBrand()});
   if(!result.ok){button.disabled=false;flash(result.error||"Could not review interpretation");return;}
   flash(action==="accept"?"Interpretation recorded.":"Analysis rejected.");
   await loadSignals();
@@ -5257,7 +5258,7 @@ async function reviewSignalProposal(id,action,button){
   const evidence=prompt(action==="approve" ? "Why is this exact change approved?" : "Why reject this proposal?");
   if(!evidence) return;
   button.disabled=true;
-  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence});
+  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence,brand:signalsBrand()});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not review proposal"); return; }
   flash(action==="approve" ? "Proposal approved. It has not been applied." : "Proposal rejected."); await loadSignals();
 }
@@ -5265,7 +5266,7 @@ async function actOnSignalProposal(id,action,button){
   let evidence="";
   if(action==="rollback"){ evidence=prompt("Why roll this change back?")||""; if(!evidence) return; }
   button.disabled=true;
-  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence});
+  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence,brand:signalsBrand()});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not "+action+" proposal"); return; }
   flash(action==="apply" ? "Approved Signals change applied." : "Signals change rolled back."); await loadSignals();
 }
@@ -5273,18 +5274,24 @@ async function saveSignalDecision(index, decision, button){
   const recommendation=SIGNALS&&SIGNALS.recommendations ? SIGNALS.recommendations[index] : null;
   if(!recommendation) return;
   button.disabled=true;
-  const result=await post("/api/signals/decision",{decision,type:recommendation.type,title:recommendation.title,rationale:recommendation.rationale});
+  const result=await post("/api/signals/decision",{decision,type:recommendation.type,title:recommendation.title,rationale:recommendation.rationale,brand:signalsBrand()});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not save the decision"); return; }
   flash("Decision saved. No configuration changed.");
   await loadSignals();
 }
 async function loadSignals(){
-  const r = await fetch("/api/signals");
+  const brand=signalsBrand();
+  const r = await fetch("/api/signals"+"?brand="+encodeURIComponent(brand));
   SIGNALS = await r.json();
   renderSignals();
   await loadOutcomes();
 }
-document.getElementById("signalsBrand")?.addEventListener("change", () => { loadOutcomes(); });
+document.getElementById("signalsBrand")?.addEventListener("change", () => {
+  briefLoaded=false;
+  insightsHistory=[];
+  loadSignals();
+  if(SIG.pane==="brief") loadBrief();
+});
 
 // ── Signals: the four outcome families + the redacted research read ──
 //
@@ -5422,7 +5429,7 @@ function renderResearch(){
     (replies?'<div class="src" style="margin-top:10px">A few redacted lines, as stored:</div>'+replies:"");
 }
 async function loadOutcomes(){
-  const brand = document.getElementById("signalsBrand")?.value || "human-inference";
+  const brand = signalsBrand();
   const [o, rr] = await Promise.all([
     fetch("/api/signals/outcomes"+"?brand="+encodeURIComponent(brand)).then(r=>r.json()).catch(e=>({error:String(e)})),
     fetch("/api/research/report"+"?brand="+encodeURIComponent(brand)).then(r=>r.json()).catch(()=>null),

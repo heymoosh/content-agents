@@ -1,22 +1,31 @@
 ---
 name: cycle
-description: Run one full weekly content cycle - ingest analytics, refresh the strategy brief, atomize new content, surface pending reviews, offer publish. The single command Muxin runs weekly.
+description: Run one full brand-scoped weekly content cycle. Usage - /cycle --brand <human-inference|charles|fiction> [--account <provider/account>].
 ---
 
 # /cycle — the weekly loop
+
+Require the canonical `--brand` argument at entry: `human-inference`, `charles`, or `fiction`.
+Reject missing or unknown brands. There is no Human Inference fallback. Pass the same explicit
+`--brand` and optional `--account` to `/strategy` and every strategy report it invokes. Strategy
+state is always under `briefs/<brand>/`; legacy top-level `briefs/` and `briefs/bets.md` are
+unassigned and unread.
 
 Pure orchestration — each step delegates to its own skill or script. Stop at every human
 checkpoint; never barrel through.
 
 ## Steps
 
-1. **Ingest.** If `data/inbox/` has files, run `npm run ingest`. If `.env` has Bluesky creds,
+1. **Ingest.** If `data/inbox/` has files, run the brand-bound pull/ingest command
+   `npm run pull -- --brand <brand> --ingest` (which supplies the configured measurement account;
+   never run bare `npm run ingest`). If `.env` has Bluesky creds,
    run `npm run bluesky`. Report what was imported. If the inbox was empty AND the latest
    brief is >2 weeks old, remind Muxin to export analytics (`docs/analytics-export-howto.md`).
 
-2. **Strategy.** If the newest file in `briefs/` is older than 7 days (or new data was just
-   imported), run the `/strategy` skill flow. Note that `/strategy` now **grades last cycle's bets
-   first** (`briefs/bets.md` + `npm run grade-bets`) before writing new recommendations — this is
+2. **Strategy.** If the newest file in `briefs/<brand>/` is older than 7 days (or new data was just
+   imported), run `/strategy --brand <brand>` (plus `--account <provider/account>` when supplied).
+   Note that `/strategy` now **grades last cycle's bets first** (`briefs/<brand>/bets.md` +
+   `npm run grade-bets -- --brand <brand>`) before writing new recommendations — this is
    the feedback loop that makes the cycle compound. Otherwise note the brief is current.
 
 3. **New content.** Ask Muxin if there's new content to atomize (Substack URL, file, or voice
@@ -32,5 +41,5 @@ checkpoint; never barrel through.
    if Muxin says yes (or already asked for publish in this conversation).
 
 6. **Wrap up.** Summarize the cycle (imported / brief / atomized / published). Offer to commit
-   and push the cycle's artifacts (briefs **including `briefs/bets.md`**, derivatives, logs, queue
+   and push the cycle's artifacts (brand-scoped briefs **including `briefs/<brand>/bets.md`**, derivatives, logs, queue
    updates) — the bets ledger is the loop's memory, so it must be committed every cycle.

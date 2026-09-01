@@ -147,9 +147,9 @@ describe("loadData: excludes deliberate spin-control-run rows from the main reso
     likes: number
   ): void {
     const info = db
-      .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, pillar, source) VALUES (?, ?, ?, ?, ?)`)
+      .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, pillar, source, brand_id, provider_account_id) VALUES (?, ?, ?, ?, ?, 'human-inference', 'test/account')`)
       .run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, pillar, source);
-    db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
+    db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts, brand_id, provider_account_id) VALUES (?, ?, ?, 0, 0, 'human-inference', 'test/account')`).run(
       info.lastInsertRowid,
       postedAt,
       likes
@@ -162,7 +162,7 @@ describe("loadData: excludes deliberate spin-control-run rows from the main reso
     insertPost(db, "x", "human-ai", "organic", "2026-06-08T00:00:00.000Z", 12);
     insertPost(db, "x", "human-ai", CONTROL_RUN_SOURCE, "2026-06-15T00:00:00.000Z", 1000);
 
-    const data = loadData(undefined, db);
+    const data = loadData(undefined, db, { brandId: "human-inference" });
     const cell = data.cells.get("x|human-ai")!;
     assert.equal(cell.n, 2, "the spin-control-run row must not be counted in n");
     assert.equal(cell.avg_eng, 11, "avg must be computed from only the two organic posts (10, 12) -> 11");
@@ -172,7 +172,7 @@ describe("loadData: excludes deliberate spin-control-run rows from the main reso
   test("a post with NULL source is treated as a normal (non-control) post", () => {
     const db = freshDb();
     insertPost(db, "bluesky", "civic-tech", null, "2026-06-01T00:00:00.000Z", 5);
-    const data = loadData(undefined, db);
+    const data = loadData(undefined, db, { brandId: "human-inference" });
     assert.equal(data.cells.get("bluesky|civic-tech")!.n, 1);
     db.close();
   });

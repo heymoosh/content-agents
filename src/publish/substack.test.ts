@@ -3,14 +3,13 @@
  * status here posts live to Muxin's real public Substack account) and the two-phase claim-then-fire
  * machine built on the shared scheduler.
  *
- * Strategy: publishSubstack touches two real, hardcoded-path files this repo shares across test
+ * Strategy: publishSubstack touches two append-only files, both redirected to isolated test paths:
  * files — the slot ledger (data/publish-schedule.jsonl, via claimSlots/findPendingClaim) and the
  * bets ledger (briefs/bets.md, via appendBetPlacement, only on an actual "fired" post).
  *   - The ledger: point CONTENT_AGENTS_TEST_LEDGER (read lazily by slots.ts's ledgerPath()) at an
  *     isolated file, same fix queue-view.test.ts already applied — running against the real ledger
  *     raced other suites (slots.test.ts) under Node's default concurrent-test-file execution.
- *   - bets.md: no such override exists (appendBetPlacement hardcodes the path), so this follows
- *     reuse-guard.test.ts's established save/restore-the-real-file convention instead.
+ *   - bets.md: CONTENT_AGENTS_TEST_BETS_PATH keeps the brand-scoped production ledger untouched.
  * A postFn is always injected — no real browser is ever launched anywhere in this suite.
  */
 
@@ -26,7 +25,7 @@ import { readLedger, type Claim } from "./slots.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TEST_LEDGER = join(tmpdir(), "substack-test-ledger.jsonl");
-const BETS_PATH = join(repoRoot, "briefs", "bets.md");
+const BETS_PATH = join(tmpdir(), "substack-test-bets.md");
 
 const dirs: string[] = [];
 
@@ -69,23 +68,22 @@ const shouldNotBeCalled: PostFn = async () => {
   throw new Error("postFn must not be called in this test");
 };
 
-let savedBets: string | null = null;
-
 describe("publishSubstack", () => {
   const originalAccountId = process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID;
   before(() => {
     process.env.CONTENT_AGENTS_TEST_LEDGER = TEST_LEDGER;
-    savedBets = existsSync(BETS_PATH) ? readFileSync(BETS_PATH, "utf8") : null;
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = BETS_PATH;
+    if (existsSync(BETS_PATH)) unlinkSync(BETS_PATH);
     process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID = "human-inference/substack";
   });
 
   after(() => {
     delete process.env.CONTENT_AGENTS_TEST_LEDGER;
+    delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
     if (originalAccountId === undefined) delete process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID;
     else process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID = originalAccountId;
     if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
-    if (savedBets === null) writeFileSync(BETS_PATH, "");
-    else writeFileSync(BETS_PATH, savedBets);
+    if (existsSync(BETS_PATH)) unlinkSync(BETS_PATH);
     for (const d of dirs) rmSync(d, { recursive: true, force: true });
   });
 

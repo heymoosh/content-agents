@@ -45,4 +45,12 @@ describe("signals recommendations", () => {
     assert.equal(read.contentDefaults.summary.top.source, "cold-start-default");
     assert.equal(read.contentDefaults.overridable, true);
   });
+
+  test("does not give Charles or Fiction Human Inference cold-start platform defaults", () => {
+    for (const brandId of ["charles", "fiction"] as const) {
+      const read = buildSignalsRecommendationRead(brandId);
+      assert.equal(read.contentDefaults.summary.top.platform, null);
+      assert.deepEqual(read.contentDefaults.platforms, []);
+    }
+  });
 });

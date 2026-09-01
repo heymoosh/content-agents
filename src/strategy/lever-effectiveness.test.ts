@@ -47,7 +47,7 @@ function insertPost(
 ): void {
   const info = db
     .prepare(
-      `INSERT INTO posts (platform, platform_post_id, posted_at, source, cta_destination, cadence_source) VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO posts (platform, platform_post_id, posted_at, source, cta_destination, cadence_source, brand_id, provider_account_id) VALUES (?, ?, ?, ?, ?, ?, 'human-inference', 'test/account')`
     )
     .run(
       platform,
@@ -57,7 +57,7 @@ function insertPost(
       fields.ctaDestination ?? null,
       fields.cadenceSource ?? null
     );
-  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
+  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts, brand_id, provider_account_id) VALUES (?, ?, ?, 0, 0, 'human-inference', 'test/account')`).run(
     info.lastInsertRowid,
     postedAt,
     likes
@@ -189,7 +189,7 @@ describe("buildReport: I/O wrapper reads from an injected DB via each lever's ow
     insertPost(db, "linkedin", { ctaDestination: "project" }, d2, 5);
     insertPost(db, "linkedin", { ctaDestination: "project" }, d4, 5);
 
-    const report = buildReport(db, NOW);
+    const report = buildReport(db, NOW, { brandId: "human-inference" });
     assert.equal(report.cadence.some((r) => r.platform === "bluesky" && r.label === "override-winning"), true);
     assert.equal(report.frame.some((r) => r.platform === "x" && r.label === "frame-winning"), true);
     assert.equal(report.cta.some((r) => r.platform === "linkedin" && r.label === "clear-winner"), true);
@@ -202,7 +202,7 @@ describe("buildReport: I/O wrapper reads from an injected DB via each lever's ow
     const d0 = new Date(NOW).toISOString();
     insertPost(db, "x", { source: "organic" }, d0, 999);
     insertPost(db, "x", { source: EXPLORATION_SOURCE }, d0, 999);
-    const report = buildReport(db, NOW);
+    const report = buildReport(db, NOW, { brandId: "human-inference" });
     assert.deepEqual(report.cadence, []);
     assert.deepEqual(report.frame, []);
     assert.deepEqual(report.cta, []);

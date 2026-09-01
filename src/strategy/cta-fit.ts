@@ -3,6 +3,7 @@ import { openDb } from "../db/db.js";
 import { CORE_TEXT, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE, loadConfig, type RoutingConfig } from "./route.js";
 import { loadStrategyConfig, type StrategyConfig } from "./platform-fit.js";
 import type { CtaDestination } from "../publish/cta.js";
+import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 
 // Strategy lever E (card d80411bc, epic 2ce597d7 "Close the loop"): a RECOMMENDATION, not an
 // auto-gate — same posture as levers A/B/D. The card as originally worded ("score CTA
@@ -43,22 +44,20 @@ export interface Row {
 // platform-fit.ts/cadence-fit.ts), and excludes rows with no cta_destination at all (nothing to
 // bucket them under — most rows today, since posts.cta_destination only started being stamped
 // once card d80411bc shipped).
-export function loadRows(injectedDb?: ReturnType<typeof openDb>): Row[] {
+export function loadRows(injectedDb?: ReturnType<typeof openDb>, context?: StrategyMeasurementContext): Row[] {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const db = injectedDb ?? openDb();
+  const latest = latestMetricsJoin(context);
+  const scope = measurementScope(context, "p", "m");
   const rows = db
     .prepare(
       `SELECT p.platform, p.cta_destination, p.posted_at, m.likes, m.replies, m.reposts
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
+       FROM posts p JOIN (${latest.sql}) m ON m.post_id = p.id
        WHERE p.platform IN (${CORE_TEXT.map(() => "?").join(",")})
          AND p.cta_destination IS NOT NULL
-         AND (p.source IS NULL OR p.source NOT IN (?, ?))`
+         AND ${scope.sql} AND (p.source IS NULL OR p.source NOT IN (?, ?))`
     )
-    .all(...CORE_TEXT, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as Row[];
+    .all(...latest.params, ...CORE_TEXT, ...scope.params, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as Row[];
   if (!injectedDb) db.close();
   return rows;
 }
@@ -157,7 +156,7 @@ function labelText(r: CtaFitResult): string {
 function main() {
   const cfg = loadConfig();
   const strategyCfg = loadStrategyConfig();
-  const rows = loadRows();
+  const rows = loadRows(undefined, parseStrategyMeasurementContext());
   const ranked = rankCtaFit(rows, cfg, strategyCfg);
 
   console.log(`# CTA-fit signal, ${new Date().toISOString().slice(0, 10)}\n`);

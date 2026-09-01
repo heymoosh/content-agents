@@ -115,11 +115,11 @@ export async function publishShorts(
     console.log("no approved video rows in the review queue");
     return [];
   }
-  assertProviderDispatch(folder, "youtube", opts.deliveryPolicy);
+  const deliveryDecision = assertProviderDispatch(folder, "youtube", opts.deliveryPolicy);
 
   // Reuse guard: skip if this slug was published to YouTube too recently.
   const slug = basename(folder);
-  const reuseCheck = checkReuse(slug, "youtube");
+  const reuseCheck = checkReuse(slug, "youtube", undefined, deliveryDecision.brand!);
   if (!reuseCheck.allowed) {
     console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
     console.log("no rows to publish: youtube blocked by the reuse guard");

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { decideDeliveryPolicy, resolveDeliveryPolicy } from "./delivery-policy.js";
+import { providerAccountForBrand } from "../config/brand-accounts.js";
 import { scheduleApproved } from "../review/studio-scheduling.js";
 import { publishText } from "./typefully.js";
 import { publishCards } from "./cards.js";
@@ -16,6 +17,12 @@ const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 
 describe("delivery policy matrix", () => {
+  test("resolves provider accounts from the explicit brand registry without fallback", () => {
+    assert.equal(providerAccountForBrand("human-inference", "typefully"), "human-inference/typefully");
+    assert.equal(providerAccountForBrand("charles", "typefully"), null);
+    assert.equal(providerAccountForBrand("fiction", "typefully"), null);
+  });
+
   test("Human Inference and Venture bind to an explicit non-secret account identity", () => {
     for (const origin of ["human-inference", "venture"] as const) {
       const decision = decideDeliveryPolicy(origin, "typefully");

@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { buildContentRequest, type ContentRequest, type ContentRequestInput } from "../review/content-request.js";
 import { authorizeGuiContentRequest, writeContentRequest } from "../review/content-request-store.js";
 import type { SignalsExperimentRecommendationInput } from "./experiment-slice.js";
+import { brandForOrigin, type BrandId } from "../identity/brand.js";
 
 export const EXPERIMENT_CONTENT_HANDOFF_VERSION = "experiment-content-handoff-v1" as const;
 
@@ -17,6 +18,8 @@ export interface ExperimentPlan {
   readonly kind: "experiment_plan";
   readonly version: typeof EXPERIMENT_CONTENT_HANDOFF_VERSION;
   readonly recommendation: SignalsExperimentRecommendationInput;
+  /** Canonical brand derived from the server-owned Content request origin. */
+  readonly brandId: BrandId | null;
   readonly contentRequest: ContentRequest;
   readonly variablesByVariant: Record<string, Record<string, string>>;
   readonly priority: "high" | "medium" | "deferred";
@@ -99,6 +102,8 @@ function normalizeVariables(value: ExperimentPlanInput["variablesByVariant"], re
 export function buildExperimentPlan(input: ExperimentPlanInput): ExperimentPlan {
   if (input.contentRequest.experiment != null) throw new Error("experiment plan input cannot pre-authorize its own Content request");
   const contentRequest = buildContentRequest(input.contentRequest);
+  const brandId = brandForOrigin(contentRequest.origin);
+  if (brandId === null) throw new Error("Signals experiment requires a Content request with a canonical brand origin");
   if (contentRequest.variants.length < 2) throw new Error("experiment plan requires at least two configured variants");
   const candidateIds = new Set(contentRequest.variants.map((variant) => variant.identity.id));
   const expected = input.recommendation.expectedOutcome;
@@ -124,6 +129,7 @@ export function buildExperimentPlan(input: ExperimentPlanInput): ExperimentPlan 
     kind: "experiment_plan" as const,
     version: EXPERIMENT_CONTENT_HANDOFF_VERSION,
     recommendation: input.recommendation,
+    brandId,
     contentRequest,
     variablesByVariant,
     capacity,

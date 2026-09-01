@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { openDb } from "../db/db.js";
 import { CORE_TEXT, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE, loadConfig, type RoutingConfig } from "./route.js";
 import { loadStrategyConfig, type StrategyConfig } from "./platform-fit.js";
+import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 
 // Strategy lever B (card 27dc7d2d, epic 2ce597d7 "Close the loop"): a RECOMMENDATION, not
 // auto-generation. Muxin decided (2026-07-15) this stays "recommend only" — the card's own literal
@@ -34,21 +35,19 @@ interface Row {
 // Raw per-post rows (platform, media_type, posted_at, engagement inputs), excluding BOTH
 // CONTROL_RUN_SOURCE and EXPLORATION_SOURCE — same policy as route.ts's loadData and
 // platform-fit.ts's loadRows, so a deliberate control/probe post never skews this recommendation.
-export function loadRows(injectedDb?: ReturnType<typeof openDb>): Row[] {
+export function loadRows(injectedDb?: ReturnType<typeof openDb>, context?: StrategyMeasurementContext): Row[] {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const db = injectedDb ?? openDb();
+  const latest = latestMetricsJoin(context);
+  const scope = measurementScope(context, "p", "m");
   const rows = db
     .prepare(
       `SELECT p.platform, p.media_type, p.posted_at, m.likes, m.replies, m.reposts
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
+       FROM posts p JOIN (${latest.sql}) m ON m.post_id = p.id
        WHERE p.media_type IS NOT NULL AND p.media_type != 'unknown'
-         AND (p.source IS NULL OR p.source NOT IN (?, ?))`
+         AND ${scope.sql} AND (p.source IS NULL OR p.source NOT IN (?, ?))`
     )
-    .all(CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as Row[];
+    .all(...latest.params, ...scope.params, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as Row[];
   if (!injectedDb) db.close();
   return rows;
 }
@@ -152,7 +151,7 @@ function labelText(r: MediaFitResult): string {
 function main() {
   const cfg = loadConfig();
   const strategyCfg = loadStrategyConfig();
-  const rows = loadRows();
+  const rows = loadRows(undefined, parseStrategyMeasurementContext());
   const ranked = rankMediaFit(rows, cfg, strategyCfg);
 
   console.log(`# Media-type fit, ${new Date().toISOString().slice(0, 10)}\n`);

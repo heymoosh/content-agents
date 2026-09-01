@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { openDb, repoRoot } from "../db/db.js";
+import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 import {
   CORE_TEXT,
   CONTROL_RUN_SOURCE,
@@ -64,20 +65,18 @@ interface Row {
 // applied per post, same shape as resonance.ts's own query — but excluding BOTH
 // CONTROL_RUN_SOURCE and EXPLORATION_SOURCE (route.ts's loadData policy), not just the former, so
 // this recommendation never leans on a deliberate control/probe post's engagement.
-export function loadRows(injectedDb?: ReturnType<typeof openDb>): Row[] {
+export function loadRows(injectedDb?: ReturnType<typeof openDb>, context?: StrategyMeasurementContext): Row[] {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const db = injectedDb ?? openDb();
+  const latest = latestMetricsJoin(context);
+  const scope = measurementScope(context, "p", "m");
   const rows = db
     .prepare(
       `SELECT p.platform, p.pillar, p.posted_at, m.likes, m.replies, m.reposts
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
-       WHERE p.pillar IS NOT NULL AND (p.source IS NULL OR p.source NOT IN (?, ?))`
+       FROM posts p JOIN (${latest.sql}) m ON m.post_id = p.id
+       WHERE p.pillar IS NOT NULL AND ${scope.sql} AND (p.source IS NULL OR p.source NOT IN (?, ?))`
     )
-    .all(CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as Row[];
+    .all(...latest.params, ...scope.params, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as Row[];
   if (!injectedDb) db.close();
   return rows;
 }
@@ -186,8 +185,9 @@ function priorText(m: PriorMatch): string {
 function main() {
   const cfg = loadConfig();
   const strategyCfg = loadStrategyConfig();
-  const data = loadData();
-  const rows = loadRows();
+  const context = parseStrategyMeasurementContext();
+  const data = loadData(undefined, undefined, context);
+  const rows = loadRows(undefined, context);
   const ranked = rankPlatformFit(cfg, data, rows, strategyCfg);
 
   console.log(`# Topic-platform fit, ${new Date().toISOString().slice(0, 10)}\n`);

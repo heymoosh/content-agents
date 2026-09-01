@@ -116,3 +116,23 @@ test("incomplete intent with a third config value is marked failed without a rec
     assert.throws(() => applySignalsProposal(p.id, "muxin", f), /config conflict/);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
+
+test("same Signals change title can exist independently per brand", () => {
+  const f = fixture();
+  try {
+    const human = proposeSignalsChange({ brandId: "human-inference", type: "TEST", title: "Set linkedin cadence to 3 posts/week", rationale: "human", actor: "muxin" }, f);
+    const charles = proposeSignalsChange({ brandId: "charles", type: "TEST", title: "Set linkedin cadence to 3 posts/week", rationale: "charles", actor: "muxin" }, f);
+    assert.notEqual(human.id, charles.id);
+    assert.equal(readSignalsProposals(f.path).length, 2);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("non-Human-Inference proposals cannot apply against shared config", () => {
+  const f = fixture();
+  try {
+    const proposal = proposeSignalsChange({ brandId: "charles", type: "TEST", title: "Set linkedin cadence to 3 posts/week", rationale: "charles", actor: "muxin" }, f);
+    reviewSignalsProposal(proposal.id, "approve", "checked", "muxin", { path: f.path });
+    assert.throws(() => applySignalsProposal(proposal.id, "muxin", f), /brand-specific configuration/i);
+    assert.match(readFileSync(join(f.root, "config/platforms.yaml"), "utf8"), /posts_per_week: 7/);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});

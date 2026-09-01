@@ -24,6 +24,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { repoRoot, openDb } from "../db/db.js";
+import { measurementAccountForBrand } from "../config/brand-accounts.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { fetchNotesList, humanInferenceSubstackMeasurementBinding, scaffoldPicked } from "../atomize/new-notes.js";
@@ -108,6 +109,7 @@ import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
 import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
 import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
 import { saveCutBody, addCutComment } from "./rows.js";
+import { isBrandId, type BrandId } from "../identity/brand.js";
 import { providerReconciliationHealth, startProviderReconciliationLoop } from "./provider-reconciliation-runner.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
@@ -268,17 +270,23 @@ const REPORTS: Record<string, string[]> = {
 // actually spawns the `claude -p` subprocess to revise the brief, and it needs both of these — but
 // they stay defined here since they're part of the cohesive Strategy/Analytics tab (scope decision,
 // see the top-of-file re-export comment).
-export function latestBriefPath(): string | null {
-  if (!existsSync(BRIEFS_DIR)) return null;
-  const files = readdirSync(BRIEFS_DIR).filter((f) => /^\d{4}-\d{2}-\d{2}-strategy-brief\.md$/.test(f)).sort();
-  return files.length ? join(BRIEFS_DIR, files[files.length - 1]) : null;
+export function latestBriefPath(brandId: BrandId, briefsRoot: string = BRIEFS_DIR): string | null {
+  const brandDir = join(briefsRoot, brandId);
+  if (!existsSync(brandDir)) return null;
+  const files = readdirSync(brandDir).filter((f) => /^\d{4}-\d{2}-\d{2}-strategy-brief\.md$/.test(f)).sort();
+  return files.length ? join(brandDir, files[files.length - 1]) : null;
 }
 
-async function runReport(cmd: string): Promise<string> {
+export function requestBrand(value: unknown): BrandId {
+  if (!isBrandId(value)) throw new Error("brand must be one of human-inference, charles, fiction");
+  return value;
+}
+
+async function runReport(cmd: string, brandId: BrandId): Promise<string> {
   const args = REPORTS[cmd];
   if (!args) throw new Error(`unknown report "${cmd}"`);
   try {
-    const { stdout } = await execFileP("npm", args, {
+    const { stdout } = await execFileP("npm", [...args, "--", "--brand", brandId], {
       cwd: repoRoot,
       timeout: STRATEGY_TIMEOUT_MS,
       maxBuffer: 20_000_000,
@@ -290,19 +298,19 @@ async function runReport(cmd: string): Promise<string> {
   }
 }
 
-function postCount(): number {
+function postCount(brandId: BrandId): number {
   const db = openDb();
   try {
-    return (db.prepare("SELECT COUNT(*) AS n FROM posts").get() as { n: number }).n;
+    return (db.prepare("SELECT COUNT(*) AS n FROM posts WHERE brand_id = ?").get(brandId) as { n: number }).n;
   } finally {
     db.close();
   }
 }
 
-function untaggedCount(): number {
+function untaggedCount(brandId: BrandId): number {
   const db = openDb();
   try {
-    return (db.prepare("SELECT COUNT(*) AS n FROM posts WHERE pillar IS NULL").get() as { n: number }).n;
+    return (db.prepare("SELECT COUNT(*) AS n FROM posts WHERE brand_id = ? AND pillar IS NULL").get(brandId) as { n: number }).n;
   } finally {
     db.close();
   }
@@ -370,8 +378,8 @@ type BriefReference = {
   scorecard: string | null;
 };
 
-function briefReference(nowMs: number = Date.now()): BriefReference | null {
-  const abs = latestBriefPath();
+function briefReference(brandId: BrandId, nowMs: number = Date.now()): BriefReference | null {
+  const abs = latestBriefPath(brandId);
   if (!abs) return null;
   const filename = basename(abs);
   const date = parseBriefDate(filename);
@@ -385,11 +393,12 @@ function briefReference(nowMs: number = Date.now()): BriefReference | null {
   };
 }
 
-function dataFreshness(nowMs: number = Date.now()): Freshness | null {
+function dataFreshness(brandId: BrandId, nowMs: number = Date.now()): Freshness | null {
   const db = openDb();
   try {
-    const metricsRow = db.prepare("SELECT MAX(captured_at) AS d FROM metrics").get() as { d: string | null };
-    const importsRow = db.prepare("SELECT MAX(imported_at) AS d FROM imports").get() as { d: string | null };
+    const metricsRow = db.prepare(`SELECT MAX(m.captured_at) AS d FROM metrics m JOIN posts p ON p.id = m.post_id
+      WHERE p.brand_id = ? AND m.brand_id = p.brand_id AND m.provider_account_id = p.provider_account_id`).get(brandId) as { d: string | null };
+    const importsRow = db.prepare("SELECT MAX(imported_at) AS d FROM imports WHERE brand_id = ?").get(brandId) as { d: string | null };
     return computeFreshness([metricsRow.d, importsRow.d], nowMs);
   } finally {
     db.close();
@@ -411,13 +420,13 @@ export type InsightsResult = {
 // LLM-dependent) so the GUI can show an "as of" stamp and a dated link instead of trusting the
 // summary text to mention how current anything is. This is otherwise a pure text answer (nothing
 // written to disk), shown straight in the GUI.
-async function generateInsights(engine: Engine = "claude"): Promise<InsightsResult> {
+async function generateInsights(brandId: BrandId, engine: Engine = "claude"): Promise<InsightsResult> {
   // Fail loud and fast, before spending a Claude call: an empty posts table almost always means
   // this checkout's data/analytics.db is a stale/isolated copy (gitignored, never synced between
   // checkouts — see IS_DEV_WORKTREE), not that there's genuinely no data.
-  if (postCount() === 0) {
+  if (postCount(brandId) === 0) {
     const summary =
-      `**No analytics data in this checkout (0 posts in data/analytics.db).**\n\n` +
+      `**No assigned analytics data for ${brandId} in this checkout (0 posts in data/analytics.db).**\n\n` +
       (IS_DEV_WORKTREE
         ? `This GUI is running from a Claude Code dev worktree, which has its own empty, gitignored ` +
           `data/analytics.db. It's never synced with your real checkout. Run \`npm run review\` from ` +
@@ -430,20 +439,21 @@ async function generateInsights(engine: Engine = "claude"): Promise<InsightsResu
   const sections: string[] = [];
   for (const key of Object.keys(REPORTS)) {
     try {
-      sections.push(`### ${key}\n${await runReport(key)}`);
+      sections.push(`### ${key}\n${await runReport(key, brandId)}`);
     } catch (e) {
       sections.push(`### ${key}\n(failed: ${e instanceof Error ? e.message : String(e)})`);
     }
   }
-  const freshness = dataFreshness();
-  const brief = briefReference();
-  const untagged = untaggedCount();
+  const freshness = dataFreshness(brandId);
+  const brief = briefReference(brandId);
+  const untagged = untaggedCount(brandId);
   const briefLabel = brief ? `${brief.date ?? "undated"}${brief.ageDays != null ? `, ${brief.ageDays}d old` : ""}` : null;
   const briefExcerpt = brief
     ? [brief.scorecard, brief.directives].filter(Boolean).join("\n\n") || "(no directives/scorecard section found)"
     : null;
   const prompt = [
     `Muxin Li wants a quick read on his content pipeline's analytics. Below is LIVE raw output from`,
+    `the explicitly selected ${brandId} brand only. Do not infer or mix another brand's data.`,
     `the pipeline's own report scripts (run just now, against the current database) — this is the`,
     `primary source. Below that is a short excerpt from his prior-cycle strategy brief`,
     `(${briefLabel ?? "none exists yet"}) for context only: it may be stale, so prefer the live`,
@@ -506,17 +516,18 @@ async function generateInsights(engine: Engine = "claude"): Promise<InsightsResu
 // Deep-dive follow-up: unlike generateInsights (which we feed pre-fetched data), Claude is allowed
 // to go run one of the same read-only reports itself, or read briefs/config, if the question needs
 // something not already in the conversation. Read-only: it's told never to edit/write/delete.
-async function askInsights(question: string, history: { role: string; content: string }[], engine: Engine = "claude"): Promise<string> {
+async function askInsights(question: string, history: { role: string; content: string }[], brandId: BrandId, engine: Engine = "claude"): Promise<string> {
   if (!question.trim()) throw new Error("ask something first");
   const transcript = history
     .map((h) => `${h.role === "user" ? "Muxin" : "Claude"}: ${h.content}`)
     .join("\n\n");
   const prompt = [
-    `You are Muxin Li's analytics assistant for his content pipeline (data/analytics.db via`,
-    `npm run snapshot/resonance/audience/origin-compare, briefs/, config/*.yaml). He's asking a`,
+    `You are Muxin Li's analytics assistant for the ${brandId} brand in his content pipeline`,
+    `(data/analytics.db via npm run snapshot/resonance/audience/origin-compare -- --brand ${brandId},`,
+    `briefs/${brandId}/, config/*.yaml). He's asking a`,
     `follow-up question after an insights summary. You MAY run those npm scripts, or read briefs/`,
     `and config files, if the question needs something not already in the conversation below. Do`,
-    `NOT edit, write, or delete any file — this is read-only Q&A.`,
+    `NOT edit, write, or delete any file. Do not read or mix another brand's state. This is read-only Q&A.`,
     ``,
     `## Conversation so far`,
     transcript || "(nothing yet)",
@@ -603,20 +614,23 @@ async function analyzeVenture(slug: string, engine: Engine = "claude"): Promise<
 // what a terminal /strategy run does (Muxin's pick, 2026-07-16: the full run, not a brief-only
 // synthesis). Verified by artifact like every atomize-family job: a new-or-updated brief file must
 // actually exist afterward, or the job fails with the log tail.
-async function refreshBrief(engine: Engine = "claude"): Promise<{ path: string }> {
-  const before = latestBriefPath();
+async function refreshBrief(brandId: BrandId, engine: Engine = "claude"): Promise<{ path: string }> {
+  const before = latestBriefPath(brandId);
   const beforeMtime = before && existsSync(before) ? statSync(before).mtimeMs : 0;
   return runQueued("strategy", `Refresh strategy brief with ${engine}`, async (job) => {
-    const result = await runClaudeSpawn(job, enginePrompt(engine, "strategy", "/strategy"), { timeoutMs: STRATEGY_RUN_TIMEOUT_MS });
+    const result = await runClaudeSpawn(job, enginePrompt(engine, "strategy", `/strategy for ${brandId}`), {
+      timeoutMs: STRATEGY_RUN_TIMEOUT_MS,
+      env: { CONTENT_AGENTS_STRATEGY_BRAND: brandId },
+    });
     const failure = decodeSpawnFailure(result, job.id, {
       timeoutVerb: "/strategy", timeoutLabel: `${STRATEGY_RUN_TIMEOUT_MS / 60_000} min`,
       exitVerb: "/strategy", includeTailOnTimeout: true,
     });
     if (failure) throw new Error(failure);
-    const after = latestBriefPath();
+    const after = latestBriefPath(brandId);
     const changed = after && (after !== before || statSync(after).mtimeMs > beforeMtime);
     if (!after || !changed) {
-      throw new Error("/strategy ran but no new or updated brief landed in briefs/. Check the job log");
+      throw new Error(`/strategy ran but no new or updated brief landed in briefs/${brandId}/. Check the job log`);
     }
     return { path: after.slice(repoRoot.length + 1) };
   }, engine);
@@ -651,9 +665,12 @@ function jobInFlight(kind: "strategy" | "scout"): boolean {
 // lets Muxin trigger the same `npm run pull -- --ingest` on demand between cron runs. Scope is
 // pull+ingest only (no bluesky, no brief regen) — Muxin still runs Generate insights / /strategy
 // himself once fresh data is in.
-async function pullFreshAnalytics(): Promise<string> {
+async function pullFreshAnalytics(brandId: BrandId): Promise<string> {
+  if (!measurementAccountForBrand(brandId)) {
+    throw new Error(`no measurement account configured for ${brandId}; refusing unbound pull/ingest`);
+  }
   return runQueued("pull", "Pull fresh analytics", async (job) => {
-    const result = await runCommandSpawn(job, "npm", ["run", "pull", "--", "--ingest"], {
+    const result = await runCommandSpawn(job, "npm", ["run", "pull", "--", "--brand", brandId, "--ingest"], {
       timeoutMs: PULL_TIMEOUT_MS,
     });
     const failure = decodeSpawnFailure(result, job.id, {
@@ -1560,9 +1577,12 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/strategy/brief") {
-      const abs = latestBriefPath();
+      let brandId: BrandId;
+      try { brandId = requestBrand(url.searchParams.get("brand")); }
+      catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); return; }
+      const abs = latestBriefPath(brandId);
       if (!abs) {
-        json(res, 200, { ok: false, error: "no strategy brief exists yet. Run /strategy first" });
+        json(res, 200, { ok: false, error: `no ${brandId} strategy brief exists yet. Run /strategy for this brand first` });
         return;
       }
       json(res, 200, { ok: true, path: abs.slice(repoRoot.length + 1), content: readFileSync(abs, "utf8") });
@@ -1571,7 +1591,8 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     if (req.method === "POST" && url.pathname === "/api/strategy/ask") {
       const b = await readBody(req);
       try {
-        const { path, content } = await reviseBrief(String(b.instruction ?? ""), requestEngine(b.engine));
+        const brandId = requestBrand(b.brand);
+        const { path, content } = await reviseBrief(String(b.instruction ?? ""), requestEngine(b.engine), brandId);
         json(res, 200, { ok: true, path, content });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1588,7 +1609,9 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         return;
       }
       try {
-        const { path } = await refreshBrief(requestEngine((await readBody(req)).engine));
+        const b = await readBody(req);
+        const brandId = requestBrand(b.brand);
+        const { path } = await refreshBrief(brandId, requestEngine(b.engine));
         json(res, 200, { ok: true, path });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1598,7 +1621,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     if (req.method === "POST" && url.pathname === "/api/strategy/insights") {
       const b = await readBody(req);
       try {
-        const result = await generateInsights(requestAnalysisEngine(b.engine));
+        const result = await generateInsights(requestBrand(b.brand), requestAnalysisEngine(b.engine));
         json(res, 200, { ok: true, ...result });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1610,7 +1633,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       const question = String(b.question ?? "");
       const history = Array.isArray(b.history) ? b.history : [];
       try {
-        const answer = await askInsights(question, history, requestInteractiveAnalysisEngine(b.engine));
+        const answer = await askInsights(question, history, requestBrand(b.brand), requestInteractiveAnalysisEngine(b.engine));
         json(res, 200, { ok: true, answer });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1619,7 +1642,9 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     }
     if (req.method === "POST" && url.pathname === "/api/strategy/pull") {
       try {
-        const log = await pullFreshAnalytics();
+        const body = await readBody(req);
+        const brandId = requestBrand(body.brand);
+        const log = await pullFreshAnalytics(brandId);
         json(res, 200, { ok: true, log });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });

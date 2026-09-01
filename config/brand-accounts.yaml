@@ -1,0 +1,28 @@
+# Delivery identities only; runtime values are injected separately.
+version: brand-account-registry-v1
+brands:
+  human-inference:
+    measurement_account: human-inference/browser-analytics
+    provider_accounts:
+      postiz: human-inference/postiz
+      typefully: human-inference/typefully
+      postpeer: human-inference/postpeer
+      youtube: human-inference/youtube
+      substack: human-inference/substack
+    platforms:
+      x: { providers: [postiz, typefully] }
+      linkedin: { providers: [postiz, typefully] }
+      bluesky: { providers: [postiz, typefully] }
+      mastodon: { providers: [postiz] }
+      threads: { providers: [postiz] }
+      tiktok: { providers: [postiz, postpeer] }
+      youtube: { providers: [postiz, youtube] }
+      substack: { providers: [substack] }
+  charles:
+    # No analytics account is configured yet.
+    provider_accounts: {}
+    platforms: {}
+  fiction:
+    # No analytics account is configured yet.
+    provider_accounts: {}
+    platforms: {}

@@ -25,13 +25,11 @@ import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { publishText } from "./typefully.js";
 import { readQueue } from "./queue.js";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BETS_PATH = join(repoRoot, "briefs", "bets.md");
+const BETS_PATH = join(tmpdir(), "reply-approval-gate-bets.md");
 
 const REPLY_TO_URL = "https://bsky.app/profile/alice.bsky.social/post/abc123";
 const REPLY_TO_TEXT = "I don't buy the fairness-gap framing.";
@@ -105,6 +103,8 @@ describe("companion: the SAME row DOES ship once manually set to approve (a real
   let folder: string | null = null;
 
   before(() => {
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = BETS_PATH;
+    if (existsSync(BETS_PATH)) rmSync(BETS_PATH, { force: true });
     process.env.TYPEFULLY_API_KEY = "test-key";
     process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set-1";
     process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = "human-inference/typefully";
@@ -119,11 +119,8 @@ describe("companion: the SAME row DOES ship once manually set to approve (a real
     delete process.env.TYPEFULLY_API_KEY;
     delete process.env.TYPEFULLY_SOCIAL_SET_ID;
     delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
-    if (folder && existsSync(BETS_PATH)) {
-      const key = `[${basename(folder)}/`;
-      const lines = readFileSync(BETS_PATH, "utf8").split("\n");
-      writeFileSync(BETS_PATH, lines.filter((l) => !l.includes(key)).join("\n"));
-    }
+    delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+    if (existsSync(BETS_PATH)) rmSync(BETS_PATH, { force: true });
   });
 
   test('status "approve" IS picked up: a real draft-create call fires and the row is marked published', async () => {

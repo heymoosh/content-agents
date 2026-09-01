@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
@@ -9,6 +9,7 @@ import { repoRoot } from "../db/db.js";
 import {
   parseBriefSignals,
   latestBriefFile,
+  readSignals,
   appendBacklogCard,
   readOutcomeFamilies,
   readResearchReport,
@@ -77,6 +78,24 @@ test("latestBriefFile picks the newest dated brief", () => {
     assert.equal(latestBriefFile(dir), "2026-06-24-strategy-brief.md");
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readSignals reads only the selected brand directory and reports brand-qualified provenance", () => {
+  const root = mkdtempSync(join(tmpdir(), "signals-brand-test-"));
+  try {
+    mkdirSync(join(root, "human-inference"), { recursive: true });
+    mkdirSync(join(root, "charles"), { recursive: true });
+    writeFileSync(join(root, "2026-08-31-strategy-brief.md"), BRIEF.replace("bluesky", "legacy"));
+    writeFileSync(join(root, "human-inference", "2026-08-30-strategy-brief.md"), BRIEF.replace("bluesky", "x"));
+    writeFileSync(join(root, "charles", "2026-08-29-strategy-brief.md"), BRIEF.replace("bluesky", "linkedin"));
+
+    const charles = readSignals("charles", root);
+    assert.equal(charles.briefPath, "briefs/charles/2026-08-29-strategy-brief.md");
+    assert.equal(charles.confidence[0]?.channel, "linkedin");
+    assert.equal(readSignals("fiction", root).briefPath, null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

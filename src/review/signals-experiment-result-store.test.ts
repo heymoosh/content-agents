@@ -58,3 +58,16 @@ test("persists one interpretation and one separate Muxin review without creating
   assert.equal(reviewed.winner, null);
   assert.equal(reviewed.autoWinner, false);
 });
+
+test("persists canonical interpretation brand without allowing an invalid binding", () => {
+  const root = mkdtempSync(join(tmpdir(), "signals-result-brand-")); roots.push(root);
+  const path = join(root, "results.jsonl");
+  const result = resultStore.recordExperimentInterpretation({
+    brandId: "charles", experimentId: "charles-experiment", recommendation: "keep", rationale: "The measured arm held.",
+    evidenceRefs: ["analytics:one"], confidence: "medium", caveats: [], engine: "codex",
+  }, path);
+  assert.equal(result.brandId, "charles");
+  assert.throws(() => resultStore.recordExperimentInterpretation({
+    brandId: "not-a-brand" as any, experimentId: "bad", recommendation: "keep", rationale: "Measured.", evidenceRefs: ["analytics:one"], confidence: "medium", caveats: [], engine: "codex",
+  }, path), /brand id/i);
+});

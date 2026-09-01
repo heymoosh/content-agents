@@ -1,4 +1,5 @@
 import { openDb } from "../db/db.js";
+import { latestMetricsJoin, parseStrategyMeasurementContext } from "./measurement-context.js";
 
 // Channel performance snapshot from the latest metrics per post.
 //   tsx src/strategy/snapshot.ts             → markdown report to stdout
@@ -43,14 +44,20 @@ function recencyWeightedEngagement(p: PostStat, now: number): number {
 }
 
 function main() {
+  const context = parseStrategyMeasurementContext();
   const db = openDb();
+  const latest = latestMetricsJoin(context);
+  const postScope = context.providerAccountId
+    ? "p.brand_id = ? AND p.provider_account_id = ?"
+    : "p.brand_id = ?";
   const posts = db
     .prepare(
       `SELECT p.id, p.platform, p.posted_at, p.url, p.content_text, p.pillar, p.media_type,
               m.impressions, m.likes, m.replies, m.reposts, m.clicks, m.new_follows
-       FROM posts p LEFT JOIN (${LATEST_METRICS}) m ON m.post_id = p.id`
+       FROM posts p LEFT JOIN (${latest.sql}) m ON m.post_id = p.id
+       WHERE ${postScope}`
     )
-    .all() as PostStat[];
+    .all(...latest.params, context.brandId, ...(context.providerAccountId ? [context.providerAccountId] : [])) as PostStat[];
 
   if (process.argv.includes("--untagged")) {
     const untagged = posts

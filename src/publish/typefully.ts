@@ -333,7 +333,7 @@ export async function publishText(
     console.log("no approved x/linkedin/bluesky rows in the review queue");
     return [];
   }
-  assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
+  const deliveryDecision = assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
 
   // UNSCHEDULED-draft mode (opts.noSchedule): skip claimSlots + OMIT publish_at, so drafts are saved
   // UNSCHEDULED and will NOT auto-post — they sit in Typefully until a human schedules them. Used by
@@ -349,7 +349,7 @@ export async function publishText(
     const reuseByPlatform = new Map<string, ReturnType<typeof checkReuse>>();
     for (const r of approved) {
       if (!reuseByPlatform.has(r.platform)) {
-        reuseByPlatform.set(r.platform, checkReuse(slug, r.platform));
+        reuseByPlatform.set(r.platform, checkReuse(slug, r.platform, undefined, deliveryDecision.brand!));
       }
     }
     for (const [, res] of reuseByPlatform) {

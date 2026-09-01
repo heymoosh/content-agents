@@ -1,4 +1,5 @@
 import { openDb } from "../db/db.js";
+import { parseStrategyMeasurementContext } from "./measurement-context.js";
 
 // Audience summary for the weekly brief: who follows you (LinkedIn demographics), how many
 // (follower/subscriber totals + recent growth), across platforms. Reads the `audience` table
@@ -19,13 +20,14 @@ interface ARow {
 const LI_DIMS = ["location", "seniority", "industry", "job_title", "company_size", "company"];
 
 function main() {
+  const context = parseStrategyMeasurementContext();
   const db = openDb();
   const all = db
     .prepare(
       `SELECT platform, captured_at, as_of_date, metric_type, dimension, value_label, value_count, value_pct
-       FROM audience`
+       FROM audience WHERE brand_id = ?${context.providerAccountId ? " AND provider_account_id = ?" : ""}`
     )
-    .all() as ARow[];
+    .all(context.brandId, ...(context.providerAccountId ? [context.providerAccountId] : [])) as ARow[];
   db.close();
 
   if (all.length === 0) {
