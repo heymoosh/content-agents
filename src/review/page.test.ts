@@ -1002,7 +1002,10 @@ test("Content separates request-grouped draft approval from publishing status", 
   assert.ok(html.includes('id="publishedMain"'));
   assert.ok(html.includes("<h2>Publishing status</h2>"));
   assert.ok(html.includes("Select all"));
-  assert.ok(html.includes("Approve selected for publishing"));
+  assert.ok(html.includes("Approve selected and attempt scheduling"));
+  assert.ok(html.includes("Each approval immediately attempts scheduling when that destination has a provider"));
+  assert.ok(html.includes("Approve and attempt scheduling"));
+  assert.ok(html.includes("A scheduling problem does not erase your approval"));
   assert.ok(html.includes("Open Focus Mode"));
   assert.ok(html.includes("Typefully"));
   assert.ok(html.includes("PostPeer"));
@@ -1011,6 +1014,36 @@ test("Content separates request-grouped draft approval from publishing status", 
   assert.ok(!html.includes("Postiz is not connected"));
   assert.ok(!html.includes("Show drafts for every piece"));
   assert.ok(!html.includes("show published / discarded"));
+});
+
+type ApprovalResultView = (kind: string, result: Record<string, any>) => {
+  status: string; message: string; scheduledWhen?: string; manualComment?: string;
+};
+
+function approvalResultMirror(): ApprovalResultView {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── begin the Content approval-result mirror ──");
+  const end = script.indexOf("// ── end of the Content approval-result mirror ──");
+  assert.ok(start > -1 && end > start, "the approval-result interpreter must reach the browser");
+  return new Function(script.slice(start, end) + "\nreturn approvalResultView;")() as ApprovalResultView;
+}
+
+test("Content approval outcomes preserve the provider/manual truth boundary", () => {
+  const view = approvalResultMirror();
+  assert.deepEqual(view("text", { scheduled: { when: "Sep 2 at 9:00 AM", ref: "provider-1" } }), {
+    status: "published", scheduledWhen: "Sep 2 at 9:00 AM", manualComment: "",
+    message: "Scheduled · Sep 2 at 9:00 AM",
+  });
+  assert.deepEqual(view("text", { scheduleError: "provider timed out" }), {
+    status: "approve", message: "Approved, scheduling needs attention: provider timed out",
+  });
+  const manual = view("text", { scheduled: { autoPublishes: false, readyToPaste: "ready-to-paste/x-1.txt" } });
+  assert.deepEqual(manual, { status: "approve", message: "Approved · ready-to-paste handoff created" });
+  assert.doesNotMatch(manual.message, /provider accepted|scheduled|uploaded/i);
+  assert.deepEqual(view("video", { scheduled: { autoPublishes: false, when: "now", manualComment: "finish in Studio" } }), {
+    status: "published", scheduledWhen: "now", manualComment: "finish in Studio",
+    message: "Uploaded (still PRIVATE: flip it manually in YouTube Studio) · now",
+  });
 });
 
 test("Fiction launch action creates a validated Content handoff and opens configuration", () => {

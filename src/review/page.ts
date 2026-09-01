@@ -1020,9 +1020,9 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <h2>Approve Drafts</h2>
         <span class="grow"></span>
         <button type="button" class="cw-back" id="reviewSelectAll">Select all</button>
-        <button type="button" class="primary" id="reviewApproveSelected">Approve selected for publishing</button>
+        <button type="button" class="primary" id="reviewApproveSelected">Approve selected and attempt scheduling</button>
       </div>
-      <div class="sheet-sub">Review related outputs together by input request. Approval moves work into the publishing workflow; it does not claim that a provider accepted it.</div>
+      <div class="sheet-sub">Review related outputs together by input request. Each approval immediately attempts scheduling when that destination has a provider. Approval is still recorded if scheduling needs attention; it never claims that a provider accepted or published the work.</div>
       <div class="cw-tabs" aria-label="Draft filters">
         <label style="flex-basis:100%">Input request <input class="request-search" id="reviewRequestFilter" list="reviewRequestOptions" type="search" placeholder="Search or choose an input request" autocomplete="off"><datalist id="reviewRequestOptions"></datalist></label>
         <label>Media <select id="reviewMediaFilter"><option value="">All</option></select></label>
@@ -1567,6 +1567,20 @@ function reviewStateLabel(status){
   if(status==="discard") return "Rejected";
   return "Draft";
 }
+// ── begin the Content approval-result mirror ──
+// One interpretation for both Focus Mode and ordinary review cards. In particular, a manual
+// ready-to-paste artifact is a completed handoff, not evidence that any provider accepted an item.
+function approvalResultView(kind,result){
+  if(result&&result.scheduled){
+    if(kind==="outreach-message") return {status:"locked",message:"Locked"};
+    if(result.scheduled.readyToPaste) return {status:"approve",message:"Approved · ready-to-paste handoff created"};
+    if(result.scheduled.autoPublishes===false) return {status:"published",scheduledWhen:result.scheduled.when,manualComment:result.scheduled.manualComment||"",message:"Uploaded (still PRIVATE: flip it manually in YouTube Studio) · "+result.scheduled.when};
+    return {status:"published",scheduledWhen:result.scheduled.when,manualComment:result.scheduled.manualComment||"",message:"Scheduled · "+(result.scheduled.when||"provider accepted")};
+  }
+  if(result&&result.scheduleError) return {status:"approve",message:"Approved, scheduling needs attention: "+result.scheduleError};
+  return {status:"approve",message:"Approved"};
+}
+// ── end of the Content approval-result mirror ──
 function contentRequestPieces(pieces){ return (pieces||[]).filter(p=>p.originalInput||p.requestId); }
 function reviewVisiblePieces(){
   const real=contentRequestPieces(DATA.pieces);
@@ -1578,13 +1592,14 @@ function openReviewFocus(piece,row,returnTo){
   body.innerHTML='<div class="rowhead"><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span class="fmt">'+esc(row.format||row.kind||"content")+' · '+esc(row.id)+'</span><span class="pill '+pillClass(row.status)+'">'+esc(reviewStateLabel(row.status))+'</span></div>'+
     '<label class="wb-label" for="reviewFocusEditor" style="display:block;margin-top:18px">EDIT THE DRAFT DIRECTLY</label>'+
     '<textarea id="reviewFocusEditor" class="review-focus-editor">'+esc(row.body||"")+'</textarea>'+
-    '<div class="actions"><button type="button" id="reviewFocusSave"'+(row.editable?'':' disabled')+'>Save edit</button><button type="button" class="approve" data-focus-act="approve">Approve</button><button type="button" class="revise" data-focus-act="revise">Request changes</button><button type="button" class="discard" data-focus-act="discard">Discard</button></div>'+
+    '<div class="actions"><button type="button" id="reviewFocusSave"'+(row.editable?'':' disabled')+'>Save edit</button><button type="button" class="approve" data-focus-act="approve">Approve and attempt scheduling</button><button type="button" class="revise" data-focus-act="revise">Request changes</button><button type="button" class="discard" data-focus-act="discard">Discard</button></div>'+
+    '<div class="src">Approval immediately attempts scheduling when this destination has a provider. A scheduling problem does not erase your approval, and provider acceptance is reported separately.</div>'+
     (row.editable?'':'<div class="src">This asset is not text-editable here.</div>');
   $("#reviewFocusTitle").textContent=piece.title+" · "+row.platform;
   $("#reviewFocus").hidden=false; $("#reviewFocus .focus-dialog").focus();
   const editor=$("#reviewFocusEditor"); if(row.editable) editor.focus();
   $("#reviewFocusSave").addEventListener("click",async ()=>{ const result=await post("/api/derivative",{slug:piece.slug,id:row.id,body:editor.value}); if(result.ok===false){flash(result.error||"Could not save");return;} row.body=editor.value.trim(); flash("Saved"); closeReviewFocus(); rerender(); });
-  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flash("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flash(result.error||"Could not update status");return;} if(act==="approve"&&result.scheduled){ row.status=row.kind==="outreach-message"?"locked":"published"; row.scheduledWhen=result.scheduled.when; flash(row.kind==="outreach-message"?"Locked":"Scheduled · "+(result.scheduled.when||"provider accepted")); } else if(act==="approve"&&result.scheduleError){ row.status="approve"; flash("Approved, scheduling needs attention: "+result.scheduleError); } else { row.status=act; flash(act==="approve"?"Approved": "Discarded"); } closeReviewFocus(); rerender(); }));
+  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flash("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flash(result.error||"Could not update status");return;} if(act==="approve"){ const view=approvalResultView(row.kind,result); row.status=view.status; row.scheduledWhen=view.scheduledWhen; row.manualComment=view.manualComment||""; flash(view.message); } else { row.status=act; flash("Discarded"); } closeReviewFocus(); rerender(); }));
 }
 function closeReviewFocus(){
   $("#reviewFocus").hidden=true; $("#reviewFocusBody").innerHTML="";
@@ -1608,15 +1623,11 @@ async function onAction(e, piece, row, el){
         row.status="locked";
         flash("Locked");
       }
-      else if (r.scheduled){
-        row.status="published"; row.scheduledWhen=r.scheduled.when; row.manualComment=r.scheduled.manualComment||"";
-        // A YouTube Short with no "youtube" cadence configured uploads PRIVATE instead of on a real
-        // publish schedule (see publishShorts) — flag that distinctly instead of a generic "Scheduled"
-        // that reads the same as an actually-scheduled post.
-        flash(r.scheduled.autoPublishes === false ? "Uploaded (still PRIVATE: flip it manually in YouTube Studio) · "+r.scheduled.when : "Scheduled · "+r.scheduled.when);
+      else {
+        const view=approvalResultView(row.kind,r);
+        row.status=view.status; row.scheduledWhen=view.scheduledWhen; row.manualComment=view.manualComment||"";
+        flash(view.message);
       }
-      else if (r.scheduleError){ row.status="approve"; flash("Approved, schedule failed: "+r.scheduleError); }
-      else { row.status="approve"; flash("Approved"); }
     } else { row.status="discard"; flash("Discarded"); }
     rerender();
   } else if (act === "revise"){
