@@ -163,7 +163,7 @@
     "@mozilla/readability": "^0.6.0",
     "@remotion/bundler": "^4.0.512",
     "@remotion/captions": "^4.0.512",
-    "@remotion/cli": "^4.0.507",
+    "@remotion/cli": "^4.0.518",
     "@remotion/renderer": "^4.0.512",
     "@types/react": "^19.2.17",
     "better-sqlite3": "^13.0.3",
