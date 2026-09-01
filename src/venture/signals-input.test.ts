@@ -156,9 +156,15 @@ describe("Venture Signals input acceptance", () => {
 
   test("rejects a handoff with no Content item refs", () => {
     assert.throws(
-      () => acceptSignalsInput(SLUG, handoff({ content_item_refs: [] }), { outcome: "accept", decided_by: "muxin", decision_ref: "x", reason: "x" }, "t"),
+      () => acceptSignalsInput(SLUG, handoff({ content_item_refs: [], evidence_tier: "controlled", claim_ceiling: "bounded-comparison" }), { outcome: "accept", decided_by: "muxin", decision_ref: "x", reason: "x" }, "t"),
       /content_item_refs.*non-empty refs/i,
     );
+  });
+
+  test("accepts lower-tier learning without upgrading its claim ceiling", () => {
+    const result = acceptSignalsInput(SLUG, handoff({ pointer_id: "survey", input_kind: "survey", evidence_tier: "survey", claim_ceiling: "stated-need", lineage: { source_id: "", variant_id: "", experiment_id: "" } }), { outcome: "accept", decided_by: "muxin", decision_ref: "survey-accept", reason: "Record the stated need." }, "t");
+    assert.equal(result.artifact?.fields?.evidence_tier, "survey");
+    assert.equal(result.artifact?.fields?.claim_ceiling, "stated-need");
   });
 
   test("accepts the same internal artifact kind in the Venture's current Phase 2", () => {

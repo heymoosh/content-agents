@@ -7,6 +7,8 @@ import { buildContentRequest } from "./content-request.js";
 import { approveExperimentPlan, buildExperimentPlan } from "../grow/experiment-content-handoff.js";
 import { signalsExperimentRecommendation } from "../grow/experiment-test-fixtures.js";
 import { markExperimentContentHandoff, readExperimentPlans, recordExperimentPlan, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
+import { recordVentureExperimentPlan } from "./signals-experiment-plan-store.js";
+import { ventureExperimentPlanDigest } from "./venture-experiment-handoff.js";
 import * as planStoreSubject from "./signals-experiment-plan-store.js";
 
 const roots: string[] = [];
@@ -87,4 +89,16 @@ describe("Signals experiment plan store", () => {
     assert.match(rows.find((row) => row.contentRequestId === "insufficient")!.priorityReason, /declared publishing capacity is insufficient/i);
     assert.match(rows.find((row) => row.contentRequestId === "legacy")!.priorityReason, /legacy plan has no declared publishing capacity/i);
   });
+});
+
+test("a Venture-origin plan remains in the normal Experiment ledger with its learning context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "venture-plan-context-")); roots.push(root);
+  const path = join(root, "plans.jsonl");
+  const plan = proposal("venture-origin", "high");
+  const ventureContext = { ventureId: "quiet-ops", phase: 2, inputRef: "response:r1", evaluationId: "eval-1", evidenceTier: "survey" as const, claimCeiling: "stated-need" as const, evidenceRefs: ["response:r1"], caveats: ["One response."] };
+  const envelope = { kind: "venture_experiment_plan" as const, version: "venture-experiment-handoff-v1" as const, plan, ventureContext, planApproval: "pending-muxin" as const, copyApproval: "pending-in-content" as const };
+  recordVentureExperimentPlan({ ...envelope, digest: ventureExperimentPlanDigest(envelope) }, path);
+  const row = readExperimentPlans(path)[0]!;
+  assert.equal(row.experimentId, "signals:venture-origin");
+  assert.deepEqual(row.ventureContext, ventureContext);
 });

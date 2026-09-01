@@ -439,12 +439,37 @@ require a new artifact.
 | `phase_1_research_read` | see §2C — expanded 2026-08-07, corrective pass |
 | `day-14-review` | see §5.1's scorecard read model below |
 | `thank-you-note` | `response_id` (must name a real record in `responses.jsonl`), `influenced_idea_or_section`, `note_text` (rules.md §8.4 caps it at two short sentences unless `muxin_asked_for_more: true`) |
-| `signals-input` | body-free accepted Signals handoff metadata: pointer, source/evidence/content refs, scope, sample size, provenance, caveats, lineage, Content decision ref, Venture gate ref, qualification, evidence status, and Venture decision fact |
+| `signals-input` | body-free accepted Signals handoff metadata: pointer, source/evidence/content refs, scope, sample size, provenance, caveats, lineage, Content decision ref, Venture gate ref, qualification, evidence status, explicit `evidence_tier`/`claim_ceiling`, and Venture decision fact |
 
 Two structured kinds — `phase_1_research_plan` and `phase_1_research_read` — get their own subsection
 (§2C) rather than a single table cell, because the 2026-08-07 review found the original one-line
 `fields` shape too free-form: it let one implementation store a thoughtful record and another put a
 paragraph in `evidence` and technically satisfy the same schema. §2C fixes that.
+
+### 2B. Signals/Venture evidence ladder and learning loop
+
+Signals inputs carry both an `evidenceTier` and its maximum honest `claimCeiling`; acceptance never
+raises the ceiling. The supported ladder is `engagement` → `attention`, `qualitative` → `resonance`,
+`survey` → `stated-need`, `directional` → `directional-comparison`, `controlled` →
+`bounded-comparison`, `funnel` → `behavioral-intent`, and `business` → `observed-demand`.
+Source/evidence references are always required. Exact experiment, treatment/control, and Content
+lineage is required only for directional and controlled tiers; lower tiers may carry no Content item
+refs. A tier is descriptive evidence, not a winner or demand fact.
+
+Signals remains analytics and pattern prioritization. Venture-native survey, comment, email, and DM
+responses may enter the same evaluator directly after their existing explicit intake judgments; they
+do not take a redundant trip through Signals. Venture owns contextual hypotheses for
+lead-generation, product, offer, and strategy. After Signals adoption and separate Venture acceptance,
+learning may be evaluated as `no-change`, `change`, or `test`; Muxin separately accepts, declines, or
+requests more evidence. Accepted change/test creates only a typed downstream proposal. It cannot
+mutate phase, checkpoint, configuration, winner, or demand state. An accepted test follows the normal
+Venture → Experiment planner → plan approval → Content drafting/review/publishing/measurement →
+Signals/Venture learning loop; the normal Experiment queue continues to support multiple experiments.
+
+Active account-level research observations provide the ordinary non-experiment path. Metric and
+subscriber-movement rows map to `engagement`/`attention`; redacted comment, reply, DM, email, and
+follow-up-question rows map to `qualitative`/`resonance`. The receipt query excludes creator,
+superseded, and deleted rows and never selects `exact_text` or `respondent_hash`.
 
 ## 2C. Phase 1 research artifacts — plan, evidence, and read
 

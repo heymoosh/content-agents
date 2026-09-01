@@ -89,3 +89,14 @@ test("proposal event cannot forge an adopted Signals decision outside the append
     assert.equal(read.ventureGate, "blocked");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("evidence tiers cap claim ceilings and only experiment tiers require lineage", () => {
+  const root = mkdtempSync(join(tmpdir(), "signals-venture-tiers-"));
+  const path = join(root, "handoffs.jsonl");
+  try {
+    const qualitative = recordSignalsVentureProposal(proposal({ id: "qualitative", evidenceTier: "qualitative", claimCeiling: "resonance", experimentId: "", sourceId: "", variantId: "" }), path);
+    assert.equal(qualitative.evidenceTier, "qualitative");
+    assert.throws(() => recordSignalsVentureProposal(proposal({ id: "overclaim", evidenceTier: "survey", claimCeiling: "observed-demand" }), path), /exceeds/i);
+    assert.throws(() => recordSignalsVentureProposal(proposal({ id: "missing-lineage", evidenceTier: "controlled", claimCeiling: "bounded-comparison", experimentId: "", sourceId: "", variantId: "" }), path), /lineage/i);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

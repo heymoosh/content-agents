@@ -392,12 +392,14 @@ const ROUTES: Route[] = [
       });
       const handoff: SignalsInputHandoff = {
         pointer_id: pointer.id, venture_id: pointer.ventureId, phase: pointer.phase, rules_version: rules.rules_version,
-        input_kind: pointer.inputKind, source_record_refs: [...pointer.sourceRecordRefs], evidence_refs: [...pointer.evidenceRefs],
+        input_kind: pointer.inputKind, factual_summary: proposal.factualSummary, source_record_refs: [...pointer.sourceRecordRefs], evidence_refs: [...pointer.evidenceRefs],
         content_item_refs: [...pointer.contentItemRefs], scope: pointer.scope, sample_size: pointer.sampleSize,
+        sample_size_by_arm: { treatment: proposal.sampleSize.treatment, control: proposal.sampleSize.control },
         provenance: pointer.provenance, caveats: [...pointer.caveats],
         lineage: { source_id: proposal.sourceId, variant_id: proposal.variantId, experiment_id: proposal.experimentId },
         content_decision: { status: "approved", decided_by: "muxin", decision_ref: pointer.contentHumanDecision!.decisionRef! },
         venture_gate_ref: pointer.ventureGate.gateRef, qualification: proposal.qualification, evidence_status: proposal.evidenceStatus,
+        evidence_tier: proposal.evidenceTier ?? proposal.inputKind, claim_ceiling: proposal.claimCeiling,
       };
       const result = acceptSignalsInput(slug, handoff, { outcome, decided_by: "muxin", decision_ref: decisionRef, reason }, actionAt);
       return { acceptance: result };

@@ -3224,6 +3224,9 @@ let VENTURE_SLUGS = [];
 let ventureSlug = null;
 let VENTURE_THREAD = null;
 let VENTURE_SIGNALS = null;
+let VENTURE_LEARNING_EVALUATIONS = [];
+let VENTURE_LEARNING_SOURCES = [];
+let VENTURE_RESPONSE_EVALUATE_ID = null;
 let VENTURE_SUMMARIES = {};
 let VENTURE_DOCUMENTS = [];
 let ventureDocument = null;
@@ -3384,13 +3387,17 @@ async function loadVenture(){
   const requestedSlug = ventureSlug;
   showRoomLoading("ventureThread");
   try {
-    const [r, signalsResponse] = await Promise.all([fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread"), fetch("/api/signals").catch(()=>null)]);
+    const [r, signalsResponse, learningResponse, sourceResponse] = await Promise.all([fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread"), fetch("/api/signals").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-evaluations").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-sources").catch(()=>null)]);
     if(!r.ok) throw new Error("venture "+r.status);
     const j = await r.json();
     if(requestedSlug !== ventureSlug){ hideRoomLoading("ventureThread"); return; }
     if(!j.ok) throw new Error(j.error || "could not read this venture");
     VENTURE_THREAD = j.thread;
     VENTURE_SIGNALS = signalsResponse&&signalsResponse.ok ? await signalsResponse.json() : null;
+    const learning = learningResponse&&learningResponse.ok ? await learningResponse.json() : null;
+    VENTURE_LEARNING_EVALUATIONS = learning&&Array.isArray(learning.evaluations) ? learning.evaluations : [];
+    const sourceData = sourceResponse&&sourceResponse.ok ? await sourceResponse.json() : null;
+    VENTURE_LEARNING_SOURCES = sourceData&&Array.isArray(sourceData.sources) ? sourceData.sources : [];
     VENTURE_SUMMARIES[requestedSlug] = j.thread;
     $("#ventureRunStepBtn").disabled = false;
     renderVenture();
@@ -3660,6 +3667,8 @@ function vSubmitResponse(){
     const counted = (typeof g.have === "number" && typeof g.need === "number")
       ? " " + g.have + " of " + g.need + " people count toward the goal."
       : "";
+    if(res.response_id) VENTURE_RESPONSE_EVALUATE_ID = res.response_id;
+    renderVenture();
     flash((res.likely_duplicate
       ? "Written down. Same identifier as one already in the log, so they count once."
       : "Written down.") + counted);
@@ -3961,13 +3970,33 @@ function vClusters(m){
       + '</div>').join("")
     + '</div>';
 }
+function ventureLearningHtml(){
+  const evaluations=Array.isArray(VENTURE_LEARNING_EVALUATIONS)?VENTURE_LEARNING_EVALUATIONS:[];
+  const sources=[];
+  const adopted=(VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).filter(p=>p.ventureSlug===ventureSlug&&p.status==="adopted"&&p.ventureDecision&&p.ventureDecision.outcome==="accept");
+  adopted.forEach(p=>sources.push('<button data-learning-source="signals-input" data-learning-id="'+esc("signals-input-"+p.id)+'">Evaluate learning from accepted Signals input</button>'));
+  if(VENTURE_RESPONSE_EVALUATE_ID) sources.push('<button class="vacts" data-learning-source="response" data-learning-id="'+esc(VENTURE_RESPONSE_EVALUATE_ID)+'">Evaluate learning from the recorded response</button>');
+  (Array.isArray(VENTURE_LEARNING_SOURCES)?VENTURE_LEARNING_SOURCES:[]).slice(0,20).forEach(s=>{
+    const id=String(s.id||"").replace(/^research:/,"");
+    if(id) sources.push('<button data-learning-source="research-observation" data-learning-id="'+esc(id)+'">Evaluate '+esc(s.evidenceTier)+' learning · '+esc(s.scope)+'</button>');
+  });
+  const sourceHtml=sources.length?'<div class="vblock"><div class="vmono">LEARNING</div><div class="vnote">Review one accepted learning receipt at a time. Evaluation never changes Venture state by itself.</div><div class="vacts">'+sources.join('')+'</div></div>':'';
+  const cards=evaluations.map(e=>{
+    const status=String(e.status||"pending");
+    const controls=status==="pending"?'<div class="vacts"><button class="primary" data-learning-decision="accept" data-learning-id="'+esc(e.evaluationId||e.id)+'">Accept</button><button data-learning-decision="request-more-evidence" data-learning-id="'+esc(e.evaluationId||e.id)+'">Request more evidence</button><button data-learning-decision="decline" data-learning-id="'+esc(e.evaluationId||e.id)+'">Decline</button></div>':'';
+    const experiment=status==="accepted"&&e.recommendation==="test"?'<div class="vform learning-experiment" data-learning-experiment="'+esc(e.evaluationId||e.id)+'"><div class="lbl">PROPOSE EXPERIMENT</div><div class="sub">Use an existing Venture Content request. The normal Experiment approval queue remains separate.</div><input data-learning-field="contentRequestId" placeholder="Content request ID" /><input data-learning-field="evidenceFamily" placeholder="outcome family" /><div class="pair"><input data-learning-field="minimumSample" placeholder="minimum sample" /><input data-learning-field="minimumDays" placeholder="minimum days" /></div><div class="pair"><input data-learning-field="availablePublishingUnits" placeholder="publishing units" /><input data-learning-field="availableDays" placeholder="available days" /></div><button class="primary" data-learning-experiment-submit="'+esc(e.evaluationId||e.id)+'">Propose Experiment</button></div>':'';
+    const acceptedNote=status==="accepted"&&e.recommendation==="change"?'<div class="vnote">Accepted as a proposal. It does not mutate Venture automatically.</div>':status==="accepted"&&e.recommendation==="test"?'<div class="vnote">Accepted as a test recommendation. Nothing is run until you propose it and approve the normal Experiment plan.</div>':'';
+    return '<div class="vblock learning-card"><div class="vmono">LEARNING EVALUATION · '+esc(status)+'</div><div class="vtitle" style="font-size:19px">'+esc(e.recommendation)+' · '+esc(e.target)+'</div><div class="vnote" style="margin-top:7px"><strong>Evidence tier:</strong> '+esc(e.evidenceTier)+' · <strong>Claim ceiling:</strong> '+esc(e.claimCeiling)+'</div><div class="vnote" style="margin-top:7px"><strong>Rationale:</strong> '+esc(e.rationale)+'</div><div class="vnote" style="margin-top:7px"><strong>Proposed change:</strong> '+esc(e.proposedChange)+'</div><div class="vnote" style="margin-top:7px"><strong>Caveats:</strong> '+(e.caveats||[]).map(esc).join('; ')+'</div>'+controls+acceptedNote+experiment+'</div>';
+  }).join('');
+  return sourceHtml+(cards?'<div class="vblock"><div class="vmono">RECORDED LEARNING</div>'+cards+'</div>':'');
+}
 function renderVenture(){
   const t = VENTURE_THREAD;
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
   $("#ventureDay").textContent = vDayLine(t.elapsedDays);
   const signals = (VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).filter(p=>p.ventureSlug===ventureSlug&&p.status==="adopted");
   const signalsHtml = signals.map(p=>'<div class="vblock" data-signals-input="'+esc(p.id)+'"><div class="vmono">SIGNALS INPUT · '+(p.ventureDecision?'DECIDED IN VENTURE':'ADOPTED IN SIGNALS')+'</div><div class="vtitle" style="font-size:20px">'+esc(p.title)+'</div><div class="vnote" style="margin-top:8px">'+esc(p.proposedInput)+' · measured '+esc(p.evidenceStatus)+' evidence · phase '+esc(p.phase)+(p.ventureDecision?' · Venture decision: '+esc(p.ventureDecision.outcome):'')+'</div>'+signalsHandoffMetaHtml(p, null, null)+'<div class="vnote" style="margin-top:6px"><strong>Venture:</strong> '+esc(p.ventureSlug)+' · <strong>Phase:</strong> '+esc(p.phase)+'</div>'+(p.ventureDecision?'':'<div class="vacts"><button class="primary" data-signals-input-action="accept" data-signals-input-id="'+esc(p.id)+'">Accept in Venture</button><button data-signals-input-action="request-more-evidence" data-signals-input-id="'+esc(p.id)+'">Request more evidence</button><button data-signals-input-action="reject" data-signals-input-id="'+esc(p.id)+'">Reject</button></div>')+'</div>').join('');
-  $("#ventureThread").innerHTML = signalsHtml + t.messages.map(m=>{
+  $("#ventureThread").innerHTML = ventureLearningHtml() + signalsHtml + t.messages.map(m=>{
     if(m.kind==="rail") return '<div class="vmono">'+esc(m.text)+'</div>';
     if(m.kind==="said") return '<div class="vsaid">'+esc(m.text)+'</div>';
     if(m.kind==="receipt") return '<div class="vreceipt"><i style="background:'+vDot(m.dot)+'"></i><span>'+esc(m.text)+'</span></div>';
@@ -4024,6 +4053,9 @@ function switchVenture(slug){
   intakeTimers.clear();
   ventureSlug=slug;
   VENTURE_THREAD=null;
+  VENTURE_LEARNING_EVALUATIONS=[];
+  VENTURE_LEARNING_SOURCES=[];
+  VENTURE_RESPONSE_EVALUATE_ID=null;
   VENTURE_DOCUMENTS=[];
   ventureDocument=null;
   ventureAnalysisPending=false;
@@ -4048,6 +4080,30 @@ document.addEventListener("click", e=>{
   const t = e.target;
   if(!t || !t.closest || !t.closest("#roomVenture")) return;
   const val = ()=> { const el = $("#vFormVal"); return el ? el.value : ""; };
+
+  const learningSource = t.closest("[data-learning-source]");
+  if(learningSource){
+    const source=learningSource.dataset.learningSource, id=learningSource.dataset.learningId;
+    if(source&&id) post("/api/venture/"+encodeURIComponent(ventureSlug)+"/learning/"+source+"/"+encodeURIComponent(id)+"/evaluate",{engine:$("#ventureEngine").value||"codex"}).then(r=>{ if(r.ok){ flash("Learning evaluation is ready for your review."); loadVenture(); } else flash(r.error||"Could not evaluate learning"); });
+    return;
+  }
+  const learningDecision = t.closest("[data-learning-decision]");
+  if(learningDecision){
+    const rationale=prompt("Why record this Venture learning decision?")||"";
+    if(!rationale.trim()) return;
+    learningDecision.disabled=true;
+    post("/api/venture/"+encodeURIComponent(ventureSlug)+"/learning-evaluations/"+encodeURIComponent(learningDecision.dataset.learningId)+"/decision",{decision:learningDecision.dataset.learningDecision,rationale}).then(r=>{ if(r.ok){ flash("Learning decision recorded."); loadVenture(); } else { learningDecision.disabled=false; flash(r.error||"Could not record learning decision"); } });
+    return;
+  }
+  const experimentSubmit = t.closest("[data-learning-experiment-submit]");
+  if(experimentSubmit){
+    const form=experimentSubmit.closest("[data-learning-experiment]");
+    const field=(name)=>form&&form.querySelector('[data-learning-field="'+name+'"]')?.value||"";
+    post("/api/venture/"+encodeURIComponent(ventureSlug)+"/learning-evaluations/"+encodeURIComponent(experimentSubmit.dataset.learningExperiment||"")+"/experiment/propose",{
+      contentRequestId:field("contentRequestId"), evidenceFamily:field("evidenceFamily"), minimumSample:Number(field("minimumSample")), minimumDays:Number(field("minimumDays")), availablePublishingUnits:Number(field("availablePublishingUnits")), availableDays:Number(field("availableDays")), engine:$("#ventureEngine").value||"codex"
+    }).then(r=>{ if(r.ok){ flash("Moved into the normal Experiment approval queue. Nothing runs or publishes automatically."); loadVenture(); } else flash(r.error||"Could not propose Experiment"); });
+    return;
+  }
 
   if(t.id === "vFormCancel") return vClose();
   const handoff = t.closest("[data-vhandoff]");
@@ -4087,7 +4143,7 @@ document.addEventListener("click", e=>{
     signalsInput.disabled=true;
     ventureWrite("/signals-input/"+encodeURIComponent(proposal.id)+"/decision", {
       outcome: signalsInput.dataset.signalsInputAction, reason,
-    }, "Signals input decision recorded", "signals-input:"+proposal.id).then(result=>{ if(result) loadSignals(); });
+    }, "Signals input decision recorded", "signals-input:"+proposal.id).then(result=>{ if(result) loadVenture(); });
     return;
   }
 

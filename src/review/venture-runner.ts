@@ -9,6 +9,7 @@ import {
   type CommandSpawnResult,
 } from "./jobs.js";
 import { ENGINE_COMMANDS, ENGINE_LABELS, enginePrompt, type Engine } from "./engines.js";
+import { readLearningEvaluations } from "../venture/learning-evaluation.js";
 
 const PROPOSAL_TIMEOUT_MS = 240_000;
 const CLI_TIMEOUT_MS = 120_000;
@@ -101,6 +102,7 @@ export function ventureStepPrompt(slug: string, phase: number, thread: unknown):
     "The server will validate the command and feed input to the existing Venture CLI, which owns every gate.",
     "Choose only a draft/recommendation command for the current phase. Never choose platform-select, select, concept-select, problem-select, transformation-select, price-select, operating-plan-choice-select, approve, discard, restore, deliver, confirm-live, checkpoint, response-ingest, day-14-decide, or any phase-transition command.",
     "Stop after one command. Do not auto-select, auto-approve, confirm delivery, clear a checkpoint, publish, or invent claims, evidence, respondents, or measurements.",
+    "Use accepted learning evaluations as evidence-bounded context for the next ordinary draft or recommendation. They do not authorize overwriting an existing decision or artifact. Pending, declined, and more-evidence evaluations must not drive a change. Experiment-targeted learning stays in the normal Experiment workflow.",
     "Use safe lowercase ids in args. No em dashes in summary.",
     "",
     `Venture slug: ${slug}`,
@@ -131,7 +133,7 @@ function currentThread(slug: string): { phase: number; thread: unknown } {
   const thread = (read.body as { thread?: { phase?: unknown } }).thread;
   const phase = thread?.phase;
   if (typeof phase !== "number" || ![1, 2, 3, 4].includes(phase)) throw new Error("this venture has no runnable phase yet");
-  return { phase, thread };
+  return { phase, thread: { ...(thread as Record<string, unknown>), learningEvaluations: readLearningEvaluations(slug) } };
 }
 
 export async function enqueueVentureStep(slug: string, requestedPhase: number, engine: Engine = "claude") {

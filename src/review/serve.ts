@@ -92,6 +92,9 @@ import { providerForKind, publishingRetryBlock, resolvePublishingAttempt, schedu
 import { handleFictionRoute } from "./serve-fiction.js";
 import { handleCharlesRoute } from "./serve-charles.js";
 import { handleSignalsRoute, prepareLiveExperimentInterpretation } from "./serve-signals.js";
+import { handleVentureLearningRoute } from "./serve-venture-learning.js";
+import { buildVentureLearningEvaluationPrompt, parseVentureLearningEvaluation, type VentureLearningContext, type VentureLearningReceipt } from "./venture-learning-evaluator.js";
+import { proposeVentureLearningExperiment, type VentureLearningExperimentRequest } from "./venture-learning-experiment-proposal.js";
 import { parseExperimentInterpretationResult, type ExperimentInterpretationInput } from "./signals-experiment-result-store.js";
 import { proposeSignalsExperiment, type SignalsExperimentProposalRequest } from "./signals-experiment-proposal.js";
 import { createApprovedVentureHandoff, findExistingVentureContentFolder } from "./venture-content-handoff-store.js";
@@ -109,6 +112,7 @@ import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./cap
 import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
 import { saveCutBody, addCutComment } from "./rows.js";
 import { providerReconciliationHealth, startProviderReconciliationLoop } from "./provider-reconciliation-runner.js";
+import { readLearningEvaluations } from "../venture/learning-evaluation.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich), jobs.ts (classifySource,
@@ -166,6 +170,42 @@ async function createSignalsExperimentProposal(input: SignalsExperimentProposalR
     const failure = decodeSpawnFailure(result, job.id, {
       timeoutVerb: `${ENGINE_LABELS[engine]} experiment proposal`, timeoutLabel: "180s",
       exitVerb: `${ENGINE_LABELS[engine]} experiment proposal`, command: ENGINE_COMMANDS[engine],
+    });
+    if (failure) throw new Error(failure);
+    return result.stdout.trim();
+  }, engine));
+}
+
+async function evaluateVentureLearning(receipt: VentureLearningReceipt, context: VentureLearningContext, engine: Engine) {
+  const prompt = buildVentureLearningEvaluationPrompt(receipt, context);
+  const output = await runQueued("venture-analysis", `Evaluate Venture learning with ${ENGINE_LABELS[engine]}`, async (job) => {
+    const result = await runAgentSpawn(job, engine, prompt, {
+      timeoutMs: 180_000,
+      permissionMode: null,
+      tools: engine === "codex" ? undefined : "",
+      sandbox: "read-only",
+    });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: `${ENGINE_LABELS[engine]} Venture learning evaluation`, timeoutLabel: "180s",
+      exitVerb: `${ENGINE_LABELS[engine]} Venture learning evaluation`, command: ENGINE_COMMANDS[engine],
+    });
+    if (failure) throw new Error(failure);
+    return result.stdout.trim();
+  }, engine);
+  return parseVentureLearningEvaluation(output, receipt, context, engine);
+}
+
+async function createVentureLearningExperiment(input: VentureLearningExperimentRequest) {
+  return proposeVentureLearningExperiment(input, async (prompt, engine) => runQueued("insights", `Plan Venture experiment with ${ENGINE_LABELS[engine]}`, async (job) => {
+    const result = await runAgentSpawn(job, engine, prompt, {
+      timeoutMs: 180_000,
+      permissionMode: null,
+      tools: engine === "codex" ? undefined : "",
+      sandbox: "read-only",
+    });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: `${ENGINE_LABELS[engine]} Venture experiment plan`, timeoutLabel: "180s",
+      exitVerb: `${ENGINE_LABELS[engine]} Venture experiment plan`, command: ENGINE_COMMANDS[engine],
     });
     if (failure) throw new Error(failure);
     return result.stdout.trim();
@@ -552,7 +592,7 @@ function ventureThreadForAnalysis(slug: string): unknown {
   }
   const body = read.body as { thread?: unknown };
   if (!body.thread) throw new Error("this venture has no readable thread yet");
-  return body.thread;
+  return { ...(body.thread as Record<string, unknown>), learningEvaluations: readLearningEvaluations(slug) };
 }
 
 export function ventureAnalysisPrompt(slug: string, thread: unknown): string {
@@ -563,6 +603,7 @@ export function ventureAnalysisPrompt(slug: string, thread: unknown): string {
     `You are giving Muxin a read-only judgment about the current venture state.`,
     `Identify what is ready now, the next decision or action that belongs to Muxin, the strongest risks or evidence gaps,`,
     `and what must not happen yet. Keep recommendations grounded only in the supplied server-derived state.`,
+    `Treat accepted learning evaluations as evidence-bounded proposals. Pending, declined, or more-evidence evaluations do not authorize a change, and no evaluation auto-mutates Venture.`,
     `Return plain markdown with short headings and bullets. No em dashes and no invented claims, numbers, or evidence.`,
     ``,
     `## Venture`,
@@ -1154,6 +1195,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       return;
     }
     if (await handleCharlesRoute({ req, res, url, readBody, json, requestEngine })) return;
+    if (await handleVentureLearningRoute({ req, res, url, readBody, json, evaluateLearning: evaluateVentureLearning, proposeExperiment: createVentureLearningExperiment })) return;
     if (await handleSignalsRoute({ req, res, url, readBody, json, interpretExperiment: interpretSignalsExperiment, proposeExperiment: createSignalsExperimentProposal })) return;
     // Approved Venture primary copy enters the ordinary Content configuration cycle. This keeps
     // its Venture provenance and does not generate or deliver anything. A retry recovers the

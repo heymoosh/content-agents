@@ -86,7 +86,7 @@ test("Signals Venture proposal is derived only from accepted measured experiment
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("Signals Venture proposal rejects generic conversation and provider-only audience metrics", async () => {
+test("Signals Venture proposals preserve weaker experiment evidence without upgrading it to demand", async () => {
   const root = mkdtempSync(join(tmpdir(), "serve-signals-venture-qualification-"));
   const plansPath = join(root, "plans.jsonl"), resultsPath = join(root, "results.jsonl"), handoffs = join(root, "handoffs.jsonl");
   try {
@@ -105,10 +105,13 @@ test("Signals Venture proposal rejects generic conversation and provider-only au
     for (const family of ["attention", "conversation", "audience"] as const) {
       const response = harness("POST", "/api/signals/experiments/experiment-qualified/venture-handoff/propose", { ventureSlug: `venture-${family}`, phase: 2 });
       await handleSignalsRoute({ ...response, res: {} as any, experimentPlansPath: plansPath, experimentResultsPath: resultsPath, ventureHandoffsPath: handoffs, readVentureState: () => ({ current_phase: 2 }), readExperimentPerformance: () => ({ experiments: [{ experimentId: "experiment-qualified", analysisStatus: "ready", primaryMetric: { family, metric: family === "attention" ? "impressions" : family === "conversation" ? "replies" : "clicks" }, outcomeRefs: ["analytics:1", "outcome:unrelated-guardrail"], primaryOutcomeRefs: { treatment: [], control: [] }, primaryComparison: { treatment: { variantId: treated, sample: 10, value: 2 }, control: { variantId: control, sample: 10, value: 1 } } }] }) });
-      assert.equal(response.response()?.code, 409);
-      assert.match(String((response.response()?.value as any).error), /qualified funnel|business|outcome[- ]ledger/i);
+      assert.equal(response.response()?.code, 200, JSON.stringify(response.response()?.value));
+      const proposal = (response.response()?.value as any).proposal;
+      assert.equal(proposal.evidenceTier, "controlled");
+      assert.equal(proposal.claimCeiling, "bounded-comparison");
+      assert.equal(proposal.inputKind, "controlled");
     }
-    assert.deepEqual(readSignalsVentureProposals(handoffs), []);
+    assert.equal(readSignalsVentureProposals(handoffs).length, 3);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

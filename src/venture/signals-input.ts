@@ -6,6 +6,7 @@ import { loadRules, requireRulesVersionMatch } from "./rules.js";
 import { withFileLock } from "../runtime/file-lock.js";
 import { join } from "node:path";
 import { ventureDir } from "./paths.js";
+import type { ClaimCeiling, EvidenceTier } from "../review/signals-venture-handoff-store.js";
 
 /** The strict, body-free envelope Venture accepts from the Content/Signals boundary. */
 export interface SignalsInputHandoff {
@@ -14,11 +15,13 @@ export interface SignalsInputHandoff {
   phase: number;
   rules_version: string;
   input_kind: string;
+  factual_summary?: string;
   source_record_refs: string[];
   evidence_refs: string[];
   content_item_refs: string[];
   scope: string;
   sample_size: number;
+  sample_size_by_arm?: { treatment: number; control: number };
   provenance: string;
   caveats: string[];
   lineage: { source_id: string; variant_id: string; experiment_id: string };
@@ -26,6 +29,8 @@ export interface SignalsInputHandoff {
   venture_gate_ref: string;
   qualification: string;
   evidence_status: string;
+  evidence_tier?: EvidenceTier;
+  claim_ceiling?: ClaimCeiling;
 }
 
 export interface SignalsInputDecision {
@@ -51,20 +56,39 @@ function refs(value: unknown, field: string): string[] {
   if (new Set(value).size !== value.length) fail(`${field} must contain unique refs`);
   return [...value] as string[];
 }
+const CEILING_RANK: Record<ClaimCeiling, number> = { attention: 1, resonance: 2, "stated-need": 3, "directional-comparison": 4, "bounded-comparison": 5, "behavioral-intent": 6, "observed-demand": 7 };
+const TIER_MAX: Record<EvidenceTier, ClaimCeiling> = { engagement: "attention", qualitative: "resonance", survey: "stated-need", directional: "directional-comparison", controlled: "bounded-comparison", funnel: "behavioral-intent", business: "observed-demand" };
+function normalizedTier(inputKind: string, explicit?: EvidenceTier): EvidenceTier | undefined {
+  if (explicit) return explicit;
+  if (inputKind in TIER_MAX) return inputKind as EvidenceTier;
+  if (/business/i.test(inputKind)) return "business";
+  if (/funnel/i.test(inputKind)) return "funnel";
+  return undefined;
+}
 function exactKeys(value: object, allowed: readonly string[], field: string): void {
   const unknown = Object.keys(value).filter((key) => !allowed.includes(key));
   if (unknown.length) fail(`${field}.${unknown[0]} is not allowed`);
 }
 function validateHandoff(value: SignalsInputHandoff, slug: string): SignalsInputHandoff {
   if (!value || typeof value !== "object") fail("handoff must be an object");
-  exactKeys(value, ["pointer_id", "venture_id", "phase", "rules_version", "input_kind", "source_record_refs", "evidence_refs", "content_item_refs", "scope", "sample_size", "provenance", "caveats", "lineage", "content_decision", "venture_gate_ref", "qualification", "evidence_status"], "handoff");
+  exactKeys(value, ["pointer_id", "venture_id", "phase", "rules_version", "input_kind", "factual_summary", "source_record_refs", "evidence_refs", "content_item_refs", "scope", "sample_size", "sample_size_by_arm", "provenance", "caveats", "lineage", "content_decision", "venture_gate_ref", "qualification", "evidence_status", "evidence_tier", "claim_ceiling"], "handoff");
   if (value.venture_id !== slug) fail(`handoff names venture ${JSON.stringify(value.venture_id)}, expected ${JSON.stringify(slug)}`);
   nonEmpty(value.pointer_id, "pointer_id"); nonEmpty(value.rules_version, "rules_version");
-  nonEmpty(value.input_kind, "input_kind"); nonEmpty(value.scope, "scope"); nonEmpty(value.provenance, "provenance");
+  nonEmpty(value.input_kind, "input_kind"); nonEmpty(value.scope, "scope");
+  if (value.factual_summary !== undefined) nonEmpty(value.factual_summary, "factual_summary");
   if (!Number.isInteger(value.phase) || value.phase < 1 || value.phase > 4) fail("phase must be an integer from 1 through 4");
   if (!Number.isInteger(value.sample_size) || value.sample_size < 1) fail("sample_size must be a positive integer");
   refs(value.source_record_refs, "source_record_refs"); refs(value.evidence_refs, "evidence_refs");
-  refs(value.content_item_refs, "content_item_refs");
+  const tier = normalizedTier(value.input_kind, value.evidence_tier);
+  if (!tier) fail("evidence_tier is invalid");
+  const ceiling = value.claim_ceiling ?? TIER_MAX[tier as EvidenceTier];
+  if (!(ceiling in CEILING_RANK)) fail("claim_ceiling is invalid");
+  if (CEILING_RANK[ceiling as ClaimCeiling] > CEILING_RANK[TIER_MAX[tier as EvidenceTier]]) fail(`claim_ceiling ${ceiling} exceeds evidence_tier ${tier}`);
+  if (!Array.isArray(value.content_item_refs)) fail("content_item_refs must be an array");
+  if ((tier === "directional" || tier === "controlled") && value.content_item_refs.length === 0) fail("content_item_refs must contain non-empty refs for experiment evidence");
+  if (tier === "directional" || tier === "controlled") nonEmpty(value.provenance, "provenance");
+  if ((tier === "directional" || tier === "controlled") && (!value.lineage?.source_id || !value.lineage?.variant_id || !value.lineage?.experiment_id)) fail(`${tier} evidence requires experiment/content/treatment lineage`);
+  if (tier === "controlled" && (!value.sample_size_by_arm || !Number.isInteger(value.sample_size_by_arm.treatment) || value.sample_size_by_arm.treatment < 1 || !Number.isInteger(value.sample_size_by_arm.control) || value.sample_size_by_arm.control < 1)) fail("controlled evidence requires both measured arm samples");
   if (!Array.isArray(value.caveats) || value.caveats.some((v) => typeof v !== "string")) fail("caveats must be an array of strings");
   if (value.qualification !== "qualified") fail("qualification must be qualified");
   if (value.evidence_status !== "measured") fail("evidence_status must be measured");
@@ -73,8 +97,10 @@ function validateHandoff(value: SignalsInputHandoff, slug: string): SignalsInput
   if (value.content_decision.status !== "approved" || value.content_decision.decided_by !== "muxin") fail("Content approval must be an explicit Muxin approval");
   nonEmpty(value.content_decision.decision_ref, "content_decision.decision_ref");
   nonEmpty(value.venture_gate_ref, "venture_gate_ref");
-  for (const key of ["source_id", "variant_id", "experiment_id"] as const) nonEmpty(value.lineage?.[key], `lineage.${key}`);
-  return value;
+  if (tier === "directional" || tier === "controlled") {
+    for (const key of ["source_id", "variant_id", "experiment_id"] as const) nonEmpty(value.lineage?.[key], `lineage.${key}`);
+  }
+  return { ...value, evidence_tier: tier, claim_ceiling: ceiling };
 }
 function validateDecision(value: SignalsInputDecision): void {
   if (!value || value.decided_by !== "muxin") fail("decided_by must be muxin; Venture acceptance cannot be inferred");
@@ -115,9 +141,14 @@ function acceptSignalsInputUnlocked(slug: string, rawHandoff: SignalsInputHandof
       artifact_kind: "signals-input",
       title: "Accepted Signals input",
       fields: {
-        pointer_id: handoff.pointer_id, input_kind: handoff.input_kind, source_record_refs: [...handoff.source_record_refs],
+        pointer_id: handoff.pointer_id, input_kind: handoff.input_kind,
+        ...(handoff.factual_summary ? { factual_summary: handoff.factual_summary } : {}),
+        ...(handoff.evidence_tier ? { evidence_tier: handoff.evidence_tier } : {}),
+        ...(handoff.claim_ceiling ? { claim_ceiling: handoff.claim_ceiling } : {}),
+        source_record_refs: [...handoff.source_record_refs],
         evidence_refs: [...handoff.evidence_refs], content_item_refs: [...handoff.content_item_refs], scope: handoff.scope,
         sample_size: handoff.sample_size, provenance: handoff.provenance, caveats: [...handoff.caveats],
+        ...(handoff.sample_size_by_arm ? { sample_size_by_arm: { ...handoff.sample_size_by_arm } } : {}),
         lineage: { ...handoff.lineage }, content_decision_ref: handoff.content_decision.decision_ref,
         venture_gate_ref: handoff.venture_gate_ref, qualification: handoff.qualification, evidence_status: handoff.evidence_status,
         acceptance_fingerprint: digest,

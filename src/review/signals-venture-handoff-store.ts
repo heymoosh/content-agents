@@ -7,14 +7,27 @@ import { withFileLock } from "../runtime/file-lock.js";
 export const SIGNALS_VENTURE_HANDOFF_PATH = dataPath("review", "signals-venture-handoffs.jsonl");
 export type SignalsVentureDecision = "adopt" | "decline" | "request-more-evidence";
 export type SignalsVentureStatus = "pending" | "adopted" | "declined" | "more-evidence";
+export type EvidenceTier = "engagement" | "qualitative" | "survey" | "directional" | "controlled" | "funnel" | "business";
+export type ClaimCeiling = "attention" | "resonance" | "stated-need" | "directional-comparison" | "bounded-comparison" | "behavioral-intent" | "observed-demand";
+
+const CEILING_RANK: Record<ClaimCeiling, number> = {
+  attention: 1, resonance: 2, "stated-need": 3, "directional-comparison": 4,
+  "bounded-comparison": 5, "behavioral-intent": 6, "observed-demand": 7,
+};
+const TIER_MAX_CEILING: Record<EvidenceTier, ClaimCeiling> = {
+  engagement: "attention", qualitative: "resonance", survey: "stated-need",
+  directional: "directional-comparison", controlled: "bounded-comparison",
+  funnel: "behavioral-intent", business: "observed-demand",
+};
 
 export interface SignalsVentureProposalInput {
   id: string; ventureSlug: string; sourceId: string; variantId: string; experimentId: string;
   title: string; factualSummary: string; proposedInput: string; rationale: string;
   confidence: "low" | "medium" | "high"; evidenceRefs: string[];
-  phase: number; inputKind: "funnel" | "business"; contentItemRefs: string[]; scope: string;
+  phase: number; inputKind: EvidenceTier; contentItemRefs: string[]; scope: string;
   sampleSize: { treatment: number; control: number }; provenance: { planDigest: string; interpretationId: string };
   caveats: string[]; qualification: "qualified"; evidenceStatus: "measured";
+  evidenceTier?: EvidenceTier; claimCeiling?: ClaimCeiling;
 }
 export interface SignalsVentureProposal extends SignalsVentureProposalInput {
   digest: string; status: SignalsVentureStatus; muxinRationale: string | null; decidedAt: string | null;
@@ -30,16 +43,22 @@ export function signalsVentureProposalId(experimentId: string, ventureSlug: stri
 }
 
 function validate(input: SignalsVentureProposalInput): SignalsVentureProposalInput {
-  for (const key of ["id", "ventureSlug", "sourceId", "variantId", "experimentId", "title", "factualSummary", "proposedInput", "rationale"] as const)
+  for (const key of ["id", "ventureSlug", "title", "factualSummary", "proposedInput", "rationale"] as const)
     if (!input[key]?.trim()) throw new Error(`${key} is required`);
   if (!["low", "medium", "high"].includes(input.confidence)) throw new Error("confidence is invalid");
-  if (!Array.isArray(input.evidenceRefs) || !input.evidenceRefs.length || input.evidenceRefs.some((v) => !v.trim())) throw new Error("evidenceRefs are required");
+  if (!Array.isArray(input.evidenceRefs) || !input.evidenceRefs.length || input.evidenceRefs.some((v) => typeof v !== "string" || !v.trim())) throw new Error("evidenceRefs are required");
   if (!Number.isInteger(input.phase) || input.phase < 1) throw new Error("phase must be a positive integer");
-  if (input.inputKind !== "funnel" && input.inputKind !== "business") throw new Error("inputKind must be qualified funnel or business evidence");
-  if (!Array.isArray(input.contentItemRefs) || !input.contentItemRefs.length) throw new Error("contentItemRefs are required");
+  const evidenceTier = input.evidenceTier ?? input.inputKind;
+  if (!(evidenceTier in TIER_MAX_CEILING)) throw new Error("evidenceTier is invalid");
+  const claimCeiling = input.claimCeiling ?? TIER_MAX_CEILING[evidenceTier as EvidenceTier];
+  if (!(claimCeiling in CEILING_RANK)) throw new Error("claimCeiling is invalid");
+  if (CEILING_RANK[claimCeiling as ClaimCeiling] > CEILING_RANK[TIER_MAX_CEILING[evidenceTier as EvidenceTier]]) throw new Error(`claimCeiling ${claimCeiling} exceeds evidenceTier ${evidenceTier}`);
+  if ((evidenceTier === "directional" || evidenceTier === "controlled") && (!input.experimentId?.trim() || !input.sourceId?.trim() || !input.variantId?.trim())) throw new Error(`${evidenceTier} evidence requires experiment/content/treatment lineage`);
+  if (evidenceTier === "controlled" && (!input.sampleSize || !Number.isInteger(input.sampleSize.treatment) || !Number.isInteger(input.sampleSize.control) || input.sampleSize.treatment < 1 || input.sampleSize.control < 1)) throw new Error("controlled evidence requires both measured arms");
+  if (!Array.isArray(input.contentItemRefs)) throw new Error("contentItemRefs must be an array");
+  if ((evidenceTier === "directional" || evidenceTier === "controlled") && input.contentItemRefs.length === 0) throw new Error("contentItemRefs are required for experiment evidence");
   if (!input.scope?.trim()) throw new Error("scope is required");
-  if (!input.sampleSize || !Number.isInteger(input.sampleSize.treatment) || !Number.isInteger(input.sampleSize.control) || input.sampleSize.treatment < 1 || input.sampleSize.control < 1) throw new Error("both measured arms are required");
-  if (!input.provenance?.planDigest?.trim() || !input.provenance.interpretationId?.trim()) throw new Error("provenance is required");
+  if ((evidenceTier === "directional" || evidenceTier === "controlled") && (!input.provenance?.planDigest?.trim() || !input.provenance.interpretationId?.trim())) throw new Error("provenance is required for experiment evidence");
   if (input.qualification !== "qualified" || input.evidenceStatus !== "measured") throw new Error("proposal must be qualified measured evidence");
   if (!Array.isArray(input.caveats)) throw new Error("caveats must be an array");
   return {
@@ -48,9 +67,10 @@ function validate(input: SignalsVentureProposalInput): SignalsVentureProposalInp
     proposedInput: input.proposedInput, rationale: input.rationale, confidence: input.confidence,
     evidenceRefs: [...new Set(input.evidenceRefs)].sort(), phase: input.phase, inputKind: input.inputKind,
     contentItemRefs: [...input.contentItemRefs], scope: input.scope,
-    sampleSize: { treatment: input.sampleSize.treatment, control: input.sampleSize.control },
-    provenance: { planDigest: input.provenance.planDigest, interpretationId: input.provenance.interpretationId },
+    sampleSize: { treatment: input.sampleSize?.treatment ?? 0, control: input.sampleSize?.control ?? 0 },
+    provenance: { planDigest: input.provenance?.planDigest ?? "", interpretationId: input.provenance?.interpretationId ?? "" },
     caveats: [...input.caveats], qualification: input.qualification, evidenceStatus: input.evidenceStatus,
+    evidenceTier, claimCeiling,
   };
 }
 function digest(input: SignalsVentureProposalInput): string { return createHash("sha256").update(JSON.stringify(validate(input))).digest("hex"); }

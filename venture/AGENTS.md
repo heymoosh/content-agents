@@ -69,11 +69,19 @@ inference. If a gate field is unset, the correct behavior is to stop and ask, ev
 
 Signals handoffs are accepted only by the Venture-owned `src/venture/signals-input.ts` seam. The
 Content/Signals view remains read-only; Venture requires an independent Muxin action, current
-venture phase/rules, qualified measured evidence, and exact body-free identity. An accepted handoff
-creates at most one `signals-input` internal artifact (`delivery_mode: none`, `publishable: false`)
-plus an idempotent canon decision event. Rejection or a request for more evidence records the
-decision event but creates no artifact. This never clears a checkpoint, unlocks a phase, or
-publishes. Same identity with changed bytes fails closed.
+venture phase/rules, source/evidence refs, and an explicit evidence tier plus honest claim ceiling.
+Ordinary measured analytics and active redacted account-level comments/replies/DMs/emails enter
+through the reviewable research-observation receipt seam. Venture-native responses use their own
+explicit intake. Engagement/comments, qualitative observations, surveys, directional/controlled comparisons, funnel
+facts, and business facts retain their respective ceilings; only directional/controlled tiers require
+exact experiment/content treatment-control lineage. An accepted handoff creates at most one
+`signals-input` internal artifact (`delivery_mode: none`, `publishable: false`) plus an idempotent
+canon decision event. Rejection or a request for more evidence records the decision event but creates
+no artifact. Accepted learning may be evaluated as no-change/change/test, then separately reviewed by
+Muxin; accepted change/test emits a typed downstream proposal only. Nothing auto-clears a checkpoint,
+unlocks a phase, publishes, changes configuration, selects a winner, or claims demand. An accepted
+test returns through the canonical Experiment planner and normal Content review/measurement loop.
+Same identity with changed bytes fails closed.
 
 **This is Build 2's expensive lesson, built in on day one.** `/story` shipped without a beat-sheet
 approval gate and drafted an inert chapter before the gate was retrofitted (commit `26bf36c`).

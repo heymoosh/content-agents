@@ -33,4 +33,6 @@ test("ventureStepPrompt requires one selected-phase step and preserves human gat
   assert.match(prompt, /Return ONLY one JSON object/);
   assert.match(prompt, /Do not auto-select, auto-approve/);
   assert.match(prompt, /Current phase: 3/);
+  assert.match(prompt, /accepted learning evaluations.*evidence-bounded context/i);
+  assert.match(prompt, /do not authorize overwriting/i);
 });

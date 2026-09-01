@@ -1,6 +1,6 @@
 ---
 name: venture
-description: Build 3 — run Phase 1 ("Attention"), Phase 2 ("Audience"), Phase 3 ("Offer"), and Phase 4 ("Operations") of a solo-business sprint that tests what an audience actually wants, builds a narrow lead magnet and owned-audience capture around it, clusters real responses into one expensive problem with a transformation, outline, and price, then installs a sustainable daily operating routine and runs the Day 14 review. Usage - /venture new <slug>, /venture <slug>.
+description: Build 3 — run Phase 1 ("Attention"), Phase 2 ("Audience"), Phase 3 ("Offer"), and Phase 4 ("Operations") of a solo-business sprint that tests what an audience actually wants, builds a narrow lead magnet and owned-audience capture around it, clusters real responses into one expensive problem with a transformation, outline, and price, then installs a sustainable daily operating routine and runs the Day 14 review. Usage - /venture new SLUG, /venture SLUG.
 ---
 
 # /venture — Phase 1: Attention, Phase 2: Audience, Phase 3: Offer, Phase 4: Operations (Build 3)
@@ -31,6 +31,21 @@ customer, or number Muxin didn't actually have.
 (Phase 2), `src/venture/phase3.ts` (Phase 3), and `src/venture/phase4.ts` (Phase 4), not by you
 remembering to stop.** Each script refuses to move forward if a prior gate hasn't cleared. Treat a
 refusal as correct behavior, not a bug to route around.
+
+## Reviewed learning inputs
+
+For an existing venture, treat accepted records from `src/venture/learning-evaluation.ts` as part of
+that venture's context. They may recommend no change, a change to a hypothesis, lead-generation
+idea, product, offer, or strategy, or a Content experiment. Retain their evidence refs, evidence
+tier, claim ceiling, affected refs, and caveats. A comment or survey can change the next
+recommendation without becoming proof of demand.
+
+An accepted learning recommendation is not permission to overwrite a selected decision, approved
+artifact, checkpoint, or phase. Use it to inform the next ordinary draft/recommendation at the
+current phase, and stop at that command's existing Muxin gate. If the accepted recommendation
+targets an experiment, leave it to the Studio's Venture-to-Experiment handoff and normal Experiment
+plan approval; do not run an unrelated phase command to simulate the test. Pending, declined, and
+more-evidence evaluations are visible context only and must not drive a change.
 
 ## Step 1: New venture — intake
 
@@ -618,6 +633,9 @@ compounding, referrals, and repeat buyers (rules.md §8.6).
 
 - One deliverable or decision at a time — never bundle "here are the ideas AND here's a draft."
 - If a gate refuses, that's the wall working. Explain what's actually missing, don't work around it.
+- Preserve the claim ceiling on every reviewed learning input. Never turn attention, resonance,
+  stated need, directional comparison, bounded comparison, or behavioral intent into observed
+  demand, and never select an experiment winner automatically.
 - Never read `venture/examples/civic-tech-worked-example.md` (if it exists) into context for a
   real venture, and never let its specific categories (e.g. "civically awake but not
   performative") leak into a clean venture's research plan as if they were universal defaults. This

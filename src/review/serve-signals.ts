@@ -175,13 +175,7 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
       const row = performance.experiments?.find((item) => item.experimentId === id);
       if (!row || row.analysisStatus !== "ready") throw new Error("a ready measured performance row is required");
       const family = row.primaryMetric.family;
-      if (family !== "audience" && family !== "business") throw new Error("only qualified funnel or business evidence can become a Venture input");
-      if (!row.outcomeRefs.length || !row.primaryComparison?.treatment || !row.primaryComparison.control) throw new Error("both measured arms and outcome references are required");
-      if (!row.outcomeRefs.some((ref) => ref.startsWith("outcome:"))) throw new Error("qualified funnel or business evidence requires an attributed outcome ledger record");
-      if (!row.primaryOutcomeRefs?.treatment.some((ref) => ref.startsWith("outcome:"))
-        || !row.primaryOutcomeRefs.control.some((ref) => ref.startsWith("outcome:"))) {
-        throw new Error("each primary experiment arm requires attributed outcome-ledger evidence; provider-only metrics do not qualify");
-      }
+      if (!row.outcomeRefs.length || !row.primaryComparison?.treatment || !row.primaryComparison.control) throw new Error("both measured arms and evidence references are required");
       const generated = readExperimentPlans(experimentPlansPath).find((item) => item.experimentId === id)?.generatedIds ?? [];
       const expectedVariants = plan.contentRequest.variants.map((variant) => variant.identity.id).sort();
       if (generated.length !== expectedVariants.length || [...generated].sort().some((variantId, index) => variantId !== expectedVariants[index])) {
@@ -191,13 +185,28 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
         || row.primaryComparison.control.variantId !== plan.recommendation.expectedOutcome.comparisonRef) {
         throw new Error("measured treatment/control variant lineage does not match the experiment plan");
       }
+      const attributedTreatment = row.primaryOutcomeRefs?.treatment.filter((ref) => ref.startsWith("outcome:")) ?? [];
+      const attributedControl = row.primaryOutcomeRefs?.control.filter((ref) => ref.startsWith("outcome:")) ?? [];
+      const attributedBothArms = attributedTreatment.length > 0 && attributedControl.length > 0;
+      const evidenceTier = family === "business" && attributedBothArms ? "business"
+        : family === "audience" && attributedBothArms ? "funnel"
+          : "controlled";
+      const claimCeiling = evidenceTier === "business" ? "observed-demand"
+        : evidenceTier === "funnel" ? "behavioral-intent"
+          : "bounded-comparison";
+      const measuredRefs = [...new Set([
+        ...interpretation.evidenceRefs,
+        ...(row.primaryOutcomeRefs?.treatment ?? []),
+        ...(row.primaryOutcomeRefs?.control ?? []),
+        ...row.outcomeRefs,
+      ])];
       const proposal = recordSignalsVentureProposal({
         id: signalsVentureProposalId(id, ventureSlug, phase), ventureSlug, phase, sourceId: plan.contentRequest.id,
         variantId: row.primaryComparison.treatment.variantId, experimentId: id, title: plan.recommendation.hypothesis,
         factualSummary: `${row.primaryMetric.metric} was measured across both experiment arms.`, proposedInput: interpretation.rationale,
         rationale: interpretation.rationale, confidence: interpretation.confidence,
-        evidenceRefs: [...new Set([...interpretation.evidenceRefs, ...row.primaryOutcomeRefs.treatment, ...row.primaryOutcomeRefs.control])],
-        inputKind: family === "business" ? "business" : "funnel", contentItemRefs: generated,
+        evidenceRefs: measuredRefs,
+        inputKind: evidenceTier, evidenceTier, claimCeiling, contentItemRefs: generated,
         scope: plan.contentRequest.id, sampleSize: { treatment: row.primaryComparison.treatment.sample, control: row.primaryComparison.control.sample },
         provenance: { planDigest: plan.digest, interpretationId: interpretation.id }, caveats: [...interpretation.caveats], qualification: "qualified", evidenceStatus: "measured",
       }, ventureHandoffsPath);

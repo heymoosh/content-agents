@@ -3499,3 +3499,18 @@ test("Venture Signals inputs stop offering decision buttons after the durable Ve
     assert.doesNotMatch(script.slice(script.indexOf("const signalsInput ="), script.indexOf("const card =", script.indexOf("const signalsInput ="))), new RegExp(forged));
   }
 });
+
+test("Venture learning loop reads evaluations and keeps decisions and experiments human-gated", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('encodeURIComponent(requestedSlug)+"/learning-evaluations'), "Venture load reads learning evaluations");
+  assert.ok(script.includes('"/learning/"+source') && script.includes('"/evaluate"'), "learning sources have evaluate routes");
+  for (const field of ["evidenceTier", "claimCeiling", "recommendation", "target", "rationale", "proposedChange", "caveats", "status"]) {
+    assert.ok(script.includes(field), `learning cards render ${field}`);
+  }
+  assert.match(script, /Evaluate learning/);
+  assert.match(script, /signals-input-"\+p\.id/);
+  assert.match(script, /request-more-evidence/);
+  assert.match(script, /does not mutate Venture automatically|normal Experiment approval queue/);
+  assert.match(script, /minimumSample|availablePublishingUnits/);
+  assert.match(script, /Never auto-apply|never.*winner|never selects a winner/i);
+});

@@ -688,9 +688,12 @@ family, claim angle, lane, audience, platform, medium, format, length, CTA, timi
 treatment. Preserve them on every variant and publish record. Signals report attention,
 conversation, audience, and business separately. Do not collapse them into one score.
 
-Comments are linked observations with author/context, date, theme, and response status. They can
-suggest a problem, language, objection, or next test. They do not by themselves prove willingness
-to pay, audience fit, or a Venture gate.
+Comments are linked observations with author/context, date, theme, and response status. Together with
+engagement, surveys, directional comparisons, controlled tests, funnel events, and business facts,
+they form an evidence ladder. Its honest ceilings are engagement → attention; qualitative/comments →
+resonance; surveys → stated-need; directional → directional-comparison; controlled → bounded-comparison;
+funnel → behavioral-intent; and business → observed-demand. A lower rung may motivate a hypothesis or test,
+but cannot be upgraded into a higher claim by copying fields or wording.
 
 Funnel events link content to profile visits, landing visits, opt-ins, replies, calls, inquiries,
 and sales when attribution is known. A quiet post with a lead is a business win; a high-reach post
@@ -698,9 +701,10 @@ with no downstream movement is not automatically a success. Missing attribution 
 missing, not guessed.
 
 Venture receives qualified patterns, audience observations, and business signals as inputs with
-scope, sample size, provenance, and caveats. It does not receive a universalized engagement claim.
-Venture's own response, decision, artifact, and approval gates remain authoritative. A content item
-can carry `from-venture` or `from-studio`, but both use the same Content pipeline.
+scope, sample size, provenance, and caveats. Signals remains analytics and pattern prioritization;
+Venture remains the authority for contextual hypotheses across lead-generation, product, offer, and
+strategy. Venture's own response, decision, artifact, and approval gates remain authoritative. A
+content item can carry `from-venture` or `from-studio`, but both use the same Content pipeline.
 
 ## 9. Phases and acceptance criteria
 
@@ -853,12 +857,14 @@ through publication and its declared measurement window.
 
 ### Phase 4: Cross-system learning and Venture handoff
 
-**Ship predicate:** Given measured Content variants, qualified comments, funnel events, and business
-outcomes, Signals may propose a caveated handoff to a named Venture with provenance, scope, sample
-size, and decision context. Muxin decides whether to adopt, decline, or request more evidence, and
-Venture's own gate decides whether the input becomes a Venture artifact or phase transition.
-Evidence is the linked signal, decision record, Venture artifact, and approval record. The owner is
-Venture only after Signals has produced qualified inputs and Muxin has approved the boundary crossing.
+**Ship predicate:** Signals may propose a caveated, ceiling-labeled analytics or experiment learning
+input to a named Venture with provenance, scope, sample size, and decision context. Muxin decides
+whether to adopt, decline, or request more evidence in Signals, then separately reviews the Venture
+recommendation. Venture-native survey, comment, email, and DM responses enter the evaluator from
+their existing manually judged intake instead of taking a redundant Signals round trip. Accepted response/comment learning may recommend `no-change`,
+`change`, or `test`; it never upgrades its evidence ceiling. Venture remains authoritative for
+contextual hypotheses across lead-generation, product, offer, and strategy. Evidence is the linked
+signal, decision records, Venture receipt/proposal, and approval records.
 
 This cross-system phase is not Venture's internal survey workflow. Surveys created for a Venture
 remain inside that named Venture and help test its market, reader-problem, product, offer, and
@@ -881,10 +887,15 @@ hypothesis-only, blocked, mismatched, or non-unique selections.
 deterministic JSON/Markdown without creating Venture artifacts or sending replies.
 
 The current Phase 4 implementation connects those contracts to the production Studio boundary.
-`src/review/serve-signals.ts` may create a body-free proposal only from a stored experiment plan,
-a separately accepted Signals interpretation, both measured experiment arms, and an explicitly
-attributed funnel or business row from the outcome ledger. Generic replies, attention, follows,
-or provider-only clicks cannot qualify the handoff. The append-only
+The Studio lists active account-level `research_observations` as bounded learning sources. Measured
+metric rows become `engagement`/`attention` receipts; redacted comments, replies, DMs, emails, and
+follow-up questions become `qualitative`/`resonance` receipts. The adapter never selects
+`exact_text` or `respondent_hash`, and the evaluator receives structured artifact identity and status
+rather than Venture artifact bodies.
+`src/review/serve-signals.ts` creates body-free proposals with an explicit evidence tier and claim
+ceiling; directional/controlled experiment tiers retain exact plan, treatment, control, and Content
+lineage, while qualitative, survey, engagement, funnel, and business inputs do not pretend to have
+experiment lineage they lack. The append-only
 `signals-venture-handoffs.jsonl` ledger preserves the named Venture, phase, experiment lineage,
 evidence, scope, sample size, provenance, caveats, and Muxin's adopt/decline/request-more-evidence
 decision without changing Venture state.
@@ -894,13 +905,19 @@ An adopted proposal appears inside that Venture's existing Studio room. The sepa
 rules, evidence status, and audit references are re-derived server-side from durable records. An
 accept creates one `signals-input` internal artifact plus an append-only canon decision. Reject and
 request-more-evidence record the decision without an artifact. No outcome clears a checkpoint,
-unlocks a phase, publishes, claims demand, or changes a general Content rule. Exact retries are
-idempotent, artifact-before-canon crash recovery does not duplicate the artifact, and changed
-identity bytes fail closed. This completes the deterministic Phase 4 ship predicate; the first
-real measured two-room handoff remains an operational proof.
+unlocks a phase, publishes, claims demand, or changes a general Content rule. A separate Venture
+learning evaluation may recommend no-change, change, or test; Muxin separately accepts, declines, or
+requests more evidence. Accepted change/test produces a typed downstream proposal only: it never
+mutates authoritative phase, checkpoint, configuration, winner, or demand state. An accepted test
+flows Venture → canonical Experiment planner → normal Experiment plan approval → canonical Content
+drafting/review/publishing/measurement → Signals and Venture learning. Multiple experiments remain
+supported in the normal Experiment queue. Exact retries are idempotent, artifact-before-canon crash
+recovery does not duplicate the artifact, and changed identity bytes fail closed. This completes the
+deterministic Phase 4 contract; integrated live operation remains unverified.
 
-**Not in scope:** turning content engagement into proof of demand, bypassing Venture decisions, or
-making Venture the owner of every Studio idea.
+**Not in scope:** turning lower-rung evidence into observed demand, bypassing Venture decisions,
+auto-mutating phase/checkpoint/configuration/winner state, or making Venture the owner of every Studio
+idea.
 
 ### Phase contract fields
 
@@ -935,7 +952,7 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is deterministic and provisional; `patterns:pool-evidence-cli` exposes explicit catalog/raw-input views, `src/patterns/reviewed-evidence-ledger-bridge.ts` projects reviewed intake without inference, and `src/patterns/source-evidence-ledger.ts` persists reviewed source/post facts append-only, while comparison readiness checks memberships and evidence scopes and keeps missing rows blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
 | Research pools | Niche, broad, and format distinction documented; `src/patterns/review-pool-coverage.ts` reports only explicit reviewed labels and keeps metadata coverage separate from comparison readiness; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
 | Experiment lineage | Phase 3 now carries approved plan identity through canonical Content variants, delivery events, exact provider/analytics matches, and explicitly attributed `data/outcomes.jsonl` facts into a per-experiment Signals read. `src/grow/signals-experiment-performance.ts` requires both controlled arms, every guardrail, sample, and duration; `src/review/signals-experiment-result-store.ts` retains one body-free keep/revise/reject science recommendation plus a separate Muxin review. Existing experiment/outcome adapters still preserve the four outcome families and Venture boundary. No read or review selects a winner. | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Implemented for the Signals content-growth loop; broader external outcome ingestion remains partial |
-| Venture handoff | Phase 4 now requires a measured two-arm experiment, accepted Signals interpretation, and attributed funnel/business outcome before an append-only body-free proposal can be reviewed in Signals and separately accepted in the named Venture. Acceptance creates one internal non-publishable artifact and canon decision without checkpoint, phase, publishing, or general-rule side effects. | Qualified, caveated inputs with separate Signals and Venture decisions and exact lineage | Deterministically implemented; real measured handoff pending |
+| Venture handoff | Phase 4 accepts an evidence-ladder input with an explicit tier and honest claim ceiling, then requires separate Signals and Venture decisions. Directional/controlled tiers retain exact experiment/content treatment-control lineage; other tiers retain only the refs they actually have. | Qualified, caveated inputs with separate Signals and Venture decisions, typed downstream learning recommendations, and exact lineage where applicable | Deterministically implemented; integrated live loop remains unverified |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
 | Model boundaries | Subscription-first and human approval rules exist; `src/agents/model-boundary.ts` records bounded role/task/route/audit facts, `src/agents/skill-contract.ts` records the lightweight stage boundaries, and `src/agents/skill-invocation.ts` records key-only readiness; all permit common-hook mad-lib adaptation without creator-body copying | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
 

@@ -39,6 +39,17 @@ describe("Signals science agent experiment recommendation", () => {
     assert.match(built.evidenceDigest, /^sha256:/); assert.match(built.promptDigest, /^sha256:/);
   });
 
+  test("can plan from an already-reviewed Venture learning recommendation without opening raw Venture evidence", () => {
+    const built = buildSignalsExperimentSciencePrompt(input(), { source: "venture-reviewed-learning" });
+    assert.match(built.prompt, /accepted Venture learning recommendation/i);
+    assert.match(built.prompt, /do not request or infer raw survey, response, or private message content/i);
+    assert.doesNotMatch(built.prompt, /Never read or infer Venture survey findings/);
+
+    const result = parseSignalsExperimentScienceResult(recommended, input(), "codex", { source: "venture-reviewed-learning" });
+    assert.equal(result.status, "recommended");
+    if (result.status === "recommended") assert.equal(result.recommendation.provenance.promptDigest, built.promptDigest);
+  });
+
   test("parses a bounded recommendation with exact evidence and model provenance", () => {
     const result = parseSignalsExperimentScienceResult(recommended, input(), "codex");
     assert.equal(result.status, "recommended");
