@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Charles persona edit workflow review</title>
+  <style>
+    :root { color-scheme: light; --ink:#221f1a; --muted:#6d665b; --paper:#fbf8f1; --card:#fff; --line:#d9cfbc; --accent:#7b2f22; --safe:#285943; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.55 Georgia,serif; }
+    main { width:min(1040px,calc(100% - 32px)); margin:40px auto 72px; }
+    h1,h2,h3 { line-height:1.16; }
+    h1 { font-size:clamp(32px,5vw,52px); margin-bottom:8px; }
+    h2 { margin-top:40px; }
+    .note,.label { color:var(--muted); font:13px/1.45 ui-sans-serif,system-ui,sans-serif; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; }
+    .before { border-top:4px solid var(--muted); }
+    .after { border-top:4px solid var(--accent); }
+    code,pre { font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#f4efe5; padding:14px; border-radius:8px; }
+    li { margin:8px 0; }
+    .safe { color:var(--safe); font-weight:700; }
+    @media (max-width:720px) { .grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body><main>
+  <div class="label">HELD LOGIC REVIEW · P2.3</div>
+  <h1>Charles persona editing</h1>
+  <p class="note">This review covers the workflow that changes the production persona. It does not change Charles's current persona or publish anything.</p>
+
+  <h2>What changes in Studio</h2>
+  <div class="grid">
+    <section class="card before"><h3>Before</h3><p>The Charles room shows Muxin's original persona brief as a read-only copy surface. The production <code>persona.yaml</code> cannot be reviewed or updated there.</p></section>
+    <section class="card after"><h3>After</h3><p>The room shows the production YAML in a separate editor. Saving creates an exact old/new proposal. Production remains unchanged until Muxin reviews and approves those exact bytes.</p></section>
+  </div>
+
+  <h2>Representative content consequence</h2>
+  <p class="note">A Luna writing worker produced this bounded illustration from the current persona and one proposed field change. It is review evidence, not a live model canary, and the proposal was not applied.</p>
+  <pre>voice.reassurance_loop:
+  Add: "When reacting to a claim from the powerful, name that claim immediately so a context-switching reader knows what Charles is denying."</pre>
+  <div class="grid">
+    <section class="card before"><div class="label">CURRENT PERSONA</div><p>“A temporary mood, dear reader. It will pass just as soon as everyone stops noticing the scaffolding, so EVERYTHING IS FINE!!”</p></section>
+    <section class="card after"><div class="label">PROPOSED PERSONA</div><p>“The powerful keep calling public anger a temporary mood, which is correct because moods never organize, vote, or remember who dismissed them. EVERYTHING IS FINE!!”</p></section>
+  </div>
+
+  <h2>Safety contract</h2>
+  <section class="card"><ul>
+    <li><span class="safe">No pre-approval mutation:</span> Previewing a proposal never changes production.</li>
+    <li><span class="safe">Exact authority:</span> Digests bind the old YAML, new YAML, proposal payload, and append-only transition chain.</li>
+    <li><span class="safe">Fail closed:</span> Stale, tampered, malformed, schema-invalid, path-injected, or source-stripping proposals are refused.</li>
+    <li><span class="safe">Truthfulness retained:</span> Existing sourced leak-bank entries cannot lose or change their source URL through this workflow.</li>
+    <li><span class="safe">Recovery:</span> Approval is atomic and idempotent. An interruption after the exact rename can recover without applying different bytes.</li>
+    <li><span class="safe">Original brief protected:</span> <code>persona-brief.md</code> stays byte-for-byte unchanged and separately copyable.</li>
+    <li><span class="safe">Delivery unchanged:</span> Charles remains ready-to-paste and manual.</li>
+  </ul></section>
+
+  <h2>Browser acceptance flow</h2>
+  <section class="card"><ol>
+    <li>Edit production YAML and save it for review.</li>
+    <li>Compare the complete old and new YAML while production remains unchanged.</li>
+    <li>Approve with review evidence, or reject with a reason.</li>
+    <li>Reload the room and confirm applied and rejected decisions persist.</li>
+    <li>The next Charles drafting job reads the approved production <code>persona.yaml</code>.</li>
+  </ol></section>
+</main></body>
+</html>
