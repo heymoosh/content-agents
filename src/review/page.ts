@@ -3539,7 +3539,7 @@ async function ventureWrite(path, body, okMsg, key){
     ventureBusy = false;
     $("#ventureAnalysisPanel").hidden = true;
     await loadVenture();
-    if(okMsg) flash(okMsg);
+    if(okMsg) flash(typeof okMsg === "function" ? okMsg(j) : okMsg);
     return j;
   } catch(e){
     ventureBusy = false;
@@ -3556,7 +3556,17 @@ function vCardAction(artifactId, action){
   if(action.id === "failed") return vOpen(key, "failed", "");
   if(action.id === "retract") return vOpen(key, "retract", "");
   if(action.destructive && !confirm(action.label + ": " + artifactId + "?")) return;
-  ventureWrite("/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id, {}, (action.label+": done"), key);
+  const deliveryMessage = j => {
+    const result = j && j.result;
+    if(!result) return action.label+": done";
+    if(result.action === "handed_off") return "Ready to paste. Publish it yourself, then confirm it here.";
+    if(result.action === "claimed") return result.detail;
+    if(result.action === "waiting") return result.detail;
+    if(result.action === "posted") return "Published and confirmed by the delivery agent.";
+    return result.detail || (action.label+": done");
+  };
+  ventureWrite("/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id, {},
+    (action.id === "deliver" || action.id === "retry-delivery") ? deliveryMessage : (action.label+": done"), key);
 }
 
 // The reason field the override discipline raises. Rendered from the server's own
@@ -5943,18 +5953,18 @@ function jobAwaitingAnswer(j){ return j.status==="blocked" && !j.answer; }
 function jobSettled(j){ return j.status==="done" || j.status==="stopped" || (j.status==="blocked" && !!j.answer); }
 // Stop is offered only where it can act: queued or running. Everything else has already settled,
 // where the route no-ops, and a blocked job's stop would discard a question she has not answered.
-function jobStopOffered(j){ return j.status==="queued" || j.status==="running"; }
+function jobStopOffered(j){ return j.kind!=="venture-delivery" && (j.status==="queued" || j.status==="running"); }
 function jobsPollDue(jobs, now, armedUntil){
   if(now < (armedUntil||0)) return true;
   if(jobs.some(j=>j.status==="queued"||j.status==="running")) return true;
   return jobs.some(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS + JOBS_POLL_MS);
 }
 const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/content/generate","/api/content/media/render","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check","/api/fiction/promotion/draft","/api/fiction/promotion/revise"];
-function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path) || /^\\/api\\/venture\\/[^/]+\\/(analyze|run-step)$/.test(path); }
+function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path) || /^\\/api\\/venture\\/[^/]+\\/(analyze|run-step)$/.test(path) || /^\\/api\\/venture\\/[^/]+\\/artifacts\\/[^/]+\\/(deliver|retry-delivery)$/.test(path); }
 function jobRoom(kind){
   if(kind==="scout"||kind==="draft-follow-up"||kind==="outreach-revise") return "Outreach";
   if(kind==="pull"||kind==="strategy"||kind==="insights"||kind==="ask-insights"||kind==="brief-revise") return "Signals";
-  if(kind==="venture-analysis"||kind==="venture-step") return "Venture";
+  if(kind==="venture-analysis"||kind==="venture-step"||kind==="venture-delivery") return "Venture";
   if(kind==="charles-draft") return "Charles";
   if(kind==="fiction-draft"||kind==="fiction-continuity"||kind==="fiction-promo") return "Fiction";
   return "Content";

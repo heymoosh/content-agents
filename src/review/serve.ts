@@ -34,6 +34,7 @@ import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { handleVentureRead } from "./venture-reads.js";
 import { handleVentureWrite } from "./venture-writes.js";
+import { deliverVenture } from "../venture/deliver.js";
 import { buildFollowups, markResponded, markContacted, markSent, moveOn, isBucket, type TrackerEvent } from "../outreach/tracker.js";
 import { deliverLockedGmailMessage, reconcileLockedGmailMessage } from "../outreach/gmail-delivery.js";
 import type { GmailSendRequest, GmailSendResult } from "../providers/email/gmail.js";
@@ -2154,6 +2155,24 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         json(res, 200, { ok: true, ...result });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && (/^\/api\/venture\/[^/]+\/artifacts\/[^/]+\/deliver$/.test(url.pathname) ||
+      /^\/api\/venture\/[^/]+\/artifacts\/[^/]+\/retry-delivery$/.test(url.pathname))) {
+      const parts = url.pathname.split("/");
+      const slug = decodeURIComponent(parts[3]);
+      const artifactId = decodeURIComponent(parts[5]);
+      try {
+        const result = await runQueued("venture-delivery", `Deliver Venture artifact ${slug}/${artifactId}`, async (job) => {
+          job.slugs = [slug];
+          const outcomes = await deliverVenture(slug, { onlyIds: [artifactId] });
+          if (outcomes.length !== 1) throw new Error(`${artifactId} is not eligible for delivery`);
+          return outcomes[0];
+        }, "codex");
+        json(res, 200, { ok: true, result });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
       return;
     }

@@ -595,6 +595,7 @@ test("an app-mode hand-off offers no confirm-live, because the server would refu
   // artifact" for anything whose delivery_mode is not manual -- the AGENT confirms those. Drawing
   // the button would be a control backed by a guaranteed refusal.
   assert.ok(!actions({ editorial_status: "approved", delivery_status: "handed_off", delivery_mode: "app" }).includes("confirm-live"));
+  assert.ok(actions({ editorial_status: "approved", delivery_status: "handed_off", delivery_mode: "app" }).includes("deliver"), "a claimed slot must remain reachable for its due-time pass");
   assert.ok(actions({ editorial_status: "approved", delivery_status: "handed_off", delivery_mode: "manual" }).includes("confirm-live"));
 });
 
@@ -613,9 +614,10 @@ test("a live artifact offers only the takedown, and a draft never offers it", ()
   assert.ok(!actions({ editorial_status: "draft", delivery_status: "awaiting_approval" }).includes("retract"));
 });
 
-test("a failed delivery offers give-up but never a Retry with nothing behind it", () => {
-  // §2.2 lists Retry; re-delivery runs through deliverVenture, which is deliberately not routed.
-  assert.deepEqual(actions({ editorial_status: "approved", delivery_status: "failed" }), ["discard"]);
+test("delivery actions are offered only where the routed engine can honor them", () => {
+  assert.ok(actions({ editorial_status: "approved", delivery_status: "ready", delivery_mode: "manual" }).includes("deliver"));
+  assert.deepEqual(actions({ editorial_status: "approved", delivery_status: "failed", delivery_mode: "app", failure: { provider: "substack-notes", message: "offline", retryable: true, at: AT } }), ["retry-delivery", "discard"]);
+  assert.deepEqual(actions({ editorial_status: "approved", delivery_status: "failed", delivery_mode: "app", failure: { provider: "substack-notes", message: "refused", retryable: false, at: AT } }), ["discard"]);
 });
 
 test("the destructive actions are marked, so the room can ask first", () => {

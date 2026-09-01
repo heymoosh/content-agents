@@ -861,7 +861,7 @@ export type JobKind =
   | "revise" | "brief-revise" | "insights" | "ask-insights" | "venture-analysis" | "venture-step" | "duplicate" | "draft-follow-up"
   | "outreach-revise"
   | "pull" | "strategy" | "scout" | "charles-draft"
-  | "fiction-draft" | "fiction-continuity" | "fiction-promo" | "content-generate" | "configured-media-render";
+  | "fiction-draft" | "fiction-continuity" | "fiction-promo" | "content-generate" | "configured-media-render" | "venture-delivery";
 
 // Kinds whose stdout IS the deliverable, not a progress channel. `runDraft` takes the spawn's
 // stdout as the outreach message body, and `ask-insights` returns it as the answer Muxin reads.
@@ -1880,6 +1880,9 @@ export function answerJob(id: string, answer: string): { error: string } | { job
 export function stopJob(id: string): { error: string } | { job: Job; stopped: boolean } {
   const job = jobs.find((j) => j.id === id);
   if (!job) return { error: "no such job" };
+  if (job.kind === "venture-delivery" && (job.status === "queued" || job.status === "running")) {
+    return { error: "delivery cannot be stopped after it is queued; wait for its recorded outcome" };
+  }
   if (job.status !== "queued" && job.status !== "running") return { job, stopped: false };
 
   job.stoppedByMuxin = true; // set BEFORE any signal — the settle path reads it first

@@ -1212,6 +1212,21 @@ test("stopping a task-closure job with no subprocess still settles as stopped an
   jobs.length = 0;
 });
 
+test("a Venture delivery job cannot report stopped while its side effects may continue", async () => {
+  jobs.length = 0;
+  let release: (() => void) | null = null;
+  const run = runQueued("venture-delivery", "live delivery", async () => {
+    await new Promise<void>((r) => { release = r; });
+  });
+  const job = jobs.find((j) => j.label === "live delivery")!;
+  await waitForJobStatus(job, "running");
+  assert.deepEqual(stopJob(job.id), { error: "delivery cannot be stopped after it is queued; wait for its recorded outcome" });
+  assert.equal(job.status, "running");
+  release!();
+  await run;
+  jobs.length = 0;
+});
+
 // The mutex half of the case above: the lane is handed on ONCE. If settleJob re-released it when
 // the orphan resolved, two jobs would run at the same time.
 test("an orphaned stopped task resolving late does not double-release the job lane", async () => {

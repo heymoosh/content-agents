@@ -96,6 +96,7 @@ async function deliverApp(slug: string, a: VentureArtifact, at: string, opts: { 
       a.artifact_id,
       {
         delivery_status: "live_confirmed",
+        failure: null,
         evidence: { type: "agent", value: ref, provider: "substack-notes", confirmed_by: "agent", confirmed_at: at },
       },
       at
@@ -134,7 +135,9 @@ export async function deliverVenture(slug: string, opts: DeliverOptions = {}): P
   // be revisited on a later run. Manual-kind handed_off artifacts wait for Muxin's own `confirm`
   // command instead, never for another deliverVenture pass.
   let candidates = readArtifacts(slug).filter(
-    (a) => readyForDelivery(a) || (a.delivery_mode === "app" && a.delivery_status === "handed_off")
+    (a) => readyForDelivery(a) ||
+      (a.delivery_mode === "app" && a.delivery_status === "handed_off") ||
+      (a.delivery_mode === "app" && a.delivery_status === "failed" && a.failure?.retryable === true)
   );
   if (opts.onlyIds) candidates = candidates.filter((a) => opts.onlyIds!.includes(a.artifact_id));
   const results: DeliverResult[] = [];

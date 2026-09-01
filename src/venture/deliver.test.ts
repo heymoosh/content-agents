@@ -243,5 +243,17 @@ describe("deliverVenture -- app (text-post-note), the live-posting-critical path
     });
     const a = readArtifact(SLUG, "p1-a");
     assert.equal(a?.failure?.retryable, false);
+    assert.deepEqual(await deliverVenture(SLUG, { postFn: async () => ({ ref: "must-not-post" }), now: farFuture }), []);
+  });
+
+  test("an explicitly retryable failure can be retried without claiming a second slot", async () => {
+    seedApprovedPost("text-post-note");
+    await deliverVenture(SLUG);
+    const farFuture = new Date(Date.now() + 400 * 24 * 3600 * 1000);
+    await deliverVenture(SLUG, { postFn: async () => { throw new PullError("NETWORK", "offline"); }, now: farFuture });
+
+    const retried = await deliverVenture(SLUG, { postFn: async () => ({ ref: "https://substack.example/retried" }), now: farFuture });
+    assert.equal(retried[0]?.action, "posted");
+    assert.equal(readArtifact(SLUG, "p1-a")?.delivery_status, "live_confirmed");
   });
 });

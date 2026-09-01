@@ -468,7 +468,10 @@ function venturePathIsCalled(script: string, route: string): boolean {
 }
 
 test("every artifact-lifecycle route has a CardAction id, and every id has a route", () => {
-  const lifecycle = VENTURE_WRITE_PATHS.map((p) => /^\/api\/venture\/:slug\/artifacts\/:id\/([a-z-]+)$/.exec(p)?.[1]).filter(Boolean);
+  const lifecycle = [...VENTURE_WRITE_PATHS,
+    "/api/venture/:slug/artifacts/:id/deliver",
+    "/api/venture/:slug/artifacts/:id/retry-delivery",
+  ].map((p) => /^\/api\/venture\/:slug\/artifacts\/:id\/([a-z-]+)$/.exec(p)?.[1]).filter(Boolean);
   assert.deepEqual([...lifecycle].sort(), [...CARD_ACTION_IDS].sort(), "the action id union and the artifact routes must be the same set");
 });
 
@@ -493,6 +496,7 @@ const VENTURE_PATHS = [...VENTURE_READ_PATHS, ...VENTURE_WRITE_PATHS, ...INTAKE_
 const DECLARED_JOB_REGEX_PATHS = [
   "/api/jobs/:id/stop", "/api/jobs/:id/log", "/api/jobs/:id/answer", "/api/jobs/:id/retry",
   "/api/venture/:slug/analyze", "/api/venture/:slug/run-step",
+  "/api/venture/:slug/artifacts/:id/deliver", "/api/venture/:slug/artifacts/:id/retry-delivery",
 ];
 
 /** `/^\/api\/venture\/[^/]+\/intake\/\d+\/draft$/` → `/api/venture/:slug/intake/:n/draft`. */
@@ -1697,6 +1701,8 @@ test("every route that enqueues a job arms the poll", () => {
   }
   assert.equal(enqueuesJob("/api/status"), false, "a status write queues nothing");
   assert.equal(enqueuesJob("/api/outreach/mark-sent"), false);
+  assert.equal(enqueuesJob("/api/venture/demo/artifacts/note-1/deliver"), true);
+  assert.equal(enqueuesJob("/api/venture/demo/artifacts/note-1/retry-delivery"), true);
 });
 
 // The Fiction room shipped its three buttons without adding their routes to the arming list, so
@@ -2014,6 +2020,7 @@ test("a stopped job holds its room strip only for the linger, then the strip goe
 test("Stop is offered on queued and running work only, never on anything already settled", () => {
   assert.equal(jobStopOffered(job({ status: "queued" })), true);
   assert.equal(jobStopOffered(job({ status: "running" })), true);
+  assert.equal(jobStopOffered(job({ status: "running", kind: "venture-delivery" })), false, "a delivery closure cannot truthfully be stopped mid-side-effect");
   for (const status of ["done", "failed", "stopped"]) {
     assert.equal(jobStopOffered(job({ status })), false, status + " has already settled; the route would no-op");
   }
@@ -2054,7 +2061,7 @@ test("client mirror: the stopped branch ships in the browser script, on both job
   assert.ok(script.includes('if(j.status==="stopped") return steps.map((t,i)=>({text:t,state: i<step?"done":"pending"}));'));
   // settled, the Stop predicate, and the sweep set that matches jobIsSweepable in jobs.ts
   assert.ok(script.includes('function jobSettled(j){ return j.status==="done" || j.status==="stopped" || (j.status==="blocked" && !!j.answer); }'));
-  assert.ok(script.includes('function jobStopOffered(j){ return j.status==="queued" || j.status==="running"; }'));
+  assert.ok(script.includes('function jobStopOffered(j){ return j.kind!=="venture-delivery" && (j.status==="queued" || j.status==="running"); }'));
   assert.ok(script.includes('JOBS.some(j=>j.status==="done"||j.status==="failed"||j.status==="stopped")'));
   assert.ok(script.includes('forSlug.every(j=>j.status==="done"||j.status==="failed"||j.status==="stopped")'));
 });
