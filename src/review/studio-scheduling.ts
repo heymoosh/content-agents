@@ -11,7 +11,7 @@ import { checkReuse } from "../publish/reuse-guard.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
 import { assertProviderDispatch, resolveDeliveryIntent, resolveDeliveryPolicy, writeReadyToPaste, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { claimSlots, fmtLa } from "../publish/slots.js";
+import { claimSlots, fmtLa, laDayKey, releaseClaims } from "../publish/slots.js";
 import {
   createPostizPost,
   createPostizTransport,
@@ -344,15 +344,24 @@ async function uploadSingleMedia(folder: string, assetRelPath: string, transport
   return uploadPostizMedia(transport, { bytes: new Uint8Array(readFileSync(mediaPath)), filename: basename(mediaPath), mime });
 }
 
-async function defaultPublishPostiz(folder: string, row: QueueRow, capability: PostizCapability, policy: DeliveryPolicyDecision): Promise<unknown> {
+export async function defaultPublishPostiz(folder: string, row: QueueRow, capability: PostizCapability, policy: DeliveryPolicyDecision, transportFactory: () => PostizTransport = createPostizTransport): Promise<unknown> {
   assertProviderDispatch(folder, "postiz", policy);
   const shape = postizShape(row);
   if (!shape) throw new Error(`Postiz does not recognize destination/media for ${row.id}`);
   const { times, labels } = claimSlots({ windowKey: shape.destination, conflictPlatforms: [shape.destination], count: 1, asset: row.asset, by: "postiz" });
   if (!times[0] || times[0] === "next-free-slot") throw new Error(`Postiz requires an explicit future slot for ${shape.destination}`);
-  const transport: PostizTransport = createPostizTransport();
-  const plan = await planPostizDispatch(folder, row, capability.accountId, times[0], transport);
-  const post = await createPostizPost(transport, plan.input);
+  const transport: PostizTransport = transportFactory();
+  let plan: Awaited<ReturnType<typeof planPostizDispatch>>;
+  let post: Awaited<ReturnType<typeof createPostizPost>>;
+  try {
+    plan = await planPostizDispatch(folder, row, capability.accountId, times[0], transport);
+    post = await createPostizPost(transport, plan.input);
+  } catch (error) {
+    // The slot was claimed before the provider call. A failed create (rate limit, validation,
+    // transport) must give it back, or every retry walks the calendar forward and leaves orphans.
+    releaseClaims([{ platform: shape.destination, day: laDayKey(new Date(times[0])), time: times[0], asset: row.asset, by: "postiz" }]);
+    throw error;
+  }
   // Same bookkeeping as the Typefully/cards publishers: queue status, publish log, and the bets
   // Placed row (CTA destination included) so grading and tag-source see this placement.
   setStatus(folder, row, "published");

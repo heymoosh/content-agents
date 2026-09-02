@@ -245,3 +245,34 @@ test("Postiz video title falls back from video/title.txt to the derivative's fir
   assert.equal((plan.input.providerSettings as { title: string }).title, "First real line of the caption. #Shorts");
   rmSync(root, { recursive: true, force: true });
 });
+
+test("a failed Postiz create gives its claimed slot back so retries do not walk the calendar", async () => {
+  const { defaultPublishPostiz } = await import("./studio-scheduling.js");
+  const { readLedger } = await import("../publish/slots.js");
+  const { PostizRateLimitError } = await import("../publish/postiz.js");
+  const { resolveDeliveryPolicy } = await import("../publish/delivery-policy.js");
+  const root = mkdtempSync(join(tmpdir(), "studio-postiz-slot-"));
+  mkdirSync(join(root, "derivatives"));
+  writeFileSync(join(root, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+  writeFileSync(join(root, "source.md"), "---\ntitle: \"Essay\"\ncanonical_url: https://example.substack.com/p/essay\n---\nBody.\n");
+  writeFileSync(join(root, "derivatives", "x-1.md"), "---\nsource_lines: [1]\ncta: source\n---\nA line Muxin wrote.\n");
+  const prevLedger = process.env.CONTENT_AGENTS_TEST_LEDGER;
+  const prevAccount = process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID;
+  process.env.CONTENT_AGENTS_TEST_LEDGER = join(root, "publish-schedule.jsonl");
+  process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID = "human-inference/postiz";
+  try {
+    const policy = resolveDeliveryPolicy(root, "postiz");
+    assert.equal(policy.mode, "provider");
+    const capability = { destination: "x" as const, media: ["text" as const], accountId: "acct-1", accountLabel: "Human Inference" };
+    const transport = { async request(path: string, init?: { method?: string }) {
+      if (init?.method === "POST" && path.endsWith("/posts")) throw new PostizRateLimitError("2026-09-02T20:00:00.000Z");
+      return {};
+    } };
+    await assert.rejects(defaultPublishPostiz(root, row(), capability, policy, () => transport), /Postiz rate limit reached/);
+    assert.deepEqual(readLedger(), [], "the claimed slot is released when the create fails");
+  } finally {
+    if (prevLedger === undefined) delete process.env.CONTENT_AGENTS_TEST_LEDGER; else process.env.CONTENT_AGENTS_TEST_LEDGER = prevLedger;
+    if (prevAccount === undefined) delete process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID; else process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID = prevAccount;
+    rmSync(root, { recursive: true, force: true });
+  }
+});

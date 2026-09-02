@@ -5897,12 +5897,24 @@ async function loadOutcomes(){
 // owns each item.
 let STUDIO = null;
 let PUBLISH_RECONCILIATION_HEALTH = null;
+let PUBLISH_DRAIN_HEALTH = null;
 function publishingHealthLine(health){
   if(!health) return "Delivery checks unavailable";
   if(health.state==="failed") return "Delivery checks stopped: "+(health.error||"provider reconciliation failed");
   if(health.state==="running") return "Delivery checks running now";
   if(health.state==="ok") return "Delivery checks current"+(health.lastCompletedAt?" · "+String(health.lastCompletedAt).slice(0,16).replace("T"," "):"");
   return "Delivery checks waiting for the first run";
+}
+function publishDrainLine(health){
+  if(!health||health.state==="idle") return "";
+  if(health.state==="failed") return "Postiz queue drain stopped: "+(health.error||"unknown error");
+  if(health.waitingRows>0){
+    const when = health.resumeAt ? new Date(health.resumeAt) : null;
+    const hhmm = when && !isNaN(when) ? when.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}) : "the next check";
+    return health.waitingRows+(health.waitingRows===1?" row":" rows")+" waiting for Postiz (90 posts per hour), resumes at "+hhmm+" while Studio stays open";
+  }
+  if(health.drained>0) return "Postiz queue drained: "+health.drained+" waiting "+(health.drained===1?"row":"rows")+" scheduled";
+  return "";
 }
 function studioDateLine(){
   const now = new Date();
@@ -5932,6 +5944,7 @@ function renderStudio(){
     '<div style="font:400 30px/1.25 Georgia,serif;margin:0 0 22px;">Needs you today</div>'+
     (rows || '<div class="empty" style="padding:20px 0">Nothing needs you right now.</div>')+
     '<div id="publishingReconciliationHealth" class="src" style="margin-top:18px">'+esc(publishingHealthLine(PUBLISH_RECONCILIATION_HEALTH))+'</div>'+
+    (publishDrainLine(PUBLISH_DRAIN_HEALTH) ? '<div id="publishingDrainHealth" class="src" style="margin-top:6px">'+esc(publishDrainLine(PUBLISH_DRAIN_HEALTH))+'</div>' : '')+
     closing;
   renderTeamRail();
   document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
@@ -5944,13 +5957,15 @@ function renderStudio(){
 }
 async function loadStudio(){
   try {
-    const [r, healthResponse] = await Promise.all([
+    const [r, healthResponse, drainResponse] = await Promise.all([
       fetch("/api/studio"),
       fetch("/api/publishing/reconciliation-health").catch(()=>null),
+      fetch("/api/publishing/drain-health").catch(()=>null),
     ]);
     if(!r.ok) throw new Error("studio "+r.status);
     STUDIO = await r.json();
     PUBLISH_RECONCILIATION_HEALTH = healthResponse&&healthResponse.ok ? await healthResponse.json() : null;
+    PUBLISH_DRAIN_HEALTH = drainResponse&&drainResponse.ok ? await drainResponse.json() : null;
     renderStudio();
     connectionRecovered();
   } catch(e) {

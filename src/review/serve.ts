@@ -118,6 +118,7 @@ import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, defaul
 import { saveCutBody, addCutComment } from "./rows.js";
 import { isBrandId, type BrandId } from "../identity/brand.js";
 import { providerReconciliationHealth, startProviderReconciliationLoop } from "./provider-reconciliation-runner.js";
+import { publishDrainHealth, startPublishDrainLoop } from "./publish-drain.js";
 import { readLearningEvaluations } from "../venture/learning-evaluation.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
@@ -1066,6 +1067,10 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     }
     if (req.method === "GET" && url.pathname === "/api/engines") {
       json(res, 200, { engines: availableEngines(), default: "claude" });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/publishing/drain-health") {
+      json(res, 200, publishDrainHealth());
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/publishing/reconciliation-health") {
@@ -2275,6 +2280,7 @@ export function startReviewServer(): void {
   // widening the default.
   server.listen(PORT, "127.0.0.1", () => {
     if (!FIXTURES_ON) startProviderReconciliationLoop();
+    if (!FIXTURES_ON) startPublishDrainLoop();
     if (FIXTURES_ON) {
       console.log(`\n  ⚠ FIXTURE MODE (${FIXTURE_ENV_VAR}=1) — the desk can serve fake data and every write is refused.`);
     }

@@ -117,6 +117,43 @@ function normalizePost(value: unknown): PostizPost {
 }
 
 /** Build a transport for the configured self-hosted instance. No module-level network calls. */
+export const POSTIZ_RATE_LIMIT_FALLBACK_MS = 60 * 60_000;
+
+/** Resume time from `Retry-After` (seconds or HTTP date) or `X-RateLimit-Reset` (epoch s/ms); one hour when absent. */
+export function rateLimitRetryAt(headers: Headers | Record<string, string> | undefined, now: Date = new Date()): string {
+  const get = (name: string): string | null =>
+    headers instanceof Headers ? headers.get(name) : (headers ? (headers[name] ?? headers[name.toLowerCase()] ?? null) : null);
+  const retryAfter = get("Retry-After")?.trim();
+  if (retryAfter) {
+    if (/^\d+$/.test(retryAfter)) return new Date(now.getTime() + Number(retryAfter) * 1000).toISOString();
+    const at = Date.parse(retryAfter);
+    if (!Number.isNaN(at) && at > now.getTime()) return new Date(at).toISOString();
+  }
+  const reset = get("X-RateLimit-Reset")?.trim();
+  if (reset && /^\d+$/.test(reset)) {
+    const n = Number(reset);
+    const ms = n > 1e12 ? n : n > 1e9 ? n * 1000 : now.getTime() + n * 1000;
+    if (ms > now.getTime()) return new Date(ms).toISOString();
+  }
+  return new Date(now.getTime() + POSTIZ_RATE_LIMIT_FALLBACK_MS).toISOString();
+}
+
+export class PostizRateLimitError extends Error {
+  readonly retryAt: string;
+  constructor(retryAt: string) {
+    super(`Postiz rate limit reached (429): the create-post endpoint allows 90 requests per hour across the whole instance, and each schedule or move counts as one. Nothing was created. Studio resumes the waiting rows automatically after ${retryAt}.`);
+    this.name = "PostizRateLimitError";
+    this.retryAt = retryAt;
+  }
+}
+
+/** The resume time carried by a flattened rate-limit message, or null when the message is something else. */
+export function postizRateLimitRetryAt(message: string | null | undefined): string | null {
+  if (!message || !/Postiz rate limit reached/.test(message)) return null;
+  const m = /after (\d{4}-\d{2}-\d{2}T[0-9:.]+Z)/.exec(message);
+  return m ? m[1] : null;
+}
+
 export function createPostizTransport(env: NodeJS.ProcessEnv = process.env, fetchImpl: typeof fetch = fetch): PostizTransport {
   const base = env.POSTIZ_BASE_URL?.trim().replace(/\/$/, "");
   const key = env.POSTIZ_API_KEY?.trim();
@@ -132,11 +169,13 @@ export function createPostizTransport(env: NodeJS.ProcessEnv = process.env, fetc
       });
       if (!response.ok) {
         const body = (await response.text().catch(() => "")).slice(0, 300);
-        if (response.status === 429) {
+        if (response.status === 429 && (init.method ?? "GET") === "POST" && /\/public\/v1\/posts$/.test(path)) {
           // Postiz throttles post creation to 90 requests per hour, one global counter for the whole
           // self-hosted instance (docs.postiz.com/public-api, "Rate Limits"). Every schedule AND every
-          // reschedule is one create, so a large batch move can hit it. Nothing partial was written.
-          throw new Error(`Postiz rate limit reached (${response.status}): the create-post endpoint allows 90 requests per hour across the whole instance, and each schedule or move counts as one. Wait for the hour to roll over, then retry the rows that were not moved.`);
+          // reschedule is one create, so a large batch move can hit it. The throttler guard runs
+          // before the controller, so nothing was created. The resume time rides in the message so
+          // callers that flatten errors to strings (scheduleApproved) can still read it back.
+          throw new PostizRateLimitError(rateLimitRetryAt(response.headers));
         }
         throw new Error(`Postiz ${init.method ?? "GET"} ${path} failed (${response.status})${body ? `: ${body}` : ""}`);
       }

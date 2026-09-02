@@ -58,6 +58,19 @@ const row: QueueRow = { id: "x-1", platform: "x", format: "text", asset: "deriva
 const execFileAsync = promisify(execFile);
 
 describe("durable publishing status", () => {
+  test("a Postiz rate limit records failed with the resume time and stays retry-eligible", async () => {
+    const path = ledger();
+    const folder = contentFolder();
+    const message = "Postiz rate limit reached (429): the create-post endpoint allows 90 requests per hour across the whole instance, and each schedule or move counts as one. Nothing was created. Studio resumes the waiting rows automatically after 2026-09-02T19:10:00.000Z.";
+    const result = await scheduleApprovedOnce(folder, "piece", row, async () => ({ scheduled: null, scheduleError: message }), path);
+    assert.equal(result.publishing.state, "failed");
+    assert.match(result.publishing.error ?? "", /after 2026-09-02T19:10:00.000Z/);
+    assert.equal(publishingRetryBlock("piece", { ...row, status: "approve" }, path), null);
+    const second = await scheduleApprovedOnce(folder, "piece", { ...row, status: "approve" }, async () => ({ scheduled: { draftId: "p-1", when: "later", plannedFor: "2026-09-10T16:00:00.000Z" }, scheduleError: null }), path);
+    assert.notEqual(second.publishing.state, "failed");
+    assert.equal(second.scheduleError, null);
+  });
+
   test("records provider, reference, planned time, and prevents a repeat schedule", async () => {
     const path = ledger(); let calls = 0;
     const folder = contentFolder();

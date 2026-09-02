@@ -6,6 +6,7 @@ import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
 import type { QueueRow } from "../publish/queue.js";
 import { scheduleApproved, scheduleKind, selectConfiguredProvider, type ScheduleKind, type SchedulerDeps } from "./studio-scheduling.js";
+import { postizRateLimitRetryAt } from "../publish/postiz.js";
 import { resolveDeliveryPolicy, type DeliveryBrand, type DeliveryMode, type DeliveryProvider as PolicyDeliveryProvider } from "../publish/delivery-policy.js";
 import {
   newDeliveryEvent,
@@ -346,7 +347,11 @@ export async function scheduleApprovedOnce(
     const status: PublishingStatus = result.scheduleError
       ? {
           slug, rowId: row.id, provider,
-          state: result.scheduleError.startsWith("blocked by reuse guard") ? "blocked" : "uncertain",
+          // A Postiz 429 comes from the throttler guard ahead of the controller: nothing was created,
+          // so `failed` is truthful and keeps the row retry-eligible for the background drainer.
+          // Any other failure stays `uncertain` because the provider may have accepted the call.
+          state: result.scheduleError.startsWith("blocked by reuse guard") ? "blocked"
+            : postizRateLimitRetryAt(result.scheduleError) ? "failed" : "uncertain",
           at: new Date().toISOString(), error: result.scheduleError,
           ...audit,
         }

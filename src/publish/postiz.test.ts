@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { cancelPostizPost, createPostizPost, defaultProviderSettings, fetchPostizCapabilities, readPostizPost, reconcilePostizPost, reschedulePostizPost, resolveConfiguredPostizCapability, selectDeliveryRoute, supportsPostiz, createPostizTransport, updatePostizPost, uploadPostizMedia, type PostizTransport } from "./postiz.js";
+import { cancelPostizPost, createPostizPost, defaultProviderSettings, fetchPostizCapabilities, readPostizPost, reconcilePostizPost, reschedulePostizPost, resolveConfiguredPostizCapability, selectDeliveryRoute, supportsPostiz, createPostizTransport, updatePostizPost, uploadPostizMedia, type PostizTransport, rateLimitRetryAt, PostizRateLimitError, postizRateLimitRetryAt } from "./postiz.js";
 import { assertLiveCanaryGate, runPostizLifecycleCanary } from "./postiz-canary.js";
 import { runCanaryMatrix } from "./canary-matrix.js";
 
@@ -360,5 +360,21 @@ describe("attended publish canary matrix", () => {
 test("transport turns a 429 into an actionable rate-limit error", async () => {
   const fetchImpl = (async () => new Response(JSON.stringify({ statusCode: 429, message: "ThrottlerException: Too Many Requests" }), { status: 429 })) as unknown as typeof fetch;
   const transport = createPostizTransport({ POSTIZ_BASE_URL: "http://postiz.test", POSTIZ_API_KEY: "k" }, fetchImpl);
-  await assert.rejects(transport.request("/public/v1/posts", { method: "POST", body: "{}" }), /90 requests per hour.*each schedule or move counts as one/);
+  await assert.rejects(transport.request("/public/v1/posts", { method: "POST", body: "{}" }), /90 requests per hour.*each schedule or move counts as one.*resumes the waiting rows automatically after \d{4}-/);
+});
+
+test("a 429 carries the provider's resume time when it sends one, else one hour", async () => {
+  const now = new Date("2026-09-02T18:10:00.000Z");
+  assert.equal(rateLimitRetryAt({ "Retry-After": "120" }, now), "2026-09-02T18:12:00.000Z");
+  assert.equal(rateLimitRetryAt({ "X-RateLimit-Reset": String(Math.floor(Date.parse("2026-09-02T18:30:00Z") / 1000)) }, now), "2026-09-02T18:30:00.000Z");
+  assert.equal(rateLimitRetryAt(undefined, now), "2026-09-02T19:10:00.000Z");
+  const fetchImpl = (async () => new Response("{}", { status: 429, headers: { "Retry-After": "60" } })) as unknown as typeof fetch;
+  const transport = createPostizTransport({ POSTIZ_BASE_URL: "http://postiz.test", POSTIZ_API_KEY: "k" }, fetchImpl);
+  let caught: unknown;
+  try { await transport.request("/public/v1/posts", { method: "POST", body: "{}" }); } catch (e) { caught = e; }
+  assert.ok(caught instanceof PostizRateLimitError);
+  assert.equal(postizRateLimitRetryAt(caught.message), caught.retryAt);
+  assert.equal(postizRateLimitRetryAt("Postiz POST /x failed (500)"), null);
+  // Only the create endpoint is throttled; a 429 anywhere else stays an ordinary transport error.
+  await assert.rejects(transport.request("/public/v1/upload", { method: "POST", body: "{}" }), /Postiz POST \/public\/v1\/upload failed \(429\)/);
 });
