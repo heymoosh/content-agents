@@ -1,10 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
+import { assertCharlesDraftPolicy, captureCharlesDraftState, restoreCharlesDraftState, validateCharlesDraftMutation } from "./charles-jobs.js";
+import * as charlesJobs from "./charles-jobs.js";
 
 async function waitForJobStatus(
   job: { status: string },
@@ -128,6 +130,99 @@ test("charlesDraftPrompt's reply mode tells Claude to fetch the real link, not i
   assert.match(p, /fetch it first, never invent/);
   assert.match(p, /https:\/\/example\.com\/post/);
   assert.match(p, /\(none yet\)/);
+});
+
+test("Charles draft output refuses the house-rule dash characters", () => {
+  assert.doesNotThrow(() => assertCharlesDraftPolicy("Quite. Everything is perfectly stable."));
+  for (const body of ["Everything is stable — do stop asking.", "Everything is stable – quite."]) {
+    assert.throws(
+      () => assertCharlesDraftPolicy(body),
+      /em dash or en dash/i,
+    );
+  }
+});
+
+test("Charles draft mutation requires one pending mode-specific row and no other tree changes", () => {
+  const root = mkdtempSync(join(tmpdir(), "charles-draft-transaction-test-"));
+  mkdirSync(join(root, "config"), { recursive: true });
+  mkdirSync(join(root, "posts", "essays"), { recursive: true });
+  writeFileSync(join(root, "config", "persona.yaml"), "identity: Charles\n");
+  writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n");
+  const snapshot = captureCharlesDraftState(root);
+  try {
+    writeFileSync(join(root, "posts", "essays", "one.md"), "---\ntype: essay\n---\n\nClean prose.\n");
+    mkdirSync(join(root, "unexpected-empty"));
+    writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n| one | essay | posts/essays/one.md | pending | generated |\n");
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /director/i,
+    );
+    rmSync(join(root, "unexpected-empty"), { recursive: true, force: true });
+
+    chmodSync(join(root, "config", "persona.yaml"), 0o600);
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /mode|permission/i,
+    );
+    chmodSync(join(root, "config", "persona.yaml"), (snapshot as any).modes?.get("config/persona.yaml") ?? 0o644);
+
+    writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n| one | essay | posts/essays/one.md | approve | generated |\n");
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /pending/i,
+    );
+
+    writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n| one | essay | posts/essays/one.md | pending | generated — note |\n");
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /em dash or en dash/i,
+    );
+
+    writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n| one | essay | posts/essays/one.md | pending | generated |\n| two | essay | posts/essays/two.md | pending | generated |\n");
+    writeFileSync(join(root, "posts", "essays", "two.md"), "---\ntype: essay\n---\n\nAlso clean.\n");
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /exactly one/i,
+    );
+
+    writeFileSync(join(root, "config", "persona.yaml"), "tampered\n");
+    assert.throws(() => (charlesJobs as any).assertCharlesStateUnchanged(snapshot, captureCharlesDraftState(root)), /changed while the draft was running/i);
+    restoreCharlesDraftState(snapshot, root);
+    assert.equal(readFileSync(join(root, "config", "persona.yaml"), "utf8"), "identity: Charles\n");
+    assert.equal(readFileSync(join(root, "review-queue.md"), "utf8"), "| id | type | file | status | notes |\n");
+    assert.equal(existsSync(join(root, "posts", "essays", "one.md")), false);
+    assert.equal(existsSync(join(root, "posts", "essays", "two.md")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Charles managed staging always removes its workspace when the task throws", async () => {
+  let stagedRoot = "";
+  await assert.rejects(
+    (charlesJobs as any).withCharlesDraftStage(async (stage: { root: string; charlesRoot: string }) => {
+      stagedRoot = stage.root;
+      assert.equal(existsSync(join(stage.charlesRoot, "config", "persona.yaml")), true);
+      throw new Error("synthetic staged failure");
+    }),
+    /synthetic staged failure/,
+  );
+  assert.ok(stagedRoot);
+  assert.equal(existsSync(stagedRoot), false);
+});
+
+test("Charles atomic queue replacement preserves a non-default existing mode", () => {
+  const root = mkdtempSync(join(tmpdir(), "charles-queue-mode-test-"));
+  const path = join(root, "review-queue.md");
+  writeFileSync(path, "before\n");
+  chmodSync(path, 0o600);
+  try {
+    (charlesJobs as any).writeCharlesQueueAtomically(path, Buffer.from("after\n"), 0o600);
+    assert.equal(readFileSync(path, "utf8"), "after\n");
+    assert.equal(statSync(path).mode & 0o7777, 0o600);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("enqueueCharlesDraft refuses an unknown mode and a reply with no link, before spawning anything", async () => {

@@ -65,6 +65,7 @@ export const GROK_FINAL_TEXT_SYSTEM_PROMPT = "You are a bounded text transformat
 
 export interface EngineSpawnOptions {
   timeoutMs: number;
+  cwd?: string;
   permissionMode?: string | null;
   model?: string;
   tools?: string;

@@ -1151,7 +1151,7 @@ export function runCommandSpawn(
   job: Job,
   command: string,
   args: string[],
-  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv; input?: string }
+  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv; input?: string; cwd?: string }
 ): Promise<CommandSpawnResult> {
   // A stopped job's future spawns are stillborn. A task job stopped between two spawns has no
   // child to signal, so stopJob settles it and hands the lane on immediately — without this guard
@@ -1171,7 +1171,7 @@ export function runCommandSpawn(
   };
   return new Promise((resolve) => {
     const child = spawn(command, args, {
-      cwd: repoRoot,
+      cwd: opts.cwd ?? repoRoot,
       timeout: opts.timeoutMs,
       killSignal: "SIGTERM",
       // Explicitly close the child's stdin (rather than leaving Node's default open, unwritten
@@ -1229,6 +1229,7 @@ export async function runAgentSpawn(
       timeoutMs: opts.timeoutMs,
       env: { ...opts.env, CONTENT_AGENT_ENGINE: engine },
       input: built.input,
+      cwd: opts.cwd,
     });
     logCost({ step: `agent:${engine}`, detail: job.label, engine });
     if (!outputFile) return result;
@@ -1264,7 +1265,7 @@ export function buildClaudeSpawnArgs(
 export function runClaudeSpawn(
   job: Job,
   prompt: string,
-  opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv }
+  opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv; cwd?: string }
 ): Promise<CommandSpawnResult> {
   // Kept as a compatibility wrapper for existing callers. The job's selected engine is what
   // actually runs, so older call sites keep their name while picker-backed jobs can use Grok or
