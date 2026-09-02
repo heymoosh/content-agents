@@ -15,7 +15,9 @@ reconciliation, one locked operational data root, the gated Postiz-first/Typeful
 matrix, and reviewed Signals apply/rollback. Operational acceptance is still open because the
 authenticated Postiz-first/Typefully-fallback lifecycle matrix has not run. A read-only discovery
 attempt on 2026-08-30 reached the configured `localhost:4007` address but the Postiz instance was
-not running, so it changed no provider state and proved no live capability.
+not running, so it changed no provider state and proved no live capability. A 2026-09-01 retry
+failed before networking because the current parent-repository `.env` no longer defines
+`POSTIZ_BASE_URL` and `POSTIZ_API_KEY`; no account identifier or provider state was read or changed.
 **Generation review:** Muxin approved the treatment, editor, voice, CTA, and distribution behavior
 shown in `docs/reviews/content-studio-phase1-generation-review.html`. The artifact contains eight Luna and eight Grok
 source-grounded treatments of Muxin's essay plus eight before/after examples from a blind Luna
@@ -47,9 +49,10 @@ is evaluated locally; HunyuanVideo 1.5 is not a fit for this Apple-Silicon machi
 **Verification status:** the subscription-backed Grok prose adapter completed a live nonempty
 canary at zero reported cost; provider-policy, Studio scheduling, Content capture, all seven media
 stage contracts, durable runtime state, provider reconciliation, and Signals apply/rollback are
-covered locally. The Postiz adapter and attended canary harness exist, but the configured local
-instance was offline during the latest read-only discovery attempt. Publishing remains live-unverified
-until Postiz capability discovery and the attended create/read/cancel/reconcile matrix pass.
+covered locally. The Postiz adapter and attended canary harness exist, but the latest read-only
+discovery attempt found the required Postiz environment configuration absent before any network
+request. Publishing remains live-unverified until the configuration is restored, capability
+discovery passes, and the attended create/read/cancel/reconcile matrix passes.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
 
@@ -118,7 +121,8 @@ passed, proving login readiness but not create/list/cancel or live delivery.
 The system is **not operationally verified end to end**. The largest unresolved boundaries are:
 
 1. The authenticated Postiz-first/Typefully-fallback create/read/cancel/reconcile matrix has not
-   run. The configured Postiz instance was offline at the latest read-only discovery attempt.
+   run. The configured Postiz instance was offline on 2026-08-30; the 2026-09-01 read-only retry
+   stopped before networking because the current Postiz environment configuration was absent.
 2. Provider reconciliation records explicit `uncertain` evidence instead of guessing when an API
    cannot prove a terminal state. Typefully and YouTube list absence is not terminal proof, and
    Substack still needs provider or reviewed human evidence.
@@ -170,7 +174,7 @@ Postiz does not support the required destination or capability.
 | YouTube Shorts | Postiz when live discovery advertises YouTube/video; otherwise the explicit YouTube Data API exception, private until `publishAt` | Capability-first selection implemented; providers unverified | Discover Postiz first. If unsupported, verify OAuth upload, scheduled-public transition, final URL, and terminal reconciliation for YouTube. |
 | Substack Notes | Constrained saved-session browser automation | Provider unverified | Run an explicitly approved canary; maintain selectors; add independent live confirmation. Full essays remain manual. |
 | Community/manual destinations | `ready-to-paste/` | Intentionally manual | Surface the handoff and status in the Studio consistently. |
-| Postiz | Self-hosted Postiz | **Implemented and deterministic-tested; provider unverified** | The adapter, environment contract, dynamic capability/account registry, Studio scheduling path, stable provider IDs, create/read/cancel/reconcile lifecycle, recovery ledger, gated canary, and fallback matrix exist. The configured local instance was offline at the latest discovery attempt; start it and pass the attended matrix before changing the working fallback. |
+| Postiz | Self-hosted Postiz | **Implemented and deterministic-tested; provider unverified** | The adapter, environment contract, dynamic capability/account registry, Studio scheduling path, stable provider IDs, create/read/cancel/reconcile lifecycle, recovery ledger, gated canary, and fallback matrix exist. The 2026-08-30 configured instance was offline; on 2026-09-01 the current parent `.env` lacked the required base URL and API key before discovery could make a request. Restore configuration, start the instance, and pass the attended matrix before changing the working fallback. |
 | Outreach email/Gmail | Send a locked email from the Content Agents GUI through the exact approved Gmail account after an explicit confirmation; retain manual/external sending for unsupported channels. | **Implemented and deterministic-tested; provider unverified.** The GUI exposes Gmail only when the matching OAuth configuration is present, validates the authenticated profile as `muxin.li.pro@gmail.com`, writes a body-free append-only delivery ledger, prevents blind retries, reconciles uncertain sends by deterministic RFC Message-ID against Sent mail, and advances the follow-up clock only after confirmed delivery. The by-hand fallback remains available. | Run one explicitly approved authenticated send/reconcile canary. Recipient address and subject are explicit send-time envelope fields; the locked reviewed artifact remains the message body and channel. |
 
 ### Scheduler and publishing status
@@ -317,8 +321,9 @@ Implemented in the PR #412 change set, with deterministic evidence:
    refusal. Pass E separately inventories only authenticated live CLI execution as nondeterministic.
 
 One bounded authenticated Codex CLI generation canary passed in a throwaway repository copy.
-Provider credentials and non-secret provider-account bindings are configured locally, but the
-configured Postiz service was offline, so no authenticated provider lifecycle canary ran. Before
+Some provider credentials and non-secret provider-account bindings are configured locally, but
+the current parent `.env` does not contain the required Postiz base URL and API key, so no
+authenticated Postiz lifecycle canary ran. Before
 operationally broadening delivery, start Postiz and explicitly gate those provider canaries. Do not
 treat a working-tree diff or deterministic test as a PR, merge, or live delivery proof. The
 read-only `publish:substack -- --check` probe did confirm
@@ -344,11 +349,13 @@ the current Phase 1 completion patch:
 7. Signals uses separate propose, review, apply, recovery, and rollback events for exact allowlisted
    configuration deltas.
 
-**Remaining Phase 1 acceptance gate:** start the configured Postiz instance, pass read-only live
-capability discovery, then run the explicitly approved attended Postiz-first/Typefully-fallback
-create/read/cancel/reconcile matrix. The 2026-08-30 discovery attempt failed closed with
-`ECONNREFUSED` at `localhost:4007`; it created or changed nothing. Do not label Phase 1 live verified
-until the matrix finishes with terminal cleanup for every created canary object.
+**Remaining Phase 1 acceptance gate:** restore the required Postiz environment configuration,
+start the instance, pass read-only live capability discovery, then run the explicitly approved
+attended Postiz-first/Typefully-fallback create/read/cancel/reconcile matrix. The 2026-08-30
+discovery attempt failed closed with `ECONNREFUSED` at `localhost:4007`; a 2026-09-01 retry found
+the current configuration absent and failed before networking. Neither attempt created or changed
+provider state. Do not label Phase 1 live verified until the matrix finishes with terminal cleanup
+for every created canary object.
 
 ### P2: complete product depth
 
