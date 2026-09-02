@@ -59,6 +59,7 @@ const PROMPT_BEFORE_DIRECTION = [
   "- Do not compare the lead with unnamed groups or claim what most, many, few, all, or no teams, companies, people, or founders do. Do not label their behavior rare, unusual, typical, or the norm. Use such a claim only when that complete claim is explicitly present in the evidence above or Muxin's direction.",
   "- Never say Muxin read, saw, liked, loved, enjoyed, followed, or worked on something unless Muxin's typed direction explicitly says she did. Evidence about the lead does not prove Muxin's actions or interests. Open directly with the lead's evidenced practice (for example, \"You test...\") rather than an encounter claim such as \"I saw...\" or \"I read...\".",
   "- Follow config/voice.yaml: Muxin's plain, direct voice. No em dashes anywhere (use periods, commas, colons, or parentheses instead). No AI tells (\"here's the thing\", \"I hope this finds you well\", hedging, thought-leader cadence).",
+  "- Do not use prose colons in this short message. Avoid antithetical AI cadence such as \"it's not about X, it's about Y\" or \"This isn't X. It's Y.\"",
   "- Short. A real person writing a real note, not a marketing email. No hashtags, no emoji.",
   "- End with a low-pressure, specific ask (a short call, a reply), not a hard sell.",
   "- Print ONLY the message body. Nothing else.",
@@ -182,6 +183,8 @@ describe("buildDraftPrompt", () => {
     const prompt = buildDraftPrompt(baseOpts);
     assert.ok(prompt.includes("config/voice.yaml"));
     assert.ok(/no em dashes/i.test(prompt));
+    assert.match(prompt, /do not use prose colons in this short message/i);
+    assert.match(prompt, /avoid antithetical AI cadence/i);
   });
 
   test("instructs printing only the message body, nothing else", () => {
@@ -537,6 +540,26 @@ describe("runDraft guard clauses (no subprocess reached)", () => {
       assert.equal(readFileSync(join(dir, "review-queue.md"), "utf8"), queue);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("hard config/voice.yaml violations fail before a message or queue write", async () => {
+    for (const body of [
+      "Here’s the thing. You test assumptions before launch.",
+      "The point: this starts lowercase.",
+      "The point isn't defending the plan, it's finding the break.",
+      "Bad dash — here.",
+    ]) {
+      const dir = makeLeadDir(leadFixture());
+      const queue = `| id | platform | format | asset | native | brand | cta | status | notes |\n|---|---|---|---|---|---|---|---|---|\n`;
+      writeFileSync(join(dir, "review-queue.md"), queue);
+      try {
+        await assert.rejects(runDraft(dir, { callClaude: async () => body }), /voice/i);
+        assert.equal(existsSync(join(dir, "messages")), false);
+        assert.equal(readFileSync(join(dir, "review-queue.md"), "utf8"), queue);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     }
   });
 });

@@ -8,6 +8,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { logCost } from "../util/cost-log.js";
 import { appendRow } from "../publish/queue.js";
+import { muxinVoiceFindings } from "../voice/configured.js";
 import { parseEvidence, type EvidenceItem } from "./qualify.js";
 
 // outreach:draft: stage 6 DRAFT (docs/outreach-engine-plan.md §5/§6 Phase 2). Composes ONE
@@ -197,6 +198,7 @@ export function buildDraftPrompt(opts: {
         ]
       : []),
     `- Follow config/voice.yaml: Muxin's plain, direct voice. No em dashes anywhere (use periods, commas, colons, or parentheses instead). No AI tells ("here's the thing", "I hope this finds you well", hedging, thought-leader cadence).`,
+    `- Do not use prose colons in this short message. Avoid antithetical AI cadence such as "it's not about X, it's about Y" or "This isn't X. It's Y."`,
     `- Short. A real person writing a real note, not a marketing email. No hashtags, no emoji.`,
     `- End with a low-pressure, specific ask (a short call, a reply), not a hard sell.`,
     `- Print ONLY the message body. Nothing else.`,
@@ -319,6 +321,10 @@ export async function runDraft(
   const unauthorized = findUnauthorizedOutreachClaims(messageBody, selected, opts.direction);
   if (unauthorized.length) {
     throw new Error(`refusing to write draft: unauthorized outreach claim(s): ${unauthorized.map((finding) => `"${finding.span}"`).join(", ")}`);
+  }
+  const voiceFindings = muxinVoiceFindings(messageBody);
+  if (voiceFindings.length) {
+    throw new Error(`refusing to write draft: config/voice.yaml violation(s): ${voiceFindings.join(", ")}`);
   }
 
   const messagesDir = join(absDir, "messages");

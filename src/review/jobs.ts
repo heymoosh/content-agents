@@ -31,6 +31,7 @@ import { configuredMediaPlan, configuredMediaStage, type ConfiguredMediaPlan, ty
 import { acquireJobExecutionLease, readDurableJobs, recoverAbandonedJobs, removeDurableJobs, upsertDurableJob } from "../runtime/durable-jobs.js";
 import { processAlive, type FileLease } from "../runtime/file-lock.js";
 import { migrateLegacyDataDirectory } from "../runtime/data-root.js";
+import { muxinVoiceFindings } from "../voice/configured.js";
 import {
   createFictionJobs,
   fictionDraftPrompt as fictionDraftPromptImpl,
@@ -340,27 +341,6 @@ export function configuredSourceSegments(folder: string, refs: readonly (number 
   return refs.map((ref) => ({ source_line: ref, text: extractSourceLines(folder, [ref]) }));
 }
 
-function configuredVoiceFindings(body: string): string[] {
-  const findings: string[] = [];
-  if (/[—–]/.test(body)) findings.push("contains an em dash or en dash");
-  const tells: readonly RegExp[] = [
-    /\bhere(?:'|’)?s the (?:thing|kicker)\b/i,
-    /\bthe thing is\b/i,
-    /\bit(?:'|’)?s not just\b/i,
-    /\bit(?:'|’)?s not about .{0,80}\bit(?:'|’)?s about\b/i,
-    /\b(?:isn(?:'|’)?t|more than) just\b/i,
-    /\blet(?:'|’)?s (?:dive in|unpack|break it down)\b/i,
-    /\b(?:in a world where|in an age of|in today(?:'|’)?s)\b/i,
-    /\b(?:at the end of the day|the reality is|the truth is|make no mistake|it(?:'|’)?s worth noting|that said|needless to say)\b/i,
-    /\b(?:delve|supercharge|game-changer|tapestry|testament|ever-evolving|robust|seamless|realm|landscape|foster|harness|elevate|empower|paradigm|journey)\b/i,
-    /\b(?:navigate the complexities|unlock(?:ing|ed|s)?|at scale)\b/i,
-  ];
-  if (tells.some((pattern) => pattern.test(body))) findings.push("contains an AI tell banned by config/voice.yaml");
-  if (/\[\^[^\]]+\]|^\[\^[^\]]+\]:/m.test(body)) findings.push("contains a markdown footnote marker");
-  if (/:\s+[a-z]/.test(body)) findings.push("starts a word lowercase after a colon");
-  return findings;
-}
-
 function configuredTreatmentInstruction(treatment: string): string {
   const instructions: Readonly<Record<string, string>> = {
     cta: "Build one compact point that earns a concrete invitation to read the essay.",
@@ -445,7 +425,7 @@ export function parseConfiguredVariantBodies(output: string, variants: readonly 
     if (variant.treatments.includes("belief-shift")) {
       assertBeliefShiftBody(body, configuredSourceSegments(folder, sourceLines), `selected engine belief-shift variant ${id}`);
     }
-    const voiceFindings = configuredVoiceFindings(body);
+    const voiceFindings = muxinVoiceFindings(body);
     if (voiceFindings.length) throw new Error(`selected engine returned treated variant ${id} with source_lines [${sourceLines.join(", ")}] that failed the voice check: ${voiceFindings.join("; ")}`);
     const normalized = body.trim().replace(/\s+/g, " ").toLowerCase();
     if (normalizedBodies.has(normalized)) throw new Error("selected engine returned a duplicate treated body");
@@ -503,7 +483,7 @@ export function parseConfiguredEditorBodies(
     const variant = variants.find((candidate) => candidate.identity.id === id)!;
     const limit = CONFIGURED_PLATFORM_LIMITS[variant.platform];
     if (limit && body.length > limit) throw new Error(`selected editor exceeded the ${variant.platform} character limit`);
-    const voiceFindings = configuredVoiceFindings(body);
+    const voiceFindings = muxinVoiceFindings(body);
     if (voiceFindings.length) throw new Error(`selected editor returned variant ${id} that failed the voice check: ${voiceFindings.join("; ")}`);
     if (variant.treatments.includes("belief-shift") && body !== original.body) {
       throw new Error(`selected editor must preserve belief-shift variant ${id} byte-for-byte`);
@@ -606,7 +586,7 @@ export function parseVentureConfiguredBodies(output: string, variants: readonly 
     if (keys.length !== 2 || !keys.includes("id") || !keys.includes("body") || !expected.has(id) || bodies.has(id) || !body) {
       throw new Error("selected engine returned a missing, duplicate, unknown, empty, or malformed Venture configured variant");
     }
-    const voiceFindings = configuredVoiceFindings(body);
+    const voiceFindings = muxinVoiceFindings(body);
     if (voiceFindings.length) throw new Error(`selected engine returned Venture variant ${id} that failed the voice check: ${voiceFindings.join("; ")}`);
     bodies.set(id, { body, sourceLines: [] });
   }
