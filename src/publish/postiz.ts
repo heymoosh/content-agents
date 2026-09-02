@@ -10,9 +10,18 @@ export interface PostizCapability {
   localMediaUpload?: boolean;
 }
 
+export interface PostizUnrecognizedIntegration {
+  identifier: string;
+  accountId: string;
+  accountLabel: string;
+  reason: "disabled" | "unknown-identifier";
+}
+
 export interface PostizCapabilityRegistry {
   fetchedAt: string;
   capabilities: readonly PostizCapability[];
+  /** Discovered rows that were deliberately not mapped to a destination; surfaced, never routed. */
+  unrecognized?: readonly PostizUnrecognizedIntegration[];
 }
 
 export type DeliveryRoute = "postiz" | "typefully" | "postpeer" | "youtube" | "substack" | "unsupported";
@@ -82,7 +91,9 @@ export function createPostizTransport(env: NodeJS.ProcessEnv = process.env, fetc
     async request(path, init = {}) {
       const response = await fetchImpl(`${base}${path}`, {
         ...init,
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...init.headers },
+        // Postiz's public-API middleware passes the raw Authorization header value to its API-key lookup
+        // (public.auth.middleware.ts); a `Bearer ` prefix is rejected as an invalid key.
+        headers: { Authorization: key, "Content-Type": "application/json", ...init.headers },
       });
       if (!response.ok) throw new Error(`Postiz ${init.method ?? "GET"} ${path} failed (${response.status})`);
       if (response.status === 204) return {};
@@ -91,28 +102,53 @@ export function createPostizTransport(env: NodeJS.ProcessEnv = process.env, fetc
   };
 }
 
-/** The connected instance is authoritative: no destination is assumed supported. */
+const KNOWN_DESTINATIONS: readonly PostizDestination[] = ["x", "linkedin", "bluesky", "mastodon", "threads", "instagram", "tiktok", "youtube", "substack"];
+
+function asDestination(value: string): PostizDestination | null {
+  return (KNOWN_DESTINATIONS as readonly string[]).includes(value) ? (value as PostizDestination) : null;
+}
+
+/**
+ * The connected instance is authoritative: no destination is assumed supported.
+ *
+ * The self-hosted public endpoint (`GET /public/v1/integrations`, public.integrations.controller.ts)
+ * returns a bare array of `{ id, name, identifier, picture, disabled, profile, customer }` and no
+ * media capability list. When an explicit `media`/`capabilities` array is present it is honored as
+ * before. When it is absent, an enabled integration whose `identifier` exactly matches a known
+ * destination is registered as text-only: text is the baseline every connected provider accepts,
+ * and the public API documents no upload path, so image/video stay unsupported until a live
+ * upload lifecycle is verified. Disabled rows are dropped and unrecognized identifiers (for
+ * example `linkedin-page`, `facebook`) are recorded, never mapped to a destination.
+ */
 export async function fetchPostizCapabilities(transport: PostizTransport, now = new Date()): Promise<PostizCapabilityRegistry> {
   const payload = await transport.request("/api/public/v1/integrations");
   const values = Array.isArray(payload) ? payload : (record(payload).integrations ?? record(payload).data);
   if (!Array.isArray(values)) throw new Error("Postiz capability response has no integrations list");
-  const capabilities = values.map((raw): PostizCapability => {
+  const capabilities: PostizCapability[] = [];
+  const unrecognized: PostizUnrecognizedIntegration[] = [];
+  for (const raw of values) {
     const item = record(raw);
-    const destination = requiredString(item.destination ?? item.platform ?? item.identifier, "integration destination") as PostizDestination;
+    const identifier = requiredString(item.destination ?? item.platform ?? item.identifier, "integration destination");
+    const accountId = requiredString(item.accountId ?? item.id, "integration account id");
+    const accountLabel = requiredString(item.accountLabel ?? item.name ?? item.username, "integration account label");
+    if (item.disabled === true) { unrecognized.push({ identifier, accountId, accountLabel, reason: "disabled" }); continue; }
     const mediaRaw = item.media ?? item.capabilities;
-    if (!Array.isArray(mediaRaw) || !mediaRaw.every((entry) => typeof entry === "string")) {
-      throw new Error(`Postiz integration ${destination} has no explicit media capabilities`);
+    if (mediaRaw !== undefined) {
+      if (!Array.isArray(mediaRaw) || !mediaRaw.every((entry) => typeof entry === "string")) {
+        throw new Error(`Postiz integration ${identifier} has no explicit media capabilities`);
+      }
+      const destination = asDestination(identifier);
+      if (!destination) { unrecognized.push({ identifier, accountId, accountLabel, reason: "unknown-identifier" }); continue; }
+      capabilities.push({ destination, media: mediaRaw.map(String) as PostizMedia[], accountId, accountLabel });
+      continue;
     }
-    return {
-      destination,
-      media: mediaRaw.map(String) as PostizMedia[],
-      accountId: requiredString(item.accountId ?? item.id, "integration account id"),
-      accountLabel: requiredString(item.accountLabel ?? item.name ?? item.username, "integration account label"),
-      // The public adapter has no documented upload/registration endpoint. Do not turn a generic
-      // provider capability string into permission to invent one or a fake public URL.
-    };
-  });
-  return { fetchedAt: now.toISOString(), capabilities };
+    const destination = asDestination(identifier);
+    if (!destination) { unrecognized.push({ identifier, accountId, accountLabel, reason: "unknown-identifier" }); continue; }
+    // The public adapter has no documented upload/registration endpoint. Do not turn a generic
+    // provider capability string into permission to invent one or a fake public URL.
+    capabilities.push({ destination, media: ["text"], accountId, accountLabel });
+  }
+  return { fetchedAt: now.toISOString(), capabilities, ...(unrecognized.length ? { unrecognized } : {}) };
 }
 
 export function supportsPostiz(registry: PostizCapabilityRegistry, destination: PostizDestination, media: PostizMedia): boolean {

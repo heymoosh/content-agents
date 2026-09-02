@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { cancelPostizPost, createPostizPost, fetchPostizCapabilities, readPostizPost, reconcilePostizPost, resolveConfiguredPostizCapability, selectDeliveryRoute, type PostizTransport } from "./postiz.js";
+import { cancelPostizPost, createPostizPost, fetchPostizCapabilities, readPostizPost, reconcilePostizPost, resolveConfiguredPostizCapability, selectDeliveryRoute, supportsPostiz, createPostizTransport, type PostizTransport } from "./postiz.js";
 import { assertLiveCanaryGate, runPostizLifecycleCanary } from "./postiz-canary.js";
 import { runCanaryMatrix } from "./canary-matrix.js";
 
@@ -25,9 +25,45 @@ describe("Postiz capability-first routing", () => {
     assert.throws(() => resolveConfiguredPostizCapability(registry, "x", "video", { POSTIZ_ACCOUNT_ID: "acct-1" }), /does not advertise/);
   });
 
-  test("refuses inferred capabilities", async () => {
-    const { client } = transport([{ integrations: [{ platform: "x", id: "acct-1", name: "HI" }] }]);
+  test("refuses a malformed explicit capability list", async () => {
+    const { client } = transport([{ integrations: [{ platform: "x", id: "acct-1", name: "HI", media: "text" }] }]);
     await assert.rejects(fetchPostizCapabilities(client), /explicit media capabilities/);
+  });
+
+  test("maps the real public integrations shape to text-only, drops disabled rows, records unknown identifiers", async () => {
+    // Exact shape of GET /public/v1/integrations in postiz-app (public.integrations.controller.ts): a bare
+    // array with no media field.
+    const { client, calls } = transport([[
+      { id: "int-x", name: "Muxin Li", identifier: "x", picture: "p", disabled: false, profile: "muxin", customer: undefined },
+      { id: "int-th", name: "human_inference", identifier: "threads", picture: "p", disabled: false, profile: "hi" },
+      { id: "int-off", name: "Old", identifier: "linkedin", picture: "p", disabled: true, profile: "old" },
+      { id: "int-fb", name: "Human Inference", identifier: "facebook", picture: "p", disabled: false, profile: "hi" },
+      { id: "int-off2", name: "Old2", identifier: "bluesky", disabled: true, media: ["text", "image"] },
+    ]]);
+    const registry = await fetchPostizCapabilities(client, new Date("2026-09-02T12:00:00Z"));
+    assert.deepEqual(registry.capabilities, [
+      { destination: "x", media: ["text"], accountId: "int-x", accountLabel: "Muxin Li" },
+      { destination: "threads", media: ["text"], accountId: "int-th", accountLabel: "human_inference" },
+    ]);
+    assert.deepEqual(registry.unrecognized, [
+      { identifier: "linkedin", accountId: "int-off", accountLabel: "Old", reason: "disabled" },
+      { identifier: "facebook", accountId: "int-fb", accountLabel: "Human Inference", reason: "unknown-identifier" },
+      { identifier: "bluesky", accountId: "int-off2", accountLabel: "Old2", reason: "disabled" },
+    ]);
+    assert.equal(supportsPostiz(registry, "x", "image"), false, "image stays unsupported without a verified upload path");
+    assert.equal(calls.length, 1);
+  });
+
+  test("sends the bare API key: Postiz's public middleware rejects a Bearer prefix", async () => {
+    const seen: Array<{ url: string; headers: Record<string, string> }> = [];
+    const fakeFetch = (async (url: string, init?: RequestInit) => {
+      seen.push({ url, headers: init?.headers as Record<string, string> });
+      return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as unknown as typeof fetch;
+    const client = createPostizTransport({ POSTIZ_BASE_URL: "http://localhost:4007/", POSTIZ_API_KEY: " key-1 " }, fakeFetch);
+    await fetchPostizCapabilities(client);
+    assert.equal(seen[0]?.url, "http://localhost:4007/api/public/v1/integrations");
+    assert.equal(seen[0]?.headers.Authorization, "key-1");
   });
 });
 

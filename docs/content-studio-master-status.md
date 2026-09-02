@@ -90,8 +90,18 @@ what has been verified, and what remains.
   `~/.content-agents/fiction-beats/the-least-of-us.json`. No recoverable prior bytes were found, so
   the file was preserved rather than guessed or deleted. Canary-only global continuity/review files
   and all disposable canary directories were removed.
+- **Postiz runtime check (2026-09-02):** the self-hosted instance is running and `healthy` on
+  `http://localhost:4007` with X, LinkedIn, Bluesky, Threads, Mastodon, Instagram, Facebook,
+  TikTok, and YouTube connected in its UI. The content-agents `.env` (main checkout) still lacks
+  `POSTIZ_BASE_URL`, `POSTIZ_API_KEY`, and `POSTIZ_ACCOUNT_ID`; this worktree has no `.env` at all
+  (the loader reads the running checkout's own root), so the canary must run from a checkout that
+  has one. Reading the `postiz-app` source revealed two adapter defects the mocked tests had hidden
+  (no media list in the real integrations response; the public middleware expects the bare API key).
+  Both were fixed with real-shape tests the same day (recorded decision 6). Discovery has still not
+  run; the API key must be generated in the Postiz UI and entered by Muxin.
 - **Next gates:** the P1 Postiz-first/Typefully-fallback lifecycle remains attended and blocked on
-  restored Postiz configuration/runtime plus explicit approval to create provider objects. Other
+  the Postiz API key in `.env`, a read-only discovery pass, then explicit approval to create
+  provider objects. Other
   honest next candidates are the attended Fiction browser/GitHub approval workflow, one signed-in
   Outreach Scout run, and the signed-in per-brand Signals/Experiment operating loop. Do not perform
   provider delivery, GitHub push/PR mutation, or account writes without the corresponding explicit
@@ -216,7 +226,7 @@ Postiz does not support the required destination or capability.
 | YouTube Shorts | Postiz when live discovery advertises YouTube/video; otherwise the explicit YouTube Data API exception, private until `publishAt` | Capability-first selection implemented; providers unverified | Discover Postiz first. If unsupported, verify OAuth upload, scheduled-public transition, final URL, and terminal reconciliation for YouTube. |
 | Substack Notes | Constrained saved-session browser automation | Provider unverified | Run an explicitly approved canary; maintain selectors; add independent live confirmation. Full essays remain manual. |
 | Community/manual destinations | `ready-to-paste/` | Intentionally manual | Surface the handoff and status in the Studio consistently. |
-| Postiz | Self-hosted Postiz | **Implemented and deterministic-tested; provider unverified** | The adapter, environment contract, dynamic capability/account registry, Studio scheduling path, stable provider IDs, create/read/cancel/reconcile lifecycle, recovery ledger, gated canary, and fallback matrix exist. The 2026-08-30 configured instance was offline; on 2026-09-01 the current parent `.env` lacked the required base URL and API key before discovery could make a request. Restore configuration, start the instance, and pass the attended matrix before changing the working fallback. |
+| Postiz | Self-hosted Postiz | **Implemented and deterministic-tested; provider unverified** | The adapter, environment contract, dynamic capability/account registry, Studio scheduling path, stable provider IDs, create/read/cancel/reconcile lifecycle, recovery ledger, gated canary, and fallback matrix exist. The 2026-08-30 configured instance was offline; on 2026-09-01 the current parent `.env` lacked the required base URL and API key before discovery could make a request. On 2026-09-02 the instance was healthy on `localhost:4007` with nine channels connected in its UI, but the content-agents `.env` still had no `POSTIZ_BASE_URL`, `POSTIZ_API_KEY`, or `POSTIZ_ACCOUNT_ID`, and a source read of `postiz-app` showed the adapter would have failed against the real public API (no media list in the integrations response; bare API key expected, not `Bearer`). Both adapter defects were fixed deterministically that day. Add the API key, run read-only discovery, then pass the attended matrix before changing the working fallback. |
 | Outreach email/Gmail | Send a locked email from the Content Agents GUI through the exact approved Gmail account after an explicit confirmation; retain manual/external sending for unsupported channels. | **Implemented and deterministic-tested; provider unverified.** The GUI exposes Gmail only when the matching OAuth configuration is present, validates the authenticated profile as `muxin.li.pro@gmail.com`, writes a body-free append-only delivery ledger, prevents blind retries, reconciles uncertain sends by deterministic RFC Message-ID against Sent mail, and advances the follow-up clock only after confirmed delivery. The by-hand fallback remains available. | Run one explicitly approved authenticated send/reconcile canary. Recipient address and subject are explicit send-time envelope fields; the locked reviewed artifact remains the message body and channel. |
 
 ### Scheduler and publishing status
@@ -387,7 +397,11 @@ the current Phase 1 completion patch:
 5. Scheduler, job, capture, publishing, and reconciliation state share one operational data root
    with cross-process locks, leases, migration, and fail-closed restart recovery.
 6. Postiz-first discovery, Typefully fallback, explicit provider exceptions, and the attended
-   lifecycle matrix are implemented and deterministic-tested.
+   lifecycle matrix are implemented and deterministic-tested. Until 2026-09-02 that deterministic
+   coverage used a mocked per-integration media list that the real self-hosted public endpoint does
+   not return, and the transport sent a `Bearer` prefix that Postiz's public API middleware rejects.
+   Both were corrected against the published `postiz-app` controller and middleware source (see
+   recorded decision 6); the adapter remains provider-unverified.
 7. Signals uses separate propose, review, apply, recovery, and rollback events for exact allowlisted
    configuration deltas.
 
@@ -423,6 +437,12 @@ for every created canary object.
    authenticated lifecycle verification remains open.
 2. Typefully remains the working fallback and must not be removed before Postiz is implemented and
    verified.
+6. Postiz discovery defaults an enabled, exactly recognized integration to text-only when the
+   instance returns no explicit media list (decided 2026-09-02 from the `postiz-app` source, which
+   returns none). Text is the baseline every connected provider accepts; image and video stay
+   unsupported on Postiz until a live upload lifecycle is verified. Disabled rows and unrecognized
+   identifiers (for example `linkedin-page`, `facebook`) are recorded in the registry and never
+   routed. This is the conservative form of a deliberate fail-closed choice; Muxin may reverse it.
 3. Outreach email is intended to send from the Content Agents GUI after Muxin's explicit approval.
    Successful sends must update sent state automatically. Manual/external sending remains the
    fallback for unsupported channels.
