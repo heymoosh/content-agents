@@ -76,6 +76,14 @@ describe("Postiz capability-first routing", () => {
     assert.equal(selectDeliveryRoute(verified, "youtube", "video", { requiresLocalMediaUpload: true }), "postiz");
   });
 
+  test("multipart uploads omit the JSON content type so fetch writes the boundary", async () => {
+    const seen: RequestInit[] = [];
+    const client = createPostizTransport({ POSTIZ_BASE_URL: "http://postiz.test", POSTIZ_API_KEY: "k" }, (async (_url: string | URL | Request, init?: RequestInit) => { seen.push(init ?? {}); return new Response(JSON.stringify({ id: "m", path: "p" }), { status: 200 }); }) as typeof fetch);
+    await uploadPostizMedia(client, { bytes: new Uint8Array([1]), filename: "a.png", mime: "image/png" });
+    assert.equal((seen[0]?.headers as Record<string, string>)["Content-Type"], undefined);
+    assert.equal((seen[0]?.headers as Record<string, string>).Authorization, "k");
+  });
+
   test("sends the bare API key: Postiz's public middleware rejects a Bearer prefix", async () => {
     const seen: Array<{ url: string; headers: Record<string, string> }> = [];
     const fakeFetch = (async (url: string, init?: RequestInit) => {

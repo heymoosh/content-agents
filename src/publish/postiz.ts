@@ -125,7 +125,8 @@ export function createPostizTransport(env: NodeJS.ProcessEnv = process.env, fetc
         ...init,
         // Postiz's public-API middleware passes the raw Authorization header value to its API-key lookup
         // (public.auth.middleware.ts); a `Bearer ` prefix is rejected as an invalid key.
-        headers: { Authorization: key, "Content-Type": "application/json", ...init.headers },
+        // A FormData body must let fetch write the multipart boundary; a fixed Content-Type would drop the file.
+        headers: { Authorization: key, ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init.headers },
       });
       if (!response.ok) {
         const body = (await response.text().catch(() => "")).slice(0, 300);
@@ -325,8 +326,7 @@ export async function uploadPostizMedia(transport: PostizTransport, file: { byte
   if (!file.bytes.length) throw new Error("Postiz upload needs a non-empty file");
   const form = new FormData();
   form.append("file", new Blob([file.bytes.slice().buffer as ArrayBuffer], { type: file.mime }), file.filename);
-  // Let fetch set the multipart boundary: an explicit Content-Type would break the body.
-  const response = record(await transport.request("/api/public/v1/upload", { method: "POST", body: form, headers: { "Content-Type": "" } }));
+  const response = record(await transport.request("/api/public/v1/upload", { method: "POST", body: form }));
   return { id: requiredString(response.id, "media id"), path: requiredString(response.path, "media path") };
 }
 
