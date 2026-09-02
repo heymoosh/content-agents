@@ -1,12 +1,14 @@
 # Content Studio master status
 
-**Last reconciled:** 2026-09-01
-**Repository baseline:** merged `origin/main` commit `10e678e` (PR #419), plus the integrated Phase 4
+**Last reconciled:** 2026-09-02
+**Repository baseline:** merged `origin/main` commit `10e678e` (PR #419), plus local recovery-branch
+commits through `444b4d9` (`fix: isolate Fiction model drafting`) and the integrated Phase 4
 cross-system learning, per-brand partition, Outreach Phase 5, Fiction P2, and Charles persona-edit patches on the current recovery
 branch. PR #419 contains the audited Phase 3 Experiment implementation. The current branch closes
 the measured Signals-to-Venture boundary and Outreach's deterministic discovery and weekly
 Strategy-summary gaps, adds Fiction's review bridge, and adds a digest-bound Studio review gate for
-production persona changes; authenticated provider and model runs remain operationally unverified.
+production persona changes. Authenticated provider lifecycles remain operationally unverified;
+bounded authenticated model runs are recorded per capability below and do not prove general model quality.
 **Phase 0 status:** operational provenance and policy wiring are complete with deterministic browser
 coverage, and one authenticated Codex generation canary passed; authenticated provider canaries remain.
 **Phase 1 status:** repository implementation and deterministic verification are complete for durable capture and
@@ -55,6 +57,40 @@ request. Publishing remains live-unverified until the configuration is restored,
 discovery passes, and the attended create/read/cancel/reconcile matrix passes.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
+
+## Current handoff — 2026-09-02
+
+- **Continue in:** `/Users/Muxin/Documents/GitHub/content-agents-worktrees/content-studio-master-status-recovery`
+  on branch `recovery/content-studio-master-status`. The latest implementation commit is `444b4d9`;
+  it is local-only and has not been pushed.
+- **Latest completed slice:** Fiction draft and repass calls now use a disposable full-tree stage,
+  exact single-chapter mutation/import rules, optimistic live-tree drift checks, Claude restricted
+  mode, and one exact `story:validate` command grant. Operational Fiction beats, continuity reports,
+  and review notes preserve their historical default paths and honor an explicit
+  `CONTENT_AGENTS_DATA_ROOT` for isolated runs. The root `AGENTS.md` records the bounded verification
+  sequence for future sessions.
+- **Behavior evidence:** an authenticated disposable-repository Claude run completed chapter-2
+  draft, continuity, instruction-bound repass, and continuity (the last check succeeded on its one
+  retry). The chapter validated, Git refs stayed fixed, and configured operational data stayed
+  isolated. After that canary, the permission boundary was tightened to Claude `--restricted` plus
+  an exact validator command; a separate authenticated Claude CLI probe and focused tests verified
+  that hardening, but the complete draft/repass canary was not rerun after the argv change.
+- **Review evidence:** the final cross-family read-only audit returned SHIP with no P0/P1/P2 after
+  canonical-series containment and exact tool-grant corrections. Focused typecheck/tests passed
+  151/151. The latest full suite was not green: 3,974/3,975 passed, with the sole failure in the
+  unrelated timing-sensitive `stopping a queued job never spawns anything, and drain() skips it`
+  assertion; the same `jobs.test.ts` file passed in focused execution. Do not claim a green merge
+  gate until a later `npm run check` passes.
+- **Canary incident:** the first isolation attempt overwrote the pre-existing
+  `~/.content-agents/fiction-beats/the-least-of-us.json`. No recoverable prior bytes were found, so
+  the file was preserved rather than guessed or deleted. Canary-only global continuity/review files
+  and all disposable canary directories were removed.
+- **Next gates:** the P1 Postiz-first/Typefully-fallback lifecycle remains attended and blocked on
+  restored Postiz configuration/runtime plus explicit approval to create provider objects. Other
+  honest next candidates are the attended Fiction browser/GitHub approval workflow, one signed-in
+  Outreach Scout run, and the signed-in per-brand Signals/Experiment operating loop. Do not perform
+  provider delivery, GitHub push/PR mutation, or account writes without the corresponding explicit
+  approval.
 
 ## Authority and update rule
 
@@ -129,8 +165,9 @@ The system is **not operationally verified end to end**. The largest unresolved 
 3. Media pipelines are deterministically wired behind approval gates, including a safe reviewed-file
    attachment path for attended Codex image and carousel files. Paid/authenticated provider renders
    and delivery paths remain live-unverified.
-4. The newer Experiment/pattern architecture contains many useful typed contracts, but much of it remains
-   scaffolded or partially connected to live generation, review, delivery, and outcomes.
+4. The Experiment/pattern Phase 2 and Phase 3 vertical slices are integrated through proposal,
+   approval, canonical Content generation, and measurement interpretation boundaries. Their first
+   approved publication and attributed measurement window remain operationally unverified.
 5. Provider credentials and non-secret account bindings are configured locally, but credentials
    alone are not lifecycle evidence and must not be described as a successful canary.
 
@@ -204,7 +241,7 @@ history and its “nothing built yet” statement is obsolete.
 
 | Capability | Latest decision | Current state | Verification | Remaining work |
 |---|---|---|---|---|
-| Fit lifecycle | Source/add, cited research, qualify, pursue/pass, editable draft, lock, approved send, per-person follow-ups. Poor fits never advance. | Implemented for client/platform flows with JSA read-only integration and matchmaker reads. | Extensive deterministic tests; selected historic real research exists. | Model-generated first draft/revision remains unverified end to end. GUI delivery remains incomplete. |
+| Fit lifecycle | Source/add, cited research, qualify, pursue/pass, editable draft, lock, approved send, per-person follow-ups. Poor fits never advance. | Implemented for client/platform flows with JSA read-only integration and matchmaker reads. | Extensive deterministic tests, selected historic real research, disposable GUI draft/revision coverage, and the bounded authenticated Claude drafting evidence described below. | Component boundaries are verified, but one signed-in source-to-draft-to-lock-to-send GUI lifecycle has not run. Gmail delivery remains provider-unverified pending explicit approval for the authenticated send/reconcile canary. |
 | Matchmaker read | Show why them, why Muxin, and why now before the yes/no choice. | Implemented and surfaced. | Unit/UI coverage. | Keep sources and current direction editable and visible. |
 | Discovery | Bounded cited scouting rotates a belief, community dialect, modality, and trusted-anchor subset; clients start from a named person's quoted worldview trail. Permanent frontier, pass-reason learning, mid-tail policy, disconfirmation downgrade, calibration, total batch cap, and bounded rate-limit retry fail closed in code. | **Phase 5 deterministic implementation complete on the current branch.** Model query expansion remains bounded by the rotated lens and one-to-two-hop public graph prompt; deterministic gates own what may be written. | Red-green unit/integration coverage exercises lens rotation, graph context, pass feedback, canonical identity, people-first evidence, disconfirmation, mid-tail caps, rate limits, success/failure ledger, cold-profile gating, and a hard five-lead whole-run cap. Final local check passes 3,748/3,748; Grok 4.5's read-only cross-family audit reports no remaining release blocker. | Run one real signed-in Scout sweep and inspect the surfaced candidates, citations, skip reasons, rate-limit behavior, and append-only run ledger. Until then, do not claim live discovery quality or operational completion. |
 | Contact selection | Muxin can use extracted contacts or add one manually. | Implemented manual/research-extracted path. | UI/unit coverage. | Automated contact discovery and public-email harvesting are not implemented. |
@@ -217,7 +254,7 @@ history and its “nothing built yet” statement is obsolete.
 
 | Capability | Latest decision | Current state | Verification | Remaining work |
 |---|---|---|---|---|
-| Co-creation surface | Write next accepts beats; Review drafts supports scene review, continuity, direct passage edits, and notes; Promotion is separate; canon stays in the rail. | Implemented through PRs #404/#406/#407. Claude drafting and repass now run in a disposable staged workspace that excludes Git metadata, secrets, and operational data; only the exact next chapter creation or target-chapter replacement may be imported after full-tree mutation validation and an optimistic live-series drift check. The scoped Claude invocation permits only the story validator. Fiction beats, continuity reports, and review notes honor `CONTENT_AGENTS_DATA_ROOT`. | Strong unit/route tests and real disposable-Chromium exact-passage edit/history pass. A bounded authenticated Claude continuity canary ran the production command against `the-least-of-us` chapter 1, wrote a fresh Claude-stamped local report with three holds and no conflicts, and left the tracked story, git state, and cost log unchanged. A later authenticated disposable-repository canary exercised the production Studio queue from chapter-2 draft through automatic continuity, instruction-bound repass, and automatic continuity again. The generated chapter passed `story:validate`, contained no en/em dash, preserved Git refs, cleaned its internal model stages, and wrote Claude provenance plus beats, continuity, and review-note evidence only beneath the configured canary data root. The post-repass continuity run exceeded its first 240-second cap and completed on the offered retry. | The authenticated drafting, repass, and continuity model calls are verified at the production job boundary. Browser interaction and the separate GitHub final-approval workflow remain operationally unverified. |
+| Co-creation surface | Write next accepts beats; Review drafts supports scene review, continuity, direct passage edits, and notes; Promotion is separate; canon stays in the rail. | Implemented through PRs #404/#406/#407. Claude drafting and repass now run in a disposable staged workspace that excludes Git metadata, secrets, and operational data; only the exact next chapter creation or target-chapter replacement may be imported after full-tree mutation validation and an optimistic live-series drift check. The scoped Claude invocation permits only the story validator. Fiction beats, continuity reports, and review notes honor `CONTENT_AGENTS_DATA_ROOT`. | Strong unit/route tests and real disposable-Chromium exact-passage edit/history pass. A bounded authenticated Claude continuity canary ran the production command against `the-least-of-us` chapter 1, wrote a fresh Claude-stamped local report with three holds and no conflicts, and left the tracked story, git state, and cost log unchanged. A later authenticated disposable-repository canary exercised the production Studio queue from chapter-2 draft through automatic continuity, instruction-bound repass, and automatic continuity again. The generated chapter passed `story:validate`, contained no en/em dash, preserved Git refs, cleaned its internal model stages, and wrote Claude provenance plus beats, continuity, and review-note evidence only beneath the configured canary data root. The post-repass continuity run exceeded its first 240-second cap and completed on the offered retry. The subsequent restricted-mode/exact-command hardening was verified separately with an authenticated Claude CLI probe and focused tests, not by rerunning the complete workflow canary. | The workflow model calls are authenticated-canary verified, while the final restricted argv boundary has separate authenticated probe evidence. Browser interaction and the GitHub final-approval workflow remain operationally unverified; rerun one bounded workflow canary only when the drafting adapter changes again or before broader release. |
 | Final chapter approval | GitHub PR is the final chapter review loop. Surgical comment-driven changes only. Lock updates append-only canon. | Existing `/story` workflow remains authoritative. The local P2 slice adds an explicit Studio action that creates or reconnects to the prescribed draft chapter PR and refuses unrelated dirty state, a wrong branch, a mismatched PR, a local commit that differs from the PR head, or a non-GitHub remote. Creating the PR intentionally parks the checkout on its story branch; canon-document approvals are then blocked until the operator returns to `main`. | Deterministic command-adapter tests cover the sole-chapter commit boundary, existing-PR idempotence, exact branch/PR/SHA verification, and command failures. | Authenticated GitHub creation/reply behavior still needs an attended canary on a disposable chapter PR. Lock remains an explicit post-merge `/story lock` action. |
 | Idea routing | Fiction should accept an idea and decide whether it belongs in world, character, plot, chapter, or imagery while preserving Muxin's wording for non-chapter material. | Implemented locally as the default Fiction page: exact raw text and exact ordered clarification turns persist outside git; the subscription-selected Claude, Grok, or Codex CLI classifies to the six-value destination union with fail-closed `clarify`; GPT-OSS is paused; non-chapter cleanup remains a provenance-bearing review proposal; main-branch authorization is required before approval can change the normalized writable document; chapter approval sends exact author context to the existing draft queue. | Focused tests cover abstention, durable clarification, byte preservation, proposal integrity, selected-doc-only writes, main-branch authorization, chapter handoff, path guards, and read-only CLI arguments. A token-and-marker-gated disposable Chromium pass drives the real Fiction GUI from byte-exact raw input through review and explicit canonical approval, proving no pre-review write, one exact cleaned append, untouched unrelated canon, durable approved state, and no live model call. Authenticated Grok, Claude, and Codex subscription canaries each classified a bounded station-signal rule as `world` and returned its already-clean wording byte-for-byte through the exact production adapter; the Codex pass used `The station signal changes the weather above it.` and produced no inbox, proposal, canon, job, GitHub, or provider write. | All three bounded subscription adapter canaries are complete. The wider authenticated GUI-to-proposal/canonical-write and chapter/GitHub workflow remains separate operational verification. |
 | PR comment engine routing | Muxin may name different engines for individual GitHub comment edits. | Implemented locally as an explicit Studio action. Each unresolved root review comment binds to one exact current line/range, may select Claude/Grok/Codex independently, defaults deterministically when no engine is named, blocks unknown/conflicting/GPT-OSS write requests, applies replacements bottom-up, validates before push, persists a resumable operation before Git/GitHub side effects, replies without auto-resolving, and records durable provenance. Subscription CLIs receive read-only/no-tools arguments. | Deterministic tests cover multi-engine parsing, malformed/outdated/overlapping spans, unrelated-byte preservation, keep/no-op comments, validation rollback, commit/push/reply-failure idempotence, root-thread filtering, and exact matching-PR preflight. | Authenticated GitHub comment ingestion, subscription CLI revisions, replies, and push still need an attended disposable-PR canary. |
