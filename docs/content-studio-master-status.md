@@ -99,9 +99,18 @@ what has been verified, and what remains.
   (no media list in the real integrations response; the public middleware expects the bare API key).
   Both were fixed with real-shape tests the same day (recorded decision 6). Discovery has still not
   run; the API key must be generated in the Postiz UI and entered by Muxin.
+- **Postiz read-only discovery (2026-09-02, later the same day):** Muxin added `POSTIZ_BASE_URL`
+  and `POSTIZ_API_KEY` to the main-checkout `.env`; the browser login stall was a URL mismatch
+  (the Compose file names `https://postiz-threads.meta:4443` as the frontend origin, so
+  `localhost:4007` posts cross-origin), resolved by logging in at the configured host. Discovery
+  through the fixed adapter authenticated and returned nine integrations: eight recognized
+  text-only (bluesky/heymoosh, x, linkedin, instagram as Muxin Li, threads, mastodon, tiktok,
+  youtube as Human Inference) and facebook recorded as `unknown-identifier`, never routed. Nothing
+  was created. `POSTIZ_ACCOUNT_ID` is still unset; the create/read/cancel/reconcile matrix awaits
+  Muxin's account choice and explicit approval.
 - **Next gates:** the P1 Postiz-first/Typefully-fallback lifecycle remains attended and blocked on
-  the Postiz API key in `.env`, a read-only discovery pass, then explicit approval to create
-  provider objects. Other
+  `POSTIZ_ACCOUNT_ID` in `.env` and explicit approval to create provider objects (discovery is
+  done). Other
   honest next candidates are the attended Fiction browser/GitHub approval workflow, one signed-in
   Outreach Scout run, and the signed-in per-brand Signals/Experiment operating loop. Do not perform
   provider delivery, GitHub push/PR mutation, or account writes without the corresponding explicit
