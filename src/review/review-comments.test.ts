@@ -7,8 +7,11 @@ import {
   appendReviewComment, appendReviewCommentSafe, charlesReviewSubject, fictionReviewSubject, listReviewComments,
   listReviewCommentsSafe, listReviewCommentsWithHealth, REVIEW_COMMENTS_PATH,
 } from "./review-comments.js";
-test("review comments preserve the legacy default when no isolated data root is configured", () => {
-  assert.equal(REVIEW_COMMENTS_PATH, join(homedir(), ".content-agents", "review-comments.jsonl"));
+test("review comments keep the legacy location shape, but never the real store under the test runner", () => {
+  // Unconfigured roots resolve to ~/.content-agents/<name> in production; under node:test the
+  // data-root guard swaps in a throwaway directory so the gate cannot write into Muxin's store.
+  assert.ok(REVIEW_COMMENTS_PATH.endsWith(join("", "review-comments.jsonl")), REVIEW_COMMENTS_PATH);
+  assert.ok(!REVIEW_COMMENTS_PATH.startsWith(join(homedir(), ".content-agents")), REVIEW_COMMENTS_PATH);
 });
 
 test("review subjects are stable and reject invalid resource identities", () => {

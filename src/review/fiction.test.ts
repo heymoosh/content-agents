@@ -8,8 +8,11 @@ import {
   readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats,
   listChapters, seriesDirFor, refuseSave, BEATS_ROOT,
 } from "./fiction.js";
-test("scene beats preserve the legacy default when no isolated data root is configured", () => {
-  assert.equal(BEATS_ROOT, join(homedir(), ".content-agents", "fiction-beats"));
+test("scene beats keep the legacy location shape, but never the real store under the test runner", () => {
+  // Unconfigured roots resolve to ~/.content-agents/<name> in production; under node:test the
+  // data-root guard swaps in a throwaway directory so the gate cannot write into Muxin's store.
+  assert.ok(BEATS_ROOT.endsWith(join("", "fiction-beats")), BEATS_ROOT);
+  assert.ok(!BEATS_ROOT.startsWith(join(homedir(), ".content-agents")), BEATS_ROOT);
 });
 
 function tmpSeries(): string {

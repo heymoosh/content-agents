@@ -17,8 +17,11 @@ import {
   continuityEngineSpawn,
   CONTINUITY_ROOT,
 } from "./continuity.js";
-test("continuity reports preserve the legacy default when no isolated data root is configured", () => {
-  assert.equal(CONTINUITY_ROOT, join(homedir(), ".content-agents", "fiction-continuity"));
+test("continuity reports keep the legacy location shape, but never the real store under the test runner", () => {
+  // Unconfigured roots resolve to ~/.content-agents/<name> in production; under node:test the
+  // data-root guard swaps in a throwaway directory so the gate cannot write into Muxin's store.
+  assert.ok(CONTINUITY_ROOT.endsWith(join("", "fiction-continuity")), CONTINUITY_ROOT);
+  assert.ok(!CONTINUITY_ROOT.startsWith(join(homedir(), ".content-agents")), CONTINUITY_ROOT);
 });
 
 const BODY = [
