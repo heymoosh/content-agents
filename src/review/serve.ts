@@ -93,6 +93,7 @@ import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts, saveIntakeSectionDr
 import { enqueueVentureStep } from "./venture-runner.js";
 import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
 import { providerForKind, publishingRetryBlock, resolvePublishingAttempt, scheduleApprovedOnce, type PublishingResolution } from "./publishing-status.js";
+import { batchReschedule, listBatchCandidates, rescheduleRow, type BatchPlan, type BatchSelection } from "./reschedule.js";
 import { handleFictionRoute } from "./serve-fiction.js";
 import { handleCharlesRoute } from "./serve-charles.js";
 import { handleSignalsRoute, prepareLiveExperimentInterpretation } from "./serve-signals.js";
@@ -1185,6 +1186,52 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         schedulingInFlight.delete(inFlightKey);
       }
       json(res, 200, result);
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/publishing/reschedule") {
+      // Move one scheduled Postiz row to an exact time or the first free cadence slot on/after a date.
+      const b = await readBody(req);
+      const slug = String(b.slug ?? "");
+      const id = String(b.id ?? "");
+      let folder: string;
+      try { folder = safeFolder(slug); }
+      catch (e) { json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) }); return; }
+      const row = readQueue(folder).rows.find((r) => r.id === id);
+      if (!row) { json(res, 404, { ok: false, error: "no such row" }); return; }
+      const inFlightKey = `${slug}/${id}`;
+      if (schedulingInFlight.has(inFlightKey)) { json(res, 200, { ok: false, error: "already scheduling/moving this row. Try again in a moment" }); return; }
+      schedulingInFlight.add(inFlightKey);
+      try {
+        json(res, 200, await rescheduleRow(folder, slug, row, { to: b.to === undefined ? undefined : String(b.to), notBefore: b.notBefore === undefined ? undefined : String(b.notBefore) }));
+      } finally { schedulingInFlight.delete(inFlightKey); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/publishing/batch-reschedule") {
+      // Move a theme cluster: selection by slug / pillar / platform / explicit ids; plan = shift N
+      // days or re-flow after a date. `dryRun` lists what would move without touching anything.
+      const b = await readBody(req);
+      const raw = (b.selection && typeof b.selection === "object" ? b.selection : {}) as Record<string, unknown>;
+      const list = (value: unknown): string[] | undefined => Array.isArray(value) ? value.map(String).filter(Boolean) : undefined;
+      const selection: BatchSelection = { slugs: list(raw.slugs), pillars: list(raw.pillars), platforms: list(raw.platforms), ids: list(raw.ids) };
+      const planRaw = (b.plan && typeof b.plan === "object" ? b.plan : {}) as Record<string, unknown>;
+      let plan: BatchPlan;
+      if (planRaw.mode === "shift" && Number.isFinite(Number(planRaw.days)) && Number(planRaw.days) !== 0) plan = { mode: "shift", days: Number(planRaw.days) };
+      else if (planRaw.mode === "after" && typeof planRaw.notBefore === "string" && Number.isFinite(Date.parse(planRaw.notBefore))) plan = { mode: "after", notBefore: planRaw.notBefore };
+      else if (b.dryRun) plan = { mode: "shift", days: 0 };
+      else { json(res, 400, { ok: false, error: "plan must be {mode:'shift', days:N} or {mode:'after', notBefore:ISO}" }); return; }
+      if (b.dryRun) {
+        const candidates = listBatchCandidates(selection).map((c) => ({ slug: c.slug, id: c.row.id, platform: c.platform, pillar: c.pillar, plannedFor: c.status.plannedFor ?? null }));
+        json(res, 200, { ok: true, dryRun: true, candidates });
+        return;
+      }
+      const keys = listBatchCandidates(selection).map((c) => `${c.slug}/${c.row.id}`);
+      const busy = keys.filter((key) => schedulingInFlight.has(key));
+      if (busy.length) { json(res, 200, { ok: false, error: `already scheduling/moving ${busy.join(", ")}. Try again in a moment` }); return; }
+      for (const key of keys) schedulingInFlight.add(key);
+      try {
+        const result = await batchReschedule(selection, plan);
+        json(res, 200, { ok: result.results.every((r) => r.ok), ...result });
+      } finally { for (const key of keys) schedulingInFlight.delete(key); }
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/publishing/resolve") {

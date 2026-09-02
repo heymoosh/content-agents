@@ -1,0 +1,109 @@
+{
+  "ranAt": "2026-09-02T19:39:10.722Z",
+  "scheduledAt": "2026-09-10T19:39:10.722Z",
+  "rescheduleTo": "2026-09-10T20:39:10.722Z",
+  "unrecognized": [],
+  "uploaded": {
+    "image": {
+      "id": "ee409a6d-6c7e-4d87-b157-87c51175e6e1",
+      "path": "https://postiz-threads.meta:4443/uploads/2026/09/02/1965ce9469cee99d47c98c988fc79280.png"
+    },
+    "video": {
+      "id": "7c83f802-7355-427b-90ed-1d4a3a623b3c",
+      "path": "https://postiz-threads.meta:4443/uploads/2026/09/02/a0efb8dc8d5252ffe52e7e105da9103bf8.mp4"
+    }
+  },
+  "channels": [
+    {
+      "destination": "tiktok",
+      "accountId": "cmtit6t5j0001mt7b13s0vhkh",
+      "accountLabel": "Human Inference",
+      "media": "video",
+      "ok": true,
+      "scheduledAt": "2026-09-10T19:39:10.722Z",
+      "rescheduledTo": "2026-09-10T20:39:10.722Z",
+      "postId": "cmtki22cc0002mn8mtqlzvuze"
+    },
+    {
+      "destination": "mastodon",
+      "accountId": "cmtixajea0001kbj7sthero4s",
+      "accountLabel": "Human Inference",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T19:39:10.722Z",
+      "rescheduledTo": "2026-09-10T20:39:10.722Z",
+      "postId": "cmtki22ew0004mn8mje8fd304"
+    },
+    {
+      "destination": "facebook",
+      "accountId": "cmthbq1db0003p67hqq50nqhv",
+      "accountLabel": "Human Inference",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T19:39:10.722Z",
+      "rescheduledTo": "2026-09-10T20:39:10.722Z",
+      "postId": "cmtki22gu0006mn8mvxerh3ja"
+    },
+    {
+      "destination": "instagram",
+      "accountId": "cmthb8bye0001p67hfr1y6dux",
+      "accountLabel": "Muxin Li",
+      "media": "image",
+      "ok": true,
+      "scheduledAt": "2026-09-10T19:39:10.722Z",
+      "rescheduledTo": "2026-09-10T20:39:10.722Z",
+      "postId": "cmtki22i90008mn8mzbmz7v50"
+    },
+    {
+      "destination": "linkedin",
+      "accountId": "cmthonsqy0001mo7yshp6q0wi",
+      "accountLabel": "Muxin Li",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T19:39:10.722Z",
+      "rescheduledTo": "2026-09-10T20:39:10.722Z",
+      "postId": "cmtki22jj000amn8mk9vr6nvz"
+    },
+    {
+      "destination": "threads",
+      "accountId": "cmtjnmg9k0001lo8l59pc7vgx",
+      "accountLabel": "human_inference",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T19:39:10.722Z",
+      "rescheduledTo": "2026-09-10T20:39:10.722Z",
+      "postId": "cmtki23se000cmn8mpjhyj3n5"
+    },
+    {
+      "destination": "x",
+      "accountId": "cmthyiizd0001pg8oasxci8p9",
+      "accountLabel": "Muxin Li",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T19:39:10.722Z",
+      "rescheduledTo": "2026-09-10T20:39:10.722Z",
+      "postId": "cmtki23um000emn8m5p9nvgdd"
+    },
+    {
+      "destination": "youtube",
+      "accountId": "cmti3w8p50003nt8jzktxn5ye",
+      "accountLabel": "Human Inference",
+      "media": "video",
+      "ok": true,
+      "scheduledAt": "2026-09-10T19:39:10.722Z",
+      "rescheduledTo": "2026-09-10T20:39:10.722Z",
+      "postId": "cmtki23w4000gmn8mruk1344a"
+    },
+    {
+      "destination": "bluesky",
+      "accountId": "cmtgn0kdg0001oz8bki0xjw05",
+      "accountLabel": "heymoosh",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T19:39:10.722Z",
+      "rescheduledTo": "2026-09-10T20:39:10.722Z",
+      "postId": "cmtki23xj000imn8m1lcdu9mo"
+    }
+  ],
+  "leftovers": []
+}

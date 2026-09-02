@@ -52,6 +52,7 @@
     "bakeoff": "tsx src/bakeoff/run.ts",
     "bakeoff:transcription": "tsx src/bakeoff/transcription.ts",
     "publish:typefully": "tsx src/publish/typefully.ts",
+    "publish:reschedule": "tsx scripts/reschedule.ts",
     "publish:youtube": "tsx src/publish/youtube.ts",
     "publish:tiktok": "tsx src/publish/tiktok.ts",
     "publish:substack": "tsx src/publish/substack.ts",

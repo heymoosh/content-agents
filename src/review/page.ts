@@ -1033,6 +1033,23 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="cw-steps" id="publishedSteps"></div>
       <div class="sheet-head"><h2>Publishing status</h2><span class="grow"></span></div>
       <div class="sheet-sub">Scheduling and publication status by input request. Text and cards go through Typefully, TikTok through PostPeer, Shorts through YouTube, and Notes through Substack. A provider is only shown as complete after its recorded result can be read back.</div>
+      <div class="sheet-sub" id="batchMovePanel" style="border:1px solid var(--line,#ccc);border-radius:6px;padding:10px">
+        <strong>Move a batch</strong>
+        <div class="cw-tabs" style="margin-top:8px">
+          <label>Pillar <input type="text" id="batchPillar" placeholder="e.g. human-ai"></label>
+          <label>Slug <input type="text" id="batchSlug" placeholder="content slug"></label>
+          <label>Platform <input type="text" id="batchPlatform" placeholder="e.g. linkedin"></label>
+        </div>
+        <div class="cw-tabs" style="margin-top:8px">
+          <label><input type="radio" name="batchMode" value="shift" checked> Shift <input type="number" id="batchShiftDays" value="1" style="width:60px"> days</label>
+          <label><input type="radio" name="batchMode" value="after"> Re-flow after <input type="date" id="batchAfterDate"></label>
+        </div>
+        <div class="actions" style="margin-top:8px">
+          <button type="button" id="batchPreviewBtn">Preview</button>
+          <button type="button" class="primary" id="batchMoveBtn">Move</button>
+        </div>
+        <div id="batchMoveResult" style="margin-top:8px"></div>
+      </div>
       <div id="publishedMain" style="margin-top:14px"><div class="empty">Nothing has entered publishing yet.</div></div>
     </div>
   </section>

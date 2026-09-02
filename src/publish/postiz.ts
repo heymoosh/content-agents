@@ -192,6 +192,15 @@ function asDestination(value: string): PostizDestination | null {
  * because Postiz validates provider rules only for non-draft creates. Disabled rows are dropped and unrecognized identifiers (for
  * example `linkedin-page`, `facebook`) are recorded, never mapped to a destination.
  */
+/**
+ * The configured instance's upload lifecycle passed live on 2026-09-02 (nine channels: schedule,
+ * reschedule, cancel; image and video fixtures registered through `POST /public/v1/upload`).
+ * Media stays advertised unless `POSTIZ_MEDIA_UPLOAD_VERIFIED=0` opts a different instance out.
+ */
+export function postizMediaUploadVerified(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.POSTIZ_MEDIA_UPLOAD_VERIFIED?.trim() !== "0";
+}
+
 export interface FetchPostizCapabilitiesOptions {
   /**
    * Set only after `uploadPostizMedia` has passed a live lifecycle on this instance (recorded in the

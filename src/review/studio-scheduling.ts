@@ -1,8 +1,8 @@
-import { basename, join } from "node:path";
-import { readFileSync } from "node:fs";
+import { basename, extname, join, isAbsolute } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 import { type QueueRow } from "../publish/queue.js";
 import { publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
-import { publishCards, isQuoteCardRow, cardTarget, basePlatform } from "../publish/cards.js";
+import { publishCards, isQuoteCardRow, cardTarget, basePlatform, cardCopy } from "../publish/cards.js";
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
 import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
@@ -15,8 +15,11 @@ import {
   createPostizPost,
   createPostizTransport,
   fetchPostizCapabilities,
+  postizMediaUploadVerified,
   resolveConfiguredPostizCapability,
   selectDeliveryRoute,
+  uploadPostizMedia,
+  type PostizCreateInput,
   type DeliveryRoute,
   type PostizCapability,
   type PostizCapabilityRegistry,
@@ -82,7 +85,7 @@ export interface SelectedSchedulingProvider {
 
 function postizShape(row: QueueRow): { destination: PostizDestination; media: PostizMedia } | null {
   const destination = (isQuoteCardRow(row.platform) ? cardTarget(row.platform) ?? basePlatform(row.platform) : row.platform) as PostizDestination;
-  if (!["x", "linkedin", "bluesky", "mastodon", "threads", "tiktok", "youtube", "substack"].includes(destination)) return null;
+  if (!["x", "linkedin", "bluesky", "mastodon", "threads", "facebook", "instagram", "tiktok", "youtube", "substack"].includes(destination)) return null;
   const media: PostizMedia = row.format === "image" ? "image" : row.format === "video" || row.format === "short" ? "video" : "text";
   return { destination, media };
 }
@@ -103,7 +106,7 @@ export async function selectConfiguredProvider(row: QueueRow, deps: Pick<Schedul
   try {
     registry = deps.fetchPostizRegistry
       ? await deps.fetchPostizRegistry()
-      : await fetchPostizCapabilities(createPostizTransport(env));
+      : await fetchPostizCapabilities(createPostizTransport(env), new Date(), { mediaUploadVerified: postizMediaUploadVerified(env) });
   } catch (error) {
     // A transport/config failure is not authoritative evidence that Postiz lacks the capability.
     // Fail closed so an ambiguous discovery result cannot silently bypass the Postiz-first route.
@@ -116,25 +119,54 @@ export async function selectConfiguredProvider(row: QueueRow, deps: Pick<Schedul
   return { provider: "postiz", postizCapability: resolveConfiguredPostizCapability(registry, shape.destination, shape.media, env) };
 }
 
+const MEDIA_MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".mp4": "video/mp4" };
+
+/**
+ * Build the exact Postiz body for a queue row from local state: text rows send the derivative body,
+ * quote cards send the card caption plus the rendered PNG, video rows send the rendered mp4 with the
+ * title from `video/title.txt`. Rebuilt the same way for a reschedule, because Postiz's in-place
+ * save overwrites content and media and its list endpoint returns neither.
+ */
+export async function buildPostizInput(folder: string, row: QueueRow, accountId: string, scheduledAt: string, transport: PostizTransport): Promise<PostizCreateInput> {
+  const shape = postizShape(row);
+  if (!shape) throw new Error(`Postiz does not recognize destination/media for ${row.id}`);
+  const base = { destination: shape.destination, accountId, scheduledAt, visibility: "scheduled" as const };
+  if (shape.media === "text") {
+    const raw = readFileSync(join(folder, row.asset), "utf8");
+    const content = row.asset.endsWith(".md") ? splitFrontmatter(raw).body.trim() : raw.trim();
+    if (!content) throw new Error(`derivative ${row.asset} has no body text`);
+    return { ...base, content };
+  }
+  if (/^https?:\/\//.test(row.asset)) throw new Error("Postiz media must be a rendered local file; remote URLs are not registered");
+  const mediaPath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
+  if (!existsSync(mediaPath)) throw new Error(`missing ${mediaPath}; render it before scheduling`);
+  const mime = MEDIA_MIME[extname(mediaPath).toLowerCase()];
+  if (!mime) throw new Error(`Postiz cannot upload ${extname(mediaPath) || "an extensionless file"}`);
+  const media = [await uploadPostizMedia(transport, { bytes: new Uint8Array(readFileSync(mediaPath)), filename: basename(mediaPath), mime })];
+  if (shape.media === "image") {
+    const { text } = cardCopy(folder, row.id);
+    return { ...base, content: text, media };
+  }
+  const titlePath = join(folder, "video", "title.txt");
+  const title = existsSync(titlePath) ? readFileSync(titlePath, "utf8").trim() : "";
+  const descPath = join(folder, "video", "description.txt");
+  const description = existsSync(descPath) ? readFileSync(descPath, "utf8").trim() : row.notes.trim();
+  if (shape.destination === "youtube") {
+    if (!title) throw new Error("YouTube via Postiz needs video/title.txt");
+    return { ...base, content: description || title, media, providerSettings: { title: /#shorts/i.test(title) ? title : `${title} #Shorts`, type: "public" } };
+  }
+  if (shape.destination === "tiktok") return { ...base, content: description || title || row.id, media, providerSettings: { title: (title || description).slice(0, 90) } };
+  return { ...base, content: description || title || row.id, media };
+}
+
 async function defaultPublishPostiz(folder: string, row: QueueRow, capability: PostizCapability, policy: DeliveryPolicyDecision): Promise<unknown> {
   assertProviderDispatch(folder, "postiz", policy);
   const shape = postizShape(row);
   if (!shape) throw new Error(`Postiz does not recognize destination/media for ${row.id}`);
-  if (shape.media !== "text" && !/^https?:\/\//.test(row.asset)) throw new Error("Postiz local media upload was selected without an implemented registration adapter");
-  const path = join(folder, row.asset);
-  const raw = shape.media === "text" ? readFileSync(path, "utf8") : row.notes;
-  const content = row.asset.endsWith(".md") ? splitFrontmatter(raw).body.trim() : raw.trim() || row.id;
   const { times, labels } = claimSlots({ windowKey: shape.destination, conflictPlatforms: [shape.destination], count: 1, asset: row.asset, by: "postiz" });
   if (!times[0] || times[0] === "next-free-slot") throw new Error(`Postiz requires an explicit future slot for ${shape.destination}`);
   const transport: PostizTransport = createPostizTransport();
-  const post = await createPostizPost(transport, {
-    destination: shape.destination,
-    accountId: capability.accountId,
-    content,
-    scheduledAt: times[0],
-    visibility: "scheduled",
-    ...(shape.media !== "text" && /^https?:\/\//.test(row.asset) ? { mediaUrls: [row.asset] } : {}),
-  });
+  const post = await createPostizPost(transport, await buildPostizInput(folder, row, capability.accountId, times[0], transport));
   return {
     id: row.id, platform: shape.destination, when: labels[0], ref: post.id,
     providerObjectId: post.id, providerAccountId: capability.accountId,

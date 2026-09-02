@@ -61,7 +61,7 @@ export function cardTarget(rowPlatform: string): string | null {
 // The post BODY (caption) for a card = the body of derivatives/<row.id>.md — the per-platform CONTEXT
 // caption (the quote itself lives on the image, rendered from the separate quote-card-N.md definition
 // derivative).
-function cardCopy(folder: string, rowId: string): { text: string; fm: Record<string, unknown> } {
+export function cardCopy(folder: string, rowId: string): { text: string; fm: Record<string, unknown> } {
   const path = join(folder, "derivatives", `${rowId}.md`);
   if (!existsSync(path)) {
     throw new Error(`missing card derivative ${path} — every quote-card row needs derivatives/<id>.md for its caption`);
