@@ -1,4 +1,5 @@
 import { type IncomingMessage, type ServerResponse } from "node:http";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import {
   listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory,
   readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats, listChapters, seriesDirFor,
@@ -7,7 +8,7 @@ import { patchChapterSpan } from "../fiction/patch.js";
 import { readContinuityReport } from "../fiction/continuity.js";
 import { addFictionDraftJob, addFictionRepassJob, addFictionCheckJob, generateFictionPromotionText, publicJob } from "./jobs.js";
 import { type Engine } from "./engines.js";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { createLockedChapterHandoff } from "./fiction-content-handoff-store.js";
 import {
@@ -38,6 +39,30 @@ type FictionRouteContext = {
   currentBranch?: () => Promise<string>;
 };
 
+const DISPOSABLE_FICTION_CLEANUP = "The signal changes the weather above the station.";
+
+/** Available only inside the combined E2E runner's token-marked disposable repository copy. */
+export function disposableFictionInboxAuthorized(
+  env: NodeJS.ProcessEnv = process.env,
+  root: string = repoRoot,
+): boolean {
+  const token = env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
+  const disposableRoot = env.E2E_REPO_ROOT;
+  if (!token || !disposableRoot) return false;
+  try {
+    if (realpathSync(disposableRoot) !== realpathSync(root)) return false;
+  } catch { return false; }
+  const marker = join(root, ".e2e-configured-engine-token");
+  return existsSync(marker) && readFileSync(marker, "utf8") === token;
+}
+
+function requireValidDisposableFictionAuthorization(): boolean {
+  const requested = Boolean(process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN);
+  const authorized = disposableFictionInboxAuthorized();
+  if (requested && !authorized) throw new Error("disposable Fiction inbox token was present but marker/root authorization failed");
+  return authorized;
+}
+
 function promotionId(chapter: number): string { return `chapter-${chapter}`; }
 function promotionPrompt(draft: Pick<FictionPromotionDraft, "request">, currentBody?: string, instruction?: string): string {
   const request = draft.request;
@@ -59,9 +84,14 @@ function promotionPrompt(draft: Pick<FictionPromotionDraft, "request">, currentB
 // Fiction endpoint wrote its response; false lets serve.ts continue its normal dispatch.
 export async function handleFictionRoute({
   req, res, url, readBody, json, requestEngine,
-  classifyIdea = classifyIdeaWithEngine,
-  cleanupIdea = cleanupIdeaWithEngine,
+  classifyIdea = async (rawText, engine) => requireValidDisposableFictionAuthorization()
+    ? "world"
+    : classifyIdeaWithEngine(rawText, engine),
+  cleanupIdea = async (rawText, classification, engine) => requireValidDisposableFictionAuthorization()
+    ? DISPOSABLE_FICTION_CLEANUP
+    : cleanupIdeaWithEngine(rawText, classification, engine),
   currentBranch = async () => {
+    if (requireValidDisposableFictionAuthorization()) return "main";
     const result = await defaultRun("git", ["branch", "--show-current"], repoRoot);
     if (result.code !== 0) throw new Error(`could not inspect current branch: ${result.stderr.trim() || `exit ${result.code}`}`);
     return result.stdout.trim();

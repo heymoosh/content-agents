@@ -24,6 +24,7 @@ const PASSES = [
   { name: "B-writes", script: "pass-b-writes.ts", title: "Pass B — the write flows (real server, worktree-isolated)" },
   { name: "C-383", script: "pass-c-383.ts", title: "Pass C — the phase-gated #383 surfaces" },
   { name: "D-editorial", script: "pass-d-editorial.ts", title: "Pass D — Fiction and Charles editorial writes" },
+  { name: "D-fiction-idea", script: "pass-d-fiction-idea.ts", title: "Pass D — Fiction idea review with a disposable injected engine" },
   { name: "D-content-generation", script: "pass-d-content-generation.ts", title: "Pass D — configured Content generation with a disposable injected engine" },
   { name: "D-outreach-generation", script: "pass-d-outreach-generation.ts", title: "Pass D — Outreach draft and revise with a disposable injected engine" },
   { name: "E-notcovered", script: "pass-d-notcovered.ts", title: "Pass E — deliberately NOT covered (model-job routes)" },
@@ -111,6 +112,7 @@ function main(): void {
           E2E_PASS: p.name,
           ...(p.name === "B-writes" ? { CONTENT_AGENTS_E2E_SCHEDULING_TOKEN: schedulingToken } : {}),
           ...(p.name === "D-content-generation" ? { CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: configuredEngineToken } : {}),
+          ...(p.name === "D-fiction-idea" ? { CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: configuredEngineToken } : {}),
           ...(p.name === "D-outreach-generation" ? { CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: configuredEngineToken } : {}),
         },
       });

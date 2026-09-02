@@ -1,9 +1,20 @@
 import { strict as assert } from "node:assert";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { handleFictionRoute } from "./serve-fiction.js";
+import { disposableFictionInboxAuthorized, handleFictionRoute } from "./serve-fiction.js";
+
+test("disposable Fiction inbox authorization requires the one-run token, exact marker, and matching root", () => {
+  const root = mkdtempSync(join(tmpdir(), "fiction-inbox-auth-"));
+  const token = "one-run-fiction-token";
+  writeFileSync(join(root, ".e2e-configured-engine-token"), token);
+  assert.equal(disposableFictionInboxAuthorized({}, root), false);
+  assert.equal(disposableFictionInboxAuthorized({ CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: token }, root), false);
+  assert.equal(disposableFictionInboxAuthorized({ CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: token, E2E_REPO_ROOT: root }, root), true);
+  assert.equal(disposableFictionInboxAuthorized({ CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: "wrong", E2E_REPO_ROOT: root }, root), false);
+  assert.equal(disposableFictionInboxAuthorized({ CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: token, E2E_REPO_ROOT: tmpdir() }, root), false);
+});
 
 test("inbox route persists exact input and returns an injected cleanup proposal without writing canon", async () => {
   const home = mkdtempSync(join(tmpdir(), "fiction-inbox-route-"));
