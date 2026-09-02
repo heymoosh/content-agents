@@ -1,5 +1,5 @@
-import { basename, extname, join, isAbsolute } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { basename, extname, join, isAbsolute, sep } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { appendBetPlacement, appendPublishLog, setStatus, type QueueRow } from "../publish/queue.js";
 import { buildPosts, loadPlatformMax, publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
 import { loadCanonicalUrl, loadContentTypesConfig, loadCtaConfig, loadSourceKind, resolveCtaLines, resolvePrimaryCtaDestination } from "../publish/cta.js";
@@ -26,6 +26,7 @@ import {
   type PostizCapabilityRegistry,
   type PostizDestination,
   type PostizMedia,
+  type PostizMediaRef,
   type PostizTransport,
 } from "../publish/postiz.js";
 
@@ -44,12 +45,26 @@ import {
 //     the outreach channel (email/linkedin-dm/contact-form/podcast-pitch), not a real destination.
 // Returns null for a row no scheduler owns — it just gets the plain approve status (CLAUDE.md rule 2
 // is preserved: the row was already set to approve; scheduling only mirrors what /publish would do).
-export type ScheduleKind = "text" | "card" | "tiktok" | "video" | "substack" | "outreach-lock";
+export type ScheduleKind = "text" | "card" | "tiktok" | "video" | "substack" | "outreach-lock" | "media";
+export const isConfiguredMediaRow = (row: Pick<QueueRow, "format" | "asset">): boolean =>
+  (row.format === "image" || row.format === "video") && /^(media-stages|configured-media)\//.test(row.asset);
 export function scheduleKind(row: QueueRow): ScheduleKind | null {
-  if (TEXT_PLATFORMS.has(row.platform)) return "text";
   if (isQuoteCardRow(row.platform)) return "card";
+  // Configured-media image/video rows (any destination, e.g. instagram/facebook, or a text-platform
+  // destination like linkedin/x) — checked BEFORE the TEXT_PLATFORMS check below so a text-platform
+  // destination doesn't misroute a configured image/video row to the text scheduler (which would try
+  // to read the rendered asset file as markdown body text). Storyboard rows are excluded on purpose:
+  // they aren't a postable asset yet (that's the video-script/render pipeline, not this dispatch).
+  // Gated on the asset path (not just format) so this never swallows the separate, older
+  // /video-pipeline row shape ({x|linkedin|bluesky, format: "video", asset: "video/short.mp4"} — a
+  // genuine native-video Typefully post, see serve.test.ts's "qvid-x" rows) — only jobs.ts's
+  // configured-media writer ever produces a media-stages/ or configured-media/ asset.
+  // Also checked before tiktok/short: the PostPeer/YouTube legacy handlers read video/short.mp4, not
+  // row.asset, so a configured tiktok/youtube video row must never fall back to them.
+  if (isConfiguredMediaRow(row)) return "media";
   if (isTikTokRow(row.platform)) return "tiktok"; // checked before "video" — a tiktok row is also a short
   if (isShortRow(row.platform, row.format)) return "video";
+  if (TEXT_PLATFORMS.has(row.platform)) return "text";
   if (isSubstackRow(row.platform)) return "substack";
   if (row.format === "outreach-message") return "outreach-lock";
   return null;
@@ -92,6 +107,10 @@ function postizShape(row: QueueRow): { destination: PostizDestination; media: Po
 }
 
 function legacyProvider(kind: ScheduleKind): SelectedSchedulingProvider {
+  // "media" (configured-media image/video rows not owned by a quote-card/short/tiktok scheduler)
+  // has no Typefully/PostPeer/YouTube fallback — Postiz is the only route, so an unconfigured
+  // instance falls back to manual ready-to-paste, same as outreach-lock's non-schedulable rows.
+  if (kind === "media") return { provider: "manual" as never };
   return { provider: kind === "text" || kind === "card" ? "typefully" : kind === "tiktok" ? "postpeer" : kind === "video" ? "youtube" : "substack" };
 }
 
@@ -115,8 +134,16 @@ export async function selectConfiguredProvider(row: QueueRow, deps: Pick<Schedul
   }
   const requiresLocalMediaUpload = shape.media !== "text" && !/^https?:\/\//.test(row.asset);
   const route = selectDeliveryRoute(registry, shape.destination, shape.media, { requiresLocalMediaUpload });
-  if (route === "unsupported") throw new Error(`no delivery provider supports ${shape.destination}/${shape.media}`);
-  if (route !== "postiz") return { provider: route };
+  // "media" rows have no legacy Typefully/PostPeer/YouTube/Substack handler wired for them (the
+  // dispatch table at the bottom of scheduleApproved has no "media" case), so any non-Postiz
+  // outcome — including an incidental legacy-route match selectDeliveryRoute would offer a
+  // text/card/video/substack kind — falls back to manual ready-to-paste instead of a route this
+  // row's kind can't actually use.
+  if (route === "unsupported") {
+    if (kind === "media") return legacyProvider(kind);
+    throw new Error(`no delivery provider supports ${shape.destination}/${shape.media}`);
+  }
+  if (route !== "postiz") return kind === "media" ? legacyProvider(kind) : { provider: route };
   return { provider: "postiz", postizCapability: resolveConfiguredPostizCapability(registry, shape.destination, shape.media, env) };
 }
 
@@ -124,6 +151,92 @@ const MEDIA_MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image
 
 /** Postiz's own per-channel limits (live `GET /integration-settings/:id`, 2026-09-02) for channels config/platforms.yaml does not cap. */
 const POSTIZ_MAX_CHARS: Partial<Record<PostizDestination, number>> = { mastodon: 500, threads: 500, facebook: 63206, instagram: 2200, tiktok: 2000, youtube: 5000, x: 4000, linkedin: 3000, bluesky: 300 };
+
+/**
+ * Per-destination maximum images/media items Postiz will actually send in one post. Source: Postiz's
+ * own provider code (github.com/gitroomhq/postiz-app, main branch, fetched 2026-09-02,
+ * libraries/nestjs-libraries/src/integrations/social/<destination>.provider.ts) —
+ *   x: `@Rules` decorator + handled API error both say "maximum of 4 items per post" (x.provider.ts)
+ *   bluesky: `@Rules('Bluesky can have maximum 1 video or 4 pictures in one post')` (bluesky.provider.ts)
+ *   instagram: carousel validation refuses fewer than 2 or more than 10 attachments (instagram.provider.ts)
+ * facebook/linkedin/mastodon/threads enforce no client-side cap in Postiz's own provider code (it
+ * forwards whatever array length it's given), so those four fall back to the platforms' own published
+ * per-post attachment limits: facebook 10, linkedin 20, mastodon 4, threads 20.
+ */
+export const POSTIZ_MAX_IMAGES: Partial<Record<PostizDestination, number>> = {
+  x: 4, bluesky: 4, instagram: 10, facebook: 10, linkedin: 20, mastodon: 4, threads: 20, tiktok: 35,
+};
+// tiktok: Postiz forwards photo posts to TikTok's Content Posting API, whose published limit is 35 images.
+
+interface ConfiguredCarouselManifest {
+  readonly version: string;
+  readonly slides: readonly string[];
+}
+
+function readCarouselManifest(folder: string, manifestRelPath: string): ConfiguredCarouselManifest {
+  const manifestAbs = isAbsolute(manifestRelPath) ? manifestRelPath : join(folder, manifestRelPath);
+  if (!existsSync(manifestAbs)) throw new Error(`missing ${manifestAbs}; render it before scheduling`);
+  let parsed: unknown;
+  try { parsed = JSON.parse(readFileSync(manifestAbs, "utf8")); }
+  catch { throw new Error(`carousel manifest ${manifestAbs} is not valid JSON`); }
+  const manifest = parsed as Partial<ConfiguredCarouselManifest> | null;
+  if (!manifest || manifest.version !== "configured-carousel-v1") {
+    throw new Error(`carousel manifest ${manifestAbs} has an unrecognized or missing version`);
+  }
+  if (!Array.isArray(manifest.slides) || manifest.slides.length === 0 || !manifest.slides.every((s) => typeof s === "string" && s.trim())) {
+    throw new Error(`carousel manifest ${manifestAbs} must list one or more non-empty slide paths`);
+  }
+  for (const slide of manifest.slides) {
+    if (isAbsolute(slide) || slide.split(/[\\/]/).includes("..")) {
+      throw new Error(`carousel manifest ${manifestAbs} references an unsafe slide path: ${slide}`);
+    }
+  }
+  return { version: manifest.version, slides: manifest.slides };
+}
+
+/** Uploads every slide of a configured carousel, in order, refusing a manifest that exceeds the destination's cap. */
+async function uploadCarouselMedia(folder: string, manifestRelPath: string, destination: PostizDestination, transport: PostizTransport): Promise<PostizMediaRef[]> {
+  const { slides } = readCarouselManifest(folder, manifestRelPath);
+  const cap = POSTIZ_MAX_IMAGES[destination];
+  if (cap === undefined) throw new Error(`no carousel image cap is known for ${destination}; add it to POSTIZ_MAX_IMAGES before sending multi-image posts there`);
+  if (slides.length > cap) {
+    throw new Error(`carousel has ${slides.length} slides, more than ${destination} allows (max ${cap})`);
+  }
+  // Validate every slide (existence, containment, type) before the first upload so a bad manifest
+  // never leaves orphaned media in Postiz's library (it has no public delete route).
+  const root = realpathSync(folder);
+  const files = slides.map((slide) => {
+    const slideAbs = join(folder, slide);
+    if (!existsSync(slideAbs)) throw new Error(`missing carousel slide ${slideAbs}; render it before scheduling`);
+    if (!realpathSync(slideAbs).startsWith(root + sep)) throw new Error(`carousel slide ${slide} resolves outside the content folder`);
+    const mime = MEDIA_MIME[extname(slideAbs).toLowerCase()];
+    if (!mime || !mime.startsWith("image/")) throw new Error(`carousel slide ${slide} is not a supported image type`);
+    return { slideAbs, mime };
+  });
+  const refs: PostizMediaRef[] = [];
+  for (const { slideAbs, mime } of files) {
+    refs.push(await uploadPostizMedia(transport, { bytes: new Uint8Array(readFileSync(slideAbs)), filename: basename(slideAbs), mime }));
+  }
+  return refs;
+}
+
+/**
+ * The caption for a non-quote-card configured-media row (single image, carousel, or video) — the
+ * verbatim body of derivatives/<row.id>.md, same file jobs.ts writes for every configured variant
+ * (CLAUDE.md rule 1: extraction-first, never composed here). Quote-card rows keep cardCopy instead
+ * (see planPostizDispatch) because their caption is a distinct per-platform context derivative, not
+ * this one.
+ */
+function derivativeCaption(folder: string, rowId: string): { text: string; fm: Record<string, unknown> } {
+  const path = join(folder, "derivatives", `${rowId}.md`);
+  if (!existsSync(path)) {
+    throw new Error(`missing derivative ${path}; every configured media row needs derivatives/<id>.md for its caption`);
+  }
+  const { fm, body } = splitFrontmatter(readFileSync(path, "utf8"));
+  const text = body.trim();
+  if (!text) throw new Error(`derivative ${path} has no caption text in its body`);
+  return { text, fm };
+}
 
 export interface PostizDispatchPlan {
   input: PostizCreateInput;
@@ -177,27 +290,58 @@ export async function planPostizDispatch(folder: string, row: QueueRow, accountI
     return { input: { ...base, content: placed.content, ...(placed.followUps.length ? { followUps: placed.followUps } : {}) }, fm, body: text, ctaDestination: placed.ctaDestination, placement: placed.placement, ctaCount: placed.ctaCount };
   }
   if (/^https?:\/\//.test(row.asset)) throw new Error("Postiz media must be a rendered local file; remote URLs are not registered");
-  const mediaPath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
-  if (!existsSync(mediaPath)) throw new Error(`missing ${mediaPath}; render it before scheduling`);
-  const mime = MEDIA_MIME[extname(mediaPath).toLowerCase()];
-  if (!mime) throw new Error(`Postiz cannot upload ${extname(mediaPath) || "an extensionless file"}`);
-  const media = [await uploadPostizMedia(transport, { bytes: new Uint8Array(readFileSync(mediaPath)), filename: basename(mediaPath), mime })];
+  const isCard = isQuoteCardRow(row.platform);
   if (shape.media === "image") {
-    const { text, fm } = cardCopy(folder, row.id);
+    // Quote cards keep their own per-platform context caption (cardCopy); every other configured
+    // image row (single or carousel) is captioned from its own derivative markdown, never composed
+    // here (CLAUDE.md rule 1). Resolved BEFORE any upload so a caption failure leaves no orphaned media.
+    const { text, fm } = isCard ? cardCopy(folder, row.id) : derivativeCaption(folder, row.id);
     const placed = placeCtas(folder, shape.destination, fm, text);
+    const media = row.asset.endsWith("carousel-manifest.json")
+      ? await uploadCarouselMedia(folder, row.asset, shape.destination, transport)
+      : [await uploadSingleMedia(folder, row.asset, transport)];
     return { input: { ...base, content: placed.content, media, ...(placed.followUps.length ? { followUps: placed.followUps } : {}) }, fm, body: text, ctaDestination: placed.ctaDestination, placement: placed.placement, ctaCount: placed.ctaCount };
   }
   const titlePath = join(folder, "video", "title.txt");
-  const title = existsSync(titlePath) ? readFileSync(titlePath, "utf8").trim() : "";
+  const legacyTitle = existsSync(titlePath) ? readFileSync(titlePath, "utf8").trim() : "";
+  if (!isCard) {
+    // Same rule as the image branch: a non-card configured video row is captioned from its own
+    // derivative, run through the same CTA placement as text/image rows. video/title.txt still
+    // wins when present (the storyboard/shorts pipeline writes it); otherwise the title is the
+    // derivative's first non-empty line (derivativeCaption already refuses an empty body).
+    const { text, fm } = derivativeCaption(folder, row.id);
+    const placed = placeCtas(folder, shape.destination, fm, text);
+    const firstLine = text.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
+    const title = legacyTitle || firstLine;
+    const media = [await uploadSingleMedia(folder, row.asset, transport)]; // after caption/title resolution: no orphaned upload on failure
+    const out = { input: { ...base, content: placed.content, media, ...(placed.followUps.length ? { followUps: placed.followUps } : {}) }, fm, body: text, ctaDestination: placed.ctaDestination, placement: placed.placement, ctaCount: placed.ctaCount };
+    if (shape.destination === "youtube") {
+      if (!title) throw new Error("YouTube via Postiz needs video/title.txt or a derivative body for a title");
+      return { ...out, input: { ...out.input, providerSettings: { title: /#shorts/i.test(title) ? title : `${title} #Shorts`, type: "public" } } };
+    }
+    if (shape.destination === "tiktok") return { ...out, input: { ...out.input, providerSettings: { title: title.slice(0, 90) } } };
+    return out;
+  }
+  const media = [await uploadSingleMedia(folder, row.asset, transport)];
+  // Quote-card (animated) video rows: unchanged legacy behavior — captioned from video/title.txt +
+  // video/description.txt (or row.notes), no source CTA (the card image itself carries the quote).
   const descPath = join(folder, "video", "description.txt");
   const description = existsSync(descPath) ? readFileSync(descPath, "utf8").trim() : row.notes.trim();
-  const video = { fm: {}, body: description || title, ctaDestination: null, placement: "none", ctaCount: 0 };
+  const video = { fm: {}, body: description || legacyTitle, ctaDestination: null, placement: "none", ctaCount: 0 };
   if (shape.destination === "youtube") {
-    if (!title) throw new Error("YouTube via Postiz needs video/title.txt");
-    return { ...video, input: { ...base, content: description || title, media, providerSettings: { title: /#shorts/i.test(title) ? title : `${title} #Shorts`, type: "public" } } };
+    if (!legacyTitle) throw new Error("YouTube via Postiz needs video/title.txt");
+    return { ...video, input: { ...base, content: description || legacyTitle, media, providerSettings: { title: /#shorts/i.test(legacyTitle) ? legacyTitle : `${legacyTitle} #Shorts`, type: "public" } } };
   }
-  if (shape.destination === "tiktok") return { ...video, input: { ...base, content: description || title || row.id, media, providerSettings: { title: (title || description).slice(0, 90) } } };
-  return { ...video, input: { ...base, content: description || title || row.id, media } };
+  if (shape.destination === "tiktok") return { ...video, input: { ...base, content: description || legacyTitle || row.id, media, providerSettings: { title: (legacyTitle || description).slice(0, 90) } } };
+  return { ...video, input: { ...base, content: description || legacyTitle || row.id, media } };
+}
+
+async function uploadSingleMedia(folder: string, assetRelPath: string, transport: PostizTransport): Promise<PostizMediaRef> {
+  const mediaPath = isAbsolute(assetRelPath) ? assetRelPath : join(folder, assetRelPath);
+  if (!existsSync(mediaPath)) throw new Error(`missing ${mediaPath}; render it before scheduling`);
+  const mime = MEDIA_MIME[extname(mediaPath).toLowerCase()];
+  if (!mime) throw new Error(`Postiz cannot upload ${extname(mediaPath) || "an extensionless file"}`);
+  return uploadPostizMedia(transport, { bytes: new Uint8Array(readFileSync(mediaPath)), filename: basename(mediaPath), mime });
 }
 
 async function defaultPublishPostiz(folder: string, row: QueueRow, capability: PostizCapability, policy: DeliveryPolicyDecision): Promise<unknown> {
@@ -301,6 +445,10 @@ export async function scheduleApproved(
         return { scheduled: await (deps.publishPostiz ?? defaultPublishPostiz)(folder, row, capability, policy), scheduleError: null };
       } catch (e) { return { scheduled: null, scheduleError: e instanceof Error ? e.message : String(e) }; }
     }
+    // "media" rows have no legacy publisher below (no Typefully/PostPeer/YouTube/Substack handler
+    // knows this row shape) — every non-"postiz"/"manual"/"blocked" outcome above is a caller
+    // error (e.g. an explicit policyDecision naming a legacy provider this kind can't use).
+    if (kind === "media") return { scheduled: null, scheduleError: `delivery policy resolved ${provider} for a media row, but media rows are Postiz-only` };
   }
   const fn =
     kind === "text" ? deps.publishText

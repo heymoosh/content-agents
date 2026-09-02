@@ -72,6 +72,7 @@ test("audiogram draws a waveform clip then burns the same captions over it", asy
   const result = await renderAudiogram({ audioPath: audio, outPath: out }, { ...d, waveform: (a, clip) => { waveformArgs = [a, clip]; writeFileSync(clip, "clip"); } });
   assert.deepEqual(waveformArgs, [audio, join(dir, "audiogram-waveform.mp4")]);
   assert.equal(calls.alignedPath, join(dir, "audiogram-waveform.mp4"));
+  assert.ok(!existsSync(join(dir, "audiogram-waveform.mp4")), "intermediate waveform clip is cleaned up");
   assert.equal(result.captions.length, 3);
   assert.ok(existsSync(out));
 });

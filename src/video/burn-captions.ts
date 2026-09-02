@@ -1,4 +1,4 @@
-import { writeFileSync, existsSync } from "node:fs";
+import { writeFileSync, existsSync, rmSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { charsToWordCaptions, type Caption } from "./captions.js";
@@ -102,8 +102,7 @@ export async function burnCaptions(input: BurnCaptionsInput, deps: BurnCaptionsD
 
 /**
  * Audiogram = a 1080x1920 waveform clip drawn from the audio (ffmpeg showwaves, $0) with the
- * same synced captions burned over it. Returns the burned result; the intermediate waveform clip
- * is left next to the output for inspection.
+ * same synced captions burned over it. The intermediate waveform clip is removed after the burn.
  */
 export async function renderAudiogram(
   input: { audioPath: string; outPath: string; transcriptPath?: string; captionsPath?: string },
@@ -112,7 +111,11 @@ export async function renderAudiogram(
   if (!existsSync(input.audioPath)) throw new Error(`missing source audio: ${input.audioPath}`);
   const clipPath = input.outPath.replace(/\.mp4$/i, "") + "-waveform.mp4";
   (deps.waveform ?? renderWaveformClip)(input.audioPath, clipPath);
-  return burnCaptions({ sourcePath: clipPath, outPath: input.outPath, transcriptPath: input.transcriptPath, captionsPath: input.captionsPath }, deps);
+  try {
+    return await burnCaptions({ sourcePath: clipPath, outPath: input.outPath, transcriptPath: input.transcriptPath, captionsPath: input.captionsPath }, deps);
+  } finally {
+    rmSync(clipPath, { force: true }); // intermediate only; the captioned output is the artifact
+  }
 }
 
 export function renderWaveformClip(audioPath: string, clipPath: string): void {

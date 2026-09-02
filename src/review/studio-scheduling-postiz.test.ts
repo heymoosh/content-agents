@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scheduleApproved, type SchedulerDeps } from "./studio-scheduling.js";
+import { scheduleApproved, scheduleKind, planPostizDispatch, type SchedulerDeps } from "./studio-scheduling.js";
 import type { QueueRow } from "../publish/queue.js";
 import type { DeliveryPolicyDecision } from "../publish/delivery-policy.js";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -137,5 +137,111 @@ test("Postiz dispatch places the source CTA like the Typefully path: reply on X,
   const bs = await planPostizDispatch(root, { ...base, id: "bs-1", platform: "bluesky", asset: "derivatives/bs-1.md" } as QueueRow, "acct", "2026-09-20T17:00:00Z", transport);
   assert.ok(bs.input.content.includes("https://example.substack.com/p/essay"), "Bluesky places the link inline");
   assert.equal(bs.input.followUps, undefined);
+  rmSync(root, { recursive: true, force: true });
+});
+
+// ── Configured-media routing: scheduleKind should own image/video rows Postiz can deliver, without
+// swallowing rows a legacy scheduler already owns (quote-card, tiktok, YouTube short, or the older
+// {x|linkedin|bluesky, format:"video", asset:"video/*.mp4"} native-video Typefully post). ────────
+test("scheduleKind routes configured-media image/video rows to 'media', not text/null", () => {
+  const configured = (over: Partial<QueueRow>): QueueRow => ({
+    id: "m-1", platform: "instagram", format: "image", asset: "media-stages/m-1.json", status: "approve", notes: "", lineIndex: 1, ...over,
+  });
+  assert.equal(scheduleKind(configured({ platform: "instagram", format: "image" })), "media");
+  assert.equal(scheduleKind(configured({ platform: "linkedin", format: "image" })), "media");
+  assert.equal(scheduleKind(configured({ platform: "instagram", format: "video", asset: "configured-media/m-1/video.mp4" })), "media");
+  assert.equal(scheduleKind(configured({ platform: "x", format: "video", asset: "configured-media/m-1/video.mp4" })), "media");
+  // still owned by the existing short/tiktok schedulers, unaffected by the new "media" kind
+  assert.equal(scheduleKind(configured({ platform: "youtube", format: "video", asset: "configured-media/m-1/video.mp4" })), "media"); // configured tiktok/youtube rows go through Postiz; the legacy PostPeer/YouTube handlers read video/short.mp4, never row.asset
+  assert.equal(scheduleKind(configured({ platform: "tiktok", format: "video", asset: "configured-media/m-1/video.mp4" })), "media");
+  // the older native-video Typefully post (not a configured-media row: no media-stages/configured-media asset)
+  assert.equal(scheduleKind({ id: "qvid-x", platform: "x", format: "video", asset: "video/short.mp4", status: "approve", notes: "", lineIndex: 1 }), "text");
+});
+
+function fakeTransport(uploaded: string[]) {
+  let n = 0;
+  return {
+    async request() {
+      n += 1;
+      const id = `media-${n}`;
+      uploaded.push(id);
+      return { id, path: `/uploads/${id}.png` };
+    },
+  };
+}
+
+test("Postiz carousel dispatch uploads every slide in order and captions from the derivative", async () => {
+  const root = mkdtempSync(join(tmpdir(), "postiz-carousel-"));
+  mkdirSync(join(root, "derivatives"));
+  mkdirSync(join(root, "configured-media", "m-1"), { recursive: true });
+  writeFileSync(join(root, "derivatives", "m-1.md"), "---\nsource_lines: [1]\n---\nCarousel caption from the derivative.\n");
+  writeFileSync(join(root, "configured-media", "m-1", "slide-1.png"), "png-1");
+  writeFileSync(join(root, "configured-media", "m-1", "slide-2.png"), "png-2");
+  writeFileSync(join(root, "configured-media", "m-1", "carousel-manifest.json"), JSON.stringify({
+    version: "configured-carousel-v1",
+    slides: ["configured-media/m-1/slide-1.png", "configured-media/m-1/slide-2.png"],
+  }));
+  const uploaded: string[] = [];
+  const row: QueueRow = { id: "m-1", platform: "linkedin", format: "image", asset: "configured-media/m-1/carousel-manifest.json", status: "approve", notes: "", lineIndex: 1 };
+  const plan = await planPostizDispatch(root, row, "acct", "2026-09-20T17:00:00Z", fakeTransport(uploaded));
+  assert.deepEqual(uploaded, ["media-1", "media-2"]);
+  assert.equal(plan.input.media?.length, 2);
+  assert.deepEqual(plan.input.media?.map((m) => m.id), ["media-1", "media-2"]);
+  assert.equal(plan.input.content, "Carousel caption from the derivative.");
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("Postiz carousel dispatch refuses a manifest that exceeds the destination's image cap", async () => {
+  const root = mkdtempSync(join(tmpdir(), "postiz-carousel-cap-"));
+  mkdirSync(join(root, "derivatives"));
+  mkdirSync(join(root, "configured-media", "m-2"), { recursive: true });
+  writeFileSync(join(root, "derivatives", "m-2.md"), "---\nsource_lines: [1]\n---\nToo many slides.\n");
+  const slides = Array.from({ length: 5 }, (_, i) => `configured-media/m-2/slide-${i + 1}.png`);
+  for (const slide of slides) writeFileSync(join(root, slide), "png");
+  writeFileSync(join(root, "configured-media", "m-2", "carousel-manifest.json"), JSON.stringify({ version: "configured-carousel-v1", slides }));
+  const row: QueueRow = { id: "m-2", platform: "x", format: "image", asset: "configured-media/m-2/carousel-manifest.json", status: "approve", notes: "", lineIndex: 1 };
+  await assert.rejects(
+    planPostizDispatch(root, row, "acct", "2026-09-20T17:00:00Z", fakeTransport([])),
+    /more than x allows \(max 4\)/,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("Postiz dispatch refuses a non-quote-card image/video row with no derivative", async () => {
+  const root = mkdtempSync(join(tmpdir(), "postiz-missing-derivative-"));
+  mkdirSync(join(root, "configured-media", "m-3"), { recursive: true });
+  writeFileSync(join(root, "configured-media", "m-3", "image.png"), "png");
+  const row: QueueRow = { id: "m-3", platform: "instagram", format: "image", asset: "configured-media/m-3/image.png", status: "approve", notes: "", lineIndex: 1 };
+  await assert.rejects(
+    planPostizDispatch(root, row, "acct", "2026-09-20T17:00:00Z", fakeTransport([])),
+    /missing derivative .*m-3\.md/,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("Postiz dispatch sends a single configured image on instagram with the derivative caption", async () => {
+  const root = mkdtempSync(join(tmpdir(), "postiz-single-image-"));
+  mkdirSync(join(root, "derivatives"));
+  mkdirSync(join(root, "configured-media", "m-4"), { recursive: true });
+  writeFileSync(join(root, "derivatives", "m-4.md"), "---\nsource_lines: [1]\n---\nSingle configured image caption.\n");
+  writeFileSync(join(root, "configured-media", "m-4", "image.png"), "png");
+  const uploaded: string[] = [];
+  const row: QueueRow = { id: "m-4", platform: "instagram", format: "image", asset: "configured-media/m-4/image.png", status: "approve", notes: "", lineIndex: 1 };
+  const plan = await planPostizDispatch(root, row, "acct", "2026-09-20T17:00:00Z", fakeTransport(uploaded));
+  assert.deepEqual(uploaded, ["media-1"]);
+  assert.equal(plan.input.media?.length, 1);
+  assert.equal(plan.input.content, "Single configured image caption.");
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("Postiz video title falls back from video/title.txt to the derivative's first line to row.notes", async () => {
+  const root = mkdtempSync(join(tmpdir(), "postiz-video-title-"));
+  mkdirSync(join(root, "derivatives"));
+  mkdirSync(join(root, "configured-media", "m-5"), { recursive: true });
+  writeFileSync(join(root, "derivatives", "m-5.md"), "---\nsource_lines: [1]\n---\nFirst real line of the caption.\nSecond line.\n");
+  writeFileSync(join(root, "configured-media", "m-5", "video.mp4"), "mp4");
+  const row: QueueRow = { id: "m-5", platform: "youtube", format: "video", asset: "configured-media/m-5/video.mp4", status: "approve", notes: "fallback note", lineIndex: 1 };
+  const plan = await planPostizDispatch(root, row, "acct", "2026-09-20T17:00:00Z", fakeTransport([]));
+  assert.equal((plan.input.providerSettings as { title: string }).title, "First real line of the caption. #Shorts");
   rmSync(root, { recursive: true, force: true });
 });

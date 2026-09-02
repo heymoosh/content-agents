@@ -356,3 +356,9 @@ describe("attended publish canary matrix", () => {
     await assert.rejects(runCanaryMatrix({ fetchedAt: registry.fetchedAt, capabilities: [] }, [], approval, runner, env), /advertises no capabilities/);
   });
 });
+
+test("transport turns a 429 into an actionable rate-limit error", async () => {
+  const fetchImpl = (async () => new Response(JSON.stringify({ statusCode: 429, message: "ThrottlerException: Too Many Requests" }), { status: 429 })) as unknown as typeof fetch;
+  const transport = createPostizTransport({ POSTIZ_BASE_URL: "http://postiz.test", POSTIZ_API_KEY: "k" }, fetchImpl);
+  await assert.rejects(transport.request("/public/v1/posts", { method: "POST", body: "{}" }), /90 requests per hour.*each schedule or move counts as one/);
+});

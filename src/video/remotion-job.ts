@@ -1,4 +1,5 @@
 import { mkdirSync, rmSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { repoRoot } from "../db/db.js";
@@ -14,7 +15,7 @@ export function remotion(args: string[]): void {
 
 /** Stage inputs under remotion/public/<job> (Remotion's staticFile root) and clean up afterwards. */
 export async function withRemotionJob<T>(fn: (jobDir: string, jobName: string) => Promise<T>): Promise<T> {
-  const jobName = `job-${Date.now().toString(36)}`;
+  const jobName = `job-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`; // unique under concurrent renders
   const jobDir = join(REMOTION_PUBLIC_DIR, jobName);
   mkdirSync(jobDir, { recursive: true });
   try {

@@ -132,6 +132,12 @@ export function createPostizTransport(env: NodeJS.ProcessEnv = process.env, fetc
       });
       if (!response.ok) {
         const body = (await response.text().catch(() => "")).slice(0, 300);
+        if (response.status === 429) {
+          // Postiz throttles post creation to 90 requests per hour, one global counter for the whole
+          // self-hosted instance (docs.postiz.com/public-api, "Rate Limits"). Every schedule AND every
+          // reschedule is one create, so a large batch move can hit it. Nothing partial was written.
+          throw new Error(`Postiz rate limit reached (${response.status}): the create-post endpoint allows 90 requests per hour across the whole instance, and each schedule or move counts as one. Wait for the hour to roll over, then retry the rows that were not moved.`);
+        }
         throw new Error(`Postiz ${init.method ?? "GET"} ${path} failed (${response.status})${body ? `: ${body}` : ""}`);
       }
       if (response.status === 204) return {};
