@@ -43,6 +43,8 @@ export interface PostizCreateInput {
   /** Remote media URLs are refused: Postiz media must be registered first (see `uploadPostizMedia`). */
   mediaUrls?: readonly string[];
   media?: readonly PostizMediaRef[];
+  /** Extra `value[]` entries: Postiz posts them as the thread's replies (X, Bluesky, Threads) or first comment (LinkedIn). */
+  followUps?: readonly string[];
   scheduledAt: string;
   visibility: "draft" | "private" | "scheduled";
   /** Provider settings merged over the per-destination defaults (`__type` is always server-injected). */
@@ -314,7 +316,11 @@ function createBody(input: PostizCreateInput, existing?: PostizExistingPost, mod
     posts: [{
       integration: { id: input.accountId },
       ...(existing?.group ? { group: existing.group } : {}),
-      value: [{ ...(existing ? { id: existing.id } : {}), content: input.content, image: (input.media ?? []).map((ref) => ({ id: ref.id, path: ref.path })) }],
+      value: [
+        { ...(existing ? { id: existing.id } : {}), content: input.content, image: (input.media ?? []).map((ref) => ({ id: ref.id, path: ref.path })) },
+        // Follow-ups carry no ids: on an in-place save the old group's extra rows are swept and these replace them.
+        ...(input.followUps ?? []).filter((text) => text.trim()).map((text) => ({ content: text, image: [] })),
+      ],
       ...(Object.keys(settings).length ? { settings } : {}),
     }],
   };

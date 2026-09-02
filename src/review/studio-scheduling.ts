@@ -1,7 +1,8 @@
 import { basename, extname, join, isAbsolute } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
-import { type QueueRow } from "../publish/queue.js";
-import { publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
+import { appendBetPlacement, appendPublishLog, setStatus, type QueueRow } from "../publish/queue.js";
+import { buildPosts, loadPlatformMax, publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
+import { loadCanonicalUrl, loadContentTypesConfig, loadCtaConfig, loadSourceKind, resolveCtaLines, resolvePrimaryCtaDestination } from "../publish/cta.js";
 import { publishCards, isQuoteCardRow, cardTarget, basePlatform, cardCopy } from "../publish/cards.js";
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
 import { publishShorts, isShortRow } from "../publish/youtube.js";
@@ -10,7 +11,7 @@ import { checkReuse } from "../publish/reuse-guard.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
 import { assertProviderDispatch, resolveDeliveryIntent, resolveDeliveryPolicy, writeReadyToPaste, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { claimSlots } from "../publish/slots.js";
+import { claimSlots, fmtLa } from "../publish/slots.js";
 import {
   createPostizPost,
   createPostizTransport,
@@ -121,21 +122,59 @@ export async function selectConfiguredProvider(row: QueueRow, deps: Pick<Schedul
 
 const MEDIA_MIME: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".mp4": "video/mp4" };
 
+/** Postiz's own per-channel limits (live `GET /integration-settings/:id`, 2026-09-02) for channels config/platforms.yaml does not cap. */
+const POSTIZ_MAX_CHARS: Partial<Record<PostizDestination, number>> = { mastodon: 500, threads: 500, facebook: 63206, instagram: 2200, tiktok: 2000, youtube: 5000, x: 4000, linkedin: 3000, bluesky: 300 };
+
+export interface PostizDispatchPlan {
+  input: PostizCreateInput;
+  fm: Record<string, unknown>;
+  body: string;
+  ctaDestination: string | null;
+  placement: string;
+  ctaCount: number;
+}
+
+/**
+ * Place the derivative's CTA line(s) exactly as the Typefully path does (`buildPosts`, cta.yaml
+ * placement): inline appends to the body, reply/comment become follow-up `value[]` entries, which
+ * Postiz posts as thread replies or, on LinkedIn, as the first comment.
+ */
+function placeCtas(folder: string, destination: PostizDestination, fm: Record<string, unknown>, body: string): { content: string; followUps: string[]; ctaDestination: string | null; placement: string; ctaCount: number } {
+  const cfg = loadCtaConfig();
+  const ctCfg = loadContentTypesConfig();
+  const canonicalUrl = loadCanonicalUrl(folder);
+  const sourceKind = loadSourceKind(folder);
+  const { ctas } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
+  const placement = cfg.placement[destination] ?? "inline";
+  const max = loadPlatformMax()[destination] ?? POSTIZ_MAX_CHARS[destination] ?? Infinity;
+  const { posts, manualComment } = buildPosts(body, ctas, placement, max);
+  const followUps = [...posts.slice(1).map((p) => p.text), ...(manualComment ? [manualComment] : [])];
+  const ctaDestination = resolvePrimaryCtaDestination(fm, canonicalUrl, cfg, sourceKind, ctCfg);
+  return { content: posts[0]?.text ?? body, followUps, ctaDestination: ctaDestination === null ? null : String(ctaDestination), placement, ctaCount: ctas.length };
+}
+
 /**
  * Build the exact Postiz body for a queue row from local state: text rows send the derivative body,
  * quote cards send the card caption plus the rendered PNG, video rows send the rendered mp4 with the
- * title from `video/title.txt`. Rebuilt the same way for a reschedule, because Postiz's in-place
- * save overwrites content and media and its list endpoint returns neither.
+ * title from `video/title.txt`. Text and card rows carry the source CTA placed per cta.yaml.
+ * Rebuilt the same way for a reschedule, because Postiz's in-place save overwrites content and
+ * media and its list endpoint returns neither.
  */
 export async function buildPostizInput(folder: string, row: QueueRow, accountId: string, scheduledAt: string, transport: PostizTransport): Promise<PostizCreateInput> {
+  return (await planPostizDispatch(folder, row, accountId, scheduledAt, transport)).input;
+}
+
+export async function planPostizDispatch(folder: string, row: QueueRow, accountId: string, scheduledAt: string, transport: PostizTransport): Promise<PostizDispatchPlan> {
   const shape = postizShape(row);
   if (!shape) throw new Error(`Postiz does not recognize destination/media for ${row.id}`);
   const base = { destination: shape.destination, accountId, scheduledAt, visibility: "scheduled" as const };
   if (shape.media === "text") {
     const raw = readFileSync(join(folder, row.asset), "utf8");
-    const content = row.asset.endsWith(".md") ? splitFrontmatter(raw).body.trim() : raw.trim();
-    if (!content) throw new Error(`derivative ${row.asset} has no body text`);
-    return { ...base, content };
+    const { fm, body } = row.asset.endsWith(".md") ? splitFrontmatter(raw) : { fm: {}, body: raw };
+    const text = body.trim();
+    if (!text) throw new Error(`derivative ${row.asset} has no body text`);
+    const placed = placeCtas(folder, shape.destination, fm, text);
+    return { input: { ...base, content: placed.content, ...(placed.followUps.length ? { followUps: placed.followUps } : {}) }, fm, body: text, ctaDestination: placed.ctaDestination, placement: placed.placement, ctaCount: placed.ctaCount };
   }
   if (/^https?:\/\//.test(row.asset)) throw new Error("Postiz media must be a rendered local file; remote URLs are not registered");
   const mediaPath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
@@ -144,19 +183,21 @@ export async function buildPostizInput(folder: string, row: QueueRow, accountId:
   if (!mime) throw new Error(`Postiz cannot upload ${extname(mediaPath) || "an extensionless file"}`);
   const media = [await uploadPostizMedia(transport, { bytes: new Uint8Array(readFileSync(mediaPath)), filename: basename(mediaPath), mime })];
   if (shape.media === "image") {
-    const { text } = cardCopy(folder, row.id);
-    return { ...base, content: text, media };
+    const { text, fm } = cardCopy(folder, row.id);
+    const placed = placeCtas(folder, shape.destination, fm, text);
+    return { input: { ...base, content: placed.content, media, ...(placed.followUps.length ? { followUps: placed.followUps } : {}) }, fm, body: text, ctaDestination: placed.ctaDestination, placement: placed.placement, ctaCount: placed.ctaCount };
   }
   const titlePath = join(folder, "video", "title.txt");
   const title = existsSync(titlePath) ? readFileSync(titlePath, "utf8").trim() : "";
   const descPath = join(folder, "video", "description.txt");
   const description = existsSync(descPath) ? readFileSync(descPath, "utf8").trim() : row.notes.trim();
+  const video = { fm: {}, body: description || title, ctaDestination: null, placement: "none", ctaCount: 0 };
   if (shape.destination === "youtube") {
     if (!title) throw new Error("YouTube via Postiz needs video/title.txt");
-    return { ...base, content: description || title, media, providerSettings: { title: /#shorts/i.test(title) ? title : `${title} #Shorts`, type: "public" } };
+    return { ...video, input: { ...base, content: description || title, media, providerSettings: { title: /#shorts/i.test(title) ? title : `${title} #Shorts`, type: "public" } } };
   }
-  if (shape.destination === "tiktok") return { ...base, content: description || title || row.id, media, providerSettings: { title: (title || description).slice(0, 90) } };
-  return { ...base, content: description || title || row.id, media };
+  if (shape.destination === "tiktok") return { ...video, input: { ...base, content: description || title || row.id, media, providerSettings: { title: (title || description).slice(0, 90) } } };
+  return { ...video, input: { ...base, content: description || title || row.id, media } };
 }
 
 async function defaultPublishPostiz(folder: string, row: QueueRow, capability: PostizCapability, policy: DeliveryPolicyDecision): Promise<unknown> {
@@ -166,7 +207,14 @@ async function defaultPublishPostiz(folder: string, row: QueueRow, capability: P
   const { times, labels } = claimSlots({ windowKey: shape.destination, conflictPlatforms: [shape.destination], count: 1, asset: row.asset, by: "postiz" });
   if (!times[0] || times[0] === "next-free-slot") throw new Error(`Postiz requires an explicit future slot for ${shape.destination}`);
   const transport: PostizTransport = createPostizTransport();
-  const post = await createPostizPost(transport, await buildPostizInput(folder, row, capability.accountId, times[0], transport));
+  const plan = await planPostizDispatch(folder, row, capability.accountId, times[0], transport);
+  const post = await createPostizPost(transport, plan.input);
+  // Same bookkeeping as the Typefully/cards publishers: queue status, publish log, and the bets
+  // Placed row (CTA destination included) so grading and tag-source see this placement.
+  setStatus(folder, row, "published");
+  const placeNote = plan.ctaCount > 0 ? `, cta→${plan.placement}` : "";
+  appendPublishLog(folder, `${row.id} → postiz post ${post.id} (${shape.destination}, ${labels[0]}${placeNote})`);
+  appendBetPlacement(folder, row.id, shape.destination, `postiz post ${post.id} @ ${labels[0]}`, plan.fm, plan.body, plan.ctaDestination);
   return {
     id: row.id, platform: shape.destination, when: labels[0], ref: post.id,
     providerObjectId: post.id, providerAccountId: capability.accountId,

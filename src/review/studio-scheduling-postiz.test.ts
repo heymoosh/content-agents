@@ -118,3 +118,24 @@ test("malformed Postiz discovery cannot authorize legacy fallback", async () => 
   assert.deepEqual(calls, []);
   assert.ok(result.scheduleError, "malformed discovery must surface an error instead of selecting Typefully");
 });
+
+test("Postiz dispatch places the source CTA like the Typefully path: reply on X, inline on Bluesky, none on video", async () => {
+  const { planPostizDispatch } = await import("./studio-scheduling.js");
+  const { mkdirSync } = await import("node:fs");
+  const root = mkdtempSync(join(tmpdir(), "postiz-cta-"));
+  mkdirSync(join(root, "derivatives"));
+  writeFileSync(join(root, "source.md"), "---\ntitle: \"Essay\"\ncanonical_url: https://example.substack.com/p/essay\n---\nBody.\n");
+  writeFileSync(join(root, "derivatives", "x-1.md"), "---\nsource_lines: [1]\ncta: source\n---\nA line Muxin wrote.\n");
+  writeFileSync(join(root, "derivatives", "bs-1.md"), "---\nsource_lines: [1]\ncta: source\n---\nAnother line.\n");
+  const transport = { async request() { throw new Error("no network in this test"); } };
+  const base = { format: "text", asset: "", status: "approve", notes: "", lineIndex: 1 } as const;
+  const x = await planPostizDispatch(root, { ...base, id: "x-1", platform: "x", asset: "derivatives/x-1.md" } as QueueRow, "acct", "2026-09-20T17:00:00Z", transport);
+  assert.equal(x.input.content, "A line Muxin wrote.", "X keeps the link out of the body");
+  assert.ok(x.input.followUps?.[0]?.includes("https://example.substack.com/p/essay"), "X carries the source link as the first reply");
+  assert.equal(x.ctaDestination, "source");
+  assert.equal(x.placement, "reply");
+  const bs = await planPostizDispatch(root, { ...base, id: "bs-1", platform: "bluesky", asset: "derivatives/bs-1.md" } as QueueRow, "acct", "2026-09-20T17:00:00Z", transport);
+  assert.ok(bs.input.content.includes("https://example.substack.com/p/essay"), "Bluesky places the link inline");
+  assert.equal(bs.input.followUps, undefined);
+  rmSync(root, { recursive: true, force: true });
+});
