@@ -181,6 +181,12 @@ what has been verified, and what remains.
   non-draft save (the production path would have 400ed), and Postiz's `update` type still writes
   `publishDate`, so only `schedule` re-saves may change a date. Test media stays in the Postiz
   media library (no public delete route); harmless.
+- **Open questions for Muxin (2026-09-02 close):** (a) confirm or change the peer follow-up
+  window (14 days to follow up, 60 to abandon, a placeholder); (b) whether to delete the stale
+  rubric files under `config/outreach/` now that `brief.md` leads; (c) the Scout `--theme`
+  sentence for the first platforms-only run; (d) whether to discard the seven stale July 17
+  pending rows in the Content review queue. Session state: ten commits unpushed, no PR, the
+  Studio server started from that session is gone and must be relaunched with `npm run review`.
 - **Next gates, in Muxin's order:** (1) the base-loop test: one real essay or Note of hers through
   the Studio front door, routing, drafting, one approval to a scheduled Postiz post; (2) the first
   platforms-only Scout run, waiting on her `--theme` sentence (proposed: platforms and shows that
