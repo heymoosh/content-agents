@@ -574,8 +574,14 @@ export function ventureConfiguredContentPrompt(request: ContentRequest, variants
 
 export function parseVentureConfiguredBodies(output: string, variants: readonly ContentVariant[]): Map<string, { body: string; sourceLines: [] }> {
   const expected = new Set(variants.map((variant) => variant.identity.id));
+  const trimmed = output.trim();
+  // Claude occasionally wraps an otherwise exact JSON response in one markdown fence despite the
+  // prompt. Accept only a fence that owns the complete response; surrounding narration remains a
+  // hard failure so the adapter never guesses which payload the engine intended.
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const source = fenced?.[1]?.trim() ?? trimmed;
   let parsed: unknown;
-  try { parsed = JSON.parse(output.trim()); } catch { throw new Error("selected engine returned invalid Venture configured-variant JSON"); }
+  try { parsed = JSON.parse(source); } catch { throw new Error("selected engine returned invalid Venture configured-variant JSON"); }
   if (!Array.isArray(parsed) || parsed.length !== expected.size) throw new Error("selected engine returned the wrong Venture configured-variant count");
   const bodies = new Map<string, { body: string; sourceLines: [] }>();
   for (const item of parsed) {

@@ -257,6 +257,12 @@ test("Venture treated variants use a dedicated engine-body contract with claim a
   const engineBody = "Engine-produced treatment of the approved claim.";
   const parsed = parseVentureConfiguredBodies(JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: engineBody }))), ventureTreated);
   assert.equal(parsed.get(ventureTreated[0]!.identity.id)?.body, engineBody);
+  const fenced = parseVentureConfiguredBodies(`\`\`\`json\n${JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: engineBody })))}\n\`\`\``, ventureTreated);
+  assert.equal(fenced.get(ventureTreated[0]!.identity.id)?.body, engineBody);
+  assert.throws(
+    () => parseVentureConfiguredBodies(`Here you go:\n\`\`\`json\n${JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: engineBody })))}\n\`\`\``, ventureTreated),
+    /invalid Venture configured-variant JSON/,
+  );
   assert.notEqual(parsed.get(ventureTreated[0]!.identity.id)?.body, venture.originalInput);
   assert.throws(
     () => parseVentureConfiguredBodies(JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: "Here’s the thing — this unlocks a new paradigm." }))), ventureTreated),
