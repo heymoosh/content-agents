@@ -8,15 +8,17 @@ branch. PR #419 contains the audited Phase 3 Experiment implementation. The curr
 the measured Signals-to-Venture boundary and Outreach's deterministic discovery and weekly
 Strategy-summary gaps, adds Fiction's review bridge, and adds a digest-bound Studio review gate for
 production persona changes. Authenticated provider lifecycles remain operationally unverified
-except the Postiz and Typefully text-draft legs passed on 2026-09-02;
+except the Postiz legs (all nine connected channels scheduled, rescheduled, and cancelled live on
+2026-09-02) and the Typefully text-draft leg passed on 2026-09-02;
 bounded authenticated model runs are recorded per capability below and do not prove general model quality.
 **Phase 0 status:** operational provenance and policy wiring are complete with deterministic browser
 coverage, and one authenticated Codex generation canary passed; authenticated provider canaries remain.
 **Phase 1 status:** repository implementation and deterministic verification are complete for durable capture and
 safe next actions, advisor-cut enforcement, seven staged media pipelines, normalized delivery and
 reconciliation, one locked operational data root, the gated Postiz-first/Typefully-fallback canary
-matrix, and reviewed Signals apply/rollback. Operational acceptance for text drafts was reached on
-2026-09-02; one decision on the scheduled-visibility canary is still Muxin's (see the gate below).
+matrix, and reviewed Signals apply/rollback. Operational acceptance for Postiz delivery was reached on
+2026-09-02: Muxin approved the far-future scheduled canary, and every connected channel passed
+schedule, reschedule, read-back, and cancel with terminal cleanup (see the gate below).
 On 2026-09-02
 the Postiz leg passed live: read-only discovery authenticated against the self-hosted instance and
 an approved Bluesky **draft** canary completed create, read, cancel, and reconcile with terminal
@@ -26,8 +28,13 @@ against the `postiz-app` source and re-tested with real response shapes before t
 Later that day the full attended matrix passed: Bluesky/text via Postiz (draft
 `cmtkcv66m0001mn8mg0e07e0v`, terminal cleanup), LinkedIn/text via the Typefully fallback (draft
 `10597216` created unscheduled and deleted with a second acknowledged delete), and YouTube/video
-recorded as the declared explicit exception. Postiz `schedule` visibility has not been exercised
-live; the canary gate deliberately permits draft or private only. Earlier attempts (2026-08-30 instance offline, 2026-09-01 configuration absent) changed no
+recorded as the declared explicit exception. Later still, with Muxin's written approval, the
+all-channel canary (`npm run verify:postiz-canary -- --all`) created one far-future `schedule`
+post per connected channel (tiktok, mastodon, facebook, instagram, linkedin, threads, x, youtube,
+bluesky), moved each one hour with the in-place re-save, read the new time back, cancelled, and
+swept the window: nine passes, zero leftovers (`docs/evidence-postiz-canary-all-2026-09-02.json`).
+Image and video fixtures were registered through the public upload route, so Postiz media is now
+live-verified for this instance. Earlier attempts (2026-08-30 instance offline, 2026-09-01 configuration absent) changed no
 provider state.
 **Generation review:** Muxin approved the treatment, editor, voice, CTA, and distribution behavior
 shown in `docs/reviews/content-studio-phase1-generation-review.html`. The artifact contains eight Luna and eight Grok
@@ -62,7 +69,9 @@ canary at zero reported cost; provider-policy, Studio scheduling, Content captur
 stage contracts, durable runtime state, provider reconciliation, and Signals apply/rollback are
 covered locally. The Postiz adapter passed live discovery and one attended draft lifecycle canary
 on 2026-09-02 (Bluesky, text). The full attended matrix (Postiz-first, Typefully fallback, explicit
-exception) passed the same day. Postiz `schedule` visibility and media remain unverified.
+exception) passed the same day, followed by the nine-channel scheduled canary with reschedule and
+media upload. Rescheduling (single row and batch by pillar/slug/platform) is implemented and
+deterministically tested; its first live use will be an ordinary Studio move, not a canary.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
 
@@ -131,11 +140,16 @@ what has been verified, and what remains.
   cases bluesky/text, linkedin/text, youtube/video(exception). Evidence: Postiz `verified`
   (`cmtkcv66m0001mn8mg0e07e0v`, ledger terminal), Typefully `verified` (`10597216`), YouTube
   `explicit-exception`. The Phase 1 live-delivery gate is met for text drafts.
-- **Next gates:** Postiz `schedule` visibility is still unproven live because the canary gate only
-  allows draft/private objects; the production Studio path uses `scheduled`. Decide whether to
-  extend the gate to a far-future `schedule` canary with immediate cancel, or accept draft-only
-  proof. Other
-  honest next candidates are the attended Fiction browser/GitHub approval workflow, one signed-in
+- **All-channel scheduled canary (2026-09-02, later):** Muxin approved a far-future `schedule`
+  canary with immediate cancel and asked for every connected channel. The gate now admits
+  `scheduled` only with `allowScheduled` approval evidence and at least seven days of lead. Result:
+  nine of nine channels passed create, reschedule (+1h, `type: schedule` re-save with the existing
+  post id and group), read-back, cancel, and terminal reconcile; the closing window sweep found no
+  canary rows. Two findings folded into the adapter: X requires `who_can_reply_post` on any
+  non-draft save (the production path would have 400ed), and Postiz's `update` type still writes
+  `publishDate`, so only `schedule` re-saves may change a date. Test media stays in the Postiz
+  media library (no public delete route); harmless.
+- **Next gates:** honest next candidates are the attended Fiction browser/GitHub approval workflow, one signed-in
   Outreach Scout run, and the signed-in per-brand Signals/Experiment operating loop. Do not perform
   provider delivery, GitHub push/PR mutation, or account writes without the corresponding explicit
   approval.
@@ -206,7 +220,9 @@ The system is **not operationally verified end to end**. The largest unresolved 
 
 1. The authenticated Postiz-first/Typefully-fallback matrix passed on 2026-09-02 (Postiz Bluesky
    draft with terminal cleanup, Typefully LinkedIn draft deleted, YouTube declared exception).
-   Postiz `schedule` visibility and any media path have not run live.
+   Later that day the nine-channel scheduled canary and media upload also passed live; the
+   Studio reschedule and batch-move paths are deterministic-tested but have not yet moved a real
+   scheduled post.
 2. Provider reconciliation records explicit `uncertain` evidence instead of guessing when an API
    cannot prove a terminal state. Typefully and YouTube list absence is not terminal proof, and
    Substack still needs provider or reviewed human evidence.
@@ -253,13 +269,13 @@ Postiz does not support the required destination or capability.
 
 | Destination | Current provider/path | State | What is still unverified or missing |
 |---|---|---|---|
-| X, LinkedIn, Bluesky, Mastodon, Threads text | Self-hosted Postiz when live discovery advertises the exact account/destination/media capability; Typefully scheduled drafts only after an explicit unsupported result | Postiz live-verified for a Bluesky text draft and Typefully live-verified for a LinkedIn text draft (attended matrix, 2026-09-02) | Postiz `schedule` visibility (provider validation runs only for non-draft creates) and the other text channels (X, Mastodon, Threads) are not yet canaried. |
-| X, LinkedIn, Bluesky quote cards | Postiz when live discovery advertises media upload for the exact account/destination; native Typefully image drafts only after an explicit unsupported result | Postiz media path unsupported by decision (no verified upload lifecycle); Typefully image fallback deterministic-tested, provider-unverified | Verify a Postiz upload lifecycle before advertising media there; run the Typefully image draft canary before relying on that fallback. |
-| TikTok | Postiz when live discovery advertises TikTok/video; otherwise the explicit PostPeer exception | Capability-first selection implemented; Postiz records TikTok as `no-text-baseline` (media required, no verified upload path), so the PostPeer exception is the live path; PostPeer unverified | Verify PostPeer schedule/list/cancel live. |
-| YouTube Shorts | Postiz when live discovery advertises YouTube/video; otherwise the explicit YouTube Data API exception, private until `publishAt` | Capability-first selection implemented; Postiz records YouTube as `no-text-baseline` (media required, no verified upload path), so the YouTube Data API exception is the live path; YouTube unverified | Verify OAuth upload, scheduled-public transition, final URL, and terminal reconciliation for YouTube. |
+| X, LinkedIn, Bluesky, Mastodon, Threads, Facebook text | Self-hosted Postiz when live discovery advertises the exact account/destination/media capability; Typefully scheduled drafts only after an explicit unsupported result | Postiz live-verified for all six text channels on 2026-09-02 (far-future schedule, reschedule, cancel); Typefully live-verified for a LinkedIn text draft | First real scheduled delivery through Studio has not run yet; Facebook has no non-Postiz fallback. |
+| X, LinkedIn, Bluesky, Instagram, Facebook quote cards | Postiz (media registered through `POST /public/v1/upload`); native Typefully image drafts only after an explicit unsupported result | Postiz image path live-verified on Instagram (2026-09-02); dispatch uploads the rendered PNG and sends the card caption | Run one real card through Studio; Typefully image fallback stays provider-unverified. |
+| TikTok | Postiz (video registered through the upload route) with the PostPeer exception only after an unsupported result | Postiz TikTok video path live-verified on 2026-09-02 (privacy SELF_ONLY canary); production sends DIRECT_POST with public privacy | Run one real short through Studio; PostPeer remains the unverified fallback. |
+| YouTube Shorts | Postiz (video plus `title`/`type` settings from `video/title.txt`) with the YouTube Data API exception only after an unsupported result | Postiz YouTube video path live-verified on 2026-09-02 (private canary) | Run one real short through Studio; the direct YouTube exception stays unverified. |
 | Substack Notes | Constrained saved-session browser automation | Provider unverified | Run an explicitly approved canary; maintain selectors; add independent live confirmation. Full essays remain manual. |
 | Community/manual destinations | `ready-to-paste/` | Intentionally manual | Surface the handoff and status in the Studio consistently. |
-| Postiz | Self-hosted Postiz | **Live-verified for text draft lifecycle (2026-09-02); schedule visibility and media unverified** | The adapter, environment contract, dynamic capability/account registry, Studio scheduling path, stable provider IDs, create/read/cancel/reconcile lifecycle, recovery ledger, gated canary, and fallback matrix exist. The 2026-08-30 configured instance was offline; on 2026-09-01 the current parent `.env` lacked the required base URL and API key before discovery could make a request. On 2026-09-02 the instance was healthy on `localhost:4007` with nine channels connected in its UI, but the content-agents `.env` still had no `POSTIZ_BASE_URL`, `POSTIZ_API_KEY`, or `POSTIZ_ACCOUNT_ID`, and a source read of `postiz-app` showed the adapter would have failed against the real public API (no media list in the integrations response; bare API key expected, not `Bearer`). Both adapter defects were fixed deterministically that day. Later that day the key was added, discovery authenticated (at that point eight channels advertised text-only, facebook unrecognized; later tightened to five text channels), and the first attended canary exposed a third guessed contract (create body, read route, cancel semantics), rewritten from source; the rerun passed create/read/cancel/reconcile on a Bluesky draft with terminal cleanup. The Typefully fallback leg passed in the same attended matrix; Typefully stays the working fallback for destinations Postiz does not advertise. |
+| Postiz | Self-hosted Postiz | **Live-verified on all nine connected channels (2026-09-02): scheduled create, in-place reschedule, cancel, media upload** | Adapter, environment contract, dynamic capability/account registry, per-channel provider settings, media registration, create/read/reschedule/update/cancel/reconcile lifecycle, recovery ledger, gated canary (draft or approved far-future schedule), fallback matrix, single-row and batch reschedule (Studio endpoints, CLI `publish:reschedule`). History: the 2026-08-30 instance was offline; on 2026-09-01 `.env` lacked the base URL and key; on 2026-09-02 discovery authenticated, the first attended draft canary exposed a guessed create/read/cancel contract that was rewritten from the `postiz-app` source, the draft lifecycle passed, and after Muxin approved scheduled visibility the all-channel canary passed with zero leftovers. |
 | Outreach email/Gmail | Send a locked email from the Content Agents GUI through the exact approved Gmail account after an explicit confirmation; retain manual/external sending for unsupported channels. | **Implemented and deterministic-tested; provider unverified.** The GUI exposes Gmail only when the matching OAuth configuration is present, validates the authenticated profile as `muxin.li.pro@gmail.com`, writes a body-free append-only delivery ledger, prevents blind retries, reconciles uncertain sends by deterministic RFC Message-ID against Sent mail, and advances the follow-up clock only after confirmed delivery. The by-hand fallback remains available. | Run one explicitly approved authenticated send/reconcile canary. Recipient address and subject are explicit send-time envelope fields; the locked reviewed artifact remains the message body and channel. |
 
 ### Scheduler and publishing status
@@ -267,8 +283,8 @@ Postiz does not support the required destination or capability.
 | Capability | Current state | Verification | Remaining work |
 |---|---|---|---|
 | Unified scheduler | `src/publish/slots.ts`, configuration, publish ledger, durable jobs, captures, provider status, and reconciliation health all resolve through `CONTENT_AGENTS_DATA_ROOT` (defaulting outside the checkout). File locks and execution leases serialize cross-process mutation; startup recovery fails abandoned non-idempotent work closed. | Strong deterministic PT/DST, migration, cross-process, stale-lock, lease, and restart-recovery tests. | Operational backup/retention for the external data root remains an installation concern, not a second checkout-local authority. |
-| Publish orchestration | Studio approval discovers the live Postiz account/capability registry first and chooses Postiz only for exact advertised support. A verified unsupported result permits the explicit Typefully/PostPeer/YouTube/manual fallback. Human Inference/Venture require exact non-secret account assertions, Fiction fails closed without a separate account, Charles is ready-to-paste, and missing/ambiguous origins are blocked at scheduler and adapter boundaries. | Deterministic policy, discovery, capability-first selection, scheduler, adapter, fallback, and real-shape lifecycle coverage; one authenticated attended matrix passed on 2026-09-02 (Postiz Bluesky draft, Typefully LinkedIn draft, YouTube exception). | Still open: Postiz `schedule` visibility (Muxin's decision), the other text channels, and any media path. Do not treat discovery transport failure as unsupported; Typefully stays the fallback for destinations Postiz does not advertise. |
-| Publishing status | Append-only normalized events record atomic claims, provider/account/object IDs, provider URLs, planned and observed timestamps, policy identity, uncertainty, human evidence, and delivered/deleted/canceled/failed/private/uncertain outcomes. A bounded reconciler runs under one cross-process lease and persists last-run health. | Strong deterministic unit, cross-process, runner-wiring, all-state normalization, human-evidence, and no-blind-retry coverage; the 2026-09-02 attended matrix exercised authenticated Postiz and Typefully draft reconciliation; other providers unverified. | APIs that cannot prove terminal state remain explicitly `uncertain`. Run authenticated provider lifecycles and retain reviewed human evidence for providers without authoritative reads. |
+| Publish orchestration | Studio approval discovers the live Postiz account/capability registry first (media advertised by default after the verified upload lifecycle; `POSTIZ_MEDIA_UPLOAD_VERIFIED=0` opts out) and chooses Postiz only for exact advertised support. A verified unsupported result permits the explicit Typefully/PostPeer/YouTube/manual fallback. A scheduled Postiz row can be moved to an exact time or the next free cadence slot, alone or as a cluster selected by pillar, slug, platform, or key (shift N days or re-flow after a date); the provider is re-saved in place, the slot ledger moved, and one publishing event appended so the Content page shows the new time at once. Typefully rows have no reschedule API and are reported as manual. | Deterministic policy, discovery, capability-first selection, scheduler, adapter, fallback, reschedule, and real-shape lifecycle coverage; the 2026-09-02 attended matrix and nine-channel scheduled canary passed. | Still open: first real scheduled delivery and first real move through Studio. Do not treat discovery transport failure as unsupported. |
+| Publishing status | Append-only normalized events record atomic claims, provider/account/object IDs, provider URLs, planned and observed timestamps, policy identity, uncertainty, human evidence, and delivered/deleted/canceled/failed/private/uncertain outcomes. A bounded reconciler runs under one cross-process lease every 15 minutes and now reads Postiz `scheduledAt` into `plannedFor`, so a move made inside Postiz itself reaches the Content page on the next pass. | Strong deterministic unit, cross-process, runner-wiring, all-state normalization, human-evidence, and no-blind-retry coverage; the 2026-09-02 matrix exercised authenticated Postiz and Typefully draft reconciliation; other providers unverified. | APIs that cannot prove terminal state remain explicitly `uncertain`. |
 
 ## Venture
 
@@ -408,8 +424,8 @@ Implemented in the PR #412 change set, with deterministic evidence:
 One bounded authenticated Codex CLI generation canary passed in a throwaway repository copy.
 Some provider credentials and non-secret provider-account bindings are configured locally, but
 the Postiz base URL, API key, and Bluesky account id are now configured in the parent `.env`, and
-one authenticated Postiz draft lifecycle canary passed on 2026-09-02. Before
-operationally broadening delivery, start Postiz and explicitly gate those provider canaries. Do not
+the Postiz draft canary, the attended matrix, and the nine-channel scheduled canary all passed on
+2026-09-02. Before operationally broadening delivery to other providers, explicitly gate their canaries. Do not
 treat a working-tree diff or deterministic test as a PR, merge, or live delivery proof. The
 read-only `publish:substack -- --check` probe did confirm
 that the saved Substack browser session is currently authenticated.
@@ -441,16 +457,19 @@ the current Phase 1 completion patch:
 7. Signals uses separate propose, review, apply, recovery, and rollback events for exact allowlisted
    configuration deltas.
 
-**Phase 1 acceptance gate: draft legs met on 2026-09-02; scheduled-visibility decision open.**
+**Phase 1 acceptance gate: met for Postiz on 2026-09-02 (scheduled visibility and media included).**
 Discovery authenticated; the approved attended matrix finished with terminal cleanup for every
 created canary object (Postiz Bluesky draft `cmtkcv66m0001mn8mg0e07e0v`, Typefully LinkedIn draft
 `10597216`) and YouTube declared as the explicit exception. One limit of that proof: Postiz runs
 its per-provider validation only for non-draft creates, so a draft canary proves the API
 lifecycle, not that the provider accepts the post. The earlier wording of this gate required a
-Postiz `schedule` canary as well; the canary gate code permits draft/private only, and relaxing it
-is a safety decision for Muxin, not the conductor. Until she either approves a far-future
-`schedule` canary with immediate cancel or accepts draft-only proof in writing, Phase 1 is
-live verified for text drafts and not labeled fully met. Media uploads stay outside the claim.
+Postiz `schedule` canary as well. Muxin approved that canary in writing on 2026-09-02 (far-future
+schedule, immediate cancel, every connected channel), the gate was relaxed to admit it only with
+`allowScheduled` evidence and seven days of lead, and all nine channels passed with terminal
+cleanup and a clean window sweep. Media uploads are inside the claim: image and video fixtures were
+registered through the public upload route and carried on the Instagram, TikTok, and YouTube
+canaries. What remains is the first real delivery and the first real move through Studio, which
+are ordinary operations, not gates.
 
 ### P2: complete product depth
 
