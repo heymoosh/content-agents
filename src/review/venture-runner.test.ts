@@ -32,6 +32,11 @@ test("ventureStepPrompt requires one selected-phase step and preserves human gat
   const prompt = ventureStepPrompt("test-venture", 3, { phase: 3, status: "awaiting_user" });
   assert.match(prompt, /Return ONLY one JSON object/);
   assert.match(prompt, /Do not auto-select, auto-approve/);
+  assert.match(prompt, /server supplies the Venture slug/i);
+  assert.match(prompt, /Only `draft` and `thank-you-note-draft` take one argument/i);
+  assert.match(prompt, /Every other allowed command takes `args: \[\]`/i);
+  assert.match(prompt, /For `plan-init`, input must use exactly/i);
+  assert.match(prompt, /unknown_id, hypothesis, conversation_question, expected_evidence/);
   assert.match(prompt, /Current phase: 3/);
   assert.match(prompt, /accepted learning evaluations.*evidence-bounded context/i);
   assert.match(prompt, /do not authorize overwriting/i);
