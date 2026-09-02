@@ -56,6 +56,8 @@ const PROMPT_BEFORE_DIRECTION = [
   "RULES:",
   "- Two-sided: the message must name something concrete and true about Acme Co from the evidence above. Do not write a generic template that could go to anyone; do not lead with flattery about shared values alone.",
   "- Do not invent a fact, statistic, or quote beyond what is given above.",
+  "- Do not compare the lead with unnamed groups or claim what most, many, few, all, or no teams, companies, people, or founders do. Do not label their behavior rare, unusual, typical, or the norm. Use such a claim only when that complete claim is explicitly present in the evidence above or Muxin's direction.",
+  "- Never say Muxin read, saw, liked, loved, enjoyed, followed, or worked on something unless Muxin's typed direction explicitly says she did. Evidence about the lead does not prove Muxin's actions or interests. Open directly with the lead's evidenced practice (for example, \"You test...\") rather than an encounter claim such as \"I saw...\" or \"I read...\".",
   "- Follow config/voice.yaml: Muxin's plain, direct voice. No em dashes anywhere (use periods, commas, colons, or parentheses instead). No AI tells (\"here's the thing\", \"I hope this finds you well\", hedging, thought-leader cadence).",
   "- Short. A real person writing a real note, not a marketing email. No hashtags, no emoji.",
   "- End with a low-pressure, specific ask (a short call, a reply), not a hard sell.",
@@ -117,6 +119,38 @@ describe("findUnauthorizedOutreachClaims", () => {
       1,
     );
   });
+
+  test("rejects explicit and greeting-elliptical claims that Muxin read or saw the source", () => {
+    for (const body of [
+      "I read your note about testing assumptions.",
+      "I just saw your post about testing assumptions.",
+      "I've long followed your work.",
+      "Saw your post about testing assumptions.",
+      "Casey, saw that Canary tests the assumption before launch.",
+      "Hi Casey, liked your post about validation.",
+    ]) {
+      assert.deepEqual(findUnauthorizedOutreachClaims(body, [GREENFIELD_ITEM]).map((finding) => finding.kind), ["muxin-interest"]);
+    }
+  });
+
+  test("only the complete generated interest sentence in Muxin's direction authorizes it", () => {
+    assert.deepEqual(
+      findUnauthorizedOutreachClaims("I saw Casey's note.", [GREENFIELD_ITEM], "I saw Casey's note."),
+      [],
+    );
+    assert.equal(
+      findUnauthorizedOutreachClaims("I saw your launch.", [GREENFIELD_ITEM], "I saw another company's demo.").length,
+      1,
+    );
+    assert.equal(
+      findUnauthorizedOutreachClaims("I read your post.", [GREENFIELD_ITEM], "I did not read Casey's post.").length,
+      1,
+    );
+    assert.equal(
+      findUnauthorizedOutreachClaims("I read your post.", [GREENFIELD_ITEM], "I read nothing about Casey.").length,
+      1,
+    );
+  });
 });
 
 describe("buildDraftPrompt", () => {
@@ -158,6 +192,22 @@ describe("buildDraftPrompt", () => {
   test("does not invent facts beyond the cited evidence", () => {
     const prompt = buildDraftPrompt(baseOpts);
     assert.ok(/do not invent/i.test(prompt));
+  });
+
+  test("steers away from the same unsupported prevalence class rejected after generation", () => {
+    const prompt = buildDraftPrompt(baseOpts);
+    assert.match(prompt, /do not compare the lead with unnamed groups/i);
+    assert.match(prompt, /most, many, few, all, or no teams/i);
+    assert.match(prompt, /complete claim is explicitly present in the evidence above or Muxin's direction/i);
+  });
+
+  test("does not invent Muxin's reading, attention, or interest when no direction exists", () => {
+    const prompt = buildDraftPrompt(baseOpts);
+    assert.match(prompt, /never say Muxin read, saw, liked, loved, enjoyed, followed, or worked on something/i);
+    assert.match(prompt, /unless Muxin's typed direction explicitly says she did/i);
+    assert.match(prompt, /evidence about the lead does not prove Muxin's actions or interests/i);
+    assert.match(prompt, /open directly with the lead's evidenced practice/i);
+    assert.match(prompt, /rather than an encounter claim/i);
   });
 });
 
@@ -465,6 +515,22 @@ describe("runDraft guard clauses (no subprocess reached)", () => {
     try {
       await assert.rejects(
         runDraft(dir, { callClaude: async () => "That's rare. Most teams build first." }),
+        /unauthorized.*claim/i,
+      );
+      assert.equal(existsSync(join(dir, "messages")), false);
+      assert.equal(readFileSync(join(dir, "review-queue.md"), "utf8"), queue);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("invented Muxin-interest claims fail before a message or queue write", async () => {
+    const dir = makeLeadDir(leadFixture());
+    const queue = `| id | platform | format | asset | native | brand | cta | status | notes |\n|---|---|---|---|---|---|---|---|---|\n`;
+    writeFileSync(join(dir, "review-queue.md"), queue);
+    try {
+      await assert.rejects(
+        runDraft(dir, { callClaude: async () => "Casey, saw that you test assumptions before launch." }),
         /unauthorized.*claim/i,
       );
       assert.equal(existsSync(join(dir, "messages")), false);

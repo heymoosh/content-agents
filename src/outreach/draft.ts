@@ -54,7 +54,7 @@ export function selectEvidenceForDraft(evidence: EvidenceItem[], classification:
 }
 
 export interface UnauthorizedOutreachClaim {
-  kind: "population-quantifier" | "prevalence-predicate";
+  kind: "population-quantifier" | "prevalence-predicate" | "muxin-interest";
   sentence: string;
   span: string;
 }
@@ -68,12 +68,13 @@ function claimSentences(value: string): string[] {
 }
 
 /**
- * Deterministically reject one bounded class of unsupported model claims: population-wide
- * prevalence/comparison language. This does not pretend to prove arbitrary semantic entailment;
- * Muxin's pending-review gate still owns broader truthfulness review. A matching sentence is
- * allowed only when that complete normalized sentence already appears in cited evidence or in
- * Muxin's own direction; authorizing only the quantifier span would permit predicate or polarity
- * substitution (for example, evidence saying "not all teams" cannot authorize "all teams").
+ * Deterministically reject two bounded classes of unsupported model claims: population-wide
+ * prevalence/comparison language, and enumerated claims that Muxin read/saw/liked/followed or
+ * worked on something. This does not pretend to prove arbitrary semantic entailment; Muxin's
+ * pending-review gate still owns broader truthfulness review. Population claims require the full
+ * normalized sentence in evidence or direction. Muxin-interest claims require the full normalized
+ * generated sentence in her direction, so a shared verb cannot authorize a changed object or
+ * polarity.
  */
 export function findUnauthorizedOutreachClaims(
   body: string,
@@ -101,6 +102,18 @@ export function findUnauthorizedOutreachClaims(
         const span = match[0];
         if (!authorized.has(normalizedClaimText(sentence))) findings.push({ kind: pattern.kind, sentence, span });
       }
+    }
+  }
+  const interestActions = "worked on|read|saw|seen|liked|loved|enjoyed|followed";
+  const interestAdverbs = "(?:(?:just|recently|long|always|actually|personally)\\s+){0,3}";
+  const authorizedInterestSentences = new Set(claimSentences(direction));
+  const explicitInterest = new RegExp(`\\bi(?:'ve| have)?\\s+${interestAdverbs}(?:${interestActions})\\b`, "iu");
+  const bareInterest = new RegExp(`^${interestAdverbs}(?:${interestActions})\\b`, "iu");
+  const ellipticalInterest = new RegExp(`^(?:hi\\s+)?[\\p{L}][\\p{L}\\p{M}'-]*,\\s*${interestAdverbs}(?:${interestActions})\\b`, "iu");
+  for (const sentence of body.split(/(?<=[.!?])\s+/u).map((part) => part.trim()).filter(Boolean)) {
+    const match = explicitInterest.exec(sentence) ?? bareInterest.exec(sentence) ?? ellipticalInterest.exec(sentence);
+    if (match && !authorizedInterestSentences.has(normalizedClaimText(sentence))) {
+      findings.push({ kind: "muxin-interest", sentence, span: match[0] });
     }
   }
   return findings;
@@ -173,6 +186,8 @@ export function buildDraftPrompt(opts: {
     `RULES:`,
     `- Two-sided: the message must name something concrete and true about ${opts.leadName} from the evidence above. Do not write a generic template that could go to anyone; do not lead with flattery about shared values alone.`,
     `- Do not invent a fact, statistic, or quote beyond what is given above.`,
+    `- Do not compare the lead with unnamed groups or claim what most, many, few, all, or no teams, companies, people, or founders do. Do not label their behavior rare, unusual, typical, or the norm. Use such a claim only when that complete claim is explicitly present in the evidence above or Muxin's direction.`,
+    `- Never say Muxin read, saw, liked, loved, enjoyed, followed, or worked on something unless Muxin's typed direction explicitly says she did. Evidence about the lead does not prove Muxin's actions or interests. Open directly with the lead's evidenced practice (for example, "You test...") rather than an encounter claim such as "I saw..." or "I read...".`,
     // Reinforced AFTER her typed text, because the last word in a prompt is the one that sticks:
     // the vision doc's line is "It never invents interest I don't have," and that is the whole
     // point of letting her type direction at all.
@@ -303,7 +318,7 @@ export async function runDraft(
   const messageBody = await (opts.callClaude ?? callClaudeDraft)(prompt);
   const unauthorized = findUnauthorizedOutreachClaims(messageBody, selected, opts.direction);
   if (unauthorized.length) {
-    throw new Error(`refusing to write draft: unauthorized population claim(s): ${unauthorized.map((finding) => `"${finding.span}"`).join(", ")}`);
+    throw new Error(`refusing to write draft: unauthorized outreach claim(s): ${unauthorized.map((finding) => `"${finding.span}"`).join(", ")}`);
   }
 
   const messagesDir = join(absDir, "messages");
