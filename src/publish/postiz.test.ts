@@ -39,6 +39,9 @@ describe("Postiz capability-first routing", () => {
       { id: "int-off", name: "Old", identifier: "linkedin", picture: "p", disabled: true, profile: "old" },
       { id: "int-fb", name: "Human Inference", identifier: "facebook", picture: "p", disabled: false, profile: "hi" },
       { id: "int-off2", name: "Old2", identifier: "bluesky", disabled: true, media: ["text", "image"] },
+      { id: "int-yt", name: "Human Inference", identifier: "youtube", picture: "p", disabled: false, profile: "hi" },
+      { id: "int-ig", name: "Muxin Li", identifier: "instagram", disabled: false },
+      { id: "int-tt", name: "Human Inference", identifier: "tiktok", disabled: false },
     ]]);
     const registry = await fetchPostizCapabilities(client, new Date("2026-09-02T12:00:00Z"));
     assert.deepEqual(registry.capabilities, [
@@ -49,6 +52,9 @@ describe("Postiz capability-first routing", () => {
       { identifier: "linkedin", accountId: "int-off", accountLabel: "Old", reason: "disabled" },
       { identifier: "facebook", accountId: "int-fb", accountLabel: "Human Inference", reason: "unknown-identifier" },
       { identifier: "bluesky", accountId: "int-off2", accountLabel: "Old2", reason: "disabled" },
+      { identifier: "youtube", accountId: "int-yt", accountLabel: "Human Inference", reason: "no-text-baseline" },
+      { identifier: "instagram", accountId: "int-ig", accountLabel: "Muxin Li", reason: "no-text-baseline" },
+      { identifier: "tiktok", accountId: "int-tt", accountLabel: "Human Inference", reason: "no-text-baseline" },
     ]);
     assert.equal(supportsPostiz(registry, "x", "image"), false, "image stays unsupported without a verified upload path");
     assert.equal(calls.length, 1);

@@ -14,7 +14,7 @@ export interface PostizUnrecognizedIntegration {
   identifier: string;
   accountId: string;
   accountLabel: string;
-  reason: "disabled" | "unknown-identifier";
+  reason: "disabled" | "unknown-identifier" | "no-text-baseline";
 }
 
 export interface PostizCapabilityRegistry {
@@ -110,6 +110,13 @@ export function createPostizTransport(env: NodeJS.ProcessEnv = process.env, fetc
 
 const KNOWN_DESTINATIONS: readonly PostizDestination[] = ["x", "linkedin", "bluesky", "mastodon", "threads", "instagram", "tiktok", "youtube", "substack"];
 
+/**
+ * Destinations whose Postiz provider accepts a text-only post. Instagram, TikTok, and YouTube require
+ * media at Postiz's own `validatePosts` step, which runs only for non-draft creates, so a draft canary
+ * cannot prove them and a `schedule` create there would 400 at validation.
+ */
+const TEXT_BASELINE_DESTINATIONS: ReadonlySet<PostizDestination> = new Set(["x", "linkedin", "bluesky", "mastodon", "threads"]);
+
 function asDestination(value: string): PostizDestination | null {
   return (KNOWN_DESTINATIONS as readonly string[]).includes(value) ? (value as PostizDestination) : null;
 }
@@ -121,9 +128,10 @@ function asDestination(value: string): PostizDestination | null {
  * returns a bare array of `{ id, name, identifier, picture, disabled, profile, customer }` and no
  * media capability list. When an explicit `media`/`capabilities` array is present it is honored as
  * before. When it is absent, an enabled integration whose `identifier` exactly matches a known
- * destination is registered as text-only: text is the baseline every connected provider accepts,
- * and the public API documents no upload path, so image/video stay unsupported until a live
- * upload lifecycle is verified. Disabled rows are dropped and unrecognized identifiers (for
+ * destination that takes text-only posts is registered as text-only; the public API documents no
+ * upload path, so image/video stay unsupported until a live upload lifecycle is verified.
+ * Media-required destinations (instagram, tiktok, youtube) are recorded as `no-text-baseline`,
+ * because Postiz validates provider rules only for non-draft creates. Disabled rows are dropped and unrecognized identifiers (for
  * example `linkedin-page`, `facebook`) are recorded, never mapped to a destination.
  */
 export async function fetchPostizCapabilities(transport: PostizTransport, now = new Date()): Promise<PostizCapabilityRegistry> {
@@ -150,6 +158,7 @@ export async function fetchPostizCapabilities(transport: PostizTransport, now = 
     }
     const destination = asDestination(identifier);
     if (!destination) { unrecognized.push({ identifier, accountId, accountLabel, reason: "unknown-identifier" }); continue; }
+    if (!TEXT_BASELINE_DESTINATIONS.has(destination)) { unrecognized.push({ identifier, accountId, accountLabel, reason: "no-text-baseline" }); continue; }
     // The public adapter has no documented upload/registration endpoint. Do not turn a generic
     // provider capability string into permission to invent one or a fake public URL.
     capabilities.push({ destination, media: ["text"], accountId, accountLabel });
