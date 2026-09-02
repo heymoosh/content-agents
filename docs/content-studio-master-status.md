@@ -533,6 +533,18 @@ are ordinary operations, not gates.
    that cut between full-screen speakers need per-shot detection and are a later step. Not built
    yet by Muxin's ordering: prove the base content loop first, and podcasting is not a live
    channel. Until built, landscape input is refused rather than squashed.
+   Added 2026-09-02: a readable podcast transcript is part of the same package. The caption
+   package's transcript today is raw whisper output in one block; for a podcast it must also
+   produce a clean, formatted transcript (paragraphs, speaker labels, light cleanup of filler,
+   no invented words) that a reader can use instead of watching. Not built yet, same ordering.
+9. Client outreach is parked, not deleted (Muxin, 2026-09-02). The `client` discovery kind, its
+   rubrics (`config/outreach/clients.md`, `config/outreach/person-fit.md`), and the existing
+   `outreach/leads/client-*` folders stay in place, but no Phase 5 run targets clients and the
+   Studio should not push client work at her. The live focus is platforms that would feature her
+   civic work and Human Inference, and peers who share those concerns and understand funding.
+   Scout runs default to `--kinds platform` with a short `--theme` sentence in that spirit, the
+   way she briefs Boardy. A peer/funder discovery kind does not exist yet; adding one is outreach
+   prompt logic and holds for her review.
 
 ## Known stale or historical documents
 
