@@ -66,7 +66,7 @@ export async function runPostizLifecycleCanary(
   catch (error) { failure = error; }
   try {
     if (!failure) {
-      read = await readPostizPost(transport, created.id);
+      read = await readPostizPost(transport, created.id, created.scheduledAt ?? input.scheduledAt);
       if (read.id !== created.id) throw new Error("live canary blocked: Postiz read returned a different stable id");
     }
   } catch (error) {
@@ -80,7 +80,7 @@ export async function runPostizLifecycleCanary(
     }
   }
   if (canceled) {
-    try { reconciled = await reconcilePostizPost(transport, created.id); }
+    try { reconciled = await reconcilePostizPost(transport, created.id, created.scheduledAt ?? input.scheduledAt); }
     catch (error) {
       failure ??= error;
       appendRecovery({ provider: "postiz", providerObjectId: created.id, at: new Date().toISOString(), phase: "reconcile", cleanupRequired: true, error: error instanceof Error ? error.message : String(error) }, safety);

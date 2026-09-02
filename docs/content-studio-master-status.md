@@ -15,11 +15,15 @@ coverage, and one authenticated Codex generation canary passed; authenticated pr
 safe next actions, advisor-cut enforcement, seven staged media pipelines, normalized delivery and
 reconciliation, one locked operational data root, the gated Postiz-first/Typefully-fallback canary
 matrix, and reviewed Signals apply/rollback. Operational acceptance is still open because the
-authenticated Postiz-first/Typefully-fallback lifecycle matrix has not run. A read-only discovery
-attempt on 2026-08-30 reached the configured `localhost:4007` address but the Postiz instance was
-not running, so it changed no provider state and proved no live capability. A 2026-09-01 retry
-failed before networking because the current parent-repository `.env` no longer defines
-`POSTIZ_BASE_URL` and `POSTIZ_API_KEY`; no account identifier or provider state was read or changed.
+authenticated Postiz-first/Typefully-fallback lifecycle matrix has only partly run. On 2026-09-02
+the Postiz leg passed live: read-only discovery authenticated against the self-hosted instance and
+an approved Bluesky **draft** canary completed create, read, cancel, and reconcile with terminal
+cleanup recorded (`cleanupRequired:false`). Getting there exposed that the adapter's create, read,
+and cancel calls had also been written to a guessed contract (see decision 7); they were rewritten
+against the `postiz-app` source and re-tested with real response shapes before the canary passed.
+The Typefully-fallback leg of the matrix and Postiz `schedule` visibility have not been exercised
+live. Earlier attempts (2026-08-30 instance offline, 2026-09-01 configuration absent) changed no
+provider state.
 **Generation review:** Muxin approved the treatment, editor, voice, CTA, and distribution behavior
 shown in `docs/reviews/content-studio-phase1-generation-review.html`. The artifact contains eight Luna and eight Grok
 source-grounded treatments of Muxin's essay plus eight before/after examples from a blind Luna
@@ -51,10 +55,9 @@ is evaluated locally; HunyuanVideo 1.5 is not a fit for this Apple-Silicon machi
 **Verification status:** the subscription-backed Grok prose adapter completed a live nonempty
 canary at zero reported cost; provider-policy, Studio scheduling, Content capture, all seven media
 stage contracts, durable runtime state, provider reconciliation, and Signals apply/rollback are
-covered locally. The Postiz adapter and attended canary harness exist, but the latest read-only
-discovery attempt found the required Postiz environment configuration absent before any network
-request. Publishing remains live-unverified until the configuration is restored, capability
-discovery passes, and the attended create/read/cancel/reconcile matrix passes.
+covered locally. The Postiz adapter passed live discovery and one attended draft lifecycle canary
+on 2026-09-02 (Bluesky, text). Publishing is live-verified for that path only; the Typefully
+fallback leg, Postiz `schedule` visibility, and media remain unverified.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
 
@@ -108,9 +111,17 @@ what has been verified, and what remains.
   youtube as Human Inference) and facebook recorded as `unknown-identifier`, never routed. Nothing
   was created. `POSTIZ_ACCOUNT_ID` is still unset; the create/read/cancel/reconcile matrix awaits
   Muxin's account choice and explicit approval.
-- **Next gates:** the P1 Postiz-first/Typefully-fallback lifecycle remains attended and blocked on
-  `POSTIZ_ACCOUNT_ID` in `.env` and explicit approval to create provider objects (discovery is
-  done). Other
+- **Postiz lifecycle canary (2026-09-02):** Muxin set `POSTIZ_ACCOUNT_ID` to the Bluesky channel
+  and approved the matrix. The first run returned 400 (`All posts must have an integration id`):
+  the adapter had posted its own input object, and its read and cancel paths assumed a
+  `GET /posts/:id` route Postiz does not have. Create/read/cancel/reconcile were rewritten from the
+  `postiz-app` DTO, controller, service, and repository (CreatePostDto body; array create response;
+  list-by-window read with uppercase `State`; soft delete by id; absence after delete as the only
+  cancellation signal). The rerun created draft `cmtkbipdk0000mn8m3fmezz2y`, read it back as
+  DRAFT, deleted it, reconciled it absent, and wrote the terminal ledger event under the
+  operational data root. Postiz stores drafts with no publish workflow, so nothing could post.
+- **Next gates:** the Typefully-fallback leg of the matrix (attended), then Postiz `schedule`
+  visibility on a far-future slot with the same cancel/reconcile proof. Other
   honest next candidates are the attended Fiction browser/GitHub approval workflow, one signed-in
   Outreach Scout run, and the signed-in per-brand Signals/Experiment operating loop. Do not perform
   provider delivery, GitHub push/PR mutation, or account writes without the corresponding explicit
@@ -180,9 +191,9 @@ passed, proving login readiness but not create/list/cancel or live delivery.
 
 The system is **not operationally verified end to end**. The largest unresolved boundaries are:
 
-1. The authenticated Postiz-first/Typefully-fallback create/read/cancel/reconcile matrix has not
-   run. The configured Postiz instance was offline on 2026-08-30; the 2026-09-01 read-only retry
-   stopped before networking because the current Postiz environment configuration was absent.
+1. The Postiz leg of the authenticated create/read/cancel/reconcile matrix passed on 2026-09-02
+   with a Bluesky draft and terminal cleanup. The Typefully-fallback leg, Postiz `schedule`
+   visibility, and any media path have not run live.
 2. Provider reconciliation records explicit `uncertain` evidence instead of guessing when an API
    cannot prove a terminal state. Typefully and YouTube list absence is not terminal proof, and
    Substack still needs provider or reviewed human evidence.
@@ -235,7 +246,7 @@ Postiz does not support the required destination or capability.
 | YouTube Shorts | Postiz when live discovery advertises YouTube/video; otherwise the explicit YouTube Data API exception, private until `publishAt` | Capability-first selection implemented; providers unverified | Discover Postiz first. If unsupported, verify OAuth upload, scheduled-public transition, final URL, and terminal reconciliation for YouTube. |
 | Substack Notes | Constrained saved-session browser automation | Provider unverified | Run an explicitly approved canary; maintain selectors; add independent live confirmation. Full essays remain manual. |
 | Community/manual destinations | `ready-to-paste/` | Intentionally manual | Surface the handoff and status in the Studio consistently. |
-| Postiz | Self-hosted Postiz | **Implemented and deterministic-tested; provider unverified** | The adapter, environment contract, dynamic capability/account registry, Studio scheduling path, stable provider IDs, create/read/cancel/reconcile lifecycle, recovery ledger, gated canary, and fallback matrix exist. The 2026-08-30 configured instance was offline; on 2026-09-01 the current parent `.env` lacked the required base URL and API key before discovery could make a request. On 2026-09-02 the instance was healthy on `localhost:4007` with nine channels connected in its UI, but the content-agents `.env` still had no `POSTIZ_BASE_URL`, `POSTIZ_API_KEY`, or `POSTIZ_ACCOUNT_ID`, and a source read of `postiz-app` showed the adapter would have failed against the real public API (no media list in the integrations response; bare API key expected, not `Bearer`). Both adapter defects were fixed deterministically that day. Add the API key, run read-only discovery, then pass the attended matrix before changing the working fallback. |
+| Postiz | Self-hosted Postiz | **Live-verified for text draft lifecycle (2026-09-02); schedule visibility and media unverified** | The adapter, environment contract, dynamic capability/account registry, Studio scheduling path, stable provider IDs, create/read/cancel/reconcile lifecycle, recovery ledger, gated canary, and fallback matrix exist. The 2026-08-30 configured instance was offline; on 2026-09-01 the current parent `.env` lacked the required base URL and API key before discovery could make a request. On 2026-09-02 the instance was healthy on `localhost:4007` with nine channels connected in its UI, but the content-agents `.env` still had no `POSTIZ_BASE_URL`, `POSTIZ_API_KEY`, or `POSTIZ_ACCOUNT_ID`, and a source read of `postiz-app` showed the adapter would have failed against the real public API (no media list in the integrations response; bare API key expected, not `Bearer`). Both adapter defects were fixed deterministically that day. Later that day the key was added, discovery authenticated (eight text-only channels, facebook unrecognized), and the first attended canary exposed a third guessed contract (create body, read route, cancel semantics), rewritten from source; the rerun passed create/read/cancel/reconcile on a Bluesky draft with terminal cleanup. Keep Typefully as the working fallback until its matrix leg also passes. |
 | Outreach email/Gmail | Send a locked email from the Content Agents GUI through the exact approved Gmail account after an explicit confirmation; retain manual/external sending for unsupported channels. | **Implemented and deterministic-tested; provider unverified.** The GUI exposes Gmail only when the matching OAuth configuration is present, validates the authenticated profile as `muxin.li.pro@gmail.com`, writes a body-free append-only delivery ledger, prevents blind retries, reconciles uncertain sends by deterministic RFC Message-ID against Sent mail, and advances the follow-up clock only after confirmed delivery. The by-hand fallback remains available. | Run one explicitly approved authenticated send/reconcile canary. Recipient address and subject are explicit send-time envelope fields; the locked reviewed artifact remains the message body and channel. |
 
 ### Scheduler and publishing status
@@ -383,8 +394,8 @@ Implemented in the PR #412 change set, with deterministic evidence:
 
 One bounded authenticated Codex CLI generation canary passed in a throwaway repository copy.
 Some provider credentials and non-secret provider-account bindings are configured locally, but
-the current parent `.env` does not contain the required Postiz base URL and API key, so no
-authenticated Postiz lifecycle canary ran. Before
+the Postiz base URL, API key, and Bluesky account id are now configured in the parent `.env`, and
+one authenticated Postiz draft lifecycle canary passed on 2026-09-02. Before
 operationally broadening delivery, start Postiz and explicitly gate those provider canaries. Do not
 treat a working-tree diff or deterministic test as a PR, merge, or live delivery proof. The
 read-only `publish:substack -- --check` probe did confirm
@@ -410,17 +421,18 @@ the current Phase 1 completion patch:
    coverage used a mocked per-integration media list that the real self-hosted public endpoint does
    not return, and the transport sent a `Bearer` prefix that Postiz's public API middleware rejects.
    Both were corrected against the published `postiz-app` controller and middleware source (see
-   recorded decision 6); the adapter remains provider-unverified.
+   recorded decision 6). The same day the first live create returned 400 and showed that the
+   create body, read route, and cancel semantics had also been guessed; those were rewritten from
+   source (decision 7) and the Postiz draft lifecycle then passed live with terminal cleanup. The
+   earlier claim that the adapter had been "fixed against the real API" was true for discovery only.
 7. Signals uses separate propose, review, apply, recovery, and rollback events for exact allowlisted
    configuration deltas.
 
-**Remaining Phase 1 acceptance gate:** restore the required Postiz environment configuration,
-start the instance, pass read-only live capability discovery, then run the explicitly approved
-attended Postiz-first/Typefully-fallback create/read/cancel/reconcile matrix. The 2026-08-30
-discovery attempt failed closed with `ECONNREFUSED` at `localhost:4007`; a 2026-09-01 retry found
-the current configuration absent and failed before networking. Neither attempt created or changed
-provider state. Do not label Phase 1 live verified until the matrix finishes with terminal cleanup
-for every created canary object.
+**Remaining Phase 1 acceptance gate:** the Postiz leg is done (2026-09-02: discovery
+authenticated; approved Bluesky draft canary created, read, canceled, reconciled absent; ledger
+terminal). Still open: the attended Typefully-fallback leg of the matrix and a Postiz `schedule`
+visibility canary on a far-future slot. Do not label Phase 1 live verified until both finish with
+terminal cleanup for every created canary object.
 
 ### P2: complete product depth
 
@@ -452,6 +464,14 @@ for every created canary object.
    unsupported on Postiz until a live upload lifecycle is verified. Disabled rows and unrecognized
    identifiers (for example `linkedin-page`, `facebook`) are recorded in the registry and never
    routed. This is the conservative form of a deliberate fail-closed choice; Muxin may reverse it.
+7. Postiz lifecycle calls follow the `postiz-app` source, not a guessed REST shape (decided
+   2026-09-02 after the first live create returned 400). Create sends CreatePostDto (`type`
+   `draft`|`schedule`, `date`, `shortLink:false`, `tags:[]`, one post per `integration.id`); Postiz
+   has no private visibility, so `private` is refused rather than downgraded, and media is refused
+   until an upload lifecycle is verified. Read lists posts in a 45-day window around the known
+   scheduled time because no read-by-id route exists; absent on read is an error. Cancel is the
+   soft delete by id; absent from the window after cancel is the only cancellation proof Postiz
+   offers, so reconcile maps absence to `canceled` and a still-listed row to its live state.
 3. Outreach email is intended to send from the Content Agents GUI after Muxin's explicit approval.
    Successful sends must update sent state automatically. Manual/external sending remains the
    fallback for unsupported channels.

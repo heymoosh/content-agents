@@ -61,6 +61,9 @@ function requiredString(value: unknown, field: string): string {
 
 function normalizeStatus(value: unknown): PostizPost["status"] {
   const status = String(value ?? "").toLowerCase();
+  // Post rows from `GET /public/v1/posts` carry Prisma's State enum: QUEUE | DRAFT | PUBLISHED | ERROR.
+  if (status === "queue") return "scheduled";
+  if (status === "error") return "failed";
   if (["draft", "scheduled", "private", "published", "canceled", "failed"].includes(status)) return status as PostizPost["status"];
   return "unknown";
 }
@@ -73,7 +76,7 @@ function normalizePost(value: unknown): PostizPost {
   };
   return {
     id: requiredString(item.id ?? item._id, "stable post id"),
-    url: typeof (item.url ?? item.postUrl) === "string" ? String(item.url ?? item.postUrl) : null,
+    url: typeof (item.url ?? item.postUrl ?? item.releaseURL) === "string" ? String(item.url ?? item.postUrl ?? item.releaseURL) : null,
     status: normalizeStatus(item.status ?? item.state),
     scheduledAt: typeof (item.scheduledAt ?? item.publishDate) === "string" ? String(item.scheduledAt ?? item.publishDate) : null,
     ...(optionalString(item.createdAt, item.created_at) ? { createdAt: optionalString(item.createdAt, item.created_at) } : {}),
@@ -95,7 +98,10 @@ export function createPostizTransport(env: NodeJS.ProcessEnv = process.env, fetc
         // (public.auth.middleware.ts); a `Bearer ` prefix is rejected as an invalid key.
         headers: { Authorization: key, "Content-Type": "application/json", ...init.headers },
       });
-      if (!response.ok) throw new Error(`Postiz ${init.method ?? "GET"} ${path} failed (${response.status})`);
+      if (!response.ok) {
+        const body = (await response.text().catch(() => "")).slice(0, 300);
+        throw new Error(`Postiz ${init.method ?? "GET"} ${path} failed (${response.status})${body ? `: ${body}` : ""}`);
+      }
       if (response.status === 204) return {};
       return response.json();
     },
@@ -193,22 +199,78 @@ function assertSafeCreate(input: PostizCreateInput, now = new Date()): void {
   if (!["draft", "private", "scheduled"].includes(input.visibility)) throw new Error("instant public Postiz posts are prohibited");
 }
 
+/**
+ * Postiz's public create contract (`POST /public/v1/posts`, CreatePostDto): `type`, `date`, `shortLink`,
+ * `tags`, and `posts[].value[].image` are all required, and each post names its channel by
+ * `integration.id`; `settings.__type` is injected server-side from the integration. Only `draft`
+ * (stored as DRAFT, no publish workflow is started) and `schedule` exist; Postiz has no private
+ * visibility, so it is refused rather than silently downgraded. The response is a bare array of
+ * `{ postId, integration }`.
+ */
+function createBody(input: PostizCreateInput): Record<string, unknown> {
+  if (input.mediaUrls?.length) throw new Error("Postiz media posts are unsupported until a live upload lifecycle is verified");
+  const type = input.visibility === "draft" ? "draft" : input.visibility === "scheduled" ? "schedule" : null;
+  if (!type) throw new Error("Postiz has no private visibility; use draft");
+  return {
+    type,
+    date: input.scheduledAt,
+    shortLink: false,
+    tags: [],
+    posts: [{ integration: { id: input.accountId }, value: [{ content: input.content, image: [] }] }],
+  };
+}
+
 export async function createPostizPost(transport: PostizTransport, input: PostizCreateInput, now = new Date()): Promise<PostizPost> {
   assertSafeCreate(input, now);
-  return normalizePost(await transport.request("/api/public/v1/posts", { method: "POST", body: JSON.stringify(input) }));
+  const body = createBody(input);
+  const response = await transport.request("/api/public/v1/posts", { method: "POST", body: JSON.stringify(body) });
+  const first = record(Array.isArray(response) ? response[0] : response);
+  return {
+    id: requiredString(first.postId ?? first.id, "stable post id"),
+    url: null,
+    status: body.type === "draft" ? "draft" : "scheduled",
+    scheduledAt: input.scheduledAt,
+  };
 }
 
-export async function readPostizPost(transport: PostizTransport, id: string): Promise<PostizPost> {
-  return normalizePost(await transport.request(`/api/public/v1/posts/${encodeURIComponent(requiredString(id, "post id"))}`));
+/** Postiz exposes no read-by-id route; posts are listed by publish-date window (`GET /public/v1/posts`). */
+const READ_WINDOW_MS = 45 * 24 * 60 * 60 * 1000;
+
+function listWindow(around: string | undefined, now: Date): string {
+  const parsed = around ? Date.parse(around) : NaN;
+  const center = Number.isFinite(parsed) ? parsed : now.getTime();
+  const startDate = new Date(center - READ_WINDOW_MS).toISOString();
+  const endDate = new Date(center + READ_WINDOW_MS).toISOString();
+  return `/api/public/v1/posts?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
 }
 
+/**
+ * Find a post by stable id within the publish-date window around `around` (the known scheduled time,
+ * defaulting to now). Returns null when absent. Deleted posts are soft-deleted (`deletedAt`) and the
+ * list filters them out, so absence after a cancel is the only cancellation signal Postiz offers.
+ */
+export async function findPostizPost(transport: PostizTransport, id: string, around?: string, now = new Date()): Promise<PostizPost | null> {
+  const stableId = requiredString(id, "post id");
+  const response = record(await transport.request(listWindow(around, now)));
+  const rows = Array.isArray(response.posts) ? response.posts : [];
+  const match = rows.find((row) => typeof row === "object" && row !== null && (row as Record<string, unknown>).id === stableId);
+  return match ? normalizePost(match) : null;
+}
+
+export async function readPostizPost(transport: PostizTransport, id: string, around?: string, now = new Date()): Promise<PostizPost> {
+  const post = await findPostizPost(transport, id, around, now);
+  if (!post) throw new Error(`Postiz post ${id} was not found in the publish-date window`);
+  return post;
+}
+
+/** `DELETE /public/v1/posts/:id` soft-deletes the post's group and returns only `{ id }`. */
 export async function cancelPostizPost(transport: PostizTransport, id: string): Promise<PostizPost> {
   const stableId = requiredString(id, "post id");
-  const response = await transport.request(`/api/public/v1/posts/${encodeURIComponent(stableId)}`, { method: "DELETE" });
-  const item = record(response);
-  return Object.keys(item).length ? normalizePost(item) : { id: stableId, url: null, status: "canceled", scheduledAt: null };
+  await transport.request(`/api/public/v1/posts/${encodeURIComponent(stableId)}`, { method: "DELETE" });
+  return { id: stableId, url: null, status: "canceled", scheduledAt: null };
 }
 
-export async function reconcilePostizPost(transport: PostizTransport, id: string): Promise<PostizPost> {
-  return readPostizPost(transport, id);
+/** Terminal cleanup is proven by absence from the list window; a still-listed post reports its live state. */
+export async function reconcilePostizPost(transport: PostizTransport, id: string, around?: string, now = new Date()): Promise<PostizPost> {
+  return (await findPostizPost(transport, id, around, now)) ?? { id: requiredString(id, "post id"), url: null, status: "canceled", scheduledAt: null };
 }

@@ -45,7 +45,7 @@ function comparableProviderId(provider: DeliveryProvider, raw: string | undefine
 /** Production readers for providers with authoritative read APIs. Others remain explicitly unavailable. */
 export function createDefaultProviderStatusReaders(deps: DefaultStatusReaderDeps = {}): ProviderStatusReaders {
   return {
-    postiz: async (status) => readPostizPost(deps.postizTransport ?? createPostizTransport(), status.providerObjectId ?? status.ref ?? ""),
+    postiz: async (status) => readPostizPost(deps.postizTransport ?? createPostizTransport(), status.providerObjectId ?? status.ref ?? "", status.plannedFor),
     typefully: async (status) => {
       const id = comparableProviderId("typefully", status.providerObjectId ?? status.ref);
       const item = (await (deps.fetchTypefully ?? fetchScheduledDrafts)()).find((entry) => comparableProviderId("typefully", entry.id) === id);

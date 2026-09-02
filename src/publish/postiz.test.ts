@@ -68,22 +68,46 @@ describe("Postiz capability-first routing", () => {
 });
 
 describe("Postiz stable lifecycle contract", () => {
-  test("create/read/cancel/reconcile preserve stable ids, urls, and statuses", async () => {
+  test("create/read/cancel/reconcile follow the real public API: array create, windowed list read, soft delete", async () => {
     const { client, calls } = transport([
-      { id: "post-7", url: "https://social.example/post-7", status: "scheduled", scheduledAt: "2026-09-01T12:00:00Z" },
-      { id: "post-7", postUrl: "https://social.example/post-7", state: "private", publishDate: "2026-09-01T12:00:00Z" },
-      { id: "post-7", status: "canceled" },
-      { id: "post-7", status: "canceled" },
+      [{ postId: "post-7", integration: "acct-1" }],
+      { posts: [{ id: "post-7", state: "QUEUE", publishDate: "2026-09-01T12:00:00.000Z", releaseURL: "https://social.example/post-7", group: "g-1" }] },
+      { id: "post-7" },
+      { posts: [] },
     ]);
     const input = { destination: "x", accountId: "acct-1", content: "approved canary", scheduledAt: "2026-09-01T12:00:00Z", visibility: "scheduled" } as const;
-    assert.equal((await createPostizPost(client, input, new Date("2026-08-30T12:00:00Z"))).id, "post-7");
-    assert.equal((await readPostizPost(client, "post-7")).url, "https://social.example/post-7");
+    const created = await createPostizPost(client, input, new Date("2026-08-30T12:00:00Z"));
+    assert.deepEqual(created, { id: "post-7", url: null, status: "scheduled", scheduledAt: "2026-09-01T12:00:00Z" });
+    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), {
+      type: "schedule", date: "2026-09-01T12:00:00Z", shortLink: false, tags: [],
+      posts: [{ integration: { id: "acct-1" }, value: [{ content: "approved canary", image: [] }] }],
+    });
+    const read = await readPostizPost(client, "post-7", input.scheduledAt);
+    assert.equal(read.url, "https://social.example/post-7");
+    assert.equal(read.status, "scheduled");
     assert.equal((await cancelPostizPost(client, "post-7")).status, "canceled");
-    assert.equal((await reconcilePostizPost(client, "post-7")).id, "post-7");
-    assert.deepEqual(calls.map((call) => [call.init?.method ?? "GET", call.path]), [
-      ["POST", "/api/public/v1/posts"], ["GET", "/api/public/v1/posts/post-7"],
-      ["DELETE", "/api/public/v1/posts/post-7"], ["GET", "/api/public/v1/posts/post-7"],
+    assert.equal((await reconcilePostizPost(client, "post-7", input.scheduledAt)).status, "canceled");
+    assert.deepEqual(calls.map((call) => [call.init?.method ?? "GET", call.path.replace(/\?.*$/, "")]), [
+      ["POST", "/api/public/v1/posts"], ["GET", "/api/public/v1/posts"],
+      ["DELETE", "/api/public/v1/posts/post-7"], ["GET", "/api/public/v1/posts"],
     ]);
+    assert.match(calls[1]?.path ?? "", /startDate=2026-07-18T12%3A00%3A00\.000Z&endDate=2026-10-16T12%3A00%3A00\.000Z/);
+  });
+
+  test("draft maps to Postiz type draft; private and media are refused before any request", async () => {
+    const { client, calls } = transport([[{ postId: "d-1", integration: "acct-1" }]]);
+    const base = { destination: "x", accountId: "acct-1", content: "c", scheduledAt: "2026-09-01T12:00:00Z" } as const;
+    const now = new Date("2026-08-30T12:00:00Z");
+    assert.equal((await createPostizPost(client, { ...base, visibility: "draft" }, now)).status, "draft");
+    assert.equal(JSON.parse(String(calls[0]?.init?.body)).type, "draft");
+    await assert.rejects(createPostizPost(client, { ...base, visibility: "private" }, now), /no private visibility/);
+    await assert.rejects(createPostizPost(client, { ...base, visibility: "draft", mediaUrls: ["https://x/y.png"] }, now), /unsupported until a live upload/);
+    assert.equal(calls.length, 1);
+  });
+
+  test("read fails closed when the post is absent from the window", async () => {
+    const { client } = transport([{ posts: [{ id: "other", state: "DRAFT" }] }]);
+    await assert.rejects(readPostizPost(client, "post-7", "2026-09-01T12:00:00Z"), /not found/);
   });
 
   test("never creates an immediate or past post", async () => {
@@ -105,8 +129,8 @@ describe("live-canary gate", () => {
 
   test("composes a gated create/read/cancel/reconcile harness lifecycle", async () => {
     const { client, calls } = transport([
-      { id: "canary-1", status: "draft" }, { id: "canary-1", status: "draft" },
-      { id: "canary-1", status: "canceled" }, { id: "canary-1", status: "canceled" },
+      [{ postId: "canary-1", integration: "acct-1" }], { posts: [{ id: "canary-1", state: "DRAFT" }] },
+      { id: "canary-1" }, { posts: [] },
     ]);
     const root = mkdtempSync(join(tmpdir(), "postiz-canary-"));
     const result = await runPostizLifecycleCanary(client, input, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"), { cleanupLedgerPath: join(root, "cleanup.jsonl"), emitRecovery: () => {} });
@@ -121,16 +145,17 @@ describe("live-canary gate", () => {
       const ledger = join(root, "cleanup.jsonl"); const emitted: string[] = []; const calls: string[] = [];
       const client: PostizTransport = { async request(path, init) {
         calls.push(`${init?.method ?? "GET"} ${path}`);
-        if (init?.method === "POST") return { id: "recover-7", status: "draft" };
+        if (init?.method === "POST") return [{ postId: "recover-7", integration: "acct-1" }];
         if (init?.method === "DELETE") {
           if (scenario === "cancel failure") throw new Error("cancel offline");
-          return { id: "recover-7", status: "canceled" };
+          return { id: "recover-7" };
         }
         if (calls.filter((call) => call.startsWith("GET")).length === 1) {
           if (scenario === "read throw") throw new Error("read offline");
-          return { id: scenario === "ID mismatch" ? "wrong-id" : "recover-7", status: "draft" };
+          // "ID mismatch" models a list that lacks the created id: read must fail closed, never match another row.
+          return { posts: [{ id: scenario === "ID mismatch" ? "wrong-id" : "recover-7", state: "DRAFT" }] };
         }
-        return { id: "recover-7", status: "canceled" };
+        return { posts: [] };
       } };
       await assert.rejects(runPostizLifecycleCanary(client, input, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"), {
         cleanupLedgerPath: ledger, emitRecovery: (event) => emitted.push(event.providerObjectId),
@@ -144,7 +169,7 @@ describe("live-canary gate", () => {
 
   test("recovery id is process-visible and cleanup runs even when durable evidence persistence fails", async () => {
     const root = mkdtempSync(join(tmpdir(), "postiz-canary-")); const emitted: string[] = [];
-    const { client, calls } = transport([{ id: "recover-9", status: "draft" }, { id: "recover-9", status: "canceled" }, { id: "recover-9", status: "canceled" }]);
+    const { client, calls } = transport([[{ postId: "recover-9", integration: "acct-1" }], { id: "recover-9" }, { posts: [] }]);
     await assert.rejects(runPostizLifecycleCanary(client, input, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"), {
       cleanupLedgerPath: root, emitRecovery: (event) => emitted.push(event.providerObjectId),
     }));
@@ -157,8 +182,8 @@ describe("live-canary gate", () => {
     const root = mkdtempSync(join(tmpdir(), "postiz-canary-"));
     const ledger = join(root, "cleanup.jsonl");
     const { client } = transport([
-      { id: "pending-1", status: "draft" }, { id: "pending-1", status: "draft" },
-      { id: "pending-1", status: "canceled" }, { id: "pending-1", status: "draft" },
+      [{ postId: "pending-1", integration: "acct-1" }], { posts: [{ id: "pending-1", state: "DRAFT" }] },
+      { id: "pending-1" }, { posts: [{ id: "pending-1", state: "DRAFT" }] },
     ]);
     await assert.rejects(runPostizLifecycleCanary(client, input, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"), { cleanupLedgerPath: ledger, emitRecovery: () => {} }), /not terminal/);
     const events = readFileSync(ledger, "utf8").trim().split("\n").map((line) => JSON.parse(line) as { cleanupRequired: boolean });
