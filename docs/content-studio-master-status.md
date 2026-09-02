@@ -61,8 +61,10 @@ what has been verified, and what remains.
 ## Current handoff — 2026-09-02
 
 - **Continue in:** `/Users/Muxin/Documents/GitHub/content-agents-worktrees/content-studio-master-status-recovery`
-  on branch `recovery/content-studio-master-status`. The latest implementation commit is `444b4d9`;
-  it is local-only and has not been pushed.
+  on branch `recovery/content-studio-master-status`. The latest implementation commit is `444b4d9`
+  (Fiction isolation). The commits after it carry this handoff document plus the deterministic
+  `jobs.test.ts` fix described below; neither changes product behavior. The branch is local-only,
+  has no upstream, and has not been pushed.
 - **Latest completed slice:** Fiction draft and repass calls now use a disposable full-tree stage,
   exact single-chapter mutation/import rules, optimistic live-tree drift checks, Claude restricted
   mode, and one exact `story:validate` command grant. Operational Fiction beats, continuity reports,
@@ -77,10 +79,13 @@ what has been verified, and what remains.
   that hardening, but the complete draft/repass canary was not rerun after the argv change.
 - **Review evidence:** the final cross-family read-only audit returned SHIP with no P0/P1/P2 after
   canonical-series containment and exact tool-grant corrections. Focused typecheck/tests passed
-  151/151. The latest full suite was not green: 3,974/3,975 passed, with the sole failure in the
-  unrelated timing-sensitive `stopping a queued job never spawns anything, and drain() skips it`
-  assertion; the same `jobs.test.ts` file passed in focused execution. Do not claim a green merge
-  gate until a later `npm run check` passes.
+  151/151. The earlier full suite had one unrelated timing-sensitive failure in
+  `stopping a queued job never spawns anything, and drain() skips it` (`src/review/jobs.test.ts`):
+  the first job held the lane with a timer, so under suite load both timers fired in one tick and
+  the second job ran before it was stopped. That flake was reproduced under parallel load (1 of 30
+  runs) and fixed on 2026-09-02 by holding the lane with a promise the test releases explicitly
+  (0 of 40 loaded runs after). The unsandboxed merge gate `npm run check` then passed:
+  typecheck clean, 3,975/3,975 tests. This is unit evidence only; it changes no product status.
 - **Canary incident:** the first isolation attempt overwrote the pre-existing
   `~/.content-agents/fiction-beats/the-least-of-us.json`. No recoverable prior bytes were found, so
   the file was preserved rather than guessed or deleted. Canary-only global continuity/review files

@@ -1354,8 +1354,13 @@ test("gitStateDrift reports the whole /story step 7 at once and never offers to 
 test("stopping a queued job never spawns anything, and drain() skips it", async () => {
   jobs.length = 0;
   let taskRan = false;
+  // The first job holds the lane until the test releases it. A timer-based hold flaked under
+  // suite load: when the event loop stalled past the hold, the hold timer and the probe timer
+  // fired in one tick, the first job finished, and drain() ran the second before it was stopped.
+  let releaseLane!: () => void;
+  const laneHeld = new Promise<void>((r) => { releaseLane = r; });
   const first = runQueued("revise", "holds the lane", async () => {
-    await new Promise((r) => setTimeout(r, 60));
+    await laneHeld;
   });
   const second = runQueued("revise", "stopped before it ever ran", async () => {
     taskRan = true;
@@ -1371,6 +1376,7 @@ test("stopping a queued job never spawns anything, and drain() skips it", async 
   // The caller's promise must settle, or the HTTP request that enqueued it hangs forever.
   await assert.rejects(second, /stopped/);
 
+  releaseLane();
   await first;
   await new Promise((r) => setTimeout(r, 30));
   assert.equal(taskRan, false, "drain() finds work by status === 'queued' — a stopped job is never picked");
