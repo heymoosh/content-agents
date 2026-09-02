@@ -7,6 +7,8 @@ import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDeri
 import { resolveAngle } from "../atomize/spin.js";
 import { assertCharlesDraftPolicy, captureCharlesDraftState, restoreCharlesDraftState, validateCharlesDraftMutation } from "./charles-jobs.js";
 import * as charlesJobs from "./charles-jobs.js";
+import { captureFictionStageState, importFictionStageMutation, validateFictionStageMutation, withFictionDraftStage } from "./fiction-jobs.js";
+import { buildEngineSpawn } from "./engines.js";
 
 async function waitForJobStatus(
   job: { status: string },
@@ -438,6 +440,20 @@ test("buildClaudeSpawnArgs: permissionMode: null omits --permission-mode entirel
 
 test("buildClaudeSpawnArgs: model/tools are appended only when explicitly set", () => {
   assert.deepEqual(buildClaudeSpawnArgs("p", { model: "sonnet" }), ["-p", "p", "--permission-mode", "acceptEdits", "--model", "sonnet"]);
+});
+
+test("Claude Fiction validation can be allowed explicitly without trusting the disposable workspace", () => {
+  const built = buildEngineSpawn("claude", "draft", {
+    timeoutMs: 1_000,
+    restricted: true,
+    tools: "Bash",
+    allowedTools: "Bash(npm run story:validate -- series --chapter 2)",
+  } as never);
+  assert.deepEqual(built.args, [
+    "-p", "draft", "--restricted", "--permission-mode", "acceptEdits", "--tools", "Bash",
+    "--allowedTools", "Bash(npm run story:validate -- series --chapter 2)",
+  ]);
+  assert.equal(built.args.includes("--dangerously-skip-permissions"), false);
 });
 
 test("enqueueOutreachDraft carries the selected engine into the queued follow-up spawn", async () => {
@@ -1140,6 +1156,110 @@ test("chapterSnapshot reads every chapter's prose, and an empty series is an emp
     const snap = chapterSnapshot(dir);
     assert.equal(snap.size, 1);
     assert.equal(snap.get(1), "The airlock was quiet.");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Fiction drafting runs in a disposable repo stage without git, secrets, or operational data", async () => {
+  const source = mkdtempSync(join(tmpdir(), "fiction-stage-source-"));
+  let stagedRoot = "";
+  try {
+    mkdirSync(join(source, ".git"));
+    mkdirSync(join(source, ".claude", "skills", "story"), { recursive: true });
+    mkdirSync(join(source, "config"));
+    mkdirSync(join(source, "src"));
+    mkdirSync(join(source, "stories", "series", "chapters"), { recursive: true });
+    mkdirSync(join(source, "data"));
+    mkdirSync(join(source, "node_modules"));
+    writeFileSync(join(source, ".env"), "LIVE_SECRET=never-copy\n");
+    writeFileSync(join(source, ".claude", "settings.json"), '{"permissions":{"allow":["Bash(npm run:*)"]}}\n');
+    writeFileSync(join(source, "data", "analytics.db"), "private operational data");
+    writeFileSync(join(source, "CLAUDE.md"), "rules\n");
+    writeFileSync(join(source, "package.json"), "{}\n");
+    writeFileSync(join(source, "package-lock.json"), "{}\n");
+    writeFileSync(join(source, "tsconfig.json"), "{}\n");
+    writeFileSync(join(source, "src", "validate.ts"), "export {};\n");
+    writeFileSync(join(source, "config", "fiction.yaml"), "safe: true\n");
+    writeFileSync(join(source, ".claude", "skills", "story", "SKILL.md"), "story rules\n");
+    writeFileSync(join(source, "stories", "AGENTS.md"), "fiction rules\n");
+    writeFileSync(join(source, "stories", "series", "series.yaml"), "slug: series\n");
+    writeFileSync(join(source, "stories", "series", "chapters", "chapter-01.md"), "---\nchapter: 1\n---\n\nOne.\n");
+
+    await withFictionDraftStage(async (stage) => {
+      stagedRoot = stage.root;
+      assert.equal(existsSync(join(stage.root, ".git")), false);
+      assert.equal(existsSync(join(stage.root, ".env")), false);
+      assert.equal(existsSync(join(stage.root, "data")), false);
+      assert.equal(existsSync(join(stage.root, "stories", "series", "chapters", "chapter-01.md")), true);
+      assert.equal(existsSync(join(stage.root, ".claude", "skills", "story", "SKILL.md")), true);
+      assert.equal(existsSync(join(stage.root, ".claude", "settings.json")), false, "broad project permissions must not enter the stage");
+      assert.equal(existsSync(join(stage.root, "node_modules")), true);
+    }, source);
+    assert.ok(stagedRoot);
+    assert.equal(existsSync(stagedRoot), false, "the staged repo is removed even after a successful task");
+  } finally {
+    rmSync(source, { recursive: true, force: true });
+  }
+});
+
+test("Fiction staged import creates a complete new chapter and refuses stale repass bytes", () => {
+  const root = mkdtempSync(join(tmpdir(), "fiction-live-import-"));
+  const live = join(root, "series");
+  try {
+    mkdirSync(join(live, "chapters"), { recursive: true });
+    writeFileSync(join(live, "chapters", "chapter-01.md"), "one\n");
+    const before = captureFictionStageState(live);
+    const fresh = Buffer.from("two, complete\n");
+    importFictionStageMutation(
+      { chapter: 2, relativePath: "stories/series/chapters/chapter-02.md", bytes: fresh, mode: 0o640 },
+      before,
+      live,
+    );
+    assert.deepEqual(readFileSync(join(live, "chapters", "chapter-02.md")), fresh);
+    assert.equal(statSync(join(live, "chapters", "chapter-02.md")).mode & 0o777, 0o640);
+
+    const repassBefore = captureFictionStageState(live);
+    writeFileSync(join(live, "chapters", "chapter-02.md"), "someone else changed it\n");
+    assert.throws(
+      () => importFictionStageMutation(
+        { chapter: 2, relativePath: "stories/series/chapters/chapter-02.md", bytes: Buffer.from("repass\n"), mode: 0o640 },
+        repassBefore,
+        live,
+      ),
+      /changed before staged import/i,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Fiction staged mutation accepts one next chapter or one target repass and rejects every other change", () => {
+  const root = mkdtempSync(join(tmpdir(), "fiction-stage-mutation-"));
+  try {
+    const chapters = join(root, "stories", "series", "chapters");
+    mkdirSync(chapters, { recursive: true });
+    mkdirSync(join(root, "config"));
+    writeFileSync(join(root, "config", "fiction.yaml"), "safe: true\n");
+    writeFileSync(join(chapters, "chapter-01.md"), "---\nchapter: 1\n---\n\nOne.\n");
+    const before = captureFictionStageState(root);
+
+    writeFileSync(join(chapters, "chapter-02.md"), "---\nchapter: 2\n---\n\nTwo.\n");
+    const draft = validateFictionStageMutation(before, "draft", "series", undefined, root);
+    assert.equal(draft.chapter, 2);
+    assert.equal(draft.relativePath, "stories/series/chapters/chapter-02.md");
+
+    const repassBefore = captureFictionStageState(root);
+    writeFileSync(join(chapters, "chapter-02.md"), "---\nchapter: 2\n---\n\nTwo, tightened.\n");
+    const repass = validateFictionStageMutation(repassBefore, "repass", "series", 2, root);
+    assert.equal(repass.chapter, 2);
+
+    const badBefore = captureFictionStageState(root);
+    writeFileSync(join(root, "config", "fiction.yaml"), "safe: false\n");
+    assert.throws(
+      () => validateFictionStageMutation(badBefore, "repass", "series", 2, root),
+      /must change only.*chapter-02\.md/i,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

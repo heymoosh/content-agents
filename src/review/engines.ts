@@ -69,6 +69,8 @@ export interface EngineSpawnOptions {
   permissionMode?: string | null;
   model?: string;
   tools?: string;
+  allowedTools?: string;
+  restricted?: boolean;
   sandbox?: "read-only" | "workspace-write" | "danger-full-access";
   outputFile?: string;
 }
@@ -115,11 +117,13 @@ export function buildEngineSpawn(
   }
 
   const args = ["-p", prompt];
+  if (engine === "claude" && opts.restricted) args.push("--restricted");
   if (opts.permissionMode !== null) {
     args.push("--permission-mode", opts.permissionMode ?? "acceptEdits");
   }
   if (opts.model !== undefined) args.push("--model", opts.model);
   if (opts.tools !== undefined) args.push("--tools", opts.tools);
+  if (engine === "claude" && opts.allowedTools !== undefined) args.push("--allowedTools", opts.allowedTools);
   return { command: engine, args };
 }
 

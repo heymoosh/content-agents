@@ -11,12 +11,12 @@
 
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import type { Engine } from "./engines.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { configuredDataPathOrLegacy } from "../runtime/data-root.js";
 
 const execFileP = promisify(execFile);
 const STORIES_ROOT = join(repoRoot, "stories");
@@ -160,7 +160,7 @@ export function readFictionChapter(slug: string, chapter: number, root: string =
 // The prototype holds her beats in client memory, which dies on reload and takes the anchor with
 // it. They live outside git instead, the same convention as the job logs and the Venture intake
 // drafts: this is studio working state, not canon, and stories/ stays the series.
-export const BEATS_ROOT = join(homedir(), ".content-agents", "fiction-beats");
+export const BEATS_ROOT = configuredDataPathOrLegacy("fiction-beats");
 
 export interface SceneBeats {
   beats: string;

@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildContinuityPrompt,
@@ -15,7 +15,11 @@ import {
   CONTINUITY_STEPS,
   unfixableReason,
   continuityEngineSpawn,
+  CONTINUITY_ROOT,
 } from "./continuity.js";
+test("continuity reports preserve the legacy default when no isolated data root is configured", () => {
+  assert.equal(CONTINUITY_ROOT, join(homedir(), ".content-agents", "fiction-continuity"));
+});
 
 const BODY = [
   "The airlock was quiet.",

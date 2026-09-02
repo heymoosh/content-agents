@@ -19,6 +19,13 @@ export function dataPath(...parts: string[]): string {
   return join(root, ...parts);
 }
 
+/** Preserve pre-fingerprinted operational paths unless an operator explicitly isolates the run. */
+export function configuredDataPathOrLegacy(...parts: string[]): string {
+  return process.env.CONTENT_AGENTS_DATA_ROOT?.trim()
+    ? dataPath(...parts)
+    : join(homedir(), ".content-agents", ...parts);
+}
+
 /** Old releases kept mutable state inside the checkout. Copy it forward once, without deleting it. */
 export function migrateLegacyDataFile(parts: readonly string[], legacyDataRoot = join(repoRoot, "data")): string {
   const canonical = dataPath(...parts);

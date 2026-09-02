@@ -2,12 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import {
   listFictionSeries, resolveDoc, saveFictionDoc, readFictionDoc,
   readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats,
-  listChapters, seriesDirFor, refuseSave,
+  listChapters, seriesDirFor, refuseSave, BEATS_ROOT,
 } from "./fiction.js";
+test("scene beats preserve the legacy default when no isolated data root is configured", () => {
+  assert.equal(BEATS_ROOT, join(homedir(), ".content-agents", "fiction-beats"));
+});
 
 function tmpSeries(): string {
   const root = mkdtempSync(join(tmpdir(), "fiction-test-"));

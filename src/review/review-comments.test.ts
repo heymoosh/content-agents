@@ -2,11 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import {
   appendReviewComment, appendReviewCommentSafe, charlesReviewSubject, fictionReviewSubject, listReviewComments,
-  listReviewCommentsSafe, listReviewCommentsWithHealth,
+  listReviewCommentsSafe, listReviewCommentsWithHealth, REVIEW_COMMENTS_PATH,
 } from "./review-comments.js";
+test("review comments preserve the legacy default when no isolated data root is configured", () => {
+  assert.equal(REVIEW_COMMENTS_PATH, join(homedir(), ".content-agents", "review-comments.jsonl"));
+});
 
 test("review subjects are stable and reject invalid resource identities", () => {
   assert.equal(fictionReviewSubject("the-least-of-us", 3), "the-least-of-us:chapter-3");

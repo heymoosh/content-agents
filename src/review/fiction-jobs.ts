@@ -1,8 +1,11 @@
-import { basename } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { execFileSync } from "node:child_process";
+import { chmodSync, cpSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 import { repoRoot } from "../db/db.js";
 import { readSceneBeats, saveSceneBeats } from "./fiction.js";
-import { resolveSeriesDir, chapterNumbers, readChapter } from "../fiction/_series.js";
+import { STORIES_DIR, resolveSeriesDir, chapterNumbers, readChapter } from "../fiction/_series.js";
 import { continuityReportPath, readContinuityReport } from "../fiction/continuity.js";
 import { ENGINE_LABELS, type Engine } from "./engines.js";
 import type { CommandSpawnResult } from "./jobs.js";
@@ -49,7 +52,7 @@ export interface FictionJobDependencies {
   runClaudeSpawn: (
     job: FictionJob,
     prompt: string,
-    opts: { timeoutMs: number; permissionMode?: string },
+    opts: { timeoutMs: number; permissionMode?: string; restricted?: boolean; tools?: string; allowedTools?: string; cwd?: string },
   ) => Promise<CommandSpawnResult>;
   runCommandSpawn: (
     job: FictionJob,
@@ -71,6 +74,17 @@ export interface FictionJobDependencies {
   ) => string | null;
   logTailSuffix: (jobId: string) => string;
   atomizePermissionMode: string;
+}
+
+export function resolveFictionStudioSeriesDir(arg: string): string {
+  const canonicalStories = realpathSync(STORIES_DIR);
+  const canonicalDir = realpathSync(resolveSeriesDir(arg));
+  const rel = relative(canonicalStories, canonicalDir);
+  const slug = basename(canonicalDir);
+  if (!rel || rel.startsWith("..") || isAbsolute(rel) || rel !== slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    throw new Error("series must be one safe slug directly under stories/");
+  }
+  return canonicalDir;
 }
 
 // Pure prompt assembly, exported so the two constraints above are directly readable in a test.
@@ -169,16 +183,9 @@ export function findFictionDupe(
   });
 }
 
-// ── The "do not touch git" rule, enforced rather than asked for ─────────────────────────────────
-// The /story skill's step 7 commits the chapter on a branch and opens a draft PR, and the dispatch
-// prompt tells the headless run not to. A prompt is a request. The run holds `acceptEdits` and it
-// legitimately needs Bash for `npm run story:validate`, so no tool filter can take git away from it
-// without also taking the validate step away. What CAN be enforced is the outcome: read where git
-// stands before the run and again after, and fail the job loudly if anything moved. That covers
-// every route to the same damage (a commit, a checkout, a new branch) instead of naming commands.
-//
-// It never reverts. Rewinding somebody's checkout to clean up after a bad run is a worse failure
-// than the one it fixes; the job reports exactly what moved and leaves it to Muxin.
+// Defense in depth around the staged workspace. The stage contains no .git entry, but the model has
+// Bash for story:validate. If it somehow reaches back to the live checkout, detect ref movement and
+// refuse the import. Nothing is ever rewound automatically.
 export interface GitState {
   head: string; // HEAD commit sha
   branch: string; // current branch name, or "HEAD" when detached
@@ -213,40 +220,56 @@ export function gitStateDrift(before: GitState | null, after: GitState | null): 
 async function runFictionDraftJob(job: FictionJob, deps: FictionJobDependencies): Promise<void> {
   const p = job.payload ?? {};
   const mode = p.mode === "repass" ? "repass" : "draft";
-  const dir = resolveSeriesDir(p.series ?? job.arg);
-  const before = chapterSnapshot(dir);
+  const dir = resolveFictionStudioSeriesDir(p.series ?? job.arg);
+  const liveBefore = captureFictionStageState(dir);
   const gitBefore = readGitState();
+  const chaptersBefore = chapterNumbers(dir);
+  const expectedChapter = mode === "repass"
+    ? p.chapter ?? 0
+    : (chaptersBefore.length ? Math.max(...chaptersBefore) + 1 : 1);
   const prompt =
     mode === "repass"
       ? fictionRepassPrompt(p.series ?? job.arg, p.chapter ?? 0, p.note ?? "")
       : fictionDraftPrompt(p.series ?? job.arg, p.beats ?? "");
 
-  const result = await deps.runClaudeSpawn(job, prompt, {
-    timeoutMs: FICTION_TIMEOUT_MS,
-    permissionMode: deps.atomizePermissionMode,
-  });
-  const failure = deps.decodeSpawnFailure(result, job.id, {
-    timeoutVerb: mode === "repass" ? "the second pass" : "the scene draft",
-    timeoutLabel: `${FICTION_TIMEOUT_MS / 60000} min`,
-    exitVerb: mode === "repass" ? "the second pass" : "the scene draft",
-    includeTailOnTimeout: true,
-  });
-  const produced = fictionRunProduced(before, chapterSnapshot(dir), mode, p.chapter);
-  const drift = gitStateDrift(gitBefore, readGitState());
-  job.status = !failure && produced !== null && !drift ? "done" : "failed";
-  if (produced === null || job.status !== "done") {
-    // A chapter that landed AND git that moved is both facts at once, and the run still failed.
-    const landed = produced === null ? "" : ` Chapter ${produced} was written, so the prose is on disk.`;
-    job.error =
-      failure ??
-      (drift
-        ? `${drift}${landed}${deps.logTailSuffix(job.id)}`
-        : mode === "repass"
-          ? `the second pass ran but chapter ${p.chapter} did not change, so nothing was written${deps.logTailSuffix(job.id)}`
-          : `it ran but wrote no new chapter file, so nothing was written${deps.logTailSuffix(job.id)}`);
+  let produced: number | null = null;
+  try {
+    await withFictionDraftStage(async (stage) => {
+      const stagedBefore = captureFictionStageState(stage.root);
+      const result = await deps.runClaudeSpawn(job, prompt, {
+        timeoutMs: FICTION_TIMEOUT_MS,
+        permissionMode: "acceptEdits",
+        restricted: true,
+        tools: "Bash",
+        allowedTools: `Bash(npm run story:validate -- ${basename(dir)} --chapter ${expectedChapter})`,
+        cwd: stage.root,
+      });
+      const failure = deps.decodeSpawnFailure(result, job.id, {
+        timeoutVerb: mode === "repass" ? "the second pass" : "the scene draft",
+        timeoutLabel: `${FICTION_TIMEOUT_MS / 60000} min`,
+        exitVerb: mode === "repass" ? "the second pass" : "the scene draft",
+        includeTailOnTimeout: true,
+      });
+      if (failure) throw new Error(failure);
+      const accepted = validateFictionStageMutation(stagedBefore, mode, basename(dir), p.chapter, stage.root);
+      const drift = gitStateDrift(gitBefore, readGitState());
+      if (drift) throw new Error(drift);
+      assertFictionStateUnchanged(liveBefore, captureFictionStageState(dir));
+      importFictionStageMutation(accepted, liveBefore, dir);
+      produced = accepted.chapter;
+    }, repoRoot, basename(dir));
+  } catch (error) {
+    job.status = "failed";
+    job.error = error instanceof Error ? error.message : String(error);
     return;
   }
-  const chapter: number = produced;
+  const chapter = produced as number | null;
+  if (chapter === null) {
+    job.status = "failed";
+    job.error = `the ${mode === "repass" ? "second pass" : "scene draft"} produced no importable chapter${deps.logTailSuffix(job.id)}`;
+    return;
+  }
+  job.status = "done";
   job.payload = { ...p, chapter };
   // Keep the anchor pointing at the scene and durably attribute each model-written operation.
   // A chapter without that receipt stays visible on disk, but the job must not claim complete.
@@ -297,7 +320,7 @@ async function runFictionCheckJob(job: FictionJob, deps: FictionJobDependencies)
 
 export function createFictionJobs(deps: FictionJobDependencies) {
   function addFictionDraftJob(seriesArg: string, beats: string, engine: Engine = "claude"): { job: FictionJob; queued: boolean } {
-    const dir = resolveSeriesDir(seriesArg); // throws on an unknown series before anything is queued
+    const dir = resolveFictionStudioSeriesDir(seriesArg); // reject client input before it reaches a tool grant
     const slug = basename(dir);
     if (!beats.trim()) throw new Error("say the beats first");
     const existing = findFictionDupe(deps.jobs, { kind: "fiction-draft", series: slug, mode: "draft" });
@@ -315,7 +338,7 @@ export function createFictionJobs(deps: FictionJobDependencies) {
   }
 
   function addFictionRepassJob(seriesArg: string, chapter: number, note: string, engine: Engine = "claude"): FictionJob {
-    const dir = resolveSeriesDir(seriesArg);
+    const dir = resolveFictionStudioSeriesDir(seriesArg);
     const slug = basename(dir);
     if (!note.trim()) throw new Error("say what to change first");
     if (!chapterNumbers(dir).includes(chapter)) throw new Error(`there is no chapter ${chapter} to run again`);
@@ -331,7 +354,7 @@ export function createFictionJobs(deps: FictionJobDependencies) {
   }
 
   function addFictionCheckJob(seriesArg: string, chapter: number, engine: Engine = "claude"): FictionJob {
-    const dir = resolveSeriesDir(seriesArg);
+    const dir = resolveFictionStudioSeriesDir(seriesArg);
     const slug = basename(dir);
     if (!chapterNumbers(dir).includes(chapter)) throw new Error(`there is no chapter ${chapter} to check`);
     const existing = findFictionDupe(deps.jobs, { kind: "fiction-continuity", series: slug, chapter });
@@ -356,3 +379,142 @@ export function createFictionJobs(deps: FictionJobDependencies) {
 
 const FICTION_TIMEOUT_MS = 20 * 60_000;
 const CONTINUITY_TIMEOUT_MS = 10 * 60_000;
+
+export interface FictionStageState {
+  files: Map<string, Buffer>;
+  dirs: Set<string>;
+  modes: Map<string, number>;
+}
+
+function fictionStageEntries(root: string, rel = ""): Array<{ rel: string; kind: "file" | "dir" | "other" }> {
+  if (!existsSync(join(root, rel))) return [];
+  const entries: Array<{ rel: string; kind: "file" | "dir" | "other" }> = [];
+  for (const entry of readdirSync(join(root, rel), { withFileTypes: true })) {
+    const child = rel ? join(rel, entry.name) : entry.name;
+    if (child === "node_modules") continue;
+    const kind = entry.isDirectory() ? "dir" : entry.isFile() ? "file" : "other";
+    entries.push({ rel: child, kind });
+    if (kind === "dir") entries.push(...fictionStageEntries(root, child));
+  }
+  return entries;
+}
+
+export function captureFictionStageState(root: string): FictionStageState {
+  const files = new Map<string, Buffer>();
+  const dirs = new Set<string>();
+  const modes = new Map<string, number>();
+  for (const entry of fictionStageEntries(root)) {
+    if (entry.kind === "other") throw new Error(`Fiction stage contains an unsupported filesystem entry: ${entry.rel}`);
+    modes.set(entry.rel, lstatSync(join(root, entry.rel)).mode & 0o7777);
+    if (entry.kind === "dir") dirs.add(entry.rel);
+    else files.set(entry.rel, readFileSync(join(root, entry.rel)));
+  }
+  return { files, dirs, modes };
+}
+
+function fictionStateDifferences(before: FictionStageState, after: FictionStageState): string[] {
+  const differences: string[] = [];
+  for (const rel of before.files.keys()) {
+    if (!after.files.has(rel)) differences.push(`removed file ${rel}`);
+    else if (!before.files.get(rel)!.equals(after.files.get(rel)!)) differences.push(`modified file ${rel}`);
+  }
+  for (const rel of after.files.keys()) if (!before.files.has(rel)) differences.push(`added file ${rel}`);
+  for (const rel of before.dirs) if (!after.dirs.has(rel)) differences.push(`removed directory ${rel}`);
+  for (const rel of after.dirs) if (!before.dirs.has(rel)) differences.push(`added directory ${rel}`);
+  for (const [rel, mode] of before.modes) if (after.modes.get(rel) !== mode) differences.push(`changed mode or permission ${rel}`);
+  return differences;
+}
+
+export function assertFictionStateUnchanged(before: FictionStageState, after: FictionStageState): void {
+  const differences = fictionStateDifferences(before, after);
+  if (differences.length) throw new Error(`Fiction changed while the model was running: ${differences.join(", ")}`);
+}
+
+export function validateFictionStageMutation(
+  before: FictionStageState,
+  mode: "draft" | "repass",
+  slug: string,
+  target: number | undefined,
+  root: string,
+): { chapter: number; relativePath: string; bytes: Buffer; mode: number } {
+  const after = captureFictionStageState(root);
+  const differences = fictionStateDifferences(before, after);
+  const chapterPrefix = join("stories", slug, "chapters");
+  const existing = [...before.files.keys()].flatMap((rel) => {
+    const match = rel.match(new RegExp(`^${chapterPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/chapter-(\\d+)\\.md$`));
+    return match ? [Number(match[1])] : [];
+  });
+  const chapter = mode === "draft" ? (existing.length ? Math.max(...existing) + 1 : 1) : target;
+  if (!chapter) throw new Error("Fiction repass needs an exact chapter target");
+  const relativePath = join(chapterPrefix, `chapter-${String(chapter).padStart(2, "0")}.md`);
+  const expected = mode === "draft" ? [`added file ${relativePath}`] : [`modified file ${relativePath}`];
+  if (differences.length !== 1 || differences[0] !== expected[0]) {
+    throw new Error(`Fiction ${mode} must change only ${relativePath}; observed: ${differences.join(", ") || "nothing"}`);
+  }
+  const bytes = after.files.get(relativePath);
+  if (!bytes) throw new Error(`Fiction ${mode} did not leave ${relativePath} as a regular file`);
+  if (/[—–]/u.test(bytes.toString("utf8"))) throw new Error(`Fiction ${mode} left an em dash or en dash in ${relativePath}`);
+  const fileMode = after.modes.get(relativePath);
+  if (fileMode === undefined) throw new Error(`Fiction ${mode} did not preserve a file mode for ${relativePath}`);
+  return { chapter, relativePath, bytes, mode: fileMode };
+}
+
+export async function withFictionDraftStage<T>(
+  task: (stage: { root: string; seriesRoot: string }) => Promise<T>,
+  sourceRoot: string = repoRoot,
+  seriesSlug?: string,
+): Promise<T> {
+  const root = mkdtempSync(join(tmpdir(), "content-agents-fiction-draft-"));
+  try {
+    const stagedPaths = ["CLAUDE.md", "AGENTS.md", "package.json", "package-lock.json", "tsconfig.json", "config", "src", join(".claude", "skills", "story")];
+    if (seriesSlug) stagedPaths.push(join("stories", "AGENTS.md"), join("stories", seriesSlug));
+    else stagedPaths.push("stories");
+    for (const rel of stagedPaths) {
+      const source = join(sourceRoot, rel);
+      if (!existsSync(source)) continue;
+      const target = join(root, rel);
+      mkdirSync(dirname(target), { recursive: true });
+      cpSync(source, target, { recursive: true });
+    }
+    const modules = join(sourceRoot, "node_modules");
+    if (existsSync(modules)) symlinkSync(modules, join(root, "node_modules"), "dir");
+    return await task({ root, seriesRoot: join(root, "stories") });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+export function importFictionStageMutation(
+  accepted: { chapter: number; relativePath: string; bytes: Buffer; mode: number },
+  liveBefore: FictionStageState,
+  liveSeriesDir: string,
+): void {
+  const prefix = `${join("stories", basename(liveSeriesDir)).replaceAll("\\", "/")}/`;
+  const normalized = accepted.relativePath.replaceAll("\\", "/");
+  const seriesRelative = normalized.startsWith(prefix) ? normalized.slice(prefix.length) : "";
+  const target = join(liveSeriesDir, seriesRelative);
+  if (!seriesRelative || seriesRelative.startsWith("../") || seriesRelative.includes("/../")) throw new Error("Fiction staged chapter escaped its live series");
+  if (!existsSync(target)) {
+    const temp = join(dirname(target), `.chapter-${randomUUID()}.tmp`);
+    try {
+      writeFileSync(temp, accepted.bytes, { flag: "wx" });
+      chmodSync(temp, accepted.mode);
+      linkSync(temp, target);
+    } finally {
+      rmSync(temp, { force: true });
+    }
+    return;
+  }
+  const beforeBytes = liveBefore.files.get(seriesRelative);
+  if (!beforeBytes || !readFileSync(target).equals(beforeBytes)) throw new Error(`Fiction chapter ${accepted.chapter} changed before staged import`);
+  const mode = liveBefore.modes.get(seriesRelative);
+  if (mode === undefined) throw new Error(`Fiction chapter ${accepted.chapter} has no preserved file mode`);
+  const temp = join(dirname(target), `.chapter-${randomUUID()}.tmp`);
+  try {
+    writeFileSync(temp, accepted.bytes, { flag: "wx" });
+    chmodSync(temp, mode);
+    renameSync(temp, target);
+  } finally {
+    rmSync(temp, { force: true });
+  }
+}

@@ -27,6 +27,27 @@ use `AGENTS.md` so any agent can discover them consistently.
 - Maturity: when you finish a feature or open a PR (not small fixes), check the next rung in `docs/maturity.md` and propose it if its trigger fires — never auto-apply.
 - Living document: when a correction recurs, add the rule here.
 
+## Bounded verification contract
+
+For context-heavy or authenticated model workflows, keep proof of behavior separate from adjacent
+hardening. Fix the verification budget before work begins (normally one authenticated canary per
+workflow and at most one retry), and use this order:
+
+1. Run an early `claude -p` architecture/threat review when private-repository export has been
+   authorized for the session.
+2. Run focused red/green tests, then a fake-model end-to-end orchestration test.
+3. Run the cross-family security audit before the authenticated canary. Auditors must classify each
+   finding as introduced blocker, pre-existing problem, or optional hardening.
+4. Fix P0/P1 findings only. Record P2 hardening unless it directly threatens data or invalidates
+   the canary.
+5. Run one isolated authenticated canary, with at most one retry.
+6. Run `npm run check` once, at the end, then commit or stop.
+
+The disposable harness must isolate Git, operational data, secrets, ports, and model permissions.
+Preserve successful model output when later validation fails. Keep long-command updates to concise
+progress/final summaries. Time-box a newly discovered adjacent issue to 30 minutes; if it cannot be
+resolved within that window, stop with evidence and ask before broadening scope.
+
 ## Repository delivery policy
 
 - This is a private, local-first repository. The declared merge gate is

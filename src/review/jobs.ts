@@ -1252,12 +1252,14 @@ export async function runAgentSpawn(
 // default so every pre-existing caller is unaffected.
 export function buildClaudeSpawnArgs(
   prompt: string,
-  opts: { permissionMode?: string | null; model?: string; tools?: string }
+  opts: { permissionMode?: string | null; model?: string; restricted?: boolean; tools?: string; allowedTools?: string }
 ): string[] {
   const args = ["-p", prompt];
+  if (opts.restricted) args.push("--restricted");
   if (opts.permissionMode !== null) args.push("--permission-mode", opts.permissionMode ?? "acceptEdits");
   if (opts.model !== undefined) args.push("--model", opts.model);
   if (opts.tools !== undefined) args.push("--tools", opts.tools);
+  if (opts.allowedTools !== undefined) args.push("--allowedTools", opts.allowedTools);
   return args;
 }
 
@@ -1265,7 +1267,7 @@ export function buildClaudeSpawnArgs(
 export function runClaudeSpawn(
   job: Job,
   prompt: string,
-  opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv; cwd?: string }
+  opts: { timeoutMs: number; permissionMode?: string | null; model?: string; restricted?: boolean; tools?: string; allowedTools?: string; env?: NodeJS.ProcessEnv; cwd?: string }
 ): Promise<CommandSpawnResult> {
   // Kept as a compatibility wrapper for existing callers. The job's selected engine is what
   // actually runs, so older call sites keep their name while picker-backed jobs can use Grok or

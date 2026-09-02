@@ -1,7 +1,7 @@
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { configuredDataPathOrLegacy } from "../runtime/data-root.js";
 
 export type ReviewCommentDomain = "fiction" | "charles";
 
@@ -17,7 +17,7 @@ export interface ReviewComment extends ReviewCommentInput {
   createdAt: string;
 }
 
-export const REVIEW_COMMENTS_PATH = join(homedir(), ".content-agents", "review-comments.jsonl");
+export const REVIEW_COMMENTS_PATH = configuredDataPathOrLegacy("review-comments.jsonl");
 
 export function fictionReviewSubject(series: string, chapter: number): string {
   const slug = required(series, "fiction series", 160);
