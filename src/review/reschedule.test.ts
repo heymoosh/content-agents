@@ -63,7 +63,7 @@ describe("reschedule a scheduled Postiz row", () => {
     const { transport, calls } = fakePostiz();
     const row = readQueue(folder).rows.find((r) => r.id === "x-1")!;
     const outcome = await rescheduleRow(folder, "2026-09-01-essay", row, { to: "2026-09-14T17:00:00Z" }, { transport, statusPath, now: () => NOW });
-    assert.equal(outcome.ok, true, outcome.error);
+    assert.equal(outcome.ok, true, String(outcome.error ?? ""));
     assert.equal(outcome.to, "2026-09-14T17:00:00.000Z");
     const save = calls.find((c) => c.body)!.body as Record<string, unknown>;
     assert.equal(save.type, "schedule");
@@ -113,6 +113,7 @@ describe("batch reschedule by theme", () => {
     assert.deepEqual(listBatchCandidates({ platforms: ["bluesky"] }, deps).map((c) => c.row.id), ["bs-1"]);
     assert.deepEqual(listBatchCandidates({ ids: ["2026-09-01-essay/x-1"] }, deps).map((c) => c.row.id), ["x-1"]);
     assert.deepEqual(listBatchCandidates({ slugs: ["other"] }, deps).map((c) => c.row.id), []);
+    assert.throws(() => listBatchCandidates({}, deps), /empty selection/);
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -136,7 +137,7 @@ describe("batch reschedule by theme", () => {
     const { transport } = fakePostiz();
     const result = await batchReschedule({ platforms: ["x"] }, { mode: "after", notBefore: "2026-10-01T00:00:00Z" }, { transport, statusPath, now: () => NOW, resolveFolder: () => folder });
     assert.equal(result.results.length, 2);
-    for (const r of result.results) assert.equal(r.ok, true, r.error);
+    for (const r of result.results) assert.equal(r.ok, true, String(r.error ?? ""));
     const times = result.results.map((r) => r.to!);
     assert.notEqual(times[0], times[1], "the second row sees the first row's new ledger claim");
     for (const time of times) assert.ok(time >= "2026-10-01T00:00:00.000Z");

@@ -1213,6 +1213,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       const raw = (b.selection && typeof b.selection === "object" ? b.selection : {}) as Record<string, unknown>;
       const list = (value: unknown): string[] | undefined => Array.isArray(value) ? value.map(String).filter(Boolean) : undefined;
       const selection: BatchSelection = { slugs: list(raw.slugs), pillars: list(raw.pillars), platforms: list(raw.platforms), ids: list(raw.ids) };
+      if (!Object.values(selection).some((values) => values?.length)) { json(res, 400, { ok: false, error: "select at least one pillar, slug, platform, or id; an empty selection would move every scheduled post" }); return; }
       const planRaw = (b.plan && typeof b.plan === "object" ? b.plan : {}) as Record<string, unknown>;
       let plan: BatchPlan;
       if (planRaw.mode === "shift" && Number.isFinite(Number(planRaw.days)) && Number(planRaw.days) !== 0) plan = { mode: "shift", days: Number(planRaw.days) };

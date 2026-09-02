@@ -1854,15 +1854,47 @@ function renderPublished(){
       const error=(row.publishingStatus&&row.publishingStatus.error)||row.scheduleError||(row.reconciled&&row.reconciled.reason)||"";
       const provider=publishingProvider(row);
       const planned=(row.reconciled&&row.reconciled.when)||(row.publishingStatus&&row.publishingStatus.plannedFor)||row.scheduledWhen||"No planned time recorded";
+      const movable=row.publishingStatus&&row.publishingStatus.provider==="postiz"&&row.publishingStatus.state==="planned";
+      const moveBtn=movable ? ' <button type="button" class="link-btn" data-move-slug="'+esc(piece.slug)+'" data-move-id="'+esc(row.id)+'">Move</button>' : '';
       const ref=row.publishingStatus&&row.publishingStatus.ref ? ' · '+esc(row.publishingStatus.ref) : '';
       const reconcile=row.publishingStatus&&(row.publishingStatus.state==="uncertain"||row.publishingStatus.state==="scheduling") ? '<div class="actions"><button data-publish-resolve="exists" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">I found it at the provider</button><button data-publish-resolve="not-created" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">Provider has nothing · allow retry</button></div>' : '';
-      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(planned)+'</span></span><span class="src"><strong>'+esc(provider)+'</strong>'+ref+'<br>'+(error?esc(error):state==="Pending"?'Waiting for the provider to accept it.':'Provider result recorded; live publication is not yet confirmed.')+reconcile+'</span>';
+      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(planned)+moveBtn+'</span></span><span class="src"><strong>'+esc(provider)+'</strong>'+ref+'<br>'+(error?esc(error):state==="Pending"?'Waiting for the provider to accept it.':'Provider result recorded; live publication is not yet confirmed.')+reconcile+'</span>';
       sec.appendChild(item);
     }
     main.appendChild(sec);
   }
   main.querySelectorAll("[data-publish-resolve]").forEach(button=>button.addEventListener("click",()=>resolvePublishing(button.dataset.slug,button.dataset.id,button.dataset.publishResolve,button)));
+  main.querySelectorAll("[data-move-slug]").forEach(button=>button.addEventListener("click",()=>moveRow(button.dataset.moveSlug,button.dataset.moveId,button)));
   if(!shown) main.innerHTML='<div class="empty">Nothing has entered publishing yet.</div>';
+}
+async function moveRow(slug,id,button){
+  const entered=prompt("New date/time (or \\"after <date>\\" for the first free slot on/after that date)","");
+  if(entered===null) return;
+  const trimmed=entered.trim();
+  if(!trimmed){ flash("Enter a date/time"); return; }
+  const afterMatch=/^after\\s+(.+)$/i.exec(trimmed);
+  const body={slug,id};
+  if(afterMatch){
+    const at=new Date(afterMatch[1].trim());
+    if(isNaN(at.getTime())){ flash("Could not read that date"); return; }
+    body.notBefore=at.toISOString();
+  } else {
+    const at=new Date(trimmed);
+    if(isNaN(at.getTime())){ flash("Could not read that date/time"); return; }
+    body.to=at.toISOString();
+  }
+  button.disabled=true;
+  const r=await post("/api/publishing/reschedule",body);
+  if(!r.ok){ button.disabled=false; flash(r.error||"Could not move this post"); return; }
+  const piece=(DATA.pieces||[]).find(p=>p.slug===slug);
+  const row=piece&&(piece.rows||[]).find(item=>item.id===id);
+  const to=r.to||(r.publishing&&r.publishing.plannedFor);
+  if(row){
+    if(row.publishingStatus&&to) row.publishingStatus.plannedFor=to;
+    if(to) row.scheduledWhen=to;
+  }
+  flash(to?"Moved to "+to:"Moved");
+  rerender();
 }
 async function resolvePublishing(slug,id,resolution,button){
   if(resolution==="not-created"&&!confirm("Only allow a retry after you checked the named provider and confirmed that no draft, upload, or post exists. Continue?")) return;
@@ -1872,6 +1904,48 @@ async function resolvePublishing(slug,id,resolution,button){
   const result=await post("/api/publishing/resolve",{slug,id,resolution,ref,plannedFor});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not record the reconciliation"); return; }
   flash(resolution==="exists"?"Provider item recorded. No retry will run.":"Provider check recorded. You may approve again to retry.");
+  await load();
+}
+function batchSelection(){
+  const sel={};
+  const pillar=($("#batchPillar")?.value||"").trim(); if(pillar) sel.pillars=[pillar];
+  const slug=($("#batchSlug")?.value||"").trim(); if(slug) sel.slugs=[slug];
+  const platform=($("#batchPlatform")?.value||"").trim(); if(platform) sel.platforms=[platform];
+  return sel;
+}
+function batchPlan(){
+  const checked=document.querySelector('input[name="batchMode"]:checked');
+  const mode=checked?checked.value:"shift";
+  if(mode==="after"){
+    const date=$("#batchAfterDate")?.value||"";
+    if(!date) return null;
+    const at=new Date(date);
+    if(isNaN(at.getTime())) return null;
+    return {mode:"after",notBefore:at.toISOString()};
+  }
+  const days=Number($("#batchShiftDays")?.value);
+  if(!Number.isFinite(days)||days===0) return null;
+  return {mode:"shift",days};
+}
+function batchCandidateLine(c){
+  return '<div class="src">'+esc(c.slug)+' · '+esc(c.id)+' · '+esc(c.platform)+' · '+esc(c.pillar||"no pillar")+' · '+esc(c.plannedFor||"no planned time")+'</div>';
+}
+async function batchPreview(){
+  const result=$("#batchMoveResult"); if(!result) return;
+  const plan=batchPlan()||{mode:"shift",days:0};
+  const r=await post("/api/publishing/batch-reschedule",{selection:batchSelection(),plan,dryRun:true});
+  if(!r.ok){ result.innerHTML='<div class="empty">'+esc(r.error||"Could not preview")+'</div>'; return; }
+  if(!r.candidates.length){ result.innerHTML='<div class="empty">No matching scheduled posts.</div>'; return; }
+  result.innerHTML='<div class="src">'+r.candidates.length+' would move:</div>'+r.candidates.map(batchCandidateLine).join("");
+}
+async function batchMove(){
+  const result=$("#batchMoveResult"); if(!result) return;
+  const plan=batchPlan();
+  if(!plan){ flash("Enter a shift amount or a re-flow date"); return; }
+  const r=await post("/api/publishing/batch-reschedule",{selection:batchSelection(),plan});
+  if(r.error&&!r.results){ result.innerHTML='<div class="empty">'+esc(r.error)+'</div>'; return; }
+  const results=r.results||[];
+  result.innerHTML='<div class="src">'+results.length+' processed:</div>'+results.map(x=>'<div class="src">'+esc(x.slug)+' · '+esc(x.id)+' · '+esc(x.platform)+' · '+(x.ok?"moved to "+esc(x.to||"same time"):"error: "+esc(x.error||"unknown"))+'</div>').join("");
   await load();
 }
 async function approveReviewSelection(){
@@ -6685,6 +6759,8 @@ for(const id of ["reviewMediaFilter","reviewPlatformFilter","reviewTreatmentFilt
 $("#reviewRequestFilter").addEventListener("input",render);
 $("#reviewSelectAll").addEventListener("click",()=>{ document.querySelectorAll("#reviewMain .review-check").forEach(box=>{ box.checked=true; reviewSelected.add(box.closest(".scan-row").dataset.reviewKey); }); });
 $("#reviewApproveSelected").addEventListener("click",approveReviewSelection);
+$("#batchPreviewBtn")?.addEventListener("click",batchPreview);
+$("#batchMoveBtn")?.addEventListener("click",batchMove);
 $("#reviewSheet").addEventListener("click", (e)=>{
   const t = e.target.closest ? e.target.closest("[data-step]") : null;
   if(!t) return; const n=Number(t.dataset.step);

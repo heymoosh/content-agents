@@ -133,6 +133,7 @@ export interface BatchCandidate {
 
 /** Every scheduled Postiz row the selection matches, earliest planned time first. */
 export function listBatchCandidates(selection: BatchSelection, deps: RescheduleDeps = {}): BatchCandidate[] {
+  if (!Object.values(selection).some((values) => values?.length)) throw new Error("select at least one pillar, slug, platform, or id; an empty selection would move every scheduled post");
   const now = deps.now?.() ?? new Date();
   const statuses = readPublishingStatuses(deps.statusPath ?? PUBLISHING_STATUS_PATH);
   const resolve = deps.resolveFolder ?? safeFolder;
