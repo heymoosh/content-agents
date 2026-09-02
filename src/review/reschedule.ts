@@ -89,19 +89,32 @@ export async function rescheduleRow(folder: string, slug: string, row: QueueRow,
     const to = resolveTime(row, target, now);
     if (Date.parse(to) === Date.parse(status.plannedFor!)) return { ...base, to, ok: true, publishing: status };
     const transport = deps.transport ?? createPostizTransport();
-    const input = await (deps.buildInput ?? buildPostizInput)(folder, row, status.providerAccountId!, to, transport);
+    // Confirm the post is still there before any media is registered, so a stale row cannot orphan an upload.
     const current = await findPostizPost(transport, status.providerObjectId!, status.plannedFor!, now).catch(() => null);
     if (!current) return { ...base, ok: false, error: "Postiz no longer lists this post at its planned time; reconcile it before moving" };
     if (current.status !== "scheduled") return { ...base, ok: false, error: `Postiz reports the post as ${current.status}; only scheduled posts move` };
-    const moved = await reschedulePostizPost(transport, { id: current.id, group: current.group }, input, to, now);
     const previous: Claim = { platform, day: laDayKey(new Date(status.plannedFor!)), time: status.plannedFor!, asset: row.asset, by: "postiz" };
-    moveClaim(previous, { time: moved.scheduledAt!, day: laDayKey(new Date(moved.scheduledAt!)) });
-    const publishing: PublishingStatus = {
-      ...status, state: "planned", at: new Date().toISOString(), plannedFor: moved.scheduledAt!,
-      providerUpdatedAt: new Date().toISOString(), error: undefined, schemaVersion: undefined, eventId: undefined,
-    };
-    appendPublishingStatus(publishing, statusPath);
-    return { ...base, to: moved.scheduledAt!, ok: true, publishing: readPublishingStatuses(statusPath)[publishingKey(slug, row.id)] ?? publishing };
+    // Check the destination slot's capacity before touching the provider; the real move happens after.
+    moveClaim(previous, { time: to, day: laDayKey(new Date(to)) }, { dryRun: true });
+    const input = await (deps.buildInput ?? buildPostizInput)(folder, row, status.providerAccountId!, to, transport);
+    const moved = await reschedulePostizPost(transport, { id: current.id, group: current.group }, input, to, now);
+    // From here the provider has moved. A local write failure must not read as "nothing happened":
+    // record an uncertain event carrying the new time so reconciliation and a human can settle it.
+    try {
+      moveClaim(previous, { time: moved.scheduledAt!, day: laDayKey(new Date(moved.scheduledAt!)) });
+      const publishing: PublishingStatus = {
+        ...status, state: "planned", at: new Date().toISOString(), plannedFor: moved.scheduledAt!,
+        providerUpdatedAt: new Date().toISOString(), error: undefined, schemaVersion: undefined, eventId: undefined,
+      };
+      appendPublishingStatus(publishing, statusPath);
+      return { ...base, to: moved.scheduledAt!, ok: true, publishing: readPublishingStatuses(statusPath)[publishingKey(slug, row.id)] ?? publishing };
+    } catch (error) {
+      const message = `Postiz moved the post to ${moved.scheduledAt} but the local record could not be updated: ${error instanceof Error ? error.message : String(error)}`;
+      try {
+        appendPublishingStatus({ ...status, state: "uncertain", at: new Date().toISOString(), plannedFor: moved.scheduledAt!, error: message, schemaVersion: undefined, eventId: undefined }, statusPath);
+      } catch { /* the error below already says the provider moved */ }
+      return { ...base, to: moved.scheduledAt!, ok: false, error: message };
+    }
   } catch (error) {
     return { ...base, ok: false, error: error instanceof Error ? error.message : String(error) };
   }

@@ -1211,12 +1211,18 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       // days or re-flow after a date. `dryRun` lists what would move without touching anything.
       const b = await readBody(req);
       const raw = (b.selection && typeof b.selection === "object" ? b.selection : {}) as Record<string, unknown>;
-      const list = (value: unknown): string[] | undefined => Array.isArray(value) ? value.map(String).filter(Boolean) : undefined;
-      const selection: BatchSelection = { slugs: list(raw.slugs), pillars: list(raw.pillars), platforms: list(raw.platforms), ids: list(raw.ids) };
+      const list = (value: unknown): string[] | undefined => {
+        if (value === undefined) return undefined;
+        if (!Array.isArray(value) || !value.every((item) => typeof item === "string" && item.trim())) throw new Error("selection fields must be arrays of non-empty strings");
+        return value.map((item) => item.trim());
+      };
+      let selection: BatchSelection;
+      try { selection = { slugs: list(raw.slugs), pillars: list(raw.pillars), platforms: list(raw.platforms), ids: list(raw.ids) }; }
+      catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); return; }
       if (!Object.values(selection).some((values) => values?.length)) { json(res, 400, { ok: false, error: "select at least one pillar, slug, platform, or id; an empty selection would move every scheduled post" }); return; }
       const planRaw = (b.plan && typeof b.plan === "object" ? b.plan : {}) as Record<string, unknown>;
       let plan: BatchPlan;
-      if (planRaw.mode === "shift" && Number.isFinite(Number(planRaw.days)) && Number(planRaw.days) !== 0) plan = { mode: "shift", days: Number(planRaw.days) };
+      if (planRaw.mode === "shift" && typeof planRaw.days === "number" && Number.isFinite(planRaw.days) && planRaw.days !== 0) plan = { mode: "shift", days: planRaw.days };
       else if (planRaw.mode === "after" && typeof planRaw.notBefore === "string" && Number.isFinite(Date.parse(planRaw.notBefore))) plan = { mode: "after", notBefore: planRaw.notBefore };
       else if (b.dryRun) plan = { mode: "shift", days: 0 };
       else { json(res, 400, { ok: false, error: "plan must be {mode:'shift', days:N} or {mode:'after', notBefore:ISO}" }); return; }

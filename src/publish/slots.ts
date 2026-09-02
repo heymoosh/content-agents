@@ -260,16 +260,22 @@ export function releaseClaims(toRelease: Claim[]): { removed: number; removedCla
  * new one appended, so a crash between the two steps cannot leave both or neither. `to.day` is the
  * LA calendar day of `to.time`, computed by the caller the same way claimSlots labels days.
  */
-export function moveClaim(from: Claim, to: { time: string; day: string }): { moved: boolean; claim: Claim } {
+export function moveClaim(from: Claim, to: { time: string; day: string }, opts: { dryRun?: boolean; schedule?: Record<string, PlatformSchedule> } = {}): { moved: boolean; claim: Claim } {
   const claim: Claim = { ...from, time: to.time, day: to.day };
-  return withLedgerLock(() => {
+  const apply = (): { moved: boolean; claim: Claim } => {
     const claims = readLedger();
     const index = claims.findIndex((c) => claimKey(c) === claimKey(from));
-    if (index === -1) { claims.push(claim); writeLedgerAtomic(claims); return { moved: false, claim }; }
-    claims.splice(index, 1, claim);
+    // The destination day must still have room under the platform's per-day cap, not counting the
+    // claim being moved; an explicit time is Muxin's choice but never a second post on a full day.
+    const maxPerDay = (opts.schedule ?? loadSchedule())[from.platform]?.maxSlotsPerDay ?? 1;
+    const taken = claims.filter((c, i) => i !== index && c.platform === from.platform && c.day === to.day).length;
+    if (taken >= maxPerDay) throw new Error(`${from.platform} already has ${taken} post${taken === 1 ? "" : "s"} claimed on ${to.day} (max ${maxPerDay}); pick another day`);
+    if (opts.dryRun) return { moved: index !== -1, claim };
+    if (index === -1) claims.push(claim); else claims.splice(index, 1, claim);
     writeLedgerAtomic(claims);
-    return { moved: true, claim };
-  });
+    return { moved: index !== -1, claim };
+  };
+  return opts.dryRun ? apply() : withLedgerLock(apply);
 }
 
 function appendLedger(claims: Claim[]): void {

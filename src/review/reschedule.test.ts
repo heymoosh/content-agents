@@ -91,6 +91,38 @@ describe("reschedule a scheduled Postiz row", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  test("a full destination day is refused before the provider is touched", async () => {
+    const { root, folder, statusPath } = fixture();
+    // x allows two slots a day (config/platforms.yaml); fill both.
+    writeLedgerAtomic([...readLedger(), { platform: "x", day: "2026-09-14", time: "2026-09-14T16:30:00.000Z", asset: "other", by: "postiz" }, { platform: "x", day: "2026-09-14", time: "2026-09-14T23:45:00.000Z", asset: "other2", by: "postiz" }]);
+    const { transport, calls } = fakePostiz();
+    const row = readQueue(folder).rows.find((r) => r.id === "x-1")!;
+    const outcome = await rescheduleRow(folder, "2026-09-01-essay", row, { to: "2026-09-14T17:00:00Z" }, { transport, statusPath, now: () => NOW, buildInput: async () => { throw new Error("must not build"); } });
+    assert.equal(outcome.ok, false);
+    assert.match(outcome.error ?? "", /already has 2 posts claimed on 2026-09-14/);
+    assert.equal(calls.filter((c) => c.body).length, 0);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a local write failure after the provider moved is recorded as uncertain with the new time", async () => {
+    const { root, folder, statusPath } = fixture();
+    const { transport } = fakePostiz();
+    const row = readQueue(folder).rows.find((r) => r.id === "x-1")!;
+    const ledger = process.env.CONTENT_AGENTS_TEST_LEDGER!;
+    let built = false;
+    const outcome = await rescheduleRow(folder, "2026-09-01-essay", row, { to: "2026-09-14T17:00:00Z" }, {
+      transport, statusPath, now: () => NOW,
+      buildInput: async (f, r, acct, at, t) => { built = true; writeFileSync(ledger, "{not json\n"); mkdirSync(join(ledger + ".lock"), { recursive: true }); return { destination: "x", accountId: acct, content: "c", scheduledAt: at, visibility: "scheduled" }; },
+    });
+    assert.equal(built, true);
+    assert.equal(outcome.ok, false);
+    assert.match(outcome.error ?? "", /Postiz moved the post to 2026-09-14T17:00:00.000Z but the local record/);
+    const status = readPublishingStatuses(statusPath)["2026-09-01-essay/x-1"];
+    assert.equal(status.state, "uncertain");
+    assert.equal(status.plannedFor, "2026-09-14T17:00:00.000Z");
+    rmSync(root, { recursive: true, force: true });
+  });
+
   test("a post Postiz no longer lists is not moved", async () => {
     const { root, folder, statusPath } = fixture();
     const transport: PostizTransport = { async request() { return { posts: [] }; } };
