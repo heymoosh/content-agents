@@ -162,6 +162,25 @@ describe("batch reschedule by theme", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  test("stops at the first Postiz rate-limit error and reports the rest as not attempted", async () => {
+    const { root, folder, statusPath } = fixture();
+    const inner = fakePostiz();
+    const transport: PostizTransport = {
+      async request(path, init) {
+        if (init?.method === "POST" && path.endsWith("/posts")) throw new Error("Postiz rate limit reached (429): the create-post endpoint allows 90 requests per hour across the whole instance, and each schedule or move counts as one.");
+        return inner.transport.request(path, init);
+      },
+    };
+    const result = await batchReschedule({ pillars: ["human-ai"] }, { mode: "shift", days: 7 }, { transport, statusPath, now: () => NOW, resolveFolder: () => folder });
+    assert.equal(result.candidates, 2);
+    assert.equal(result.results.length, 2);
+    assert.equal(result.results[0].ok, false);
+    assert.match(String(result.results[0].error), /rate limit reached/);
+    assert.match(String(result.results[1].error), /not attempted/);
+    assert.equal(inner.calls.filter((c) => c.path.endsWith("/posts") && c.body).length, 0, "no further create calls after the first 429");
+    rmSync(root, { recursive: true, force: true });
+  });
+
   test("after re-flows through the cadence so two rows on one platform take distinct slots", async () => {
     const { root, folder, statusPath } = fixture();
     appendPublishingStatus({ slug: "2026-09-01-essay", rowId: "x-2", provider: "postiz", state: "planned", at: NOW.toISOString(), plannedFor: "2026-09-12T17:00:00.000Z", providerObjectId: "pz-1", providerAccountId: "acct-x" }, statusPath);

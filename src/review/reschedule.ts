@@ -177,14 +177,26 @@ export function listBatchCandidates(selection: BatchSelection, deps: RescheduleD
  * number of days); `after` re-flows the cluster through the cadence, earliest first, starting at
  * the first free slot on or after the date, so a theme can wait behind a newer essay or campaign.
  */
+const isPostizRateLimit = (error: string | undefined): boolean => /Postiz rate limit reached/.test(error ?? "");
+
 export async function batchReschedule(selection: BatchSelection, plan: BatchPlan, deps: RescheduleDeps = {}): Promise<{ candidates: number; results: RescheduleOutcome[] }> {
   const candidates = listBatchCandidates(selection, deps);
   const results: RescheduleOutcome[] = [];
-  for (const candidate of candidates) {
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
     const target: RescheduleTarget = plan.mode === "shift"
       ? { to: new Date(Date.parse(candidate.status.plannedFor!) + plan.days * 24 * 60 * 60 * 1000).toISOString() }
       : { notBefore: plan.notBefore };
-    results.push(await rescheduleRow(candidate.folder, candidate.slug, candidate.row, target, deps));
+    const outcome = await rescheduleRow(candidate.folder, candidate.slug, candidate.row, target, deps);
+    results.push(outcome);
+    if (!outcome.ok && isPostizRateLimit(outcome.error)) {
+      // Postiz counts blocked requests against its 90/hour create limit too, so pressing on only
+      // deepens the hole. Stop here and report the rest as untouched so they can be retried later.
+      for (const rest of candidates.slice(i + 1)) {
+        results.push({ slug: rest.slug, id: rest.row.id, platform: rest.row.platform, from: rest.status.plannedFor ?? null, ok: false, error: "not attempted: Postiz rate limit reached earlier in this batch; retry after the hour rolls over" });
+      }
+      break;
+    }
   }
   return { candidates: candidates.length, results };
 }
