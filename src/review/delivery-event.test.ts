@@ -25,5 +25,9 @@ describe("delivery event normalization", () => {
         providerUpdatedAt: "2026-01-02T00:00:00.000Z", providerPublishedAt: "2026-01-03T00:00:00.000Z",
       });
     }
+    // A Postiz row read back after a reschedule carries `scheduledAt`; reconciliation must follow it.
+    const moved = normalizeProviderStatus("postiz", { id: "p-1", status: "scheduled", scheduledAt: "2026-09-20T17:00:00.000Z", url: null });
+    assert.equal(moved.state, "planned");
+    assert.equal(moved.plannedFor, "2026-09-20T17:00:00.000Z");
   });
 });
