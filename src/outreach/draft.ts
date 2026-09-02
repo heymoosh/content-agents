@@ -53,6 +53,59 @@ export function selectEvidenceForDraft(evidence: EvidenceItem[], classification:
   return picked.length ? picked : evidence;
 }
 
+export interface UnauthorizedOutreachClaim {
+  kind: "population-quantifier" | "prevalence-predicate";
+  sentence: string;
+  span: string;
+}
+
+function normalizedClaimText(value: string): string {
+  return value.toLowerCase().replace(/[’]/g, "'").replace(/\s+/g, " ").trim();
+}
+
+function claimSentences(value: string): string[] {
+  return value.split(/(?<=[.!?])\s+/u).map(normalizedClaimText).filter(Boolean);
+}
+
+/**
+ * Deterministically reject one bounded class of unsupported model claims: population-wide
+ * prevalence/comparison language. This does not pretend to prove arbitrary semantic entailment;
+ * Muxin's pending-review gate still owns broader truthfulness review. A matching sentence is
+ * allowed only when that complete normalized sentence already appears in cited evidence or in
+ * Muxin's own direction; authorizing only the quantifier span would permit predicate or polarity
+ * substitution (for example, evidence saying "not all teams" cannot authorize "all teams").
+ */
+export function findUnauthorizedOutreachClaims(
+  body: string,
+  evidence: EvidenceItem[],
+  direction = "",
+): UnauthorizedOutreachClaim[] {
+  const authorized = new Set([
+    ...evidence.flatMap((item) => [item.quote, item.description]),
+    direction,
+  ].filter(Boolean).flatMap(claimSentences));
+  const patterns: Array<{ kind: UnauthorizedOutreachClaim["kind"]; re: RegExp }> = [
+    {
+      kind: "prevalence-predicate",
+      re: /\b(?:that|this|which|it)(?:['’]s| is)\s+(?:rare|unusual|uncommon|not common|the exception|the norm|typical)\b/giu,
+    },
+    {
+      kind: "population-quantifier",
+      re: /\b(?:almost all|the majority of|hardly any|most|many|few|some|all|no|nobody|everyone)\s+(?:teams?|companies|people|founders|startups|products?|pms|leaders|orgs?|organizations|engineers|builders|folks)\b/giu,
+    },
+  ];
+  const findings: UnauthorizedOutreachClaim[] = [];
+  for (const sentence of body.split(/(?<=[.!?])\s+/u).map((part) => part.trim()).filter(Boolean)) {
+    for (const pattern of patterns) {
+      for (const match of sentence.matchAll(pattern.re)) {
+        const span = match[0];
+        if (!authorized.has(normalizedClaimText(sentence))) findings.push({ kind: pattern.kind, sentence, span });
+      }
+    }
+  }
+  return findings;
+}
+
 // The fence Muxin's typed direction sits inside. Exported so the test can assert her words land
 // between the two markers rather than loose in the instruction body.
 export const DIRECTION_FENCE_OPEN = "<<<MUXIN'S DIRECTION";
@@ -193,6 +246,8 @@ export async function runDraft(
     channel?: string;
     recipient?: string;
     direction?: string;
+    /** Selected adapter provenance for the zero-cost execution log; CLI calls default to Claude. */
+    engine?: string;
     callClaude?: (prompt: string) => Promise<string>;
   } = {},
 ): Promise<DraftResult> {
@@ -246,6 +301,10 @@ export async function runDraft(
   // -- same model/tools/prompt/timeout either way, only the transport differs. The CLI path below
   // (main()) and every test always use the default execFile-based callClaudeDraft.
   const messageBody = await (opts.callClaude ?? callClaudeDraft)(prompt);
+  const unauthorized = findUnauthorizedOutreachClaims(messageBody, selected, opts.direction);
+  if (unauthorized.length) {
+    throw new Error(`refusing to write draft: unauthorized population claim(s): ${unauthorized.map((finding) => `"${finding.span}"`).join(", ")}`);
+  }
 
   const messagesDir = join(absDir, "messages");
   mkdirSync(messagesDir, { recursive: true });
@@ -282,7 +341,7 @@ export async function runDraft(
 
   writeFileSync(messageFile, `${frontmatter}\n${messageBody}\n`);
 
-  logCost({ step: "outreach:draft", detail: leadName, costUsd: 0 });
+  logCost({ step: "outreach:draft", detail: leadName, costUsd: 0, engine: opts.engine ?? "claude" });
 
   return { dir: dirArg, messageFile, messageId, channel, evidenceIds };
 }

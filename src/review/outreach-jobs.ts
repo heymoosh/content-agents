@@ -150,6 +150,7 @@ export function enqueueOutreachDraft(
       channel: opts.channel,
       recipient: opts.recipient,
       direction: opts.direction,
+      engine: job.engine ?? "codex",
       callClaude: async (prompt) => {
         const result = await spawn(job, prompt, {
           timeoutMs: DRAFT_TIMEOUT_MS,

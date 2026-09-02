@@ -22,6 +22,21 @@ test("Outreach draft, follow-up, and directed jobs accept Grok and GPT/Codex", a
   jobs.length = 0;
 });
 
+test("Outreach jobs pass the selected engine into runDraft cost provenance", async () => {
+  jobs.length = 0;
+  let loggedEngine: string | undefined;
+  await enqueueOutreachDraft("draft", "outreach/leads/acme", {}, "grok", {
+    ...deps,
+    runDraft: async (_dir, opts) => {
+      loggedEngine = opts?.engine;
+      await opts?.callClaude?.("draft");
+      return { dir: "outreach/leads/acme", messageFile: "messages/message-01.md", messageId: "message-01", channel: "email", evidenceIds: [] };
+    },
+  });
+  assert.equal(loggedEngine, "grok");
+  jobs.length = 0;
+});
+
 test("Outreach jobs reject Claude or unknown engines instead of remapping them", async () => {
   jobs.length = 0;
   assert.throws(() => enqueueOutreachDraft("draft", "outreach/leads/acme", {}, "claude" as never, deps), /Outreach engine/);

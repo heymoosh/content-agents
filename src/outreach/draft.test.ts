@@ -1,11 +1,11 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildDraftPrompt, selectEvidenceForDraft, runDraft,
-  fenceSafeDirection, DIRECTION_FENCE_OPEN, DIRECTION_FENCE_CLOSE,
+  fenceSafeDirection, findUnauthorizedOutreachClaims, DIRECTION_FENCE_OPEN, DIRECTION_FENCE_CLOSE,
 } from "./draft.js";
 import type { EvidenceItem } from "./qualify.js";
 
@@ -77,6 +77,44 @@ describe("selectEvidenceForDraft", () => {
     assert.deepEqual(
       picked.map((e) => e.id),
       ["E9"],
+    );
+  });
+});
+
+describe("findUnauthorizedOutreachClaims", () => {
+  test("rejects the authenticated canary's unsupported prevalence and population claims", () => {
+    const findings = findUnauthorizedOutreachClaims(
+      "That's rare. Most teams build first and rationalize the assumption after.",
+      [GREENFIELD_ITEM, WORLDVIEW_ITEM],
+    );
+    assert.deepEqual(findings.map((finding) => finding.kind), ["prevalence-predicate", "population-quantifier"]);
+  });
+
+  test("does not overreach into ordinary quantities, lead-specific language, or adjectival rare", () => {
+    for (const body of [
+      "Many thanks for the note.",
+      "I've spent many years on this.",
+      "How do you pick the five?",
+      "How do you persuade most of your team?",
+      "This is a rare chance to compare notes.",
+    ]) assert.deepEqual(findUnauthorizedOutreachClaims(body, [GREENFIELD_ITEM]), []);
+  });
+
+  test("permits a population phrase only when Muxin's direction or cited evidence already authorizes it", () => {
+    const body = "Most teams skip the test.";
+    assert.equal(findUnauthorizedOutreachClaims(body, [GREENFIELD_ITEM]).length, 1);
+    assert.deepEqual(findUnauthorizedOutreachClaims(body, [GREENFIELD_ITEM], "Most teams skip the test."), []);
+    assert.deepEqual(findUnauthorizedOutreachClaims(body, [{ ...GREENFIELD_ITEM, quote: "Most teams skip the test." }]), []);
+  });
+
+  test("a shared quantifier span cannot authorize a changed predicate or reversed polarity", () => {
+    assert.equal(
+      findUnauthorizedOutreachClaims("Most teams fabricate results.", [GREENFIELD_ITEM], "Most teams skip the test.").length,
+      1,
+    );
+    assert.equal(
+      findUnauthorizedOutreachClaims("All teams skip validation.", [{ ...GREENFIELD_ITEM, quote: "Not all teams skip validation." }]).length,
+      1,
     );
   });
 });
@@ -415,6 +453,22 @@ describe("runDraft guard clauses (no subprocess reached)", () => {
         },
       });
       assert.ok(!/MUXIN'S DIRECTION/.test(promptSeen));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("unsupported population claims fail before a message or queue write", async () => {
+    const dir = makeLeadDir(leadFixture());
+    const queue = `| id | platform | format | asset | native | brand | cta | status | notes |\n|---|---|---|---|---|---|---|---|---|\n`;
+    writeFileSync(join(dir, "review-queue.md"), queue);
+    try {
+      await assert.rejects(
+        runDraft(dir, { callClaude: async () => "That's rare. Most teams build first." }),
+        /unauthorized.*claim/i,
+      );
+      assert.equal(existsSync(join(dir, "messages")), false);
+      assert.equal(readFileSync(join(dir, "review-queue.md"), "utf8"), queue);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
