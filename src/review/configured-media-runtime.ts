@@ -3,7 +3,8 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readQueue, writeCell } from "../publish/queue.js";
-import { getImage, getTranscription } from "../providers/registry.js";
+import { getImage } from "../providers/registry.js";
+import { burnCaptions, renderAudiogram } from "../video/burn-captions.js";
 import { logCost } from "../util/cost-log.js";
 import { tryAcquireFileLease } from "../runtime/file-lock.js";
 
@@ -348,32 +349,40 @@ export const defaultConfiguredMediaRenderer: ConfiguredMediaRenderer = async (st
     return { primaryAsset, assets: [primaryAsset, ...assets], costUsd };
   }
   if (stage.media === "video-caption-package") {
-    let transcript = (stage.plan as { transcript?: string }).transcript ?? "";
-    let costUsd = 0;
-    if (stage.sourcePaths?.[0]) {
-      const source = join(folder, stage.sourcePaths[0]);
-      const audio = join(outDir, "source-audio.wav");
-      execFileSync("ffmpeg", ["-y", "-i", source, "-vn", "-ac", "1", "-ar", "16000", audio], { stdio: "ignore" });
-      const provider = await getTranscription();
-      const result = await provider.transcribe({ audioPath: audio });
-      transcript = result.text; costUsd = result.costUsd;
-      logCost({ step: `transcription:${provider.name}`, detail: `${stage.id}/caption-package`, costUsd });
-    }
-    if (!transcript.trim()) throw new Error("caption package produced no transcript");
     const transcriptPath = `configured-media/${stage.id}/transcript.txt`;
     const captionsPath = `configured-media/${stage.id}/captions.json`;
-    writeFileSync(join(folder, transcriptPath), transcript.trim() + "\n");
+    if (stage.sourcePaths?.[0]) {
+      // A real source video: one local whisper.cpp alignment pass, then the house caption style is
+      // burned over the clip (the same CaptionOverlay every short uses), so the primary asset is a
+      // publishable captioned video, not a sidecar manifest.
+      const primaryAsset = `configured-media/${stage.id}/captioned.mp4`;
+      await burnCaptions({
+        sourcePath: join(folder, stage.sourcePaths[0]), outPath: join(folder, primaryAsset),
+        transcriptPath: join(folder, transcriptPath), captionsPath: join(folder, captionsPath),
+      });
+      return { primaryAsset, assets: [primaryAsset, transcriptPath, captionsPath], costUsd: 0 };
+    }
+    // Storyboard-derived transcript (no source video yet): sidecars only, evenly spaced word timings.
+    const transcript = ((stage.plan as { transcript?: string }).transcript ?? "").trim();
+    if (!transcript) throw new Error("caption package produced no transcript");
+    writeFileSync(join(folder, transcriptPath), transcript + "\n");
     writeFileSync(join(folder, captionsPath), JSON.stringify(wordCaptions(transcript), null, 2) + "\n");
     const primaryAsset = `configured-media/${stage.id}/caption-manifest.json`;
     writeFileSync(join(folder, primaryAsset), JSON.stringify({ version: "configured-caption-package-v1", transcriptPath, captionsPath }, null, 2) + "\n");
-    return { primaryAsset, assets: [primaryAsset, transcriptPath, captionsPath], costUsd };
+    return { primaryAsset, assets: [primaryAsset, transcriptPath, captionsPath], costUsd: 0 };
   }
   if (stage.media === "audiogram") {
     const sourcePath = stage.sourcePaths?.[0];
     if (!sourcePath) throw new Error("approved audiogram stage has no source audio");
+    // Waveform clip (ffmpeg showwaves, 1080x1920) with the synced house captions burned over it.
     const primaryAsset = `configured-media/${stage.id}/audiogram.mp4`;
-    execFileSync("ffmpeg", ["-y", "-i", join(folder, sourcePath), "-filter_complex", "[0:a]showwaves=s=1080x1080:mode=line:colors=0x19a7a0[v]", "-map", "[v]", "-map", "0:a", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-shortest", join(folder, primaryAsset)], { stdio: "ignore" });
-    return { primaryAsset, assets: [primaryAsset], costUsd: 0 };
+    const transcriptPath = `configured-media/${stage.id}/transcript.txt`;
+    const captionsPath = `configured-media/${stage.id}/captions.json`;
+    await renderAudiogram({
+      audioPath: join(folder, sourcePath), outPath: join(folder, primaryAsset),
+      transcriptPath: join(folder, transcriptPath), captionsPath: join(folder, captionsPath),
+    });
+    return { primaryAsset, assets: [primaryAsset, transcriptPath, captionsPath], costUsd: 0 };
   }
   throw new Error(`configured media renderer does not own ${stage.media}`);
 };

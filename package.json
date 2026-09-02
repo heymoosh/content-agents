@@ -35,6 +35,7 @@
     "render": "tsx src/video/render.ts",
     "card": "tsx src/video/card.ts",
     "script:draft": "tsx src/video/script.ts",
+    "captions": "tsx scripts/captions.ts",
     "story:new": "tsx src/fiction/new-series.ts",
     "story:context": "tsx src/fiction/context.ts",
     "story:draft": "tsx src/fiction/draft.ts",
