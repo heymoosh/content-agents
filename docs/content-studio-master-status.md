@@ -21,8 +21,11 @@ an approved Bluesky **draft** canary completed create, read, cancel, and reconci
 cleanup recorded (`cleanupRequired:false`). Getting there exposed that the adapter's create, read,
 and cancel calls had also been written to a guessed contract (see decision 7); they were rewritten
 against the `postiz-app` source and re-tested with real response shapes before the canary passed.
-The Typefully-fallback leg of the matrix and Postiz `schedule` visibility have not been exercised
-live. Earlier attempts (2026-08-30 instance offline, 2026-09-01 configuration absent) changed no
+Later that day the full attended matrix passed: Bluesky/text via Postiz (draft
+`cmtkcv66m0001mn8mg0e07e0v`, terminal cleanup), LinkedIn/text via the Typefully fallback (draft
+`10597216` created unscheduled and deleted with a second acknowledged delete), and YouTube/video
+recorded as the declared explicit exception. Postiz `schedule` visibility has not been exercised
+live; the canary gate deliberately permits draft or private only. Earlier attempts (2026-08-30 instance offline, 2026-09-01 configuration absent) changed no
 provider state.
 **Generation review:** Muxin approved the treatment, editor, voice, CTA, and distribution behavior
 shown in `docs/reviews/content-studio-phase1-generation-review.html`. The artifact contains eight Luna and eight Grok
@@ -56,8 +59,8 @@ is evaluated locally; HunyuanVideo 1.5 is not a fit for this Apple-Silicon machi
 canary at zero reported cost; provider-policy, Studio scheduling, Content capture, all seven media
 stage contracts, durable runtime state, provider reconciliation, and Signals apply/rollback are
 covered locally. The Postiz adapter passed live discovery and one attended draft lifecycle canary
-on 2026-09-02 (Bluesky, text). Publishing is live-verified for that path only; the Typefully
-fallback leg, Postiz `schedule` visibility, and media remain unverified.
+on 2026-09-02 (Bluesky, text). The full attended matrix (Postiz-first, Typefully fallback, explicit
+exception) passed the same day. Postiz `schedule` visibility and media remain unverified.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
 
@@ -120,8 +123,14 @@ what has been verified, and what remains.
   cancellation signal). The rerun created draft `cmtkbipdk0000mn8m3fmezz2y`, read it back as
   DRAFT, deleted it, reconciled it absent, and wrote the terminal ledger event under the
   operational data root. Postiz stores drafts with no publish workflow, so nothing could post.
-- **Next gates:** the Typefully-fallback leg of the matrix (attended), then Postiz `schedule`
-  visibility on a far-future slot with the same cancel/reconcile proof. Other
+- **Attended matrix (2026-09-02):** after Muxin's "Go", `verify:publish-canary-matrix` ran with
+  cases bluesky/text, linkedin/text, youtube/video(exception). Evidence: Postiz `verified`
+  (`cmtkcv66m0001mn8mg0e07e0v`, ledger terminal), Typefully `verified` (`10597216`), YouTube
+  `explicit-exception`. The Phase 1 live-delivery gate is met for text drafts.
+- **Next gates:** Postiz `schedule` visibility is still unproven live because the canary gate only
+  allows draft/private objects; the production Studio path uses `scheduled`. Decide whether to
+  extend the gate to a far-future `schedule` canary with immediate cancel, or accept draft-only
+  proof. Other
   honest next candidates are the attended Fiction browser/GitHub approval workflow, one signed-in
   Outreach Scout run, and the signed-in per-brand Signals/Experiment operating loop. Do not perform
   provider delivery, GitHub push/PR mutation, or account writes without the corresponding explicit
@@ -191,9 +200,9 @@ passed, proving login readiness but not create/list/cancel or live delivery.
 
 The system is **not operationally verified end to end**. The largest unresolved boundaries are:
 
-1. The Postiz leg of the authenticated create/read/cancel/reconcile matrix passed on 2026-09-02
-   with a Bluesky draft and terminal cleanup. The Typefully-fallback leg, Postiz `schedule`
-   visibility, and any media path have not run live.
+1. The authenticated Postiz-first/Typefully-fallback matrix passed on 2026-09-02 (Postiz Bluesky
+   draft with terminal cleanup, Typefully LinkedIn draft deleted, YouTube declared exception).
+   Postiz `schedule` visibility and any media path have not run live.
 2. Provider reconciliation records explicit `uncertain` evidence instead of guessing when an API
    cannot prove a terminal state. Typefully and YouTube list absence is not terminal proof, and
    Substack still needs provider or reviewed human evidence.
@@ -428,11 +437,11 @@ the current Phase 1 completion patch:
 7. Signals uses separate propose, review, apply, recovery, and rollback events for exact allowlisted
    configuration deltas.
 
-**Remaining Phase 1 acceptance gate:** the Postiz leg is done (2026-09-02: discovery
-authenticated; approved Bluesky draft canary created, read, canceled, reconciled absent; ledger
-terminal). Still open: the attended Typefully-fallback leg of the matrix and a Postiz `schedule`
-visibility canary on a far-future slot. Do not label Phase 1 live verified until both finish with
-terminal cleanup for every created canary object.
+**Phase 1 acceptance gate: met on 2026-09-02.** Discovery authenticated; the approved attended
+matrix finished with terminal cleanup for every created canary object (Postiz Bluesky draft
+`cmtkcv66m0001mn8mg0e07e0v`, Typefully LinkedIn draft `10597216`) and YouTube declared as the
+explicit exception. Phase 1 is live verified for text drafts. Postiz `schedule` visibility and
+media uploads stay outside that claim until their own canaries run.
 
 ### P2: complete product depth
 
