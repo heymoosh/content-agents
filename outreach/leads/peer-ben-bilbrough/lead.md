@@ -1,5 +1,5 @@
 ---
-kind: client
+kind: peer
 name: "Ben Bilbrough"
 url: "https://www.linkedin.com/in/ben-bilbrough"
 source: boardy

@@ -103,6 +103,13 @@ describe("evaluateQualify: platform-kind downgrade lands on a legal fit value", 
     assert.equal(result.downgraded, true);
     assert.ok(result.reasons.some((r) => r.includes("forced to unclear")));
   });
+
+  test("peer kind is treated like client: classification field, unclear as the downgrade target", () => {
+    const result = evaluateQualify(baseInput({ kind: "peer", classification: "turnaround" }), []);
+    assert.equal(result.fieldName, "classification");
+    assert.equal(result.finalValue, "unclear");
+    assert.equal(result.downgraded, true);
+  });
 });
 
 describe("evaluateQualify: non-jsa lead, single-key path", () => {

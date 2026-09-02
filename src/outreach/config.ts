@@ -11,7 +11,7 @@ import { repoRoot } from "../db/db.js";
 
 // Follow-up tracker buckets (plan §3 / card 659b50f0 / Phase 4 card 21a5eb84) -- the same four
 // reason-buckets data/outreach/tracker.jsonl events carry.
-export type FollowUpBucket = "client" | "platform" | "jobsearch" | "inbound";
+export type FollowUpBucket = "client" | "platform" | "peer" | "jobsearch" | "inbound";
 
 export interface FollowUpWindow {
   followUpAfterDays: number;
@@ -32,7 +32,7 @@ export interface OutreachConfig {
   };
 }
 
-const FOLLOW_UP_BUCKETS: readonly FollowUpBucket[] = ["client", "platform", "jobsearch", "inbound"];
+const FOLLOW_UP_BUCKETS: readonly FollowUpBucket[] = ["client", "platform", "peer", "jobsearch", "inbound"];
 
 const DEFAULTS: OutreachConfig = {
   jsaDbPathEnv: "JSA_DB_PATH",
@@ -45,6 +45,7 @@ const DEFAULTS: OutreachConfig = {
   followUp: {
     client: { followUpAfterDays: 7, abandonAfterDays: 30 },
     platform: { followUpAfterDays: 10, abandonAfterDays: 45 },
+    peer: { followUpAfterDays: 14, abandonAfterDays: 60 },
     jobsearch: { followUpAfterDays: 7, abandonAfterDays: 30 },
     inbound: { followUpAfterDays: 3, abandonAfterDays: 14 },
   },

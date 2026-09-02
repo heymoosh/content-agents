@@ -14,6 +14,8 @@ export interface OutreachLeadCandidate {
 
 export function isGoodOutreachFit(lead: OutreachLeadCandidate): boolean {
   if (lead.kind === "client") return lead.classification === "turnaround" || lead.classification === "greenfield";
+  // A peer is someone to meet, not a company to classify: eligible unless explicitly disqualified.
+  if (lead.kind === "peer") return lead.classification !== "disqualified";
   if (lead.kind === "platform") return lead.fit === "strong" || lead.fit === "partial";
   return false;
 }

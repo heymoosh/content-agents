@@ -17,10 +17,19 @@ import {
   markContacted,
   moveOn,
   markSent,
+  BUCKETS,
+  isBucket,
   type TrackerEvent,
 } from "./tracker.js";
 
 const CONFIG: OutreachConfig = loadOutreachConfig();
+
+describe("BUCKETS / isBucket", () => {
+  test("peer is a legal follow-up bucket", () => {
+    assert.ok(BUCKETS.includes("peer"));
+    assert.equal(isBucket("peer"), true);
+  });
+});
 
 function tmpFile(name: string): { dir: string; path: string } {
   const dir = mkdtempSync(join(tmpdir(), "tracker-test-"));
@@ -260,6 +269,14 @@ describe("buildClientPlatformRows", () => {
   test("returns [] when the leads root doesn't exist", () => {
     const rows = buildClientPlatformRows("client", [], CONFIG, join(dir, "nope"), "2026-07-10T00:00:00.000Z");
     assert.deepEqual(rows, []);
+  });
+
+  test("peer kind picks up peer-* folders on its own bucket", () => {
+    writeLead(leadsRoot, "peer-jane-doe", { lockedMessage: true, pitchAngle: "you both build in the same space" });
+    writeLead(leadsRoot, "client-acme-co", { lockedMessage: true });
+    const peerRows = buildClientPlatformRows("peer", [], CONFIG, leadsRoot, "2026-07-10T00:00:00.000Z");
+    assert.deepEqual(peerRows.map((r) => r.lead), ["peer-jane-doe"]);
+    assert.equal(peerRows[0].why, "you both build in the same space");
   });
 });
 

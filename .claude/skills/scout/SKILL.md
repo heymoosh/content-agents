@@ -61,7 +61,7 @@ Three kinds, one run:
 ## Usage
 
 ```
-/scout                                          # all 3 kinds, theme = every pillar's signals
+/scout                                          # platforms only by default (client work is parked), theme = every pillar's signals
 /scout --kinds client,platform                  # skip content-example this run
 /scout --theme "AI-era career strategy"          # focus the search instead of the full pillar list
 /scout --limit 5                                 # request up to 5 per kind; whole run still caps at 5

@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { intakeFromJsa } from "./intake.js";
+import { intakeFromJsa, leadDir, fitFieldLine } from "./intake.js";
 
 // Regression coverage for intake.ts's single most load-bearing rule: --from-jsa MUST refuse an
 // unfiltered/bare bulk import (docs/outreach-engine-plan.md, SKILL.md "no accidental full-database
@@ -49,5 +49,21 @@ describe("intakeFromJsa: --from-jsa refusal guard", () => {
       assert.ok(!/requires --verdict/.test(message));
       assert.ok(!/requires either a company name argument/.test(message));
     }
+  });
+});
+
+// Peer-kind coverage (pure helpers only -- no I/O, so no real outreach/leads/ folder is ever
+// touched by these tests). `intakeManual` itself always writes under the real repoRoot and is
+// intentionally not exercised in tests for that reason.
+describe("peer-kind intake helpers", () => {
+  test("leadDir scaffolds a peer-<slug> folder name, same shape as client/platform", () => {
+    const dir = leadDir("peer", "Jane Doe");
+    assert.ok(dir.endsWith("outreach/leads/peer-jane-doe"));
+  });
+
+  test("fitFieldLine treats peer like client: a classification field, not fit", () => {
+    assert.match(fitFieldLine("peer"), /^classification: unclear/);
+    assert.match(fitFieldLine("client"), /^classification: unclear/);
+    assert.match(fitFieldLine("platform"), /^fit: weak/);
   });
 });

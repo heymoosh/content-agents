@@ -17,7 +17,7 @@ import { lookupCompany, listByVerdict, type JsaRecord } from "./jsa.js";
 // guards: it MUST be given --verdict, AND either a specific company name or --limit N. Bare
 // `--from-jsa` with neither is refused outright, no accidental full-db pull.
 
-export type LeadKind = "client" | "platform";
+export type LeadKind = "client" | "platform" | "peer";
 
 export interface ManualIntakeSource {
   kind: LeadKind;
@@ -30,8 +30,16 @@ export interface JsaIntakeSource {
   verdicts: string[];
 }
 
-function leadDir(kind: LeadKind, name: string): string {
+// Exported (pure, no I/O) so folder naming and the classification-vs-fit frontmatter split are
+// unit-testable without writing into the real outreach/leads/ tree.
+export function leadDir(kind: LeadKind, name: string): string {
   return join(repoRoot, "outreach", "leads", `${kind}-${slugify(name)}`);
+}
+
+export function fitFieldLine(kind: LeadKind): string {
+  return kind === "platform"
+    ? "fit: weak   # strong | partial | weak | disqualified"
+    : "classification: unclear   # turnaround | greenfield | unclear | disqualified";
 }
 
 function decisionLogLine(note: string): string {
@@ -86,8 +94,7 @@ function writeLeadFile(dir: string, opts: {
   profileSeed?: string;
   decisionNote: string;
 }): void {
-  const fitField =
-    opts.kind === "client" ? "classification: unclear   # turnaround | greenfield | unclear | disqualified" : "fit: weak   # strong | partial | weak | disqualified";
+  const fitField = fitFieldLine(opts.kind);
   const jsaLine = opts.source === "jsa" ? `\njsa_verdict: ${opts.jsaVerdict ?? "unknown"}` : "";
   const frontmatter =
     `---\n` +
@@ -262,14 +269,14 @@ function main() {
   const name = args.name ?? args.positional;
   if (!name) {
     console.error(
-      "usage: tsx src/outreach/intake.ts --kind client|platform --name \"...\" [--url ...]\n" +
+      "usage: tsx src/outreach/intake.ts --kind client|platform|peer --name \"...\" [--url ...]\n" +
         '   or: tsx src/outreach/intake.ts --from-jsa --verdict TARGET "Company Name"\n' +
         "   or: tsx src/outreach/intake.ts --from-jsa --verdict TARGET --limit N",
     );
     process.exit(1);
   }
-  if (args.kind !== "client" && args.kind !== "platform") {
-    console.error(`--kind must be "client" or "platform" (got "${args.kind}")`);
+  if (args.kind !== "client" && args.kind !== "platform" && args.kind !== "peer") {
+    console.error(`--kind must be "client", "platform", or "peer" (got "${args.kind}")`);
     process.exit(1);
   }
   const dir = intakeManual({ kind: args.kind, name, url: args.url });

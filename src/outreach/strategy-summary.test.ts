@@ -13,6 +13,7 @@ const followups: FollowupsResult = {
   buckets: {
     client: [{ key: "client:client-acme:", bucket: "client", lead: "client-acme", who: "Acme", why: "fit", status: "due", lastTouch: "2026-08-20", lastEvent: "contacted", nextAction: "Follow up", dueDate: "2026-08-27", abandonDate: null }],
     platform: [{ key: "platform:platform-civic-lab:", bucket: "platform", lead: "platform-civic-lab", who: "Civic Lab", why: "fit", status: "responded", lastTouch: "2026-08-28", lastEvent: "responded", nextAction: "Review reply", dueDate: null, abandonDate: null }],
+    peer: [],
     inbound: [],
     jobsearch: [],
   },
@@ -31,7 +32,7 @@ test("weekly Outreach section includes target list, per-bucket follow-up counts,
 });
 
 test("empty Outreach state is explicit rather than silently omitted", () => {
-  const empty: FollowupsResult = { buckets: { client: [], platform: [], inbound: [], jobsearch: [] }, jobsearchNote: null };
+  const empty: FollowupsResult = { buckets: { client: [], platform: [], peer: [], inbound: [], jobsearch: [] }, jobsearchNote: null };
   const text = renderOutreachStrategySection([], empty);
   assert.match(text, /no platform-kind leads yet/i);
   assert.match(text, /No follow-up rows are active/i);

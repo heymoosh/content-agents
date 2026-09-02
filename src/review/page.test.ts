@@ -1256,8 +1256,9 @@ import type { OutreachLeadView } from "./page.js";
 
 const lead = (over: Partial<OutreachLeadView> = {}): OutreachLeadView => ({ dir: "outreach/leads/client-acme", ...over });
 
-test("outreachSegment: four values, because content-example leads are real rows on the desk", () => {
+test("outreachSegment: five values, because content-example leads are real rows on the desk", () => {
   assert.equal(outreachSegment(lead({ kind: "platform" })), "platform");
+  assert.equal(outreachSegment(lead({ kind: "peer" })), "peer");
   assert.equal(outreachSegment(lead({ kind: "client", source: "jsa" })), "org-role");
   assert.equal(outreachSegment(lead({ kind: "client", source: "scout" })), "org-mission");
   assert.equal(outreachSegment(lead({ kind: "content-example" })), "content-example");
@@ -1269,20 +1270,22 @@ test("outreachSegment: nothing writes fm.segment today, so the kind/source read 
   assert.equal(outreachSegment(lead({ segment: "", kind: "platform" })), "platform");
 });
 
-test("groupLeadsBySegment: four groups in the design's order, empty ones dropped", () => {
+test("groupLeadsBySegment: five groups in the design's order, empty ones dropped", () => {
   const leads = [
     lead({ dir: "a", kind: "content-example" }),
     lead({ dir: "b", kind: "client", source: "jsa" }),
     lead({ dir: "c", kind: "platform" }),
     lead({ dir: "d", kind: "client", source: "scout" }),
     lead({ dir: "e", kind: "platform" }),
+    lead({ dir: "f", kind: "peer" }),
   ];
   const groups = groupLeadsBySegment(leads);
   assert.deepEqual(groups.map((g) => g.name), [
-    "PLATFORMS", "ORGANIZATIONS · MISSION FIT", "ORGANIZATIONS · OPEN ROLES", "EXAMPLES",
+    "PLATFORMS", "PEERS", "ORGANIZATIONS · MISSION FIT", "ORGANIZATIONS · OPEN ROLES", "EXAMPLES",
   ]);
   assert.deepEqual(groups[0].leads.map((l) => l.dir), ["c", "e"]);
-  assert.deepEqual(groups[3].leads.map((l) => l.dir), ["a"]);
+  assert.deepEqual(groups[1].leads.map((l) => l.dir), ["f"]);
+  assert.deepEqual(groups[4].leads.map((l) => l.dir), ["a"]);
   assert.equal(groupLeadsBySegment([lead({ kind: "platform" })]).length, 1, "empty groups do not render");
   assert.equal(groupLeadsBySegment([]).length, 0);
 });
@@ -1291,14 +1294,15 @@ test("groupLeadsBySegment: an Example lead is never dropped on the floor", () =>
   const groups = groupLeadsBySegment([lead({ dir: "x", kind: "content-example" })]);
   assert.equal(groups.length, 1);
   assert.equal(groups[0].key, "content-example");
-  assert.equal(groups[0].note, OUTREACH_SEGMENTS[3].note, "the Example group keeps the line this page already shipped");
+  const exampleSegment = OUTREACH_SEGMENTS.find((s) => s.key === "content-example");
+  assert.equal(groups[0].note, exampleSegment?.note, "the Example group keeps the line this page already shipped");
 });
 
 test("groupLeadsBySegment: every lead handed in lands in exactly one group", () => {
   const leads = [
     lead({ dir: "a", kind: "platform" }), lead({ dir: "b", kind: "client", source: "jsa" }),
     lead({ dir: "c", kind: "client" }), lead({ dir: "d", kind: "content-example" }),
-    lead({ dir: "e", kind: undefined }),
+    lead({ dir: "e", kind: undefined }), lead({ dir: "f", kind: "peer" }),
   ];
   const seen = groupLeadsBySegment(leads).flatMap((g) => g.leads.map((l) => l.dir));
   assert.equal(seen.length, leads.length);
@@ -1312,8 +1316,9 @@ test("lastPitchedLabel: a real tracker timestamp, or the plain truth that there 
   assert.equal(lastPitchedLabel("   "), "never pitched");
 });
 
-test("threadSegLabel: the design's three labels, plus the fourth the repo actually needs", () => {
+test("threadSegLabel: the design's three labels, plus the peer and example labels the repo actually needs", () => {
   assert.equal(threadSegLabel("platform"), "PLATFORM · SELECTED");
+  assert.equal(threadSegLabel("peer"), "PEER · SELECTED");
   assert.equal(threadSegLabel("org-mission"), "MISSION FIT · SELECTED");
   assert.equal(threadSegLabel("org-role"), "OPEN ROLE · SELECTED");
   assert.equal(threadSegLabel("content-example"), "EXAMPLE · SELECTED");

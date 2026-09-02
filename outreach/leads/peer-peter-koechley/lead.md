@@ -1,5 +1,5 @@
 ---
-kind: client
+kind: peer
 name: "Peter Koechley"
 url: "https://www.linkedin.com/in/peterkoechley"
 source: boardy

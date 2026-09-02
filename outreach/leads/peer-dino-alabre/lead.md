@@ -1,5 +1,5 @@
 ---
-kind: client
+kind: peer
 name: "Dino Alabre"
 url: "https://www.linkedin.com/in/dino-alabre-144417239"
 source: boardy

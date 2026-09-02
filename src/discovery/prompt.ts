@@ -21,6 +21,7 @@ export interface ClientPlatformDiscoveryOpts {
   rubric: string; // config/outreach/clients.md or platforms.md
   worldviewMap: string; // config/outreach/worldview-map.md
   extraContext: string; // person-fit rubric (client) or spin_angles text (platform)
+  brief?: string; // config/outreach/brief.md: Muxin's short statement of what she wants; wins over the rubric
   excludeNames: string[]; // names of leads already on file, so the model doesn't re-propose them
   searchBudgetPerSignal: number;
   lens?: { belief: string; dialect: string; modality: string };
@@ -77,6 +78,7 @@ export function buildClientPlatformDiscoveryPrompt(opts: ClientPlatformDiscovery
     `Theme to search around: ${opts.theme}`,
     excludeBlock,
     ``,
+    ...(opts.brief?.trim() ? [`--- MUXIN'S BRIEF (config/outreach/brief.md): the primary lens; where it disagrees with the rubric below, the brief wins ---`, opts.brief.trim(), ``] : []),
     `--- ${rubricLabel} ---`,
     opts.rubric.trim(),
     ``,

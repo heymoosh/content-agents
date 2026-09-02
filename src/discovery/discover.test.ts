@@ -137,7 +137,7 @@ describe("discovery: STEP markers", () => {
   after(() => rmSync(TMP_RUN_LOG, { force: true }));
 
   test("emits one marker per kind, in order, each before that kind's work", async () => {
-    const { trace, run } = traceRun();
+    const { trace, run } = traceRun([...DISCOVERY_KINDS]);
     await run();
     assert.deepEqual(trace, [
       "STEP 1/3 Scouting companies worth pitching",
@@ -156,7 +156,7 @@ describe("discovery: STEP markers", () => {
   });
 
   test("every emitted line parses back through the job queue's own parser", async () => {
-    const { trace, run } = traceRun();
+    const { trace, run } = traceRun([...DISCOVERY_KINDS]);
     await run();
     const markers = trace.filter((l) => l.startsWith("STEP ")).map((l) => parseStepMarker(l));
     assert.equal(markers.length, DISCOVERY_KINDS.length);
@@ -172,6 +172,7 @@ describe("discovery: STEP markers", () => {
   test("a caller that passes no onStep still runs — markers stay opt-in", async () => {
     const ran: DiscoveryKind[] = [];
     const result = await runDiscover({
+      kinds: [...DISCOVERY_KINDS],
       theme: "a fixed theme",
       runLogPath: TMP_RUN_LOG,
       runKind: async (kind) => {
@@ -196,4 +197,16 @@ describe("discovery: STEP markers", () => {
       DISCOVERY_STEP_LABELS["content-example"],
     ]);
   });
+});
+
+test("a bare scout sweeps platforms only; client work is parked (decision 9)", async () => {
+  const { DEFAULT_DISCOVERY_KINDS } = await import("./discover.js");
+  assert.deepEqual(DEFAULT_DISCOVERY_KINDS, ["platform"]);
+  const ran: DiscoveryKind[] = [];
+  await runDiscover({
+    theme: "a fixed theme",
+    runLogPath: join(tmpdir(), `discover-default-${randomUUID()}.jsonl`),
+    runKind: async (kind) => { ran.push(kind); return { kind, created: [], skipped: [] }; },
+  });
+  assert.deepEqual(ran, ["platform"], "runDiscover honors the default, not just the constant");
 });

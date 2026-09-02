@@ -1,5 +1,5 @@
 ---
-kind: client
+kind: peer
 name: "Pradnya Haldipur"
 url: ""
 source: boardy

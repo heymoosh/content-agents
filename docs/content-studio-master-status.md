@@ -78,10 +78,42 @@ what has been verified, and what remains.
 ## Current handoff — 2026-09-02
 
 - **Continue in:** `/Users/Muxin/Documents/GitHub/content-agents-worktrees/content-studio-master-status-recovery`
-  on branch `recovery/content-studio-master-status`. The latest implementation commit is `444b4d9`
-  (Fiction isolation). The commits after it carry this handoff document plus the deterministic
-  `jobs.test.ts` fix described below; neither changes product behavior. The branch is local-only,
-  has no upstream, and has not been pushed.
+  on branch `recovery/content-studio-master-status`. The branch is local-only, has no upstream, and
+  has not been pushed; open no PR without Muxin's word. Start Studio with `npm run review` from the
+  worktree after exporting the main-checkout `.env` (the worktree has none); it serves
+  `http://localhost:4600` and dies with the terminal. Run the gate `npm run check` unsandboxed.
+  The 2026-09-02 evening slices below are the latest work (see git log for hashes).
+- **Studio front-door room router (2026-09-02):** the capture router was a keyword match (7 of 16
+  drafted probes landed in the right room). `POST /api/captures/classify` now asks the subscription
+  analyst route (GPT via codex, Claude fallback, no tools, empty working directory) for the room
+  and a one-sentence reason, keyword match as fallback; 15 of 16 probes land correctly, the one
+  miss is Signals by design. Verdicts are bound to the exact text read, superseded reads are
+  ignored, server failures are named, the "Wrong room?" override stays. Evidence:
+  `docs/evidence-capture-router-2026-09-02.md`. The pillar-to-platform router inside `/atomize`
+  is a different thing and is still unproven end to end: the base-loop test needs one real piece
+  of Muxin's writing dropped into the front door (probe text is invented and extraction-first
+  forbids running it through drafting).
+- **Postiz batch drain (2026-09-02):** a 429 on create releases the claimed slot, records a
+  retry-eligible failure with the resume time, and a five-minute loop in the Studio server
+  re-dispatches waiting approved rows once the window reopens, one create per row, stopping at the
+  next 429. Studio shows "N rows waiting for Postiz, resumes at HH:MM". It runs only while Studio
+  is open; batch moves of already-scheduled posts are not auto-resumed.
+- **Test leak into the real data root (2026-09-02):** every gate run had written its fixture jobs
+  into Muxin's real Studio job store (172 fake tasks on her desk). `dataRoot()` and the legacy
+  path now resolve to a throwaway directory whenever node:test's `NODE_TEST_CONTEXT` is set and
+  no `CONTENT_AGENTS_DATA_ROOT` is configured. The leaked store was backed up beside itself and
+  cleared. The main-checkout `.env` gained `CONTENT_AGENTS_POSTIZ_ACCOUNT_ID` and
+  `CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID` (non-secret identity labels) the same day.
+- **Outreach reset toward what Muxin actually wants (2026-09-02):** the seven "follow up with"
+  rows on the Studio desk are her own Boardy intros from 2026-07-24 (PR #274), not scout output.
+  They and two more Boardy leads are now `peer`-kind (`outreach/leads/peer-*`), a third lead kind
+  beside client and platform with its own PEERS segment, follow-up bucket, and a 14/60-day
+  follow-up/abandon window in `config/outreach.yaml` that Muxin has not yet confirmed.
+  `config/outreach/brief.md` is her short Boardy-style statement of what she wants and leads the
+  platform scout prompt, declared to win over the older rubric files (she considers them mostly
+  stale; only the Collective Intelligence Project and Audrey Tang anchors and the non-dilutive
+  funding preference still hold). A bare `/scout` now sweeps platforms only (decision 9). Peers skip the research pass (a Boardy-style intro needs none) and draft directly; only an
+  explicit `disqualified` blocks a peer from triage or drafting.
 - **Latest completed slice:** Fiction draft and repass calls now use a disposable full-tree stage,
   exact single-chapter mutation/import rules, optimistic live-tree drift checks, Claude restricted
   mode, and one exact `story:validate` command grant. Operational Fiction beats, continuity reports,
@@ -149,10 +181,14 @@ what has been verified, and what remains.
   non-draft save (the production path would have 400ed), and Postiz's `update` type still writes
   `publishDate`, so only `schedule` re-saves may change a date. Test media stays in the Postiz
   media library (no public delete route); harmless.
-- **Next gates:** honest next candidates are the attended Fiction browser/GitHub approval workflow, one signed-in
-  Outreach Scout run, and the signed-in per-brand Signals/Experiment operating loop. Do not perform
-  provider delivery, GitHub push/PR mutation, or account writes without the corresponding explicit
-  approval.
+- **Next gates, in Muxin's order:** (1) the base-loop test: one real essay or Note of hers through
+  the Studio front door, routing, drafting, one approval to a scheduled Postiz post; (2) the first
+  platforms-only Scout run, waiting on her `--theme` sentence (proposed: platforms and shows that
+  would feature her talking about her civic work and Human Inference); (3) the attended Fiction
+  browser/GitHub approval workflow and the signed-in per-brand Signals/Experiment loop. Later, by
+  her ordering: the landscape/podcast reframe and readable podcast transcript (decision 8), and
+  samples of the carousel, caption burn-in, and audiogram. Do not perform provider delivery,
+  GitHub push/PR mutation, or account writes without the corresponding explicit approval.
 
 ## Authority and update rule
 
@@ -312,7 +348,7 @@ history and its “nothing built yet” statement is obsolete.
 | Contact selection | Muxin can use extracted contacts or add one manually. | Implemented manual/research-extracted path. | UI/unit coverage. | Automated contact discovery and public-email harvesting are not implemented. |
 | Draft, edit, lock | Direction input, engine choice, direct edit, revise with model, validation, immutable lock. | Implemented. The prompt now directs the model to open with the evidenced practice instead of inventing an encounter, forbids prose colons in the short message, and names the antithetical cadence ban. The post-generation boundary deterministically rejects enumerated population/prevalence and Muxin-interest syntactic classes. Population/prevalence claims require the complete normalized sentence in cited evidence or Muxin's direction; first-person, selected-adverb, greeting-elliptical, and bare-opening read/saw/liked/loved/enjoyed/followed/worked-on claims require the complete normalized generated sentence in Muxin's direction. Full-sentence authorization prevents predicate, object, and polarity substitution. The same shared hard `config/voice.yaml` checker now runs at both Content and Outreach generation boundaries; Outreach refuses findings before any message, queue, or cost write. These bounded grammars intentionally do not pretend to prove arbitrary entailment, which remains part of pending human review. Successful execution logs retain the selected engine. | Unit/route/UI coverage plus disposable Chromium through the real first-draft and same-file revision controls, with a one-run token-gated injected engine, a real pending queue row, durable message bytes, and no live model call. Authenticated Claude canaries exposed unsupported prevalence, invented encounters, lowercase-after-colon prose, and an antithetical voice tell; the hard boundaries rejected those samples before persistence, while human review separately rejected an unsupported presupposition. After prompt alignment, one bounded authenticated sample passed the claim and voice guards plus independent cross-family human review: it stayed grounded in E1/E2, used conditional rather than presumed breakage, retained one pending row, logged zero-cost Claude provenance, and sent nothing. This proves the bounded adapter/draft path and layered gates, not general model quality. | Keep both deterministic boundaries and pending human review fail closed. Repeat the bounded canary when the adapter or voice policy changes; do not generalize one accepted sample into a broad quality claim. |
 | Send | Send a locked message from the Content Agents GUI through the exact connected Gmail account after Muxin's explicit confirmation; retain manual/external sending for unsupported channels such as LinkedIn DMs. | Implemented locally with exact-account OAuth verification, locked-email-only route/UI, append-only intent/outcome evidence, deterministic Sent-mail reconciliation, and automatic confirmed sent-state updates. Manual “sent elsewhere” remains available. | Provider, ledger, reconciliation, route-contract, UI-contract, and follow-up-state tests; final local `npm run check` passes 3,907/3,907. | Run one explicitly approved authenticated Gmail send/reconcile canary; until then, keep the path provider-unverified. |
-| Follow-ups | Append-only per-person clocks with origin context; client/platform/inbound/job-search buckets; mark sent/responded/move on; no guilt styling. The read-only weekly Strategy summary includes the borrowed-audience target list, every bucket's counts, and honest degraded JSA state. | Implemented, including Strategy integration on the current branch. | Strong tests, browser tracker write coverage, renderer tests, and a successful real local `outreach:strategy-summary` read. | Drafting support is limited for buckets without lead folders. Actual delivery remains external. |
+| Follow-ups | Append-only per-person clocks with origin context; client/platform/peer/inbound/job-search buckets (peer added 2026-09-02 for Boardy-style intros); mark sent/responded/move on; no guilt styling. The read-only weekly Strategy summary includes the borrowed-audience target list, every bucket's counts, and honest degraded JSA state. | Implemented, including Strategy integration on the current branch. | Strong tests, browser tracker write coverage, renderer tests, and a successful real local `outreach:strategy-summary` read. | Drafting support is limited for buckets without lead folders. Actual delivery remains external. |
 | Outreach to Content | Locked outreach can become extraction-first Content source. | Existing reuse path. | Deterministic tests around source/lock boundaries. | Exclude cold B2B outreach derivatives from resonance metrics until the open strategy decision is implemented. |
 
 ## Fiction
@@ -543,8 +579,12 @@ are ordinary operations, not gates.
    Studio should not push client work at her. The live focus is platforms that would feature her
    civic work and Human Inference, and peers who share those concerns and understand funding.
    Scout runs default to `--kinds platform` with a short `--theme` sentence in that spirit, the
-   way she briefs Boardy. A peer/funder discovery kind does not exist yet; adding one is outreach
-   prompt logic and holds for her review.
+   way she briefs Boardy. `config/outreach/brief.md` is her short statement of what she wants
+   (platforms that would feature her; peers who share the civic and democracy-tech concerns and
+   understand non-dilutive funding; anchors: the Collective Intelligence Project and Audrey Tang)
+   and the platform scout prompt puts it first, declared to win over the older rubric files,
+   which she considers mostly stale. Boardy-style intros need no deep analysis. A peer/funder
+   discovery kind does not exist yet; adding one is outreach prompt logic and holds for her review.
 
 ## Known stale or historical documents
 

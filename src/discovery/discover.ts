@@ -37,7 +37,7 @@ import type { EvidenceItem } from "../outreach/qualify.js";
 //
 //   tsx src/discovery/discover.ts [--kinds client,platform,content-example] [--theme "..."] [--limit N]
 //
-// Default kinds = all three; default theme = the pillars.yaml signal list (config/pillars.yaml);
+// Default kinds = platform only (master-status decision 9, 2026-09-02: client work is parked); pass --kinds to widen; default theme = the pillars.yaml signal list (config/pillars.yaml);
 // default limit = 3 candidates per kind. One `claude -p` call per kind (not per pillar) keeps a
 // run to at most 3 subprocess calls regardless of theme breadth.
 
@@ -45,6 +45,9 @@ const execFileP = promisify(execFile);
 
 export type DiscoveryKind = "client" | "platform" | "content-example";
 export const DISCOVERY_KINDS: readonly DiscoveryKind[] = ["client", "platform", "content-example"];
+// What a bare `/scout` sweeps. Platforms only since 2026-09-02 (decision 9): Muxin is not taking
+// client work now and the platform search is the part she cannot do by hand.
+export const DEFAULT_DISCOVERY_KINDS: readonly DiscoveryKind[] = ["platform"];
 
 const RUN_LOG_PATH = join(repoRoot, "data", "outreach", "run-log.jsonl");
 const LENS_STATE_PATH = join(repoRoot, "data", "outreach", "discovery-lens.json");
@@ -526,6 +529,8 @@ async function sweepKind(kind: DiscoveryKind, theme: string, maxCandidates: numb
   const platformsRubric = readFileSync(join(repoRoot, "config", "outreach", "platforms.md"), "utf8");
   const worldviewMap = readFileSync(join(repoRoot, "config", "outreach", "worldview-map.md"), "utf8");
   const personFitRubric = readFileSync(join(repoRoot, "config", "outreach", "person-fit.md"), "utf8");
+  const briefPath = join(repoRoot, "config", "outreach", "brief.md");
+  const brief = existsSync(briefPath) ? readFileSync(briefPath, "utf8") : "";
 
   const budget = computeDiscoveryBudget(kind, maxCandidates, config.searchBudgetPerSignal);
   const prompt = buildClientPlatformDiscoveryPrompt({
@@ -535,6 +540,7 @@ async function sweepKind(kind: DiscoveryKind, theme: string, maxCandidates: numb
     rubric: kind === "client" ? clientsRubric : platformsRubric,
     worldviewMap,
     extraContext: kind === "client" ? personFitRubric : loadSpinAnglesText(),
+    brief,
     excludeNames,
     searchBudgetPerSignal: config.searchBudgetPerSignal,
     lens: context.lens,
@@ -616,7 +622,7 @@ export interface RunDiscoverOptions {
 }
 
 export async function runDiscover(opts: RunDiscoverOptions = {}): Promise<RunDiscoverResult> {
-  const kinds = opts.kinds && opts.kinds.length ? opts.kinds : [...DISCOVERY_KINDS];
+  const kinds = opts.kinds && opts.kinds.length ? opts.kinds : [...DEFAULT_DISCOVERY_KINDS];
   const theme = opts.theme?.trim() || defaultTheme();
   const maxCandidates = Math.max(1, Math.min(opts.limit ?? 3, 5));
   const batchCap = Math.max(1, Math.min(loadOutreachConfig().batchCap, 5));

@@ -1,5 +1,5 @@
 ---
-kind: client
+kind: peer
 name: "Zach Berke"
 url: "https://www.linkedin.com/in/zberke"
 source: boardy

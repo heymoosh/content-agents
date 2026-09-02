@@ -787,10 +787,10 @@ export function outreachGmailConnection(env: NodeJS.ProcessEnv = process.env): {
 export function recordOutreachInitialSend(
   dir: string,
   detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
-  record: (bucket: "client" | "platform", lead: string, opts: { person?: string; channel?: string; message?: string; note?: string }) => TrackerEvent = markSent,
+  record: (bucket: "client" | "platform" | "peer", lead: string, opts: { person?: string; channel?: string; message?: string; note?: string }) => TrackerEvent = markSent,
 ): TrackerEvent {
   if (!isValidLeadDir(dir)) throw new Error("not a valid outreach lead folder");
-  if (detail.kind !== "client" && detail.kind !== "platform") throw new Error("this item is not an outreach lead");
+  if (detail.kind !== "client" && detail.kind !== "platform" && detail.kind !== "peer") throw new Error("this item is not an outreach lead");
   const message = detail.latestMessage;
   if (!message || message.status !== "locked") throw new Error("lock the outreach message before recording its initial send");
   return record(detail.kind, basename(dir), {
@@ -805,10 +805,10 @@ export function recordOutreachGmailSend(
   dir: string,
   detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
   providerMessageId: string | undefined,
-  record: (bucket: "client" | "platform", lead: string, opts: { person?: string; channel?: string; message?: string; note?: string }) => TrackerEvent = markSent,
+  record: (bucket: "client" | "platform" | "peer", lead: string, opts: { person?: string; channel?: string; message?: string; note?: string }) => TrackerEvent = markSent,
 ): TrackerEvent {
   if (!isValidLeadDir(dir)) throw new Error("not a valid outreach lead folder");
-  if (detail.kind !== "client" && detail.kind !== "platform") throw new Error("this item is not an outreach lead");
+  if (detail.kind !== "client" && detail.kind !== "platform" && detail.kind !== "peer") throw new Error("this item is not an outreach lead");
   const message = detail.latestMessage;
   if (!message || message.status !== "locked") throw new Error("lock the outreach message before sending it");
   return record(detail.kind, basename(dir), {

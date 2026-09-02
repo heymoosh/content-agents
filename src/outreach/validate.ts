@@ -27,7 +27,7 @@ import { parseEvidence, LEAD_SOURCES } from "./qualify.js";
 // target. It carries neither
 // classification nor fit (see the kind-specific branch below); it reuses every other lead.md
 // convention (required sections, evidence shape) unchanged.
-const VALID_KINDS = new Set(["client", "platform", "content-example"]);
+const VALID_KINDS = new Set(["client", "platform", "peer", "content-example"]);
 // Sourced from qualify.ts's LEAD_SOURCES so the two files can't drift on what a valid
 // `source:` value is -- "ingested": pre-existing research (e.g. Muxin's Obsidian vault)
 // snapshotted into a lead.md directly, distinct from "manual" (hand-typed intake), "jsa",
@@ -53,7 +53,7 @@ export function checkLeadShape(file: string, fm: Record<string, unknown>, body: 
 
   const kind = String(fm.kind ?? "");
   if (!VALID_KINDS.has(kind)) {
-    violations.push(`${file}: kind must be "client", "platform", or "content-example" (got "${kind}")`);
+    violations.push(`${file}: kind must be "client", "platform", "peer", or "content-example" (got "${kind}")`);
   }
 
   if (!fm.name || typeof fm.name !== "string" || !fm.name.trim()) {
@@ -79,15 +79,15 @@ export function checkLeadShape(file: string, fm: Record<string, unknown>, body: 
     );
   }
 
-  if (kind === "client") {
+  if (kind === "client" || kind === "peer") {
     const classification = String(fm.classification ?? "");
     if (!VALID_CLASSIFICATIONS.has(classification)) {
       violations.push(
-        `${file}: kind: client requires classification in turnaround|greenfield|unclear|disqualified (got "${classification}")`,
+        `${file}: kind: ${kind} requires classification in turnaround|greenfield|unclear|disqualified (got "${classification}")`,
       );
     }
     if (fm.fit !== undefined) {
-      violations.push(`${file}: kind: client should not carry a "fit" field (that's the platform-kind field)`);
+      violations.push(`${file}: kind: ${kind} should not carry a "fit" field (that's the platform-kind field)`);
     }
   } else if (kind === "platform") {
     const fit = String(fm.fit ?? "");

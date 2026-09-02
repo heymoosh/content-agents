@@ -1,5 +1,5 @@
 ---
-kind: client
+kind: peer
 name: "Trudy Hall"
 url: "https://www.linkedin.com/in/orelier-social"
 source: boardy

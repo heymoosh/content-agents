@@ -274,11 +274,16 @@ export async function runDraft(
   const raw = readFileSync(leadPath, "utf8");
   const { fm, body } = splitFrontmatter(raw);
 
-  const kind = fm.kind === "platform" ? "platform" : "client";
+  const kind = fm.kind === "platform" ? "platform" : fm.kind === "peer" ? "peer" : "client";
 
   let classification: string;
   let classificationLabel: string | undefined;
-  if (kind === "platform") {
+  if (kind === "peer") {
+    // Boardy-style intro: no fit classification to clear, only an explicit disqualification blocks it.
+    classification = String(fm.classification ?? "unclear");
+    if (classification === "disqualified") throw new Error("refusing to draft: this peer is marked disqualified");
+    classificationLabel = "Peer";
+  } else if (kind === "platform") {
     const fit = String(fm.fit ?? "unclear");
     if (!POSITIVE_FITS.has(fit)) {
       throw new Error(

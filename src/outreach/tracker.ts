@@ -16,7 +16,7 @@ import { listByVerdict, type JsaRecord } from "./jsa.js";
 // context -- it never reads lead.md's own `status` field.
 
 export type Bucket = FollowUpBucket;
-export const BUCKETS: readonly Bucket[] = ["client", "platform", "inbound", "jobsearch"];
+export const BUCKETS: readonly Bucket[] = ["client", "platform", "peer", "inbound", "jobsearch"];
 export function isBucket(x: string): x is Bucket {
   return (BUCKETS as readonly string[]).includes(x);
 }
@@ -262,7 +262,7 @@ export function latestLockedMessage(leadDirAbs: string): LockedMessageInfo | nul
 // with no tracker event yet is still a legal row: "not yet contacted, no due-date pressure" (the
 // same treatment the jobsearch bucket gives an untouched JSA TARGET below).
 export function buildClientPlatformRows(
-  kind: "client" | "platform",
+  kind: "client" | "platform" | "peer",
   events: TrackerEvent[],
   config: OutreachConfig,
   leadsRoot: string = LEADS_ROOT,
@@ -388,6 +388,7 @@ export function buildFollowups(nowIso: string = new Date().toISOString()): Follo
     buckets: {
       client: buildClientPlatformRows("client", events, config, LEADS_ROOT, nowIso),
       platform: buildClientPlatformRows("platform", events, config, LEADS_ROOT, nowIso),
+      peer: buildClientPlatformRows("peer", events, config, LEADS_ROOT, nowIso),
       inbound: buildInboundRows(events, config, nowIso),
       jobsearch: jobsearch.rows,
     },

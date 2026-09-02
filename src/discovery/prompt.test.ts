@@ -188,3 +188,16 @@ describe("buildContentExampleDiscoveryPrompt", () => {
     assert.match(prompt, /a separate tool composes that analysis later/);
   });
 });
+
+test("buildClientPlatformDiscoveryPrompt: Muxin's brief leads the prompt and is declared to win over the rubric", () => {
+  const base = {
+    kind: "platform" as const, theme: "civic tech shows", maxCandidates: 3, rubric: "RUBRIC BODY",
+    worldviewMap: "MAP BODY", extraContext: "SPIN BODY", excludeNames: [], searchBudgetPerSignal: 2,
+  };
+  const withBrief = buildClientPlatformDiscoveryPrompt({ ...base, brief: "BRIEF BODY: platforms that would feature her." });
+  assert.ok(withBrief.includes("MUXIN'S BRIEF (config/outreach/brief.md)"));
+  assert.ok(withBrief.indexOf("BRIEF BODY") < withBrief.indexOf("RUBRIC BODY"), "brief comes before the rubric");
+  assert.match(withBrief, /the brief wins/);
+  const without = buildClientPlatformDiscoveryPrompt(base);
+  assert.ok(!without.includes("MUXIN'S BRIEF"), "no block when no brief is supplied");
+});

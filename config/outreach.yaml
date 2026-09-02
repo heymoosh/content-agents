@@ -51,6 +51,9 @@ follow_up:
   inbound:
     follow_up_after_days: 3
     abandon_after_days: 14
+  peer:
+    follow_up_after_days: 14
+    abandon_after_days: 60
 
 # Mid-tail size bands (plan §9e guard #3): candidates at or past these thresholds are
 # downgraded/excluded from discovery — everyone is already vying for them and Muxin can

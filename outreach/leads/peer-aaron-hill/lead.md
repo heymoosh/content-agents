@@ -1,5 +1,5 @@
 ---
-kind: client
+kind: peer
 name: "Aaron Hill"
 url: ""
 source: boardy

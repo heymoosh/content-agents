@@ -34,7 +34,7 @@ export function renderOutreachRecommendations(leads: OutreachLeadView[]): string
   const eligible = filterOutreachRecommendations(leads.map((lead) => ({
     ...lead,
     kind: lead.kind ?? "",
-    classification: lead.classification ?? (lead.kind === "client" ? lead.classificationOrFit : undefined),
+    classification: lead.classification ?? (lead.kind !== "platform" ? lead.classificationOrFit : undefined),
     fit: lead.fit ?? (lead.kind === "platform" ? lead.classificationOrFit : undefined),
   })));
   if (!eligible.length) return '<div class="outreach-empty">No good-fit leads yet.</div>';
@@ -109,12 +109,14 @@ export interface OutreachLeadView {
 export function outreachSegment(lead: OutreachLeadView): string {
   if (lead.segment) return lead.segment;
   if (lead.kind === "platform") return "platform";
+  if (lead.kind === "peer") return "peer";
   if (lead.kind === "client") return lead.source === "jsa" ? "org-role" : "org-mission";
   return "content-example";
 }
 
 export const OUTREACH_SEGMENTS: { key: string; name: string; note: string }[] = [
   { key: "platform", name: "PLATFORMS", note: "Where the audience already is. Bring the work, not a pitch." },
+  { key: "peer", name: "PEERS", note: "People to know. An intro, not a pitch." },
   { key: "org-mission", name: "ORGANIZATIONS · MISSION FIT", note: "They do the thing you write about. Bring the overlap." },
   { key: "org-role", name: "ORGANIZATIONS · OPEN ROLES", note: "They are hiring for what you already built. Bring the receipt." },
   { key: "content-example", name: "EXAMPLES", note: "raw material for a writing angle" },
@@ -131,6 +133,7 @@ export function lastPitchedLabel(lastTouch: string | null | undefined): string {
 
 export function threadSegLabel(segment: string): string {
   if (segment === "platform") return "PLATFORM · SELECTED";
+  if (segment === "peer") return "PEER · SELECTED";
   if (segment === "org-mission") return "MISSION FIT · SELECTED";
   if (segment === "org-role") return "OPEN ROLE · SELECTED";
   return "EXAMPLE · SELECTED";

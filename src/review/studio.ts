@@ -198,13 +198,16 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
   const followupsDue = fuSummary.reduce((n, b) => n + b.due + b.overdue, 0);
 
   const needsYou: NeedsYouItem[] = [];
-  for (const bucket of ["client", "platform"] as const) {
+  for (const bucket of ["client", "platform", "peer"] as const) {
     for (const row of followups.buckets[bucket]) {
       if (row.status !== "due" && row.status !== "overdue") continue;
+      const detailPrefix = bucket === "peer"
+        ? (row.status === "overdue" ? "Overdue. " : "Due now. ")
+        : (row.status === "overdue" ? "Worth a call on moving on. " : "Due now. ");
       needsYou.push({
         room: "followups", label: "Outreach", urgent: true,
         text: `Follow up with ${row.who}.`,
-        detail: `${row.status === "overdue" ? "Worth a call on moving on. " : "Due now. "}${clipOnWord(row.why, 90)}`,
+        detail: `${detailPrefix}${clipOnWord(row.why, 90)}`,
         action: "Open", dir: row.dir,
       });
     }

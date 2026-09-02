@@ -51,6 +51,7 @@ Scaffold `outreach/leads/<kind>-<slug>/lead.md`. Two sources:
 ```
 npm run outreach:add -- --kind client --name "Acme Co" --url https://acme.co
 npm run outreach:add -- --kind platform --name "Some Podcast" --url https://pod.example.com
+npm run outreach:add -- --kind peer --name "Jane Doe" --url https://jane.example.com
 npm run outreach:add -- --from-jsa --verdict TARGET "PostHog"
 npm run outreach:add -- --from-jsa --verdict TARGET --limit 3
 ```

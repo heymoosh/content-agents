@@ -1,5 +1,5 @@
 ---
-kind: client
+kind: peer
 name: "Lee White"
 url: "https://www.linkedin.com/in/lee-white-live-in-flow"
 source: boardy

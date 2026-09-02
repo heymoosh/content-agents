@@ -395,6 +395,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .seg-chip { font:700 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em;
     text-transform:uppercase; padding:2px 8px; border-radius:5px; }
   .seg-chip.platform { background:var(--blue-bg); color:var(--blue); }
+  .seg-chip.peer { background:#ece6f5; color:#6b4fa0; }
   .seg-chip.org-role { background:var(--amber-bg); color:var(--amber); }
   .seg-chip.org-mission { background:var(--green-bg); color:var(--green); }
   .seg-chip.content-example { background:#efeae0; color:#5a5346; }
@@ -2293,17 +2294,20 @@ const outSaid = new Map();       // lead dir → the direction she sent with the
 function leadSegment(l){
   if (l.segment) return l.segment;
   if (l.kind === "platform") return "platform";
+  if (l.kind === "peer") return "peer";
   if (l.kind === "client") return l.source === "jsa" ? "org-role" : "org-mission";
   return "content-example";
 }
 const SEG_INFO = {
   "platform":        { label:"Platform",      dot:"#2f5d9a", line:"a stage or audience that could host you" },
+  "peer":            { label:"Peer",          dot:"#6b4fa0", line:"someone worth knowing, not a pitch" },
   "org-role":        { label:"Org · role",    dot:"#9a6b12", line:"values fit with an open role behind it" },
   "org-mission":     { label:"Org · mission", dot:"#2f7d46", line:"values-aligned, worth knowing" },
   "content-example": { label:"Example",       dot:"#7a7266", line:"raw material for a writing angle" },
 };
 const OUT_SEGMENTS = [
   { key:"platform",        name:"PLATFORMS",                   note:"Where the audience already is. Bring the work, not a pitch." },
+  { key:"peer",            name:"PEERS",                        note:"People to know. An intro, not a pitch." },
   { key:"org-mission",     name:"ORGANIZATIONS · MISSION FIT", note:"They do the thing you write about. Bring the overlap." },
   { key:"org-role",        name:"ORGANIZATIONS · OPEN ROLES",  note:"They are hiring for what you already built. Bring the receipt." },
   { key:"content-example", name:"EXAMPLES",                    note:"raw material for a writing angle" },
@@ -2318,6 +2322,7 @@ function lastPitchedLabel(lastTouch){
 }
 function threadSegLabel(seg){
   if(seg==="platform") return "PLATFORM · SELECTED";
+  if(seg==="peer") return "PEER · SELECTED";
   if(seg==="org-mission") return "MISSION FIT · SELECTED";
   if(seg==="org-role") return "OPEN ROLE · SELECTED";
   return "EXAMPLE · SELECTED";
@@ -2409,6 +2414,7 @@ function outreachGoodFit(l){
   const fit=String(l.classificationOrFit||l.fit||l.classification||"").trim().toLowerCase();
   if(l.kind==="platform") return fit==="strong"||fit==="partial";
   if(l.kind==="client") return fit==="turnaround"||fit==="greenfield";
+  if(l.kind==="peer") return fit!=="disqualified";
   return false;
 }
 
@@ -5980,7 +5986,7 @@ async function loadStudio(){
 // Everything sent, and what's next — every row tied back to its origin: why you reached out,
 // what you said, the dossier. Two people at one org are two rows with two clocks (the tracker
 // folds per person). Calm copy from nextActionLabel; nothing here sends anything.
-const FU_FILTERS = [["all","All"],["platform","Platform"],["client","Org"],["jobsearch","Job search"],["inbound","Inbound"]];
+const FU_FILTERS = [["all","All"],["platform","Platform"],["client","Org"],["peer","Peer"],["jobsearch","Job search"],["inbound","Inbound"]];
 let fuFilter = "all";
 let FOLLOWUPS_DATA = null;
 const fuPending = new Set();
@@ -6001,7 +6007,7 @@ function fuAllRows(){
   const d = FOLLOWUPS_DATA;
   if(!d || !d.buckets) return [];
   const rows = [];
-  for(const bucket of ["client","platform","jobsearch","inbound"]) for(const r of (d.buckets[bucket]||[])) rows.push(r);
+  for(const bucket of ["client","platform","peer","jobsearch","inbound"]) for(const r of (d.buckets[bucket]||[])) rows.push(r);
   return rows;
 }
 function followupRowHtml(row){
@@ -6024,7 +6030,7 @@ function followupRowHtml(row){
   return '<div class="fu-row">'+
     '<div class="fu-head"><span class="fu-dot" style="background:'+fuDotColor(row.status)+'"></span>'+
       '<div><span class="fu-name">'+esc(nameParts[0])+'</span>'+(row.person?' <span class="fu-org">· '+esc(nameParts[1])+'</span>':"")+
-      ' <span class="seg-chip '+(row.bucket==="platform"?"platform":row.bucket==="client"?"org-role":"content-example")+'">'+esc(row.bucket==="client"?"org":row.bucket)+'</span>'+
+      ' <span class="seg-chip '+(row.bucket==="platform"?"platform":row.bucket==="client"?"org-role":row.bucket==="peer"?"peer":"content-example")+'">'+esc(row.bucket==="client"?"org":row.bucket)+'</span>'+
       '<div class="fu-meta">'+sentLine+' · <button type="button" class="wb-link fu-toggle" data-key="'+esc(row.key)+'">'+(open?"hide why":"show why")+'</button></div></div>'+
       '<span class="fu-next" style="color:'+fuNextColor(row.status)+'">'+esc(row.nextAction)+'</span></div>'+
     origin + status +
