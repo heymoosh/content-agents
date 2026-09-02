@@ -277,6 +277,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .capture textarea.dimmed { opacity:.6; }
   .capture-verdict { margin:12px 0 0; padding:11px 14px; border:1px solid #e3d9c3; background:#fffdf8;
     border-radius:8px; font-size:13.5px; line-height:1.55; color:var(--ink); max-width:640px; }
+  .capture-verdict .cv-note { margin-top:6px; font-size:12.5px; color:#5a5346; }
   .capture-verdict .cv-row { margin-top:9px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;
     font-size:12.5px; color:#8a7f6d; }
   .capture-verdict button { font-size:12.5px; padding:4px 11px; }
@@ -6547,11 +6548,12 @@ function closeLinkAsk(clearText){
   setCaptureRail(false);
 }
 // States the room it picked, then offers the explicit action that makes a durable handoff.
-function showCaptureVerdict(room){
+function showCaptureVerdict(room, note){
   const v = captureVerdict(room);
   const box = $("#captureVerdict");
   const others = ["Content","Fiction","Outreach","Venture","Charles"].filter(r=>r!==room);
   box.innerHTML = '<div>'+esc(v.line)+'</div>'+
+      (note?'<div class="cv-note">'+esc(note)+'</div>':'')+
       '<div class="cv-row"><button class="primary cap-go">Start on it</button></div>'+
     '<div class="cv-row"><span>Wrong room?</span>'+
       others.map(r=>'<button class="cap-move" data-room="'+r+'">'+r+'</button>').join("")+'</div>';
@@ -6606,6 +6608,7 @@ async function advanceCaptureSafely(room, text){
 async function takeCaptureTo(room){
   const t = captureText();
   if(!t){ flash("Write or paste something first"); return; }
+  if(t!==ROUTED_TEXT){ hideCaptureVerdict(); flash("The text changed after it was read. Reading it again."); return routeCapture(); }
   const saved = await post("/api/captures", {room:room, text:t});
   if(!saved.ok){ flash(saved.error||"Could not save this capture. It is still in the box."); return; }
   try {
@@ -6655,12 +6658,34 @@ function renderCaptureHandoff(){
     });
   }
 }
-function routeCapture(){
-  const v = classifyCapture(captureText());
-  if(v.kind==="empty"){ flash("Write or paste something first"); return; }
-  if(v.kind==="ask-link"){ openLinkAsk(v.url); return; }
-  showCaptureVerdict(v.room);
-  flash("I read this as "+v.room+".");
+// The room read asks the server (a model judgment on the subscription route, keyword sniff as
+// fallback). The inline classifyCapture mirror above still answers instantly for empty text and
+// bare links, and stands in when the server cannot be reached.
+let ROUTE_GEN = 0;         // in-flight guard: only the newest read may show its verdict
+let ROUTED_TEXT = null;    // the exact text the shown verdict was read from
+async function routeCapture(){
+  const text = captureText();
+  const quick = classifyCapture(text);
+  if(quick.kind==="empty"){ flash("Write or paste something first"); return; }
+  if(quick.kind==="ask-link"){ openLinkAsk(quick.url); return; }
+  const gen = ++ROUTE_GEN;
+  const btn = $("#routeBtn"); if(btn) btn.disabled = true;
+  flash("Reading this…");
+  let room = quick.room, note = "Keyword guess. Pick the room yourself if this is wrong.";
+  try {
+    const r = await post("/api/captures/classify", {text:text});
+    if(gen!==ROUTE_GEN) return; // a newer read superseded this one
+    if(r.ok && r.verdict && r.verdict.kind==="room"){
+      room = r.verdict.room;
+      note = r.method==="model" ? (r.reason||"Read by "+(r.engine||"the model")+".") : "Keyword guess ("+(r.fallbackReason||"model unavailable")+"). Pick the room yourself if this is wrong.";
+    } else if(r && r.error){
+      note = "Keyword guess. The server could not read this: "+r.error+". Pick the room yourself if this is wrong.";
+    }
+  } catch(e) { if(gen!==ROUTE_GEN) return; note = "Keyword guess. The server could not be reached. Pick the room yourself if this is wrong."; }
+  if(btn) btn.disabled = false;
+  ROUTED_TEXT = text;
+  showCaptureVerdict(room, note);
+  flash("I read this as "+room+".");
 }
 // "Versions for Content" holds the link in Content for Muxin to decide what to do with it next.
 async function linkReadForContent(){

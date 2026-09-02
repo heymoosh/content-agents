@@ -93,5 +93,7 @@ export interface AnalystResult {
 
 export interface AnalystProvider {
   name: string;
-  analyze(req: { prompt: string; timeoutMs?: number }): Promise<AnalystResult>;
+  // `cwd` lets a caller run the CLI somewhere other than the repo (an empty temp dir when the
+  // prompt carries untrusted text, so a read-only sandbox has nothing to read).
+  analyze(req: { prompt: string; timeoutMs?: number; cwd?: string }): Promise<AnalystResult>;
 }

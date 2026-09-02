@@ -12,10 +12,10 @@ const DEFAULT_TIMEOUT_MS = 240_000;
 
 export const provider: AnalystProvider = {
   name: "claude-cli",
-  async analyze({ prompt, timeoutMs }) {
+  async analyze({ prompt, timeoutMs, cwd }) {
     try {
       const { stdout } = await execFileP("claude", ["-p", prompt, "--tools", ""], {
-        cwd: repoRoot,
+        cwd: cwd ?? repoRoot,
         timeout: timeoutMs ?? DEFAULT_TIMEOUT_MS,
         maxBuffer: 20_000_000,
       });

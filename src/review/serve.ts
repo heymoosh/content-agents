@@ -51,6 +51,7 @@ import {
   getLiveStateAsOf,
   cancelScheduled,
 } from "./rows.js";
+import { routeCapture as routeCaptureWithModel } from "./capture-router.js";
 import {
   classifySource,
   sourceDispatch,
@@ -1386,6 +1387,17 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     }
     if (req.method === "GET" && url.pathname === "/api/captures") {
       json(res, 200, { ok: true, captures: listCaptures() });
+      return;
+    }
+    // The front door's room read: a subscription-route model judgment with the keyword sniff as
+    // fallback (src/review/capture-router.ts). Pure read: it creates and queues nothing; the desk
+    // still shows the verdict with "Wrong room?" buttons and waits for Start on it.
+    if (req.method === "POST" && url.pathname === "/api/captures/classify") {
+      const b = await readBody(req);
+      try {
+        const routed = await routeCaptureWithModel(String(b.text ?? ""));
+        json(res, 200, { ok: true, ...routed });
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/captures") {

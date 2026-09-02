@@ -2401,7 +2401,15 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(start > -1 && end > start, "the capture client section must be identifiable");
   const section = script.slice(start, end);
   const paths = [...new Set([...section.matchAll(/\/api\/[a-z0-9/-]+/g)].map((m) => m[0]))].sort();
-  assert.deepEqual(paths, ["/api/captures", "/api/captures/start"]);
+  assert.deepEqual(paths, ["/api/captures", "/api/captures/classify", "/api/captures/start"]);
+  const routeRead = section.slice(section.indexOf("async function routeCapture"), section.indexOf('// "Versions for Content"'));
+  assert.ok(routeRead.includes('post("/api/captures/classify"'), "the room read asks the server-side model route");
+  assert.ok(routeRead.includes("showCaptureVerdict(room, note)"), "the verdict shows the model's reason or names the keyword guess");
+  assert.ok(!routeRead.includes("/api/captures/start") && !routeRead.includes('post("/api/captures",'), "the room read creates nothing");
+  assert.ok(routeRead.includes("if(gen!==ROUTE_GEN) return;"), "a superseded read never shows its verdict");
+  assert.ok(routeRead.includes("r.error"), "a server failure is named, not hidden behind a bare keyword guess");
+  const takeBody = section.slice(section.indexOf("async function takeCaptureTo"), section.indexOf("let SERVER_CAPTURES"));
+  assert.ok(takeBody.includes("if(t!==ROUTED_TEXT)"), "a verdict is bound to the exact text it was read from");
   assert.ok(section.includes('SERVER_CAPTURES'));
   assert.ok(!section.includes('content-studio.capture-handoff.v1'), "the retired browser-local capture store must not remain a second authority");
   assert.ok(section.includes('CAPTURE WAITING HERE'));
