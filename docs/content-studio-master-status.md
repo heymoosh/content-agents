@@ -669,17 +669,33 @@ are ordinary operations, not gates.
    retaining the voice and the point of the original input, and it must know it is handling a
    Charles or Fiction source so it does not over-flatten the piece with generic optimization. That
    needs a mechanically checkable restricted treatment, the editor un-fused from `source_lines`
-   provenance, an origin-aware voice rubric, and an origin-aware editor prompt carrying the
-   source's own voice contract.
+   provenance, and an editor chosen by source kind (next paragraph).
+   (b2) **Separate editors, not one editor with multiple personalities** (Muxin, 2026-09-02).
+   There is one editor today, `configuredColdFeedEditorPrompt` (`src/review/jobs.ts:443-461`),
+   with `config/voice.yaml` written into it as a literal instruction and called for every origin.
+   The replacement is a registry of named editors, one per source kind — a Fiction social editor,
+   a Charles social editor, a Venture social editor, and today's prompt moved in unchanged as the
+   Studio/Human-Inference one — each a complete, independent instruction set for its own focus,
+   each carrying its own voice rubric (`charles/config/persona.yaml` for Charles, with the em-dash
+   ban carrying over to all) and its own `editor_pass:` stamp so a derivative records which editor
+   made it. A single prompt that switches voice contracts by condition is explicitly rejected.
    (c) **`/cycle` predates this model and contradicts it.** Its drafting/review/publish steps
    duplicate the Content room and produce work Content's approve step cannot see; its ingest and
    strategy steps have no room equivalent and stay.
    (d) **Venture measurement already works** through the Signals experiment path with live
    analytics readback, which is the mechanism Muxin recalled.
-   The full gap inventory, in fix order with file and line references, is
-   `docs/content-room-alignment-plan.md`. **Nothing in it is approved to build**; items 1, 2 and 5
-   there are content-generation LOGIC and each needs a draft PR with an old-versus-new sample
-   under CLAUDE.md rule 7.
+   All six gaps are agreed work with no preference order among them (Muxin, 2026-09-02); the
+   running order is the one the code forces. Two cheap prerequisites gate the rest — settling
+   platform limits on `config/platforms.yaml` instead of the hardcoded table at `jobs.ts:438-440`,
+   and building the editor registry while un-fusing the editor from `source_lines` provenance at
+   `jobs.ts:804`. Then Venture, then Fiction/Charles. Two lanes run genuinely in parallel: the
+   `jobs.ts` editor lane, and an independent lane holding Studio Start, the media auto-selection
+   check, retiring `/cycle`'s review and publish steps, and making `/atomize` write a
+   `content-request.json` so already-drafted work becomes reviewable. The `/atomize` capability
+   port collides with the editor lane on the same file and queues behind it; retiring `/cycle`'s
+   drafting step depends on that port finishing. The full inventory, dependency chain, parallelism
+   table and rule 7 split is `docs/content-room-alignment-plan.md`. **Nothing in it is approved to
+   build.**
 
 ## Known stale or historical documents
 

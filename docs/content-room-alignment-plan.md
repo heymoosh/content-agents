@@ -92,14 +92,23 @@ the check.
   (CLAUDE.md rule 5) and governed by `charles/config/persona.yaml`; Fiction likewise, with the
   em-dash ban carrying over to both. Without this, the first Charles editor pass throws on his own
   satire.
-- **Origin-aware editor *prompt*, not just an origin-aware gate.** The blind editor
-  (`jobs.ts:814-818`) is spawned with `tools: ""` and is told to sharpen topic grounding for a
-  context-switching scanner. Run unchanged over Charles, that instruction flattens a satirical
-  persona into optimized copy that passes every check and loses the thing worth publishing. The
-  editor must be handed the source's own voice contract — `charles/config/persona.yaml` for
-  Charles, the canon/voice restrictions the Fiction handoff already carries — and told to preserve
-  voice and point while it improves hook and structure. This is Muxin's "don't over-flatten with
-  optimizations", and it is a prompt change, not only a validation change.
+- **Separate editors, one per source kind — not one editor told to switch personality.**
+  (Muxin, 2026-09-02.) There is one editor today: `configuredColdFeedEditorPrompt`
+  (`jobs.ts:443-461`), a single function with `config/voice.yaml` written into it as a literal
+  instruction line, called for every origin. Run unchanged over Charles it flattens a satirical
+  persona into optimized copy that passes every check and loses the thing worth publishing.
+  The fix is **not** a conditional prompt: a prompt carrying several voice contracts and a rule for
+  choosing between them is one editor with multiple personalities, and it will blur them.
+  Instead, an **editor registry**: a named editor per source kind, each a complete and independent
+  instruction set written for its own focus — a Fiction social editor, a Charles social editor, a
+  Venture social editor, and today's prompt moved in unchanged as the Studio/Human-Inference one.
+  Each registry entry owns three things: its full prompt, its own voice rubric (Charles's is
+  `charles/config/persona.yaml`, not `config/voice.yaml`; the em-dash ban carries over to every
+  one), and its own `editor_pass:` stamp, so a derivative's frontmatter records which editor made
+  it rather than today's single `cold-feed-v1` (`jobs.ts:840`). Selection defaults from
+  `request.origin` and stays choosable.
+  This replaces the separate "origin-aware voice rubric" bullet above as a mechanism: the rubric
+  is no longer a branch inside a shared validator, it is a property each editor carries.
 
 **Approval sequencing is not a problem.** The control variant stays byte-exact (`jobs.ts:831`), so
 the upstream approval in `charles/review-queue.md` still covers exactly what it approved. The
@@ -177,8 +186,69 @@ gate, and the content request carries a `recommendations` block. That appears to
 but it has not been exercised end to end in this worktree. Verify against a real run before
 deciding whether anything is missing.
 
+## Dependencies and running order
+
+All six items are agreed work; there is no priority order among them by preference (Muxin,
+2026-09-02). What follows is the order the code forces, and what can genuinely run at the same
+time.
+
+### Two prerequisites that are cheap and block the rest
+
+- **P1 — one source of truth for platform limits.** `jobs.ts:438-440` hardcodes
+  `CONFIGURED_PLATFORM_LIMITS` and `config/platforms.yaml` holds `max_chars` as configuration.
+  This must be settled **before** item 1, because item 1 wires Venture into the limit check and
+  doing that against the hardcoded table entrenches the wrong source of truth in a second place.
+  `config/platforms.yaml` should win; it is what `validate.ts` already reads.
+- **P2 — the editor registry and un-fusing the editor from provenance.** Items 1 and 2 both need
+  the editor to run for an origin that has no `source_lines`, and both need an editor chosen by
+  source kind. That is the registry above plus splitting the `jobs.ts:804` gate
+  (`treated.length && authoritative?.sourceLines.length`) into its two separate questions. Building
+  it once, first, is the difference between one change and the same change made twice
+  incompatibly.
+
+### The forced chain
+
+```
+P1 -> P2 -> item 1 (Venture)  -> item 2 (Fiction/Charles)
+              \-> item 5 port sequence -> item 3b (retire /cycle drafting)
+```
+
+- **Item 1 after P2**, not before: deleting the Venture branch at `jobs.ts:793-803` drops Venture
+  through to the `:804` gate, which is false for it (`resolveConfiguredAuthoritative` returns
+  `null` for Venture), so without P2 the bypass is replaced by a different bypass.
+- **Item 2 after item 1** only because both rewrite the same region of `jobs.ts`. They are
+  independent in design and serial in merge. Item 2 additionally needs its own new piece — the
+  mechanically checkable restricted treatment kind — which nothing else blocks and which can be
+  written and tested while item 1 is in review.
+- **Item 3 splits.** `/cycle`'s review and publish steps duplicate what the Content room already
+  owns and can be retired immediately, dependent on nothing (**3a**). Its drafting step cannot be
+  retired until Content can do what `/atomize` does, so **3b depends on the item 5 port**. Retiring
+  drafting first would remove the only working path.
+- **Item 5 is its own sequence**, roughly: routing gate (decides which variants get made at all),
+  then `validate`, then the remaining seven capabilities, which are largely independent of each
+  other once the first two land.
+
+### What is genuinely parallel
+
+| Lane | Work | Touches | Notes |
+|---|---|---|---|
+| A | P1, P2, item 1, item 2 | `src/review/jobs.ts` | Strictly serial within itself: one file, one region. |
+| B | item 4 (Studio Start), item 6 (media check), 3a, and the `/atomize` content-request fix below | `serve.ts`, `page.ts`, skills, verification | No overlap with lane A at all. Fully parallel. Start item 6 first — it is verification with no code, it is cheap, and it may change item 5's scope. |
+| C | item 5's port sequence | `src/review/jobs.ts` generation path | **Collides with lane A on the same file.** Run C after lane A rather than beside it, or split the generation module before starting either. |
+
+So: two lanes safely in parallel (A and B), with C queued behind A. Not three.
+
+### One small independent fix worth doing early
+
+`/atomize` writes no `content-request.json`, which is the whole reason the 14 pending rows in
+`content/2026-09-02-the-world-s-broken-what-do-we-do` are invisible in Content's approve step
+(`page.ts:1616`). Having `/atomize` write one is small, has no dependency on anything above, and
+makes existing drafted work reviewable now rather than after the item 5 port. It belongs in lane B.
+
 ## Rule 7
 
-Items 1, 2 and 5 change what future runs generate. They are content-generation LOGIC and each needs
-a draft PR carrying an old-versus-new content sample, not a self-vet merge. Items 3, 4 and 6 are
-not logic changes.
+Lane A (P1, P2, items 1 and 2) and lane C (item 5) change what future runs generate. They are
+content-generation LOGIC: each needs a draft PR carrying an old-versus-new content sample, not a
+self-vet merge. Lane B is not logic — item 4, item 6, 3a and the content-request fix change
+routing, verification and bookkeeping, not what a run produces — with one exception: **3b**, which
+removes a drafting path, is a logic change and holds.
