@@ -435,9 +435,17 @@ export function parseConfiguredVariantBodies(output: string, variants: readonly 
   return bodies;
 }
 
-const CONFIGURED_PLATFORM_LIMITS: Readonly<Record<string, number>> = {
-  x: 280, bluesky: 300, threads: 500, mastodon: 500, community: 1500, linkedin: 3000,
-};
+/**
+ * The one source of truth for a platform's character limit is `config/platforms.yaml` `max_chars`,
+ * which `src/atomize/validate.ts` already reads. This resolves it the same way (via the memoized
+ * `loadPlatforms()`), so the studio generation path and the atomize validator can never drift.
+ * Returns `undefined` for a platform with no configured limit (e.g. substack, tiktok, youtube),
+ * which callers treat as "no character gate", exactly as the previous hardcoded table did by
+ * omission.
+ */
+export function configuredPlatformLimit(platform: string): number | undefined {
+  return loadPlatforms().platforms[platform]?.max_chars;
+}
 
 /** A context-blind second pass that edits for a reader encountering the post cold in a mixed feed. */
 export function configuredColdFeedEditorPrompt(variants: readonly ContentVariant[], bodies: ReadonlyMap<string, { body: string }>): string {
@@ -453,7 +461,7 @@ export function configuredColdFeedEditorPrompt(variants: readonly ContentVariant
     JSON.stringify(variants.map((variant) => ({
       id: variant.identity.id,
       platform: variant.platform,
-      max_characters: CONFIGURED_PLATFORM_LIMITS[variant.platform] ?? null,
+      max_characters: configuredPlatformLimit(variant.platform) ?? null,
       editing_constraint: variant.treatments.includes("belief-shift") ? "Return this body byte-for-byte; the reviewed mechanism requires exact approved-source sentences." : null,
       body: bodies.get(variant.identity.id)?.body ?? "",
     }))),
@@ -481,7 +489,7 @@ export function parseConfiguredEditorBodies(
       throw new Error("selected editor returned a missing, duplicate, unknown, or empty cold-feed variant");
     }
     const variant = variants.find((candidate) => candidate.identity.id === id)!;
-    const limit = CONFIGURED_PLATFORM_LIMITS[variant.platform];
+    const limit = configuredPlatformLimit(variant.platform);
     if (limit && body.length > limit) throw new Error(`selected editor exceeded the ${variant.platform} character limit`);
     const voiceFindings = muxinVoiceFindings(body);
     if (voiceFindings.length) throw new Error(`selected editor returned variant ${id} that failed the voice check: ${voiceFindings.join("; ")}`);
