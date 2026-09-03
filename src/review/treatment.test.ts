@@ -173,6 +173,26 @@ test("each channel carries its OWN reuse window, read through the real config", 
   }
 });
 
+// The production caller (serve.ts's /api/content/treatment) injects no `data`, so it falls
+// through to loadData(). Every other test in this file injects COLD, which is exactly why the
+// unbound-read failure was invisible to the suite while the endpoint 400ed for every piece.
+test("refuses a measured read with no brand instead of calling loadData unbound", () => {
+  const f = folderWith(ROUTING_MD);
+  try {
+    assert.throws(
+      () => readTreatment("slug", {
+        cfg: CFG,
+        folder: f.dir,
+        claimSlots: fakeSlots as unknown as TreatmentDeps["claimSlots"],
+        checkReuse: () => ({ allowed: true, minDays: 14 }),
+      }),
+      /readTreatment needs a brand/
+    );
+  } finally {
+    f.cleanup();
+  }
+});
+
 test("never-placed reads as an explicit unknown, not as a measured zero", () => {
   const f = folderWith(ROUTING_MD);
   try {

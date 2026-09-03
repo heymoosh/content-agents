@@ -117,7 +117,7 @@ import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
 import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
 import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
 import { saveCutBody, addCutComment } from "./rows.js";
-import { isBrandId, type BrandId } from "../identity/brand.js";
+import { brandForOrigin, isBrandId, type BrandId } from "../identity/brand.js";
 import { providerReconciliationHealth, startProviderReconciliationLoop } from "./provider-reconciliation-runner.js";
 import { publishDrainHealth, startPublishDrainLoop } from "./publish-drain.js";
 import { readLearningEvaluations } from "../venture/learning-evaluation.js";
@@ -1444,7 +1444,14 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         if (lens) {
           mechanismBody = (await readAuthoritativeApprovedCut(folder, lens)).body;
         }
-        json(res, 200, readTreatment(slug, { folder, mechanismBody }));
+        // Measured fit reads one brand's analytics. The piece's own request names its origin, so
+        // prefer that; a folder without one must say which brand explicitly. No default: an
+        // unbound read is exactly what `loadData` refuses.
+        const requested = url.searchParams.get("brand");
+        const stored = await readContentRequest(folder).catch(() => null);
+        const brandId = brandForOrigin(stored?.origin) ?? (requested ? requestBrand(requested) : null);
+        if (!brandId) throw new Error("brand must be one of human-inference, charles, fiction");
+        json(res, 200, readTreatment(slug, { folder, mechanismBody, measurement: { brandId } }));
       } catch (e) {
         json(res, 400, { error: String((e as Error)?.message ?? e) });
       }
