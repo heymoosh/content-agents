@@ -24,8 +24,9 @@ for her. Everything else self-vet merges after a green local `npm run check`.
 
 ### Do this next, in this order
 
-**The PR queue is empty. Every open PR was resolved on 2026-09-03 — start by building, not by
-triage.** What happened is under "PR hygiene" below; you do not need it to begin.
+**The only open PR is #442 (P1, held for Muxin by design — see "Do this next"). Start by building,
+not by triage.** The rest of the 2026-09-03 queue was resolved that day; what happened is under "PR
+hygiene" below, and you do not need it to begin.
 
 **Session of 2026-09-03 (evening) already shipped the first two pieces — start at P2.**
 
@@ -69,7 +70,7 @@ Remaining, in order:
 ### Ground rules that bite immediately
 
 - Run the gate `npm run check` **unsandboxed**; under the sandbox it reports ~196 phantom failures.
-  Green as of 2026-09-02 at **4,053 tests / 484 suites / 0 failures**.
+  Green as of 2026-09-03 at **4,055 tests / 484 suites / 0 failures** (P1 and item 4 each added a test).
 - A fresh worktree has no `node_modules` and no `.env`: run `npm run worktree:setup` first.
 - Studio: `npm run review` serves `http://localhost:4600` and dies with the terminal.
 - Hosted CI is `on: workflow_dispatch` only. The sole automatic PR check is `gitleaks`, a secret
@@ -124,6 +125,14 @@ families, on anything that writes files other code reads.
   breaches; mechanism traced above and further down). Her call on all five: accept them (they are
   covered by the green 4,053-test gate) or revert. Nothing publishes either way — rule 2 still gates
   that through `review-queue.md`.
+- **Item-4 follow-up — a promoted capture still reads as "waiting."** The Content Start path stamps
+  a capture's `startedAt`/`jobId` through `startCapture`; item 4's Fiction path uses
+  `saveCapture` + `createIdea` and stamps nothing, because `markCaptureStarted` requires a `jobId`
+  and there is no "promoted, no job" stamp. So a Fiction capture that is now a durable inbox idea
+  still shows on Studio home as "CAPTURE WAITING HERE" (`startedAt: null`). Pre-existing (Fiction was
+  never stamped before), not a regression, but item 4 makes it visible. Needs a
+  `markCapturePromoted(id, target)` or a `jobId`-optional stamp; scope it together with the three
+  deferred Start rooms, which will need the same.
 - **Finding 6a:** `image-carousel` can never be auto-recommended for a Substack-ingested essay —
   the rule needs three markdown headings and `htmlToText` emits none. The fix lives in
   `fetch-substack.ts` and would shift every `source_lines` number, so it is recorded, not built.
