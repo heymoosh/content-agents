@@ -15,7 +15,12 @@ const platformRouteSchema = z.object({
 }).strict();
 const brandSchema = z.object({
   measurement_account: accountId.optional(),
-  provider_accounts: z.record(z.enum(DELIVERY_PROVIDERS), accountId),
+  // zod 4 makes z.record() over an enum key EXHAUSTIVE: every provider would become required.
+  // Charles and Fiction deliberately declare no delivery accounts, so that would fail the whole
+  // registry closed. partialRecord keeps the zod 3 contract -- enum-constrained keys, all
+  // optional -- and the superRefine below is what actually requires an account for any provider a
+  // platform routes to.
+  provider_accounts: z.partialRecord(z.enum(DELIVERY_PROVIDERS), accountId),
   platforms: z.record(z.string().min(1), platformRouteSchema),
 }).strict().superRefine((brand, ctx) => {
   for (const [platform, route] of Object.entries(brand.platforms)) {

@@ -85,32 +85,43 @@ what has been verified, and what remains.
   worktree after exporting the main-checkout `.env` (the worktree has none); it serves
   `http://localhost:4600` and dies with the terminal. Run the gate `npm run check` unsandboxed.
   The 2026-09-02 evening slices below are the latest work (see git log for hashes).
-- **Blocked on Muxin, carried into the next session (2026-09-02, night).** Each of these was
-  attempted and denied by the Claude Code permission classifier, not by a code problem. Run them
-  from the repo root; prefixing with `!` in the Claude Code prompt runs them in-session.
-  1. **Land the branch on `main`.** Approved but undone. `git push origin HEAD:main` and
-     `gh pr create` were both denied. The branch is 4 behind `main` (dependabot commits landed
-     after it forked) but `git merge-tree` reports the merge clean, so a rebase is not required.
-     Do not rebase inside the sandbox: it must rewrite `.claude/skills/*`, which is on the sandbox
-     deny list, and a half-finished rebase left 170 modified and 103 deleted files in this worktree
-     earlier tonight.
-  2. **Delete the 15th contained branch.** `agent/pattern-local-evidence-inventory` is provably
-     contained in `main` but is what the main checkout is sitting on, so it cannot be deleted until
-     that checkout moves: `git -C ~/Documents/GitHub/content-agents checkout main && git branch -D
-     agent/pattern-local-evidence-inventory`.
-  3. **Delete two proven-stale untracked paths** (`rm -rf` was denied; both are captured in
-     `refs/wip/` first, so they are recoverable):
-     `~/Documents/GitHub/content-agents/docs/content-studio-program/staging/reviewed-evidence-staging-20260826/`
-     — a strict predecessor of the committed `reviewed-evidence-staging-claude-20260826/` sibling
-     (same 70 evidence rows, one field fewer, written a day earlier), and
-     `~/Documents/GitHub/content-agents/.claude/worktrees/content-studio-ui-recovery/venture/e2e-phase3/`
-     plus `.../venture/e2e-probe-venture/` — end-to-end test residue in the real data root.
-  4. **Decide three modified files in the `content-studio-ui-recovery` worktree**, all of which
-     look like the same e2e residue: a backlog card that says outright "Filed by the end-to-end
-     suite to prove the write lands", a `review-queue.md` status flipped `discard` to `hold`, and a
-     `data/outreach/tracker.jsonl` row marking `client-aaron-hill` contacted by email on
-     2026-08-29. The tracker row is the one worth a human look — if that outreach really happened
-     it should be kept, and if it was the e2e suite writing into the real data root it should go.
+- **State cleanup completed (2026-09-02, night).** All of it is done; nothing here is outstanding.
+  The main checkout is back on `main` and fast-forwarded to `cb1923b`. All **15** branches proven
+  contained in `main` are deleted, including `agent/pattern-local-evidence-inventory`, which had
+  been blocking the checkout switch. Two proven-stale untracked paths are gone: the
+  `reviewed-evidence-staging-20260826/` directory (a strict predecessor of the committed
+  `reviewed-evidence-staging-claude-20260826/` sibling: same 70 evidence rows, one field fewer,
+  written a day earlier) and the `venture/e2e-phase3/` + `venture/e2e-probe-venture/` residue in
+  the `content-studio-ui-recovery` worktree. That worktree's three modified files were discarded
+  too, after Muxin confirmed the `data/outreach/tracker.jsonl` row claiming `client-aaron-hill` was
+  contacted by email on 2026-08-29 is **false** — the end-to-end suite wrote it into the real data
+  root, along with a backlog card and a flipped `review-queue.md` status. Every one of those
+  deletions was snapshotted to `refs/wip/` first and is recoverable from there.
+  **A standing lesson: an e2e run that writes into the real data root produces state that reads as
+  real history.** A false outreach record is worse than noise, because a later session would act on
+  it. `4e611cc` fixed the test root; this residue predated the fix.
+  Landing the branch on `main` needed a merge, not a rebase: a direct push to `main` must
+  fast-forward, and the branch had forked 4 commits earlier. `origin/main` was merged in
+  (`package.json` / `package-lock.json` only, clean), which made `main` an ancestor. That merge
+  pulled in the zod 3 to 4 major bump, so the pre-merge test run was re-run against the merged tree
+  before anything touched `main`.
+  That re-run caught **two real defects already live on `main`**, both from the zod 4 bump (#430),
+  which merged with a red gate.
+  1. *Typecheck, cosmetic.* zod 4 requires an explicit key schema for `z.record()`, and
+     `src/review/develop.ts:305` was the last single-arg call in the repo. Fixed by passing
+     `z.string()`. No behavior change.
+  2. *Runtime, serious.* zod 4 made `z.record()` over an **enum** key exhaustive — every key
+     becomes required. `src/config/brand-accounts.ts:18` maps delivery providers that way, and
+     Charles and Fiction deliberately declare no delivery accounts, so on `main` today the brand
+     account registry **fails to load at all** and takes the whole publish path with it: 48 tests
+     across publishing, scheduling, Signals, and delivery-policy fail. Fixed with
+     `z.partialRecord`, which restores the zod 3 contract of enum-constrained but optional keys.
+     The existing `superRefine` is what actually requires an account for any provider a platform
+     routes to, so partial keys were always the intent. It is the only enum-keyed record in `src/`.
+  Both fixes are schema corrections, not content-generation logic, so rule 7 does not hold them.
+  The lesson for the dependabot lane: **a major version bump merged green on hosted CI while the
+  local gate was red.** Hosted CI did not run, or did not run this. Until that is understood, treat
+  a dependabot major as needing a local `npm ci && npm run check` before it merges, not after.
 - **Repo state cleanup (2026-09-02, night):** the branch was pushed to origin (66 commits that had
   existed only on this disk), and `npm run check` passed unsandboxed at **4040 tests / 484 suites /
   0 failures** as the merge proof. Branch hygiene: every local branch was tested for containment

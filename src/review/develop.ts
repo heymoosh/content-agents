@@ -302,7 +302,7 @@ export const CTA_CONFIG_PATH = join(repoRoot, "config", "cta.yaml");
 
 const ctaHostsSchema = z
   .object({
-    targets: z.record(z.object({ url: z.string().optional() }).passthrough()).optional(),
+    targets: z.record(z.string(), z.object({ url: z.string().optional() }).passthrough()).optional(),
     source_fallback: z.object({ url: z.string().optional() }).passthrough().optional(),
   })
   .passthrough();
