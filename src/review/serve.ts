@@ -110,7 +110,8 @@ import { authorizeGuiContentRequest, readAuthoritativeApprovedCut, readContentRe
 import type { ContentRequestInput } from "./content-request.js";
 import { createLockedChapterHandoff } from "./fiction-content-handoff-store.js";
 import { toContentRequestInput } from "./fiction-content-handoff.js";
-import { seriesDirFor } from "./fiction.js";
+import { seriesDirFor, listFictionSeries } from "./fiction.js";
+import { createIdea } from "../fiction/idea-inbox.js";
 import { loadFictionPromotionDraft } from "./fiction-promotion-draft.js";
 import { createApprovedCharlesHandoff } from "./charles-content-handoff-store.js";
 import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
@@ -1410,11 +1411,27 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
       return;
     }
-    // Content's Start on it action is deliberately advisor-only. It can create source/cuts, but
-    // it has no approval, scheduling, or publishing capability.
+    // Studio Start does real server work per room. Content's action is deliberately advisor-only:
+    // it can create source/cuts, but has no approval, scheduling, or publishing capability. A routed
+    // Fiction capture lands as a durable inbox idea (needs-review state), so it survives a reload as
+    // a real room item instead of text prefilled into a field. `room` defaults to Content so existing
+    // callers are unchanged. Charles, Venture and Outreach have no durable lightweight room-item store
+    // yet (see docs/content-studio-master-status.md); those rooms still only persist the capture.
     if (req.method === "POST" && url.pathname === "/api/captures/start") {
       const b = await readBody(req);
+      const room = String(b.room ?? "Content") as CaptureRoom;
       try {
+        if (room === "Fiction") {
+          // No model runs here: createIdea only writes the raw idea. Classification happens later,
+          // when Muxin opens the idea in the Fiction room. A stray capture must not start a job.
+          const series = listFictionSeries();
+          if (series.length !== 1) throw new Error(series.length === 0 ? "no fiction series exists yet" : "more than one fiction series exists; open the Fiction room to choose one");
+          const capture = saveCapture("Fiction", String(b.text ?? ""));
+          const idea = createIdea(series[0]!.slug, capture.text);
+          json(res, 200, { ok: true, capture, idea, room: "Fiction", replayed: false });
+          return;
+        }
+        if (room !== "Content") throw new Error(`Studio Start does not create a room item for ${room} yet`);
         const result = startCapture("Content", String(b.text ?? ""), (jobId, capture) => {
           const dispatch = sourceDispatch(classifySource(capture.text), capture.text);
           if ("error" in dispatch) throw new Error(dispatch.error);

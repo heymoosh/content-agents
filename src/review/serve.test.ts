@@ -42,6 +42,9 @@ import {
   reconcileLockedOutreachEmail,
   reviewRequestHandler,
 } from "./serve.js";
+import { listFictionSeries } from "./fiction.js";
+import { listIdeas } from "../fiction/idea-inbox.js";
+import { jobs as jobStore } from "./jobs.js";
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
 import { approveConfiguredMediaStage } from "./configured-media-runtime.js";
@@ -287,6 +290,60 @@ test("POST attach-reviewed executes the real route and returns promoted reviewed
     await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
     rmSync(folder, { recursive: true, force: true });
   }
+});
+
+test("Studio Start routes a Fiction capture into a durable inbox idea, no model job (item 4)", async () => {
+  // The fiction idea store honors CONTENT_AGENTS_HOME but not NODE_TEST_CONTEXT, so isolate it
+  // explicitly — otherwise this leaks into Muxin's real ~/.content-agents fiction inbox.
+  const home = mkdtempSync(join(tmpdir(), "fiction-start-home-"));
+  const priorHome = process.env.CONTENT_AGENTS_HOME;
+  process.env.CONTENT_AGENTS_HOME = home;
+  const series = listFictionSeries();
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    // The feature resolves the single series automatically; the repo carries exactly one.
+    assert.equal(series.length, 1, "test assumes one fiction series in stories/");
+    const slug = series[0]!.slug;
+    const text = `A lighthouse keeper who edits the sea. ${Date.now()}`;
+    const jobsBefore = jobStore.length;
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/captures/start`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ room: "Fiction", text }),
+    });
+    const body = await response.json() as { ok?: boolean; idea?: { id: string; series: string; rawText: string; status: string; classification: string; proposal: unknown }; job?: unknown; error?: string };
+    assert.equal(response.status, 200, body.error ?? "fiction start failed");
+    assert.equal(body.ok, true);
+    assert.equal(body.idea?.series, slug);
+    assert.equal(body.idea?.rawText, text);
+    assert.equal(body.idea?.status, "needs-review");
+    // No model job runs on Fiction Start. Guard the invariant directly, not just by wall-clock: the
+    // response carries no job, the idea is unclassified with no cleanup proposal (a classified idea
+    // would mean the model path ran), and nothing was enqueued into the shared job store.
+    assert.equal(body.job, undefined, "Fiction Start returns no job — it must not enqueue a model run");
+    assert.equal(body.idea?.classification, "clarify", "the idea stays unclassified; classification is a later Muxin step");
+    assert.equal(body.idea?.proposal, null, "no cleanup proposal — the model cleanup path must not run on Start");
+    assert.equal(jobStore.length, jobsBefore, "Fiction Start must not add a job to the store");
+    // Durable: it is readable from the inbox store afterward, not just in the response.
+    const stored = listIdeas(slug, home);
+    assert.ok(stored.some((idea) => idea.rawText === text), "the idea persisted to the inbox store");
+  } finally {
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+    if (priorHome === undefined) delete process.env.CONTENT_AGENTS_HOME; else process.env.CONTENT_AGENTS_HOME = priorHome;
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("Studio Start defaults room to Content, preserving the pre-item-4 callers", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const start = source.indexOf('url.pathname === "/api/captures/start"');
+  const end = source.indexOf('url.pathname === "/api/content"', start);
+  const route = source.slice(start, end);
+  assert.match(route, /const room = String\(b\.room \?\? "Content"\)/, "room defaults to Content so existing start callers are unchanged");
+  assert.match(route, /startCapture\("Content"/, "the Content path still runs the advisor-only develop enqueue");
+  assert.match(route, /Studio Start does not create a room item for \$\{room\} yet/, "Charles/Venture/Outreach fail closed rather than silently no-op");
 });
 
 test("the initial GUI Content save derives source authority on the server", () => {
