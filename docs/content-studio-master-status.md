@@ -77,13 +77,13 @@ what has been verified, and what remains.
 
 ## Current handoff — 2026-09-02
 
-- **Continue in:** `/Users/Muxin/Documents/GitHub/content-agents-worktrees/content-studio-master-status-recovery`
-  on branch `recovery/content-studio-master-status`. The branch is pushed to
-  `origin/recovery/content-studio-master-status` with an upstream set, so nothing on it is
-  local-only any more. It has **not** landed on `main` and has no PR; open no PR without Muxin's
-  word. Start Studio with `npm run review` from the
-  worktree after exporting the main-checkout `.env` (the worktree has none); it serves
-  `http://localhost:4600` and dies with the terminal. Run the gate `npm run check` unsandboxed.
+- **Continue in:** `/Users/Muxin/Documents/GitHub/content-agents` on `main`. Everything described
+  below has landed there (PR #434, then #435); the
+  `content-agents-worktrees/content-studio-master-status-recovery` worktree that carried it is
+  merged and disposable. Start Studio with `npm run review`; it serves `http://localhost:4600` and
+  dies with the terminal. Run the gate `npm run check` **unsandboxed** — under the sandbox it
+  reports phantom failures. A fresh worktree needs `npm run worktree:setup` before any script, and
+  has no `.env` of its own.
   The 2026-09-02 evening slices below are the latest work (see git log for hashes).
 - **State cleanup completed (2026-09-02, night).** All of it is done; nothing here is outstanding.
   The main checkout is back on `main` and fast-forwarded to `cb1923b`. All **15** branches proven
