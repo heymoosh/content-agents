@@ -90,9 +90,46 @@ what has been verified, and what remains.
   miss is Signals by design. Verdicts are bound to the exact text read, superseded reads are
   ignored, server failures are named, the "Wrong room?" override stays. Evidence:
   `docs/evidence-capture-router-2026-09-02.md`. The pillar-to-platform router inside `/atomize`
-  is a different thing and is still unproven end to end: the base-loop test needs one real piece
-  of Muxin's writing dropped into the front door (probe text is invented and extraction-first
-  forbids running it through drafting).
+  is a different thing. Partly closed the same evening — see the next bullet.
+- **Base loop on a real essay (2026-09-02, evening):** the front door and the pillar-to-platform
+  router were both read against Muxin's own writing for the first time. Source: "The world's
+  broken. What do we do?" (published 2026-08-30, 3,677 words), the newest of seven essays
+  published since 2026-08-02 that had never been through the pipeline. Ingest exposed a real
+  extraction defect: `htmlToText` in `src/atomize/fetch-substack.ts` decoded six named entities by
+  hand and no numeric references, so the first pull wrote **119 undecoded references into
+  `source.md`** (`&#8217;` x69, `&#8220;`/`&#8221;` x46, and `&#233;`/`&#232;`/`&#237;` inside
+  "Medecins Sans Frontieres" and "la alegria"). `source.md` is the file every derivative quotes
+  line for line, so all 119 would have shipped encoded and two real proper nouns misspelled. Fixed
+  with one shared decoder, `src/util/html-entities.ts` (named + decimal + hex + the Windows-1252
+  range, single-pass so an escaped entity stays escaped), wired into `fetch-substack.ts` (body and
+  title) and `src/patterns/youtube-transcript.ts`, which had the same named-only chain. Re-pulling
+  the same essay: 0 remaining references. `src/patterns/reddit-rss.ts` was deliberately left alone
+  (it already decodes numeric references and its ordering is part of a documented double-unescape).
+  Second defect: `src/strategy/route.ts` requires `--brand`, and every usage string omitted it, so
+  the documented invocation produces a stack trace instead of a usage line; corrected in
+  `route.ts`, `src/strategy/exploration.ts`, `src/strategy/routing-drift.ts`,
+  `.claude/skills/strategy/SKILL.md`, and — caught by the audit below, and the ones that actually
+  matter — `.claude/skills/atomize/SKILL.md` step 3.5, `.claude/skills/develop/SKILL.md`, and this
+  repo's `CLAUDE.md` pipeline table. Drafting then ran on the same folder and produced 15
+  derivatives (11 text, 3 quote-card captions, 1 card line), each with `source_lines`, and 15
+  `pending` rows; `npm run validate` on the real output returned `ok: 15 derivative(s) within
+  platform limits`, so the routing gate held on live drafting, not just in tests. The Claude CLI
+  hit a session limit mid-attempt and the leg was re-run on the codex CLI — same subscription
+  route, $0 either way.
+  A cross-family Grok audit against six written requirements returned **FIX** with three defects,
+  all now closed: the `/atomize` skill's own route invocation (above), the `CLAUDE.md` table, and
+  a decoder bug where the five unmapped Windows-1252 slots and `&#8;` decoded into invisible
+  control characters — contradicting that code's own comment and planting junk in a
+  quoted-verbatim file. `fromCodePoint` now refuses C0/C1 controls except tab, newline and
+  carriage return. Suite: 4,040 passing, 0 failing, typecheck clean.
+  What the run does NOT prove: the routing decisions came back entirely `cold-start` because all
+  20 posts in this worktree's `data/analytics.db` have a null `pillar`, so the router's code path
+  is proven live but its decisions reflect a thin snapshot, not Muxin's history; source triage ran
+  but had nothing to narrow (`frame-native`, no beat-2, no case); no scoped brief existed so no
+  directives applied and no community derivative was drafted; no image or video was rendered
+  (no-spend constraint), so the quote-card rows point at a PNG that does not exist yet; and
+  nothing was approved, scheduled, or published. Evidence:
+  `docs/evidence-base-loop-2026-09-02.md`.
 - **Postiz batch drain (2026-09-02):** a 429 on create releases the claimed slot, records a
   retry-eligible failure with the resume time, and a five-minute loop in the Studio server
   re-dispatches waiting approved rows once the window reopens, one create per row, stopping at the
@@ -187,8 +224,11 @@ what has been verified, and what remains.
   sentence for the first platforms-only run; (d) whether to discard the seven stale July 17
   pending rows in the Content review queue. Session state: ten commits unpushed, no PR, the
   Studio server started from that session is gone and must be relaunched with `npm run review`.
-- **Next gates, in Muxin's order:** (1) the base-loop test: one real essay or Note of hers through
-  the Studio front door, routing, drafting, one approval to a scheduled Postiz post; (2) the first
+- **Next gates, in Muxin's order:** (1) the base-loop test: its unblocked prefix ran on 2026-09-02
+  (real essay in, front door, routing, drafting; see the base-loop bullet above and
+  `docs/evidence-base-loop-2026-09-02.md`). What remains is hers: one approval of a drafted row
+  into a scheduled Postiz post. Routing should be re-read against her real tagged analytics before
+  that approval, since this run's decisions were all cold-start; (2) the first
   platforms-only Scout run, waiting on her `--theme` sentence (proposed: platforms and shows that
   would feature her talking about her civic work and Human Inference); (3) the attended Fiction
   browser/GitHub approval workflow and the signed-in per-brand Signals/Experiment loop. Later, by

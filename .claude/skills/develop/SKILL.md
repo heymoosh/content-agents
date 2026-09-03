@@ -55,7 +55,7 @@ platforms" runs the normal `/atomize --continue` pipeline afterward.
      `config/platforms.yaml` `spin_angles` entry, one line on how this piece does or doesn't fit
      that channel's approved angle.
    - **Routing preview** (kind `routing`, one card): judge the pillar(s) per
-     `config/pillars.yaml`, then run `npm run route -- --pillar <pillars>` WITHOUT `--folder`
+     `config/pillars.yaml`, then run `npm run route -- --brand <brand> --pillar <pillars>` WITHOUT `--folder`
      (prints the decision, writes nothing) and report which platforms would be included/skipped
      and why in one line each.
 

@@ -8,7 +8,7 @@ import { parseStrategyMeasurementContext, type StrategyMeasurementContext } from
 // it checks the same score math (computeFit) across two independent windows so a single noisy
 // snapshot never trips a flag, and reports (never writes) the result.
 //
-//   tsx src/strategy/route.ts --flags
+//   tsx src/strategy/route.ts --brand <brand> --flags
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 const WINDOW_WEEKS = 4;

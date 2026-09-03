@@ -29,7 +29,7 @@ function ptMonthKey(d: Date): string {
 // 92bb2ae6's scoping note: a standalone, independently testable mechanism is the concrete minimum):
 //   1. `npm run explore` picks this month's due probe(s) and appends the ledger.
 //   2. For a platform picked this way, route that ONE piece with:
-//        tsx src/strategy/route.ts --pillar <picked-pillar> --explore <platform> --folder <folder>
+//        tsx src/strategy/route.ts --brand <brand> --pillar <picked-pillar> --explore <platform> --folder <folder>
 //      `--explore` forces that platform's decision to `include` (confidence "exploration") for
 //      this single routing.md, even though it is off that pillar's config/routing.yaml defaults.
 //   3. When /atomize drafts the derivative for that platform, stamp its frontmatter
@@ -227,7 +227,7 @@ function main() {
   } else {
     console.log(
       `\nNext: for each platform picked above, route + draft that one probe:\n` +
-        `  tsx src/strategy/route.ts --pillar <pillar> --explore <platform> --folder <content-folder>\n` +
+        `  tsx src/strategy/route.ts --brand <brand> --pillar <pillar> --explore <platform> --folder <content-folder>\n` +
         `then stamp the drafted derivative's frontmatter exploration_probe: true before it reaches review-queue.md.`
     );
   }

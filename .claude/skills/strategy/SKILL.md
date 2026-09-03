@@ -177,7 +177,7 @@ memory that makes `/cycle` compound instead of restarting every week. Legacy top
      this calendar month just prints a skip line). When it prints a pick, add a [TEST]
      recommendation in Step 4 naming the platform + pillar: next time Muxin atomizes a piece,
      route ONE derivative for that platform with
-     `tsx src/strategy/route.ts --pillar <pillar> --explore <platform> --folder <folder>` and
+     `tsx src/strategy/route.ts --brand <brand> --pillar <pillar> --explore <platform> --folder <folder>` and
      stamp that derivative's frontmatter `exploration_probe: true` before it reaches
      `review-queue.md` (see `.claude/skills/atomize/SKILL.md` step 3.5). `/strategy` only
      surfaces the pick, it never drafts content itself.

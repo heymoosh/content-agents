@@ -186,7 +186,8 @@ to the same `source.md` and the same platform-fit decision.
    later, if this piece becomes a short).
 
 3.5. **Route — decide which platforms this piece is for.** Run
-   `npm run route -- --pillar <pillar> --folder <folder>` — pass **all** tagged pillars in ONE
+   `npm run route -- --brand <brand> --pillar <pillar> --folder <folder>` — `--brand` is required
+   (`human-inference` for Muxin's own writing); pass **all** tagged pillars in ONE
    call, comma-separated (e.g. `--pillar civic-tech,human-ai`), not one invocation per pillar.
    The router merges across pillars itself (include if *either* pillar includes it, unless
    *any* pillar's `config/routing.yaml` `never` rule vetoes it — that veto is a hard stop no
@@ -206,7 +207,7 @@ to the same `source.md` and the same platform-fit decision.
    **Exploration probe (card 92bb2ae6):** if the latest strategy brief's [TEST] recommendations
    name an off-assignment platform + pillar probe still due this month, and this piece's tagged
    pillar matches, add `--explore <platform>` to the same route call (e.g.
-   `--pillar civic-tech --explore linkedin --folder <folder>`) to force that ONE platform's
+   `--brand human-inference --pillar civic-tech --explore linkedin --folder <folder>`) to force that ONE platform's
    decision to `include` for this piece only, even though `config/routing.yaml` doesn't default
    it there. Draft that platform's derivative same as any other in step 4, but stamp its
    frontmatter `exploration_probe: true`. Everything else about the piece (other platforms,

@@ -29,6 +29,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseTimedTextJson3 } from "./youtube.js";
+import { decodeHtmlEntities } from "../util/html-entities.js";
 
 // Overridable so a machine that installed yt-dlp somewhere unusual does not have to fight PATH.
 export const YT_DLP_BIN = process.env.YT_DLP_PATH ?? "yt-dlp";
@@ -163,14 +164,10 @@ export function parseVtt(raw: string): string | null {
     if (trimmed.includes("-->")) continue;
     if (/^(Kind|Language|NOTE|STYLE|REGION):?\b/.test(trimmed)) continue;
     if (/^\d+$/.test(trimmed)) continue;
-    const text = trimmed
-      .replace(/<[^>]*>/g, "")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&amp;/g, "&")
+    // Same shared decoder the essay ingest uses: a caption track carries the speaker's own
+    // words, and `&#8217;` was surviving the old named-only chain into the stored transcript.
+    const text = decodeHtmlEntities(trimmed.replace(/<[^>]*>/g, ""))
+      .replace(/\u00a0/g, " ")
       .trim();
     if (text === "") continue;
     if (out.length > 0 && out[out.length - 1] === text) continue;

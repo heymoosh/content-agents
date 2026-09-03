@@ -11,7 +11,7 @@ import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, t
 // from analytics (resonance) + editorial config (config/routing.yaml) + a graceful
 // cold-start. Routing GATES generation in /atomize; Muxin's review stays the final gate.
 //
-//   tsx src/strategy/route.ts --pillar civic-tech[,human-ai,...] [--folder content/<slug>] [--explore <platform>]
+//   tsx src/strategy/route.ts --brand human-inference --pillar civic-tech[,human-ai,...] [--folder content/<slug>] [--explore <platform>]
 //        → prints JSON decisions; writes <folder>/routing.md when --folder is given.
 //          Multiple comma-separated pillars are merged in ONE pass (include if any pillar
 //          includes, unless any pillar's `never` rule vetoes it) instead of overwriting
@@ -22,9 +22,9 @@ import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, t
 //          review-queue.md approval still gates publishing; the derivative drafted from this
 //          routing.md should be stamped `exploration_probe: true` in its frontmatter so
 //          tag-source.ts/loadData can exclude its eventual post from the main resonance figures.
-//   tsx src/strategy/route.ts --all
+//   tsx src/strategy/route.ts --brand <brand> --all
 //        → full pillar × platform routing-map markdown (for the strategy brief)
-//   tsx src/strategy/route.ts --flags
+//   tsx src/strategy/route.ts --brand <brand> --flags
 //        → routing-drift.ts's persistent divergence flags (data vs config/routing.yaml
 //          defaults, over two independent windows) — computed/printed only, never written back.
 
@@ -554,7 +554,7 @@ function main() {
   const pillars = pillarArg ? [...new Set(pillarArg.split(",").map((p) => p.trim()))] : undefined;
   if (!pillars || pillars.length === 0 || pillars.some((p) => !PILLARS.includes(p))) {
     console.error(
-      `usage: tsx src/strategy/route.ts --pillar <${PILLARS.join("|")}>[,<pillar2>,...] [--folder <content-folder>]  |  --all  |  --flags`
+      `usage: tsx src/strategy/route.ts --brand <human-inference|charles|fiction> --pillar <${PILLARS.join("|")}>[,<pillar2>,...] [--folder <content-folder>]  |  --all  |  --flags`
     );
     process.exit(1);
   }
