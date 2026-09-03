@@ -117,7 +117,7 @@ import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
 import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
 import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
 import { saveCutBody, addCutComment } from "./rows.js";
-import { isBrandId, type BrandId } from "../identity/brand.js";
+import { brandForOrigin, isBrandId, type BrandId } from "../identity/brand.js";
 import { providerReconciliationHealth, startProviderReconciliationLoop } from "./provider-reconciliation-runner.js";
 import { publishDrainHealth, startPublishDrainLoop } from "./publish-drain.js";
 import { readLearningEvaluations } from "../venture/learning-evaluation.js";
@@ -1444,7 +1444,16 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         if (lens) {
           mechanismBody = (await readAuthoritativeApprovedCut(folder, lens)).body;
         }
-        json(res, 200, readTreatment(slug, { folder, mechanismBody }));
+        // Measured fit reads one brand's analytics. The piece's own request names its origin, so
+        // prefer that; otherwise take the brand the caller asked for. No default: an unbound read
+        // is exactly what `loadData` refuses. A folder with no pillar never reaches `loadData`, so
+        // it is still answered here rather than refused for a brand it does not need.
+        // A missing request is ordinary; an unreadable one is an integrity failure and must not be
+        // laundered into "no request".
+        const requested = url.searchParams.get("brand");
+        const stored = existsSync(join(folder, "content-request.json")) ? await readContentRequest(folder) : null;
+        const brandId = brandForOrigin(stored?.origin) ?? (requested ? requestBrand(requested) : null);
+        json(res, 200, readTreatment(slug, { folder, mechanismBody, ...(brandId ? { measurement: { brandId } } : {}) }));
       } catch (e) {
         json(res, 400, { error: String((e as Error)?.message ?? e) });
       }

@@ -1,9 +1,9 @@
 ---
 name: cycle
-description: Run one full brand-scoped weekly content cycle. Usage - /cycle --brand <human-inference|charles|fiction> [--account <provider/account>].
+description: Run the brand-scoped weekly ingest, strategy and drafting loop. Review and publish live in the Content room, not here. Usage - /cycle --brand <human-inference|charles|fiction> [--account <provider/account>].
 ---
 
-# /cycle — the weekly loop
+# /cycle — the weekly ingest, strategy and drafting loop
 
 Require the canonical `--brand` argument at entry: `human-inference`, `charles`, or `fiction`.
 Reject missing or unknown brands. There is no Human Inference fallback. Pass the same explicit
@@ -34,12 +34,17 @@ checkpoint; never barrel through.
    publish.) **Video is separate:** for any piece worth a short, offer to run `/video <folder>`
    — it's the heavier, costlier path, so it's opt-in per piece, not automatic.
 
-4. **Pending reviews.** Scan `content/*/review-queue.md` for rows still `pending` or `revise`.
-   List them with folder paths. For `revise` rows, offer to run `/atomize --revise`.
-
-5. **Publish.** For folders with `approve` rows, offer to run `/publish <folder>`. Only run it
-   if Muxin says yes (or already asked for publish in this conversation).
-
-6. **Wrap up.** Summarize the cycle (imported / brief / atomized / published). Offer to commit
+4. **Wrap up.** Summarize the cycle (imported / brief / atomized). Offer to commit
    and push the cycle's artifacts (brand-scoped briefs **including `briefs/<brand>/bets.md`**, derivatives, logs, queue
    updates) — the bets ledger is the loop's memory, so it must be committed every cycle.
+   Then point Muxin at the Content room in Studio (`npm run review`) for review and publish.
+
+## Retired steps — review and publish
+
+`/cycle` used to scan for `pending`/`revise` rows and offer to run `/publish`. Both were removed:
+the Content room in Studio already owns review and approval, and `/publish` is invoked directly on
+a folder. Two front doors for the same step is how a piece ends up reviewed in one place and
+published from another. Do not re-add them here.
+
+Drafting (step 3) is still `/atomize` on purpose. It stays until the Content room can do what
+`/atomize` does; retiring it before then would remove the only working drafting path.

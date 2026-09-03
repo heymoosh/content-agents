@@ -58,7 +58,8 @@ derivative, the video script, and the video title/description. The short version
 ## Cut-aware steps
 
 Steps 2-8 below read as if there's one source. When step 1.5 approved more than one cut, run them
-once per additional cut, substituting throughout:
+once per additional cut, substituting throughout (step 8.5 is folder-level, not per-cut — running
+it again is a harmless refresh, so run it once after the last cut):
 - "the source" / `source.md` → that cut's `cuts/<lens>/cut.md` (its body is the drafting material,
   same role `source.md`'s body plays for `extract`).
 - `<folder>/derivatives/` → `<folder>/cuts/<lens>/derivatives/`.
@@ -107,7 +108,7 @@ to the same `source.md` and the same platform-fit decision.
    - Once approved: `extract` needs no extra scaffolding — it's today's top-level `source.md` /
      `derivatives/` layout, continue straight into step 2. Any OTHER approved lens gets scaffolded
      via `addCut()` (`src/atomize/cuts.ts`): `addCut(folderDir, { lens, title, text })` writes
-     `cuts/<lens>/cut.md` + `cuts/<lens>/derivatives/`. Then run steps 2-8 again, once per
+     `cuts/<lens>/cut.md` + `cuts/<lens>/derivatives/`. Then run steps 2–8.5 again, once per
      additional approved cut, pointed at that cut instead of `source.md` (see "Cut-aware steps"
      below) — equivalent to `/atomize --continue <folder> --cut <lens>`.
    - This step never blocks generation the way a hard gate would — if Muxin only wants `extract`
@@ -512,6 +513,18 @@ to the same `source.md` and the same platform-fit decision.
      one driven by `/cycle`) write `from /cycle`. Never write `reply to mention` here — that value
      belongs to the not-yet-built inbound-reply pipeline (see the backlog card "Inbound listening +
      voice-replies").
+
+8.5 **Make the folder visible in the Content room.** Run
+   `npm run content-request -- <folder> --brand <brand>`. The Content room lists a piece for
+   approval only when its folder carries a `content-request.json` (`src/review/rows.ts`
+   `listPieces` sets `requestId`/`descriptor`/`originalInput` from one; `page.ts` filters the
+   review list on those). Without this, the rows step 8 just wrote exist on disk and are
+   invisible in the room where Muxin approves them.
+   It is bookkeeping, not configuration: the request records the run's identity, verbatim source
+   body and `source_lines` provenance, and deliberately selects no platform, media or treatment,
+   because Studio configured and generated none of this. A request written by the Content room is
+   never overwritten — the script keeps it and says so.
+
    Then STOP. Do not publish.
    Tell Muxin: the folder path, asset counts, which platforms routing skipped (and why, per
    `routing.md`), any derivative flagged for a Spin pass on storytelling, and anything else
@@ -541,6 +554,6 @@ invoked, read the corresponding file first and follow its instructions:
   resume at step 2 instead of re-ingesting. Read `references/continue-mode.md` and follow it
   before doing anything else.
 - **`/atomize --continue <folder> --cut <lens>`** — same, but for an additional approved cut from
-  step 1.5 (not `extract`): resume steps 2-8 pointed at `cuts/<lens>/cut.md` instead of
+  step 1.5 (not `extract`): resume steps 2–8.5 pointed at `cuts/<lens>/cut.md` instead of
   `source.md`, per "Cut-aware steps" above. `<lens>`'s `cuts/<lens>/cut.md` must already exist
   (step 1.5's `addCut()` call) before this runs.

@@ -3211,7 +3211,7 @@ async function cwLoadTreatment(){
   CW.loading = true; CW.treatErr = null;
   try {
     const [r, signals, requestResult] = await Promise.all([
-      fetch("/api/content/treatment?slug="+encodeURIComponent(slug)+(CW.approvedLens?"&lens="+encodeURIComponent(CW.approvedLens):"")),
+      fetch("/api/content/treatment?slug="+encodeURIComponent(slug)+(CW.approvedLens?"&lens="+encodeURIComponent(CW.approvedLens):"")+"&brand="+encodeURIComponent(signalsBrand())),
       fetch("/api/signals?brand=human-inference").then(x=>x.json()).catch(()=>null),
       fetch("/api/content/request?slug="+encodeURIComponent(slug)).then(x=>x.json()).catch(()=>null),
     ]);

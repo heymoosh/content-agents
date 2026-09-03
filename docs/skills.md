@@ -5,7 +5,7 @@ from each skill's own SKILL.md frontmatter; that file is always the source of tr
 
 | Skill | Build | One-liner |
 |---|---|---|
-| `/cycle` | all | The single weekly command: ingest → strategy → atomize → review → publish |
+| `/cycle` | all | The weekly ingest → strategy → atomize loop; review and publish belong to the Content room |
 | `/strategy` | 0 | Weekly strategy brief from analytics data, grades last cycle's bets first |
 | `/atomize` | 1 | One piece of content → text posts + quote cards + review queue |
 | `/brand-lens` | 1 | Human Inference brand enforcement: proposes angles / flags drafts, never rewrites |
@@ -19,9 +19,10 @@ from each skill's own SKILL.md frontmatter; that file is always the source of tr
 
 ## `/cycle`
 
-Run one full weekly content cycle: ingest analytics, refresh the strategy brief, atomize new
-content, surface pending reviews, offer publish. Pure orchestration; every step delegates to
-its own skill or script and stops at every human checkpoint.
+Run one weekly content cycle: ingest analytics, refresh the strategy brief, atomize new content.
+Pure orchestration; every step delegates to its own skill or script and stops at every human
+checkpoint. Review and publish are the Content room's, not `/cycle`'s — it retired those steps so
+there is one approve-and-publish surface, not two.
 
 **Usage:** `/cycle`
 

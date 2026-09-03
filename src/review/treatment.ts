@@ -32,6 +32,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { recommendSourceDistribution, type SourceDistributionRecommendation } from "./source-distribution.js";
 import { readReviewedMechanismRecommendations } from "./reviewed-mechanism-recommendations.js";
 import type { RecommendationEvidence } from "./content-request.js";
+import type { StrategyMeasurementContext } from "../strategy/measurement-context.js";
 import {
   CORE_TEXT,
   PILLARS,
@@ -191,6 +192,11 @@ export interface TreatmentDeps {
   recommendMechanisms?: (body: string) => RecommendationEvidence[];
   /** Server-read approved cut body. Whole-source text must never authorize a mechanism treatment. */
   mechanismBody?: string | null;
+  /**
+   * Whose analytics the measured fit is read from. Required whenever `data` is not injected:
+   * `loadData` refuses an unbound read, and there is no Human Inference fallback.
+   */
+  measurement?: StrategyMeasurementContext;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +268,10 @@ export function readTreatment(slug: string, deps: TreatmentDeps = {}): Treatment
 
   let merged: MergedDecision[];
   if (pillars.length > 0) {
-    const data = deps.data ?? loadData();
+    if (!deps.data && !deps.measurement) {
+      throw new Error("readTreatment needs a brand: measured fit reads one brand's analytics, and there is no default");
+    }
+    const data = deps.data ?? loadData(undefined, undefined, deps.measurement);
     const perPillar = new Map<string, Decision[]>();
     for (const pillar of pillars) perPillar.set(pillar, decideForPillar(pillar, cfg, data));
     merged = mergeDecisions(pillars, perPillar);

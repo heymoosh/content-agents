@@ -117,10 +117,14 @@ Two artifacts, two approvals, nothing stale.
 
 ### 3. Work made by `/cycle` is invisible in Content's approve step
 
-`page.ts:1616` filters the review list to pieces that have a content request. `/atomize` never
-writes one (`atomize/SKILL.md:495-524` appends queue rows only), so a `/cycle` run produces drafts
-that step 1 counts and step 3 hides. The
-`content/2026-09-02-the-world-s-broken-what-do-we-do` folder is the live example: 15 derivatives,
+**Fixed 2026-09-02** — `/atomize` now writes the request at step 8.5
+(`npm run content-request`), and the live folder below is visible again. The description below is
+the state it fixed; keep it for the reasoning, not as current behavior.
+
+`page.ts:1616` filters the review list to pieces that have a content request. `/atomize` did not
+write one (`atomize/SKILL.md:495-524` appended queue rows only), so a `/cycle` run produced drafts
+that step 1 counted and step 3 hid. The
+`content/2026-09-02-the-world-s-broken-what-do-we-do` folder was the live example: 15 derivatives,
 14 pending rows, no content request, nothing visible to approve.
 
 `/cycle` is human-invoked only — nothing in the repo calls it, there is no cron entry
@@ -238,12 +242,12 @@ P1 -> P2 -> item 1 (Venture)  -> item 2 (Fiction/Charles)
 
 So: two lanes safely in parallel (A and B), with C queued behind A. Not three.
 
-### One small independent fix worth doing early
+### One small independent fix worth doing early — DONE 2026-09-02
 
-`/atomize` writes no `content-request.json`, which is the whole reason the 14 pending rows in
-`content/2026-09-02-the-world-s-broken-what-do-we-do` are invisible in Content's approve step
-(`page.ts:1616`). Having `/atomize` write one is small, has no dependency on anything above, and
-makes existing drafted work reviewable now rather than after the item 5 port. It belongs in lane B.
+`/atomize` wrote no `content-request.json`, which was the whole reason the 14 pending rows in
+`content/2026-09-02-the-world-s-broken-what-do-we-do` were invisible in Content's approve step
+(`page.ts:1616`). It now writes one at step 8.5, on the default, `--continue` and `notes` paths.
+See `docs/evidence-lane-b-2026-09-02.md`.
 
 ## Rule 7
 

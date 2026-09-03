@@ -40,7 +40,8 @@ folder too. One window, one folder, that's the whole system.
 1. **Export analytics** (~10 min, every 1–2 weeks): X, LinkedIn, Substack → drop the files
    into `data/inbox/<platform>/`. Exact clicks: `docs/analytics-export-howto.md`.
 2. **Run `/cycle`** in Claude Code. It imports the data, refreshes the strategy brief
-   (`briefs/`), asks if you have new content to atomize, and lists anything waiting on you.
+   (`briefs/`), and asks if you have new content to atomize. It stops there: review and publish
+   are the Content room's job (`npm run review`), or `/publish <folder>` directly.
 3. **Write your thing** as usual (Substack, voice memo, build log). Atomize it:
    `/atomize https://yoursubstack.substack.com/p/your-post` (or a file path, or a `.m4a`).
 4. **Review**: open `content/<date>-<slug>/review-queue.md`, set each row to
@@ -55,7 +56,7 @@ folder too. One window, one folder, that's the whole system.
 
 | Command | What it does |
 |---|---|
-| `/cycle` | The weekly everything: ingest → strategy → atomize prompts → review reminders → publish offer |
+| `/cycle` | The weekly loop up to drafting: ingest → strategy → atomize prompts. Review and publish live in the Content room. |
 | `/strategy` | Just regenerate the strategy brief from current data |
 | `/atomize <url\|file>` | Just atomize one piece of content (stops at the review queue) |
 | `/atomize --revise <folder>` | Re-draft the rows you marked `revise`, using your notes |

@@ -11,7 +11,7 @@ directly and spreads the ones worth spreading.
 2. **Pick.** Muxin says which to spread. `npm run new-notes -- --pick 1,3` scaffolds one content
    folder per picked note (`source_kind: substack-note`, the note's own URL as `origin` +
    `canonical_url`). Don't spread every note — only the ones worth cross-posting.
-3. **Spread each.** For each scaffolded folder, run the standard flow (steps 2–8 in SKILL.md): read the
+3. **Spread each.** For each scaffolded folder, run the standard flow (steps 2–8.5 in SKILL.md): read the
    brief, tag the pillar, `npm run route`, generate derivatives, validate, queue. A note is short
    and already platform-ready, so the **whole note is the extract** — derivatives are near-verbatim
    cross-posts trimmed to each platform's limit (extraction-first still holds; if a note is too thin
