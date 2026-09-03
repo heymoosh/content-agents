@@ -10,6 +10,29 @@ disposable — do not continue in it.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
+> ### ▶ NEXT ACTION (2026-09-03 handoff) — build slice 1.5, the decision-11 contracts
+> Everything else on the board is done or deliberately held. Start here:
+> 1. **Build slice 1.5 — the durable capture/state contracts + Fiction confirm-before-canon gate.**
+>    This is the reordered first step (contracts-first, per Codex review + Muxin). The full 7-item
+>    checklist is in the "Decision 11 build order — REVISED to contracts-first" subsection under
+>    decision 11 below. Start with the capture event-log + room projections + Venture answer
+>    protocol. Self-vet mergeable (routing/gates/classification don't compose prose → nothing here
+>    holds under rule 7).
+> 2. **Then slice 2** (Studio Start routing + Charles/Venture queues) and **re-target PR #448's
+>    Fiction queue at the new confirm gate**, then un-draft/rebase #448 for merge.
+> 3. **Then slice 3** (Charles combined-review layout).
+>
+> **Held, do NOT merge yet:** PR #448 (`feat/room-queue-slice1-fiction`) — green (4056/4056) but a
+> draft; it shortcuts into Fiction's *old* canon-approve path that slice 1.5's gate replaces. Rebase
+> and re-open only after the gate lands.
+>
+> **Rule 7 (settled):** only actual fiction *chapter prose* (line-commented in a PR) ever holds. The
+> whole decision-11 feature — routing, queues, gates, fan-out — self-vet merges on green.
+>
+> **Repo gotchas:** run `npm run check` UNSANDBOXED (sandbox = phantom failures + EPERM); client JS
+> lives in a `<script>` template literal so regex backslashes MUST be doubled (`\\s`), enforced by
+> `page.test.ts`; Fiction route tests MUST set `CONTENT_AGENTS_HOME` or they write the real inbox.
+
 ### Standing authorization (settles the old "nothing is approved to build" gate)
 
 Muxin owns *what* gets built, and she has already said it: **work through this document.** She does
