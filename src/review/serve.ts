@@ -116,6 +116,8 @@ import { loadFictionPromotionDraft } from "./fiction-promotion-draft.js";
 import { createApprovedCharlesHandoff } from "./charles-content-handoff-store.js";
 import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
 import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
+import { projectFictionCapture, syncFictionQueue } from "./fiction-queue.js";
+import { pendingCount, projectCaptureEvents, roomQueueItems } from "./room-queue.js";
 import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
 import { saveCutBody, addCutComment } from "./rows.js";
 import { brandForOrigin, isBrandId, type BrandId } from "../identity/brand.js";
@@ -1390,6 +1392,25 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       json(res, 200, { ok: true, captures: listCaptures() });
       return;
     }
+    // One room's queue projection (decision 11, slice 1.5a). Read-side reconcile: legacy capture
+    // events are projected on first read, Fiction items mirror their idea's status. `pending` is
+    // the collapsed-summary count — only still-needs-attention states (room-queue.ts).
+    if (req.method === "GET" && url.pathname === "/api/room-queue") {
+      const room = String(url.searchParams.get("room") ?? "") as CaptureRoom;
+      if (!["Content", "Fiction", "Outreach", "Venture", "Signals", "Charles"].includes(room)) {
+        json(res, 400, { ok: false, error: "capture room is invalid" }); return;
+      }
+      try {
+        if (room === "Fiction") {
+          json(res, 200, { ok: true, room, ...syncFictionQueue({ series: listFictionSeries().map((s) => s.slug) }) });
+          return;
+        }
+        projectCaptureEvents(listCaptures().filter((capture) => capture.room === room));
+        const items = roomQueueItems(room).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        json(res, 200, { ok: true, room, items, pending: pendingCount(items) });
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
     // The front door's room read: a subscription-route model judgment with the keyword sniff as
     // fallback (src/review/capture-router.ts). Pure read: it creates and queues nothing; the desk
     // still shows the verdict with "Wrong room?" buttons and waits for Start on it.
@@ -1428,7 +1449,9 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           if (series.length !== 1) throw new Error(series.length === 0 ? "no fiction series exists yet" : "more than one fiction series exists; open the Fiction room to choose one");
           const capture = saveCapture("Fiction", String(b.text ?? ""));
           const idea = createIdea(series[0]!.slug, capture.text);
-          json(res, 200, { ok: true, capture, idea, room: "Fiction", replayed: false });
+          // The raw capture event stays as-is; the idea link and lifecycle live in the room queue.
+          const queueItem = projectFictionCapture(capture, idea);
+          json(res, 200, { ok: true, capture, idea, queueItem, room: "Fiction", replayed: false });
           return;
         }
         if (room !== "Content") throw new Error(`Studio Start does not create a room item for ${room} yet`);

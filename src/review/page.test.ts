@@ -369,6 +369,9 @@ test("wiring guard: every emitted <script> block parses as JavaScript", () => {
 // now: the Content room's configuration flow reads the first, and Signals reads the other two.
 // Add an entry only for a route whose UI genuinely has not landed yet, and delete it the moment it has.
 const PENDING_UI_ROUTES = new Set<string>([
+  // Room queue projection read (decision 11, slice 1.5a). The client caller is PR #448's Fiction
+  // bottom queue, held until it re-targets from ficInbox onto this route (slice 2).
+  "/api/room-queue",
 ]);
 
 test("wiring guard: every client /api path has a serve.ts route, and every route has a caller", () => {
