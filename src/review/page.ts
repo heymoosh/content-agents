@@ -5055,7 +5055,7 @@ function renderFiction(){
     '<div class="src" style="max-width:680px;margin-top:24px;padding-top:16px;border-top:1px solid #efe7d6">Direct line edits and final acceptance happen in the story PR. Use the revision note here to ask for another focused pass; the canonical chapter is never silently overwritten.</div>';
   const ficQueue=(ficInbox||[]).filter(i=>i.status==="needs-review").map(i=>({
     id:i.id,
-    title:(i.rawText||"").replace(/\s+/g," ").trim().slice(0,90)||"(untitled idea)",
+    title:(i.rawText||"").replace(/\\s+/g," ").trim().slice(0,90)||"(untitled idea)",
     meta:(i.classification||"clarify")+" · "+(i.proposal?"cleanup ready to review":"needs a destination first"),
     tag:"IDEA", tagCls:"yours",
     action:i.proposal?"Review":"Open"
