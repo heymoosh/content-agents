@@ -142,6 +142,20 @@ what has been verified, and what remains.
   `/Users/Muxin/Documents/GitHub/content-agents/.claude/worktrees/content-studio-ui-recovery`
   (on `agent/studio-functionality`), whose entire dirty state is end-to-end test residue written
   into the real data root — the defect `4e611cc` fixed, from a run predating it.
+- **PR #420 landed on `main` without Muxin's review, as a side effect of landing the recovery
+  branch (2026-09-03).** This is a rule 7 breach and it should be recorded plainly. #420 ("Phase 4:
+  connect measured Signals learning to Venture") was a draft held *because* it changes Venture
+  judgment and Content/Signals generation-adjacent gates. Its commits were already inside
+  `recovery/content-studio-master-status` before this session began (`ef5a29e` is an ancestor of
+  `53a461c`), so when #434 merged at 03:28:42Z GitHub found #420's head reachable from `main` and
+  auto-closed it as MERGED one second later. Nobody merged it deliberately. **The lesson: before
+  landing a long-lived integration branch, check whether it already carries a held PR's commits**
+  — `git merge-base --is-ancestor <held-branch> <integration-branch>` answers it, and a held PR's
+  protection is worth nothing if an unrelated branch quietly contains it. The other four held PRs
+  (#421, #422, #423, #433) were checked and are **not** in `main`. Muxin's options on #420 are to
+  accept it (the code is covered by the green 4040-test gate) or to revert the merge; that decision
+  is hers and has not been made. Nothing here publishes regardless — rule 2 still gates that
+  through `review-queue.md`.
 - **Open PR state (2026-09-02):** five draft PRs and two dependabot PRs. Four of the drafts (#423
   Charles persona, #422 Outreach discovery, #421 Fiction inbox, #420 Venture handoff) are correctly
   held under rule 7 — each is a content-generation LOGIC change, each names an old-vs-new review
