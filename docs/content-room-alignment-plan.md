@@ -34,9 +34,13 @@ Nothing here is approved to build. This is the inventory and a proposed order.
 
 ## What does not match, in the order it should be fixed
 
-### 1. Venture ships treated variants with no editor and no character limits
+### 1. Content does not always run the editor — Venture has a bypass branch inside it
 
-`jobs.ts:793-803` gives Venture its own generation branch. It skips four things the studio path
+**Decided 2026-09-02 (Muxin):** Venture's job is to send its work into Content (directly, or via a
+Signals experiment that then sends it to Content), and **Content always runs the editor**. The code
+does not do that today, so this is a bypass to delete rather than a design to change.
+
+`jobs.ts:793-803` gives Venture its own generation branch *inside* `generateConfiguredContent`. It skips four things the studio path
 enforces: the blind cold-feed editor, the platform character limits
 (`CONFIGURED_PLATFORM_LIMITS`, checked only at `jobs.ts:484`), `source_lines` traceability
 (`parseVentureConfiguredBodies` returns `sourceLines: []`, `jobs.ts:597`), and
@@ -46,11 +50,19 @@ enforces: the blind cold-feed editor, the platform character limits
 This is the only live contradiction of the model today: Venture copy ships under Muxin's own byline
 with rule 5 in full force, through the room that is supposed to own the editor gate, without it.
 
-**Change:** route the Venture branch through the same editor pass and the same limit check.
+**Change:** route the Venture branch through the same editor pass and the same limit check every
+other origin gets. Venture keeps its scoped tracing exception (`claim_refs` instead of
+`source_lines`, CLAUDE.md rule 1) — that exemption is from tracing, not from the editor.
 
 ### 2. Fiction and Charles cannot produce platform variations at all
 
-`jobs.ts:608-610` throws on any treated variant for those origins:
+**Decided 2026-09-02 (Muxin):** Content should apply good hooks and storytelling to Fiction and
+Charles work like anything else, but it must **retain the voice and the point of its original
+input**. Content has to know it is handling a Charles or a Fiction source so it does not
+over-flatten the piece with generic platform optimization.
+
+"Cannot produce variations" is literal, not a judgment call: `jobs.ts:608-610` throws on any treated
+variant for those origins:
 
 > `configured fiction treatments are unavailable: no enforceable restricted transformation exists;
 > request an untreated control only`
@@ -64,7 +76,7 @@ bounds a treatment against an approved cut; Charles has no cut, so nothing const
 treatment could invent. The fix is to supply the missing enforceable boundary rather than to remove
 the check.
 
-**Change, three parts:**
+**Change, four parts:**
 
 - **A narrow treatment kind whose boundary is mechanically checkable**: every sentence in the
   treated body must already appear in the approved body. Re-hooking, reordering, trimming and
@@ -80,6 +92,14 @@ the check.
   (CLAUDE.md rule 5) and governed by `charles/config/persona.yaml`; Fiction likewise, with the
   em-dash ban carrying over to both. Without this, the first Charles editor pass throws on his own
   satire.
+- **Origin-aware editor *prompt*, not just an origin-aware gate.** The blind editor
+  (`jobs.ts:814-818`) is spawned with `tools: ""` and is told to sharpen topic grounding for a
+  context-switching scanner. Run unchanged over Charles, that instruction flattens a satirical
+  persona into optimized copy that passes every check and loses the thing worth publishing. The
+  editor must be handed the source's own voice contract — `charles/config/persona.yaml` for
+  Charles, the canon/voice restrictions the Fiction handoff already carries — and told to preserve
+  voice and point while it improves hook and structure. This is Muxin's "don't over-flatten with
+  optimizations", and it is a prompt change, not only a validation change.
 
 **Approval sequencing is not a problem.** The control variant stays byte-exact (`jobs.ts:831`), so
 the upstream approval in `charles/review-queue.md` still covers exactly what it approved. The
