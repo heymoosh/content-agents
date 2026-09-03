@@ -162,7 +162,14 @@ what has been verified, and what remains.
   packet under `docs/reviews/*.html`, and each is waiting on Muxin's eyes and nothing else. **#433
   (per-brand Strategy) has an empty PR body** — it touches brief synthesis, which is on rule 7's
   hold list, so it needs a body, a review packet, and an old-vs-new sample before it can be judged.
-  Only #423 conflicts with `main`. On merge method: Muxin's "commit depth is version history"
+  **Correction (2026-09-02, evening): all four now conflict with `main`, not only #423.** Tested
+  with `git merge-tree --write-tree origin/main origin/<branch>` — #433, #423, #422 and #421 each
+  conflict, so every one needs a rebase before it can even be judged. A related finding on #433:
+  its diff still *adds* the `context?: StrategyMeasurementContext` parameter to `loadData`, which
+  `main` already carries identically (`src/strategy/route.ts:153` on both heads) — part of the
+  brand partition reached `main` by another route, so some of #433 is already landed and its
+  remaining delta is smaller than its 77-file diff suggests. Worth knowing before writing its body.
+  On merge method: Muxin's "commit depth is version history"
   position argues for `--merge` or `--rebase` over the `--squash` habit, which would collapse the
   67 commits she said cost nothing.
 - **Room-model architecture review (2026-09-02, evening):** Muxin stated the intended job of each

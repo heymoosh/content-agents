@@ -175,6 +175,20 @@ about a PR on rule 7's hold list, so it is surfaced, not acted on.
 #433 also edits `.claude/skills/cycle/SKILL.md` and `.claude/skills/atomize/SKILL.md`, both changed
 in this session; it will need a rebase whatever Muxin decides.
 
+**All four held PRs now conflict with `main`, not just #423** as the status doc said. Tested with
+the containment check the status doc itself prescribes:
+
+```
+$ git merge-tree --write-tree origin/main origin/<branch>
+feature/per-brand-strategy-p2   (#433): CONFLICTS with main
+feature/charles-persona-edit    (#423): CONFLICTS with main
+feature/outreach-phase5-discovery (#422): CONFLICTS with main
+feature/fiction-idea-inbox-p2   (#421): CONFLICTS with main
+```
+
+Each needs a rebase before it can be judged. None was rebased here — they are Muxin's to decide on,
+and rebasing a held PR silently is not this session's call. Status doc corrected.
+
 ## R6 — status-doc reconciliation
 
 `docs/content-studio-master-status.md` updated per its own checklist: the room-model execution
@@ -186,9 +200,9 @@ corrected.
 
 ## Gate
 
-`npm run check`, unsandboxed, on the final tree: see the PR body for the exact count. Baseline was
-4,040/4,040; this session adds 12 tests (11 for the atomize content request, 1 for the treatment
-brand guard).
+`npm run check`, unsandboxed, on the final tree: typecheck clean, **4,052 tests / 484 suites / 0
+failures**. Baseline before this session was 4,040/4,040; the 12 added tests are 11 for the atomize
+content request and 1 for the treatment brand guard.
 
 ## Not done, and why
 
