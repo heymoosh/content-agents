@@ -24,20 +24,20 @@ for her. Everything else self-vet merges after a green local `npm run check`.
 
 ### Do this next, in this order
 
-**The only open PR is #442 (P1, held for Muxin by design — see "Do this next"). Start by building,
-not by triage.** The rest of the 2026-09-03 queue was resolved that day; what happened is under "PR
-hygiene" below, and you do not need it to begin.
+**No open PRs. Start by building, not by triage.** The rest of the 2026-09-03 queue was resolved
+that day; what happened is under "PR hygiene" below, and you do not need it to begin.
 
-**Session of 2026-09-03 (evening) already shipped the first two pieces — start at P2.**
+**Session of 2026-09-03 (evening) shipped P1 and item 4; a new decided scope — per-room queues
+(decision 11) — is approved to build. Start at P2 for lane A, or the per-room queues for lane B.**
 
-- **P1 is DONE, held as draft PR #442** (`lane-a/p1-platform-limits-single-source`). It deletes
+- **P1 is DONE and MERGED — PR #442** (`c6842cd`, rebased onto `main` 2026-09-03). It deleted
   `CONFIGURED_PLATFORM_LIMITS` and resolves platform character limits from `config/platforms.yaml`
-  via a memoized `configuredPlatformLimit()`. It is a **pure identity refactor** — for every
+  via a memoized `configuredPlatformLimit()`. It was a **pure identity refactor** — for every
   platform reachable as a `variant.platform`, config `max_chars` equals the retired table value (or
   both absent); `quote-card` is a media type, never a platform, so its 180-char config limit cannot
-  introduce a new gate. The PR body carries the full old-vs-new limits table (delta: none). Held
-  under rule 7 for Muxin's one-glance review; a regression test pins the values. **P2 branches on
-  top of #442, not on `main`.**
+  introduce a new gate. A regression test pins the values. Merged after Muxin confirmed it needed no
+  hold (rule 7 covers only changes to *how content is created*, not limit-sourcing). **P2 branches
+  on `main` now.**
 - **Item 4 (Fiction leg) is DONE and MERGED — PR #443** (`d682d77`). Studio Start
   (`POST /api/captures/start`) now takes an optional `room` (default `"Content"`, backwards
   compatible) and, for `room: "Fiction"`, lands the capture as a **durable inbox idea** via the
@@ -50,21 +50,26 @@ hygiene" below, and you do not need it to begin.
     `takeCaptureTo` already saves it via `POST /api/captures` before advancing, so every capture
     persists in `studio-captures.json` tagged with its room. The real gap was **promotion into the
     room's own item type**, which item 4 now closes for Fiction.
-  - **Charles, Venture, Outreach remain a product question for Muxin.** None has a durable
-    lightweight room-item store to reuse: Charles's only create is a draft-*generation* job,
-    Venture's is the heavy `commitIntake`, Outreach's `intakeManual` needs a name/URL and has no
-    endpoint. Start **fails closed** for them (clear error). Inventing "a Charles input" / "a
-    Venture note" / "an Outreach capture" store would be a product-shape guess (HOLD, rule 7 /
-    CLAUDE.md). **Muxin: say what each of those should become and Start can create it.**
+  - **Charles, Venture, Fiction Start rooms — RESOLVED 2026-09-03: build per-room queues (decision
+    11).** Muxin answered the product question. Each room home gets an **expandable queue** (collapsed
+    with a pending count) at its bottom, reusing Content's pick-a-source visual; Studio Start files a
+    routed capture into the destination room's queue as a durable item (extends the item-4 pattern);
+    clicking a row resumes that room's native interaction. Venture: one queue per venture, capture
+    names its venture, Studio asks if unclear. Fiction: its own queue, chat-confirms before writing
+    canon (no auto-classify). Charles: single queue, multi-select output types (composer already
+    does this), review room shows the essay in a scrollable sub-window with other drafts stacked
+    below. Full spec + building-block line refs: decision 11 under "Recorded product decisions".
+    Outreach's Start leg stays deferred (no queue spec'd yet; `intakeManual` needs a name/URL).
 
 Remaining, in order:
 
-1. **Build the rest of lane A, strictly serial, in `src/review/jobs.ts`, on top of #442:** P2
+1. **Build the rest of lane A, strictly serial, in `src/review/jobs.ts`, on top of `main`:** P2
    (editor registry, un-fuse the editor from provenance) → item 1 (Venture through the normal
    editor) → item 2 (Fiction and Charles treated variants). Each is content-generation LOGIC:
    **draft PR, old-versus-new sample, hold.** Line references: "Room-model execution order" below.
-2. **Lane B is otherwise clear** (item 4 Fiction done; item 6, 3a, the content-request fix done).
-   The only open lane-B work is the three deferred Start rooms above, which need Muxin's decision.
+2. **Lane B: the per-room queues (decision 11) are the main open work** — mostly UI + input-routing,
+   self-vet mergeable (the Fiction confirm-before-canon prompt and any Charles suggest-type logic
+   hold). Item 4 Fiction, item 6, 3a, and the content-request fix are done.
 3. **Lane C (item 5's port sequence) queues behind lane A** — same file, same region.
 
 ### Ground rules that bite immediately
@@ -1083,6 +1088,40 @@ are ordinary operations, not gates.
    drafting step depends on that port finishing. The full inventory, dependency chain, parallelism
    table and rule 7 split is `docs/content-room-alignment-plan.md`. **Nothing in it is approved to
    build.**
+11. **Per-room queues, and Studio Start files into them (Muxin, 2026-09-03 — approved to build).**
+   Refines decision 10's "Studio creates nothing itself": Studio Start's safe create action is to
+   file a routed capture into the destination room's own queue as a durable item — it still
+   generates no content (consistent with the item-4 Fiction inbox already shipped, PR #443). Every
+   room home (Fiction, Charles, Venture) gains a **queue at the bottom of its home page**, reusing
+   Content's pick-a-source visual pattern (`cw-src` rows: tag pill + title + meta + action,
+   `src/review/page.ts:3071`). The queue is **expandable: collapsed by default showing only a count
+   of pending items, expand to reveal the rows.** Clicking a row resumes *that room's native
+   interaction* (Venture chat, Fiction chat/drafting, Charles drafting) — not a Content handoff.
+   Bottom-of-home append points: Fiction `renderFiction()` (`page.ts:4895`), Charles
+   `renderCharles()` (`page.ts:5347`), Venture `renderVenture()` (`page.ts:4191`).
+   Per-room specifics:
+   - **Venture — one queue per venture** (`venture/<slug>/`; enumerate with `listVentures()`,
+     `src/venture/paths.ts:20`). The capture names its venture ("this is for <venture>"); Studio
+     matches that to a venture slug and files it into that venture's queue. **If the venture is
+     unclear or ambiguous, Studio asks Muxin which venture** rather than guessing or misfiling.
+   - **Fiction — its own queue; no auto draft-vs-canon classification** (reverses an earlier
+     2026-09-03 idea of an auto-classifier). A queued Fiction capture opens a chat with the Fiction
+     agent; the agent **confirms with Muxin before writing anything canon-like** (canon.md,
+     bible.md, outline.md, characters/) — canon integrity stays human-gated, consistent with the
+     idea inbox already refusing to write `canon.md` (`src/fiction/idea-inbox.ts:274`). Plain draft
+     ideas still use `createIdea` → `stories/<series>/ideas.json` (`idea-inbox.ts:136`).
+   - **Charles — single queue; per-capture multi-select of output types** (essay, quick
+     post/oneliner, reply — any and all, not one at a time). The multi-select composer already
+     exists (`.charles-format` checkboxes, `page.ts:5248-5265`); wire it to the Studio Start and
+     queue path. The Charles **review room shows all outputs from one capture together**: an essay
+     sits in its own scrollable sub-window, openable to a focus mode for editing, with the other
+     posts/first-drafts stacked below it — the essay does not fill the whole pane.
+   Studio Start routing today has only Content + Fiction branches (`serve.ts:1420-1444`); the
+   Venture and Charles branches and all three bottom-of-home queues are net-new. Rule 7: this is
+   UI + input-routing, not content-generation logic (it changes where a capture lands and how a
+   room is browsed, not the words a run produces), so it self-vet merges — except the Fiction
+   confirm-before-canon chat prompt and any Charles "suggest output type from the input" logic are
+   judgment prompts and hold for Muxin's review when their wording is authored.
 
 ## Known stale or historical documents
 
