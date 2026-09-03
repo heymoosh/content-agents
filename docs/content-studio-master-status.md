@@ -24,20 +24,21 @@ for her. Everything else self-vet merges after a green local `npm run check`.
 
 ### Do this next, in this order
 
-1. **Rebase the four held PRs onto `main`** — #421 (Fiction idea inbox), #422 (Outreach discovery),
-   #423 (Charles persona edit), #433 (per-brand Strategy). All four conflict with `main` today, so
-   none of them can even be *judged* until they rebase. Rebasing does not merge them; the rule 7
-   hold stands. While rebasing #433, write its PR body — it is empty, and part of its diff
-   (`loadData`'s `context?: StrategyMeasurementContext` parameter) is already identical on `main`,
-   so its real delta is far smaller than its 77-file diff suggests.
-2. **Then build lane A, strictly serial, in `src/review/jobs.ts`:** P1 (delete
+**The PR queue is empty. Every open PR was resolved on 2026-09-03 — start by building, not by
+triage.** What happened is under "PR hygiene" below; you do not need it to begin.
+
+1. **Build lane A, strictly serial, in `src/review/jobs.ts`:** P1 (delete
    `CONFIGURED_PLATFORM_LIMITS`, read `config/platforms.yaml`) → P2 (editor registry, un-fuse the
    editor from provenance) → item 1 (Venture through the normal editor) → item 2 (Fiction and
    Charles treated variants). Each one is content-generation LOGIC: **draft PR, old-versus-new
    sample, hold.** Line references: "Room-model execution order" below.
-3. **Item 4 (Studio Start for the other rooms) stays blocked** until #421 and #423 land — they
-   already carry the per-room inbox code it needs. Do not rebuild it on `main`.
-4. **Lane C (item 5's port sequence) queues behind lane A** — same file, same region.
+2. **Item 4 (Studio Start for the other rooms) is UNBLOCKED as of 2026-09-03** — the per-room inbox
+   code it waited on is already on `main` (`src/fiction/idea-inbox.ts`, `src/review/serve-fiction.ts`,
+   `src/review/serve-charles.ts`). It was blocked only by draft PRs #421/#423, which turned out to
+   contain older copies of that same code and are now closed. Item 4 is lane B, touches different
+   files from lane A, and **can be built in parallel with step 1**. Build on `main`; do not resurrect
+   those branches.
+3. **Lane C (item 5's port sequence) queues behind lane A** — same file, same region.
 
 ### Ground rules that bite immediately
 
@@ -63,11 +64,40 @@ touched would have become impossible to configure in the Content room — strict
 invisibility it was fixing. **One auditor would have shipped it.** Run two, from different
 families, on anything that writes files other code reads.
 
+### PR hygiene — done 2026-09-03
+
+**Open PRs: zero.** Six were resolved, none of them by rebasing.
+
+- **#393 and #397 (dependabot) merged after a real local gate.** Hosted CI runs no tests, so both
+  bumps were merged into a scratch branch and put through `npm ci && npm run check` unsandboxed
+  first: **4,053 tests / 484 suites / 0 failures**. This is the check #430 skipped.
+- **#421, #422, #423 and #433 closed as already-landed, not rebased.** Every one of them was
+  already on `main` — the `recovery/content-studio-master-status` integration branch carried the
+  work in, in a *newer* form. Their branches predate roughly 16k lines of later work, so merging or
+  rebasing any of them would have **reverted `main`**: #433 would have restored the zod-3
+  `z.record(z.enum(...))` in `brand-accounts.ts` that took the whole publish path down, #422 would
+  have undone the decision-9 `DEFAULT_DISCOVERY_KINDS = ["platform"]` narrowing and downgraded zod
+  to ^3.24.2, #423 would have dropped `listReviewCommentsWithHealth`. Confirmed two ways that
+  agreed: a per-line containment test (every line each PR meant to add, checked against `main`'s own
+  copy of that file) and an independent codex audit, which returned CLOSE-ALL with its own
+  file:line evidence. Each branch still exists on origin, so every close is reversible.
+- **The trap that hid this, worth remembering.** This doc previously said the four were "checked
+  and are **not** in `main`". That was true of the *commits* — `git merge-base --is-ancestor` says
+  no — and false of the *content*. **Commit ancestry does not answer "is this work already on
+  main"** when the work arrived by a second route. Compare trees or lines, not ancestry.
+- **So it is four more rule 7 breaches, beside #420**, from the same mechanism: content-generation
+  logic reached `main` without Muxin's review because an integration branch quietly carried it.
+  Her review packets survive the closes, on `main` at
+  `docs/reviews/content-studio-fiction-p2-review.html`,
+  `docs/reviews/outreach-phase5-discovery-review.html` and
+  `docs/reviews/charles-persona-edit-review.html`.
+
 ### Open, recorded, not scheduled
 
-- **PR #420 merged without Muxin's review** (a rule 7 breach; mechanism traced further down). Her
-  call: accept it (it is covered by the green gate) or revert. Nothing publishes either way — rule 2
-  still gates that through `review-queue.md`.
+- **PR #420, #421, #422, #423 and #433 all merged or landed without Muxin's review** (rule 7
+  breaches; mechanism traced above and further down). Her call on all five: accept them (they are
+  covered by the green 4,053-test gate) or revert. Nothing publishes either way — rule 2 still gates
+  that through `review-queue.md`.
 - **Finding 6a:** `image-carousel` can never be auto-recommended for a Substack-ingested essay —
   the rule needs three markdown headings and `htmlToText` emits none. The fix lives in
   `fetch-substack.ts` and would shift every `source_lines` number, so it is recorded, not built.
@@ -77,12 +107,37 @@ families, on anything that writes files other code reads.
   single-user local tool, deliberately out of scope). All in
   `docs/evidence-lane-b-2026-09-02.md`.
 
-### Branch hygiene state (2026-09-03)
+### Branch hygiene state (2026-09-03) — done
 
-`repo-hygiene.sh --rescue` reports **no uncommitted work and no untracked paths** anywhere. Twenty
-local `agent/*`, `docs/*`, `feat/*` and `fix/*` branches remain unpushed and unmerged (tips
-2026-08-24 through 2026-08-31); they are local-only work, not residue, and were left alone. Run the
-script to list them.
+`repo-hygiene.sh --rescue` reports **no uncommitted work and no untracked paths** anywhere, and the
+local branch list is now clean. Twenty-eight local branches were measured the same way the closed
+PRs were — for each, every line it intended to add was checked against `main`'s own copy of the
+same file:
+
+- **15 carried content `main` does not have** and were **pushed to origin**, so nothing survives
+  only on this disk: `agent/cs2-jobs-outreach-charles-extract`, `agent/cs2-page-room-pure-helpers`,
+  `agent/cs2-serve-walled-room-routes`, `agent/cs3-studio-durable-handoff`,
+  `agent/cs4-signals-recommendation-decisions`, `agent/cs5-content-workbench-continuity`,
+  `agent/cs6-parallel-safe-ui-completion`, `agent/fiction-charles-functionality`,
+  `agent/prototype-subtraction`, `agent/studio-fourth-batch-20260825`,
+  `agent/studio-functionality`, `agent/studio-second-batch-20260824`,
+  `docs/content-studio-master-status-final`, `feat/content-studio-phase2-evidence`,
+  `fix/phase3-experiment-audit-gaps`. They are unreviewed and mostly stale; treat them as an
+  archive, not a queue.
+- **12 measured zero unique content** and were deleted locally (all reflog-recoverable):
+  `agent/content-studio-coordinator-local-merge` `8e4d4b9`,
+  `agent/content-studio-coordinator-reconcile` `7448d59`,
+  `agent/pattern-corrected-candidate-account-slate` `d220c40`,
+  `agent/pattern-local-evidence-inventory-clean-commit` `4b7644f`,
+  `agent/pattern-local-evidence-inventory-handoff` `993b067`,
+  `agent/pattern-local-evidence-inventory-integration` `1188922`,
+  `agent/pattern-research-professional-publishing` `632567e`,
+  `agent/pattern-stage-evidence-text-community` `ae0da99`,
+  `agent/pattern-stage-evidence-visual-video` `9b825e8`,
+  `docs/content-studio-master-status` `eaccfe8`, `docs/pr420-carried` `1202ccd`,
+  `feat/content-studio-phase1-completion` `cd42927`.
+- The session's own working branches were deleted after merging: `lane-b/atomize-content-request`
+  `9fc1156`, `docs/handoff-2026-09-03`, and the `deps/gate-check` scratch branch.
 
 ---
 
@@ -238,10 +293,19 @@ what has been verified, and what remains.
   landing a long-lived integration branch, check whether it already carries a held PR's commits**
   — `git merge-base --is-ancestor <held-branch> <integration-branch>` answers it, and a held PR's
   protection is worth nothing if an unrelated branch quietly contains it. The other four held PRs
-  (#421, #422, #423, #433) were checked and are **not** in `main`. Muxin's options on #420 are to
+  (#421, #422, #423, #433) were checked and are **not** in `main`. **Corrected 2026-09-03: that
+  conclusion was wrong, and its wrongness is the real lesson.** `--is-ancestor` answers a question
+  about *commits*; all four PRs' *content* was already on `main`, carried in by the recovery branch
+  along a different route. All four are now closed as already-landed — see "PR hygiene" at the top
+  of this doc. When you want to know whether work is already on `main`, compare trees or lines, not
+  ancestry. Muxin's options on #420 are to
   accept it (the code is covered by the green 4040-test gate) or to revert the merge; that decision
   is hers and has not been made. Nothing here publishes regardless — rule 2 still gates that
   through `review-queue.md`.
+- **Open PR state (2026-09-02) — SUPERSEDED 2026-09-03: the queue is now empty.** The two
+  dependabot PRs merged after a real local gate; the four drafts closed as already-landed. See
+  "PR hygiene" at the top of this doc. The paragraph below is kept for the record, not as
+  current state.
 - **Open PR state (2026-09-02):** five draft PRs and two dependabot PRs. Four of the drafts (#423
   Charles persona, #422 Outreach discovery, #421 Fiction inbox, #420 Venture handoff) are correctly
   held under rule 7 — each is a content-generation LOGIC change, each names an old-vs-new review
@@ -734,12 +798,12 @@ carrying an old-versus-new sample.
   from the piece's own request origin, then an explicit `?brand=`, and 400s naming the missing
   brand if neither exists. No Human Inference default.
   Evidence: `docs/evidence-lane-b-2026-09-02.md`.
-- **Item 4 is BLOCKED on Muxin, not on design (2026-09-02, evening).** The durable per-room
-  inboxes it needs are already written and waiting in held draft PRs: **#421** carries
-  `src/fiction/idea-inbox.ts` and `src/review/serve-fiction.ts` (it *is* the Fiction leg) and
-  **#423** carries `src/review/serve-charles.ts`; both also change `src/review/page.ts`. Building
-  item 4 on `main` now would duplicate that work and conflict with two rule-7 holds. It needs her
-  decision on #421/#423 first.
+- **Item 4 is UNBLOCKED (2026-09-03).** It was recorded a day earlier as blocked on Muxin's
+  decision about draft PRs #421/#423, which carried the durable per-room inboxes it needs. Those
+  PRs turned out to hold *older copies* of code already on `main`: `src/fiction/idea-inbox.ts`,
+  `src/review/serve-fiction.ts` and `src/review/serve-charles.ts` are all there today, in a newer
+  form. Both PRs are closed. **Build item 4 on `main`, in lane B, in parallel with lane A** — it
+  touches different files. Do not resurrect those branches.
 - **Item 5 is its own sequence:** the platform routing gate first (it decides which variants get
   made at all), then `validate`, then the remaining seven capabilities, which are largely
   independent of one another once those two land.
@@ -749,7 +813,7 @@ carrying an old-versus-new sample.
 | Lane | Work | Touches | Notes |
 |---|---|---|---|
 | A | P1, P2, item 1, item 2 | `src/review/jobs.ts` | Strictly serial within itself: one file, one region. |
-| B | Item 4 (Studio Start for the other rooms), item 6 (media auto-selection live check), 3a, and the `/atomize` content-request fix below | `serve.ts`, `page.ts`, skills, verification | No overlap with lane A at all. Start item 6 first: it is verification with no code, it is cheap, and it may change item 5's scope. |
+| B | Item 4 (Studio Start for the other rooms). Item 6, 3a and the `/atomize` content-request fix are all DONE. | `serve.ts`, `page.ts`, skills, verification | No overlap with lane A at all. **Item 4 is the only thing left in this lane and is unblocked as of 2026-09-03** — build it in parallel with lane A. |
 | C | Item 5's port sequence | `jobs.ts` generation path | **Collides with lane A on the same file.** Queue C behind A, or split the generation module before starting either. |
 
 **One small independent fix worth doing early — DONE (2026-09-02, evening).** `/atomize` wrote no
