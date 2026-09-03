@@ -123,7 +123,11 @@ same file:
   `agent/studio-functionality`, `agent/studio-second-batch-20260824`,
   `docs/content-studio-master-status-final`, `feat/content-studio-phase2-evidence`,
   `fix/phase3-experiment-audit-gaps`. They are unreviewed and mostly stale; treat them as an
-  archive, not a queue.
+  archive, not a queue. **`repo-hygiene.sh` will still list seven of them under "unpushed,
+  unmerged"** — that is a false alarm. All fifteen are on origin at identical SHAs; only the local
+  upstream-tracking config is unset, because `.git/config` could not be locked from the worktree
+  the pushes ran in. Verify with `git rev-parse <branch>` against `refs/remotes/origin/<branch>`
+  before believing the script on this one.
 - **12 measured zero unique content** and were deleted locally (all reflog-recoverable):
   `agent/content-studio-coordinator-local-merge` `8e4d4b9`,
   `agent/content-studio-coordinator-reconcile` `7448d59`,
