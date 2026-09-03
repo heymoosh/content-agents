@@ -320,8 +320,10 @@ what has been verified, and what remains.
   window (14 days to follow up, 60 to abandon, a placeholder); (b) whether to delete the stale
   rubric files under `config/outreach/` now that `brief.md` leads; (c) the Scout `--theme`
   sentence for the first platforms-only run; (d) whether to discard the seven stale July 17
-  pending rows in the Content review queue. Session state: ten commits unpushed, no PR, the
-  Studio server started from that session is gone and must be relaunched with `npm run review`.
+  pending rows in the Content review queue. Session state (corrected 2026-09-02, evening): that
+  session's commits are on `main` — the branch was pushed, merged as PR #434/#435/#437, and the
+  count is stale. The Studio server started from that session is gone and must be relaunched with
+  `npm run review`.
 - **Next gates, in Muxin's order:** (1) the base-loop test: its unblocked prefix ran on 2026-09-02
   (real essay in, front door, routing, drafting; see the base-loop bullet above and
   `docs/evidence-base-loop-2026-09-02.md`). What remains is hers: one approval of a drafted row
@@ -613,10 +615,35 @@ so this is the order the code forces. Full inventory with file and line referenc
   mechanically checkable restricted treatment kind (every sentence in the treated body must already
   appear in the approved body), is blocked by nothing and can be written and tested while item 1 is
   in review. Lifting the block at `jobs.ts:608-610` is the last step, not the first.
-- **Item 3 splits.** `/cycle`'s review and publish steps duplicate what the Content room already
-  owns and can be retired immediately, dependent on nothing (**3a**). Its drafting step cannot be
+- **Item 3 splits. 3a is DONE (2026-09-02, evening).** `/cycle`'s review and publish steps
+  duplicated what the Content room already owns and were retired: steps 4 and 5 are gone from
+  `.claude/skills/cycle/SKILL.md`, the wrap-up now points at the Content room, a "Retired steps"
+  note records why so they are not re-added, and `README.md` and `CLAUDE.md`'s pipeline table no
+  longer claim `/cycle` reviews or publishes. Its drafting step is deliberately untouched (**3b**,
+  still held). Its drafting step cannot be
   retired until Content can do what `/atomize` does, so **3b depends on the item 5 port** —
   retiring drafting first would delete the only working path.
+- **Item 6 is VERIFIED (2026-09-02, evening) — no code change needed, two findings.** Media type
+  *is* auto-selected per source with a stated reason, pre-checked in the GUI (`page.ts:2991` seeds
+  the media choices from the recommendations), overridable by hand, and staged behind an approval
+  gate before any renderer runs. Read live against Muxin's real essay: topic `civic-technology`,
+  recommending `static-quote-card` and `short-video-script`. **Finding 6a:** `image-carousel` can
+  never be auto-recommended for a Substack-ingested essay — the rule needs three markdown headings
+  and `htmlToText` emits none, so an ingested essay has zero by construction; the fix lives in
+  `fetch-substack.ts` and would shift every `source_lines` number, so it is recorded, not built.
+  **Finding 6b, fixed:** `GET /api/content/treatment` 400ed for every piece, because
+  `treatment.ts` called `loadData()` unbound and `loadData` requires an explicit brand. Every test
+  in `treatment.test.ts` injects data, so the 4,040-test gate never saw it. `readTreatment` now
+  takes a measurement context and refuses an unbound read by name; `serve.ts` resolves the brand
+  from the piece's own request origin, then an explicit `?brand=`, and 400s naming the missing
+  brand if neither exists. No Human Inference default.
+  Evidence: `docs/evidence-lane-b-2026-09-02.md`.
+- **Item 4 is BLOCKED on Muxin, not on design (2026-09-02, evening).** The durable per-room
+  inboxes it needs are already written and waiting in held draft PRs: **#421** carries
+  `src/fiction/idea-inbox.ts` and `src/review/serve-fiction.ts` (it *is* the Fiction leg) and
+  **#423** carries `src/review/serve-charles.ts`; both also change `src/review/page.ts`. Building
+  item 4 on `main` now would duplicate that work and conflict with two rule-7 holds. It needs her
+  decision on #421/#423 first.
 - **Item 5 is its own sequence:** the platform routing gate first (it decides which variants get
   made at all), then `validate`, then the remaining seven capabilities, which are largely
   independent of one another once those two land.
@@ -629,11 +656,15 @@ so this is the order the code forces. Full inventory with file and line referenc
 | B | Item 4 (Studio Start for the other rooms), item 6 (media auto-selection live check), 3a, and the `/atomize` content-request fix below | `serve.ts`, `page.ts`, skills, verification | No overlap with lane A at all. Start item 6 first: it is verification with no code, it is cheap, and it may change item 5's scope. |
 | C | Item 5's port sequence | `jobs.ts` generation path | **Collides with lane A on the same file.** Queue C behind A, or split the generation module before starting either. |
 
-**One small independent fix worth doing early.** `/atomize` writes no `content-request.json`, which
-is the entire reason the 14 pending rows in
-`content/2026-09-02-the-world-s-broken-what-do-we-do` are invisible in Content's approve step
-(`page.ts:1616`). Making `/atomize` write one is small, depends on nothing above, and makes
-already-drafted work reviewable now instead of after the item 5 port. It belongs in lane B.
+**One small independent fix worth doing early — DONE (2026-09-02, evening).** `/atomize` wrote no
+`content-request.json`, which was the entire reason the 14 pending rows in
+`content/2026-09-02-the-world-s-broken-what-do-we-do` were invisible in Content's approve step
+(`page.ts:1616`). `src/atomize/content-request.ts` + `npm run content-request` now write one, called
+from `/atomize` SKILL.md step 8.5. Verified against the real folder: `listPieces()` through
+`page.ts`'s own filter returned **0** visible pieces before and returns that folder with its 14
+pending rows after. The request records identity, the verbatim source body and `source_lines`
+provenance, and selects no platform/media/treatment (zero derived variants) — Studio configured and
+generated none of it. Evidence: `docs/evidence-lane-b-2026-09-02.md`.
 
 **Rule 7 split.** Lane A and lane C change what future runs generate: content-generation LOGIC,
 each needing a draft PR carrying an old-versus-new content sample, not a self-vet merge. Lane B is
