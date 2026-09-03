@@ -32,6 +32,7 @@
     "new-content": "tsx src/atomize/new-content.ts",
     "new-notes": "tsx src/atomize/new-notes.ts",
     "validate": "tsx src/atomize/validate.ts",
+    "content-request": "tsx src/atomize/content-request.ts",
     "render": "tsx src/video/render.ts",
     "card": "tsx src/video/card.ts",
     "script:draft": "tsx src/video/script.ts",
