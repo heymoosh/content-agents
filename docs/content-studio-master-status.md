@@ -119,9 +119,13 @@ what has been verified, and what remains.
      The existing `superRefine` is what actually requires an account for any provider a platform
      routes to, so partial keys were always the intent. It is the only enum-keyed record in `src/`.
   Both fixes are schema corrections, not content-generation logic, so rule 7 does not hold them.
-  The lesson for the dependabot lane: **a major version bump merged green on hosted CI while the
-  local gate was red.** Hosted CI did not run, or did not run this. Until that is understood, treat
-  a dependabot major as needing a local `npm ci && npm run check` before it merges, not after.
+  The lesson for the dependabot lane, now traced to its cause: **`.github/workflows/ci.yml` is
+  `on: workflow_dispatch:` only.** Hosted CI never runs on a PR — the sole automatic check is
+  `gitleaks`, which is a secret scan and reads no test. That is deliberate (the workflow says so:
+  the local gate is the merge gate, and CLAUDE.md rule 7 calls hosted CI manual/advisory), and it
+  works fine for agent-opened PRs, which run `npm run check` locally before merging. **Dependabot
+  PRs do not.** Nothing at all gates them, which is exactly how #430 landed red. Until that is
+  closed, a dependabot major needs a local `npm ci && npm run check` *before* it merges.
 - **Repo state cleanup (2026-09-02, night):** the branch was pushed to origin (66 commits that had
   existed only on this disk), and `npm run check` passed unsandboxed at **4040 tests / 484 suites /
   0 failures** as the merge proof. Branch hygiene: every local branch was tested for containment
