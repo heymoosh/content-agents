@@ -756,11 +756,11 @@ pending Muxin decision. It preserves missing evidence and non-qualified
 comments, never claims demand, includes no comment body in the projection, and
 does not create a Venture artifact or write to Signals.
 
-### `outcome_ledger` (scaffolded; append-only persistence boundary exists)
+### `outcome_ledger` (implemented for reviewed local ingestion and Signals reads)
 
 `src/grow/outcome-ledger.ts` stores normalized funnel events and business
 outcomes as append-only JSONL facts. Each row keeps its outcome family,
-lineage, evidence refs, collection window, attribution confidence, and
+canonical brand identity, lineage, evidence refs, collection window, attribution confidence, and
 revision link when a later row supersedes an earlier fact. Unknown attribution
 is represented explicitly with a null content item and a reason. The ledger
 rejects post bodies, model outputs, rankings, and winner claims; it does not
@@ -773,6 +773,20 @@ The pure `appendOutcomeRow`/`appendOutcomeLedger` functions are the separate
 append-only persistence seam; the CLI itself does not write a ledger.
 Persistence remains separate from the human decision to interpret or adopt a
 result.
+
+`src/ingest/outcomes.ts` and `npm run ingest:outcomes -- --brand <brand> --input <file>` are the
+reviewed local write boundary. They require an explicit canonical brand, validate every row before
+one cross-process-locked batch append, and leave the ledger unchanged if any row conflicts or is not
+ready. The Studio outcome-family read consumes the same canonical operational ledger, applies
+non-destructive revisions, excludes unassigned history, and exposes landing visits, opt-ins, and
+separate business-event counts only within the selected brand. This is an explicit import seam, not
+a live landing-page, payment-provider, or CRM connector.
+Imported facts must use a fact-bearing lifecycle status (`measured`, `observed`, `reported`,
+`verified`, `current`, or `corrected`). Landing-visit and opt-in rows shown as counts use
+`metric: event_count`, an event unit, and a non-negative integer value; exact attributed rate rows
+remain available to Experiment but never render as event counts. Null event counts and draft/rejected
+rows cannot be rendered as counts. Ledger-wide duplicate or revision corruption fails the read, while structurally
+valid legacy rows without a brand remain visibly excluded from every selected-brand measurement.
 
 ### `grow_learning_bundle` (scaffolded; side-effect-free feed-context join exists)
 
@@ -918,6 +932,29 @@ copied into Muxin's body. A common hook may be adapted as a mad-lib template
 around Muxin's original claim, experience, example, evidence, and point of
 view. The template supplies a structure, not a creator's body or signature
 wording.
+
+### Reviewed mechanism recommendation boundary
+
+The first Content recommendation consumer is deliberately narrower than
+general pattern readiness. `src/review/reviewed-mechanism-recommendations.ts`
+recognizes the retained used-to-think/now `research-dossier-v2` hypothesis only
+after `validateUsableResearchDossier` replays its canonical, digest-bound Muxin
+review. It emits a `belief-shift` recommendation only when the exact approved
+cut contains a first-person prior belief before a first-person current belief.
+
+`authorizeGuiContentRequest` removes every client-supplied
+`research-dossier:` row, recomputes canonical evidence from that authoritative
+cut, and refuses `belief-shift` when no match exists. Whole-source text, a
+browser claim, an unrelated cross-room source, a tampered digest, or a
+non-hypothesis disposition cannot authorize the treatment. The persisted
+reason retains the hypothesis and no-winner boundary. It is never evidence
+that the mechanism improves performance, and every eligible selection remains
+Muxin-overridable. Generation independently replays the canonical dossier and
+requires the persisted evidence to match before starting a job or writing an
+artifact. Draft parsing additionally requires every output sentence to be an
+exact sentence from the cited approved source lines and requires the old belief
+to precede the current belief. The blind cold-feed pass must return that
+body byte-for-byte, so prompt compliance is not the output authority.
 
 ### `platform-treatment-blueprint-v1` (scaffolded; explicit body-free overlay)
 

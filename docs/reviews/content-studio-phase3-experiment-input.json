@@ -69,7 +69,7 @@
       "mechanism": "signals-science-agent-v1",
       "engine": "codex",
       "evidenceDigest": "sha256:74682d099526a6d9608e440f851d249c2220d8cffff00e9201430d972e126425",
-      "promptDigest": "sha256:1984731c73a346b6b7782aae883af8dc4feacd77e34b02ce9ded6d9a85050edb",
+      "promptDigest": "sha256:4ea52f5bb2354620f35ee609d2bf083986fe44325a8457f5e276491f715d3498",
       "responseDigest": "sha256:422f18f25a090b92ef582873b9b53d3d978bc31c77cf3c9a8b538e85628f49ab"
     }
   },

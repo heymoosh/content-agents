@@ -69,11 +69,16 @@ test("selected Outreach is a lightweight yes-or-no message workspace", () => {
   assert.match(html, /details[^>]+class="outreach-why"/);
 });
 
-test("Outreach does not advertise a Gmail send path", () => {
+test("selected Outreach exposes Gmail only when the exact approved account is ready", () => {
   const html = renderSelectedOutreachComposer({ dir: "outreach/leads/good", kind: "client", classification: "greenfield" }, {
     account: "muxin.li.pro@gmail.com", authenticated: true, sendPermission: true,
   });
-  assert.doesNotMatch(html, /Gmail|Connect Gmail|outreach-send/);
+  assert.match(html, /Send with Gmail|outreach-send/);
   assert.match(html, /outreach-copy/);
   assert.match(html, /outreach-mark-sent/);
+
+  const unavailable = renderSelectedOutreachComposer({ dir: "outreach/leads/good", kind: "client", classification: "greenfield" }, {
+    account: "other@example.com", authenticated: true, sendPermission: true,
+  });
+  assert.doesNotMatch(unavailable, /Send with Gmail|outreach-send/);
 });

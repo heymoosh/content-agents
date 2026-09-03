@@ -124,6 +124,12 @@ export const EXPENSIVE_ROUTES = [
   "/api/notes",
 ];
 
+/** Model-backed writes that share a pathname with a safe read and therefore need method scoping. */
+export const EXPENSIVE_REQUESTS = [
+  "POST /api/fiction/inbox",
+  "POST /api/fiction/inbox/clarify",
+] as const;
+
 export type Status = "pass" | "fail" | "blocked";
 
 export type Result = {
@@ -283,7 +289,10 @@ export type Session = {
   close: () => Promise<void>;
 };
 
-export async function openSession(port: number, options: { allowInjectedRoutes?: readonly string[] } = {}): Promise<Session> {
+export async function openSession(port: number, options: {
+  allowInjectedRoutes?: readonly string[];
+  allowInjectedRequests?: readonly string[];
+} = {}): Promise<Session> {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
@@ -305,8 +314,11 @@ export async function openSession(port: number, options: { allowInjectedRoutes?:
   // page load through the handler for no benefit, and only API routes can spawn a model job.
     await page.route("**/api/**", async (route, req: Request) => {
     const path = new URL(req.url()).pathname;
-    const explicitlyInjected = options.allowInjectedRoutes?.includes(path) === true;
-    if (!explicitlyInjected && EXPENSIVE_ROUTES.some((e) => path === e || path.startsWith(e + "/"))) {
+    const requestKey = `${req.method()} ${path}`;
+    const explicitlyInjected = options.allowInjectedRoutes?.includes(path) === true
+      || options.allowInjectedRequests?.includes(requestKey) === true;
+    if (!explicitlyInjected && (EXPENSIVE_REQUESTS.includes(requestKey as typeof EXPENSIVE_REQUESTS[number])
+      || EXPENSIVE_ROUTES.some((e) => path === e || path.startsWith(e + "/")))) {
       blockedCalls.push(`${req.method()} ${path}`);
       await route.abort();
       return;

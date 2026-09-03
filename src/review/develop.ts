@@ -291,11 +291,10 @@ export function listDevelopSessions(): DevelopSession[] {
 //   READ IN    an http(s) origin on a host that is not one of hers. Source material, not a post
 //              of hers.
 //
-// The design prototype's fourth tag, VENTURE ("handed over from the venture build"), is
-// deliberately NOT rendered. Nothing in this repo hands a Venture artifact to content/:
-// src/venture/deliver.ts writes ready-to-paste files and Substack Notes and never scaffolds a
-// content folder. A tag no source could ever earn is a claim with no read behind it
-// (docs/prototype-port-rules.md Rule 0).
+// Cross-room identity is intentionally not inferred into this three-value authorship tag. Durable
+// Fiction, Charles, and Venture requests now render their validated owning-room authority in the
+// configuration panel itself; source.md's tag remains a narrower statement about publication or
+// authorship provenance (docs/prototype-port-rules.md Rule 0).
 
 export type SourceTag = "SUBSTACK" | "YOURS" | "READ IN";
 
@@ -303,7 +302,7 @@ export const CTA_CONFIG_PATH = join(repoRoot, "config", "cta.yaml");
 
 const ctaHostsSchema = z
   .object({
-    targets: z.record(z.object({ url: z.string().optional() }).passthrough()).optional(),
+    targets: z.record(z.string(), z.object({ url: z.string().optional() }).passthrough()).optional(),
     source_fallback: z.object({ url: z.string().optional() }).passthrough().optional(),
   })
   .passthrough();

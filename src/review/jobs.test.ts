@@ -1,10 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
+import { assertCharlesDraftPolicy, captureCharlesDraftState, restoreCharlesDraftState, validateCharlesDraftMutation } from "./charles-jobs.js";
+import * as charlesJobs from "./charles-jobs.js";
+import { captureFictionStageState, importFictionStageMutation, validateFictionStageMutation, withFictionDraftStage } from "./fiction-jobs.js";
+import { buildEngineSpawn } from "./engines.js";
 
 async function waitForJobStatus(
   job: { status: string },
@@ -128,6 +132,99 @@ test("charlesDraftPrompt's reply mode tells Claude to fetch the real link, not i
   assert.match(p, /fetch it first, never invent/);
   assert.match(p, /https:\/\/example\.com\/post/);
   assert.match(p, /\(none yet\)/);
+});
+
+test("Charles draft output refuses the house-rule dash characters", () => {
+  assert.doesNotThrow(() => assertCharlesDraftPolicy("Quite. Everything is perfectly stable."));
+  for (const body of ["Everything is stable — do stop asking.", "Everything is stable – quite."]) {
+    assert.throws(
+      () => assertCharlesDraftPolicy(body),
+      /em dash or en dash/i,
+    );
+  }
+});
+
+test("Charles draft mutation requires one pending mode-specific row and no other tree changes", () => {
+  const root = mkdtempSync(join(tmpdir(), "charles-draft-transaction-test-"));
+  mkdirSync(join(root, "config"), { recursive: true });
+  mkdirSync(join(root, "posts", "essays"), { recursive: true });
+  writeFileSync(join(root, "config", "persona.yaml"), "identity: Charles\n");
+  writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n");
+  const snapshot = captureCharlesDraftState(root);
+  try {
+    writeFileSync(join(root, "posts", "essays", "one.md"), "---\ntype: essay\n---\n\nClean prose.\n");
+    mkdirSync(join(root, "unexpected-empty"));
+    writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n| one | essay | posts/essays/one.md | pending | generated |\n");
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /director/i,
+    );
+    rmSync(join(root, "unexpected-empty"), { recursive: true, force: true });
+
+    chmodSync(join(root, "config", "persona.yaml"), 0o600);
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /mode|permission/i,
+    );
+    chmodSync(join(root, "config", "persona.yaml"), (snapshot as any).modes?.get("config/persona.yaml") ?? 0o644);
+
+    writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n| one | essay | posts/essays/one.md | approve | generated |\n");
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /pending/i,
+    );
+
+    writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n| one | essay | posts/essays/one.md | pending | generated — note |\n");
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /em dash or en dash/i,
+    );
+
+    writeFileSync(join(root, "review-queue.md"), "| id | type | file | status | notes |\n| one | essay | posts/essays/one.md | pending | generated |\n| two | essay | posts/essays/two.md | pending | generated |\n");
+    writeFileSync(join(root, "posts", "essays", "two.md"), "---\ntype: essay\n---\n\nAlso clean.\n");
+    assert.throws(
+      () => validateCharlesDraftMutation(snapshot, "essay", root),
+      /exactly one/i,
+    );
+
+    writeFileSync(join(root, "config", "persona.yaml"), "tampered\n");
+    assert.throws(() => (charlesJobs as any).assertCharlesStateUnchanged(snapshot, captureCharlesDraftState(root)), /changed while the draft was running/i);
+    restoreCharlesDraftState(snapshot, root);
+    assert.equal(readFileSync(join(root, "config", "persona.yaml"), "utf8"), "identity: Charles\n");
+    assert.equal(readFileSync(join(root, "review-queue.md"), "utf8"), "| id | type | file | status | notes |\n");
+    assert.equal(existsSync(join(root, "posts", "essays", "one.md")), false);
+    assert.equal(existsSync(join(root, "posts", "essays", "two.md")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Charles managed staging always removes its workspace when the task throws", async () => {
+  let stagedRoot = "";
+  await assert.rejects(
+    (charlesJobs as any).withCharlesDraftStage(async (stage: { root: string; charlesRoot: string }) => {
+      stagedRoot = stage.root;
+      assert.equal(existsSync(join(stage.charlesRoot, "config", "persona.yaml")), true);
+      throw new Error("synthetic staged failure");
+    }),
+    /synthetic staged failure/,
+  );
+  assert.ok(stagedRoot);
+  assert.equal(existsSync(stagedRoot), false);
+});
+
+test("Charles atomic queue replacement preserves a non-default existing mode", () => {
+  const root = mkdtempSync(join(tmpdir(), "charles-queue-mode-test-"));
+  const path = join(root, "review-queue.md");
+  writeFileSync(path, "before\n");
+  chmodSync(path, 0o600);
+  try {
+    (charlesJobs as any).writeCharlesQueueAtomically(path, Buffer.from("after\n"), 0o600);
+    assert.equal(readFileSync(path, "utf8"), "after\n");
+    assert.equal(statSync(path).mode & 0o7777, 0o600);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("enqueueCharlesDraft refuses an unknown mode and a reply with no link, before spawning anything", async () => {
@@ -343,6 +440,20 @@ test("buildClaudeSpawnArgs: permissionMode: null omits --permission-mode entirel
 
 test("buildClaudeSpawnArgs: model/tools are appended only when explicitly set", () => {
   assert.deepEqual(buildClaudeSpawnArgs("p", { model: "sonnet" }), ["-p", "p", "--permission-mode", "acceptEdits", "--model", "sonnet"]);
+});
+
+test("Claude Fiction validation can be allowed explicitly without trusting the disposable workspace", () => {
+  const built = buildEngineSpawn("claude", "draft", {
+    timeoutMs: 1_000,
+    restricted: true,
+    tools: "Bash",
+    allowedTools: "Bash(npm run story:validate -- series --chapter 2)",
+  } as never);
+  assert.deepEqual(built.args, [
+    "-p", "draft", "--restricted", "--permission-mode", "acceptEdits", "--tools", "Bash",
+    "--allowedTools", "Bash(npm run story:validate -- series --chapter 2)",
+  ]);
+  assert.equal(built.args.includes("--dangerously-skip-permissions"), false);
 });
 
 test("enqueueOutreachDraft carries the selected engine into the queued follow-up spawn", async () => {
@@ -1050,6 +1161,110 @@ test("chapterSnapshot reads every chapter's prose, and an empty series is an emp
   }
 });
 
+test("Fiction drafting runs in a disposable repo stage without git, secrets, or operational data", async () => {
+  const source = mkdtempSync(join(tmpdir(), "fiction-stage-source-"));
+  let stagedRoot = "";
+  try {
+    mkdirSync(join(source, ".git"));
+    mkdirSync(join(source, ".claude", "skills", "story"), { recursive: true });
+    mkdirSync(join(source, "config"));
+    mkdirSync(join(source, "src"));
+    mkdirSync(join(source, "stories", "series", "chapters"), { recursive: true });
+    mkdirSync(join(source, "data"));
+    mkdirSync(join(source, "node_modules"));
+    writeFileSync(join(source, ".env"), "LIVE_SECRET=never-copy\n");
+    writeFileSync(join(source, ".claude", "settings.json"), '{"permissions":{"allow":["Bash(npm run:*)"]}}\n');
+    writeFileSync(join(source, "data", "analytics.db"), "private operational data");
+    writeFileSync(join(source, "CLAUDE.md"), "rules\n");
+    writeFileSync(join(source, "package.json"), "{}\n");
+    writeFileSync(join(source, "package-lock.json"), "{}\n");
+    writeFileSync(join(source, "tsconfig.json"), "{}\n");
+    writeFileSync(join(source, "src", "validate.ts"), "export {};\n");
+    writeFileSync(join(source, "config", "fiction.yaml"), "safe: true\n");
+    writeFileSync(join(source, ".claude", "skills", "story", "SKILL.md"), "story rules\n");
+    writeFileSync(join(source, "stories", "AGENTS.md"), "fiction rules\n");
+    writeFileSync(join(source, "stories", "series", "series.yaml"), "slug: series\n");
+    writeFileSync(join(source, "stories", "series", "chapters", "chapter-01.md"), "---\nchapter: 1\n---\n\nOne.\n");
+
+    await withFictionDraftStage(async (stage) => {
+      stagedRoot = stage.root;
+      assert.equal(existsSync(join(stage.root, ".git")), false);
+      assert.equal(existsSync(join(stage.root, ".env")), false);
+      assert.equal(existsSync(join(stage.root, "data")), false);
+      assert.equal(existsSync(join(stage.root, "stories", "series", "chapters", "chapter-01.md")), true);
+      assert.equal(existsSync(join(stage.root, ".claude", "skills", "story", "SKILL.md")), true);
+      assert.equal(existsSync(join(stage.root, ".claude", "settings.json")), false, "broad project permissions must not enter the stage");
+      assert.equal(existsSync(join(stage.root, "node_modules")), true);
+    }, source);
+    assert.ok(stagedRoot);
+    assert.equal(existsSync(stagedRoot), false, "the staged repo is removed even after a successful task");
+  } finally {
+    rmSync(source, { recursive: true, force: true });
+  }
+});
+
+test("Fiction staged import creates a complete new chapter and refuses stale repass bytes", () => {
+  const root = mkdtempSync(join(tmpdir(), "fiction-live-import-"));
+  const live = join(root, "series");
+  try {
+    mkdirSync(join(live, "chapters"), { recursive: true });
+    writeFileSync(join(live, "chapters", "chapter-01.md"), "one\n");
+    const before = captureFictionStageState(live);
+    const fresh = Buffer.from("two, complete\n");
+    importFictionStageMutation(
+      { chapter: 2, relativePath: "stories/series/chapters/chapter-02.md", bytes: fresh, mode: 0o640 },
+      before,
+      live,
+    );
+    assert.deepEqual(readFileSync(join(live, "chapters", "chapter-02.md")), fresh);
+    assert.equal(statSync(join(live, "chapters", "chapter-02.md")).mode & 0o777, 0o640);
+
+    const repassBefore = captureFictionStageState(live);
+    writeFileSync(join(live, "chapters", "chapter-02.md"), "someone else changed it\n");
+    assert.throws(
+      () => importFictionStageMutation(
+        { chapter: 2, relativePath: "stories/series/chapters/chapter-02.md", bytes: Buffer.from("repass\n"), mode: 0o640 },
+        repassBefore,
+        live,
+      ),
+      /changed before staged import/i,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Fiction staged mutation accepts one next chapter or one target repass and rejects every other change", () => {
+  const root = mkdtempSync(join(tmpdir(), "fiction-stage-mutation-"));
+  try {
+    const chapters = join(root, "stories", "series", "chapters");
+    mkdirSync(chapters, { recursive: true });
+    mkdirSync(join(root, "config"));
+    writeFileSync(join(root, "config", "fiction.yaml"), "safe: true\n");
+    writeFileSync(join(chapters, "chapter-01.md"), "---\nchapter: 1\n---\n\nOne.\n");
+    const before = captureFictionStageState(root);
+
+    writeFileSync(join(chapters, "chapter-02.md"), "---\nchapter: 2\n---\n\nTwo.\n");
+    const draft = validateFictionStageMutation(before, "draft", "series", undefined, root);
+    assert.equal(draft.chapter, 2);
+    assert.equal(draft.relativePath, "stories/series/chapters/chapter-02.md");
+
+    const repassBefore = captureFictionStageState(root);
+    writeFileSync(join(chapters, "chapter-02.md"), "---\nchapter: 2\n---\n\nTwo, tightened.\n");
+    const repass = validateFictionStageMutation(repassBefore, "repass", "series", 2, root);
+    assert.equal(repass.chapter, 2);
+
+    const badBefore = captureFictionStageState(root);
+    writeFileSync(join(root, "config", "fiction.yaml"), "safe: false\n");
+    assert.throws(
+      () => validateFictionStageMutation(badBefore, "repass", "series", 2, root),
+      /must change only.*chapter-02\.md/i,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // ── Fiction dedupe identity (audit finding) ─────────────────────────────────────────────────────
 // The dedupe used to match ANY queued or running fiction-draft job for the series, so a queued
 // first pass swallowed a chapter-3 second pass: the route answered ok with that unrelated job and
@@ -1139,8 +1354,13 @@ test("gitStateDrift reports the whole /story step 7 at once and never offers to 
 test("stopping a queued job never spawns anything, and drain() skips it", async () => {
   jobs.length = 0;
   let taskRan = false;
+  // The first job holds the lane until the test releases it. A timer-based hold flaked under
+  // suite load: when the event loop stalled past the hold, the hold timer and the probe timer
+  // fired in one tick, the first job finished, and drain() ran the second before it was stopped.
+  let releaseLane!: () => void;
+  const laneHeld = new Promise<void>((r) => { releaseLane = r; });
   const first = runQueued("revise", "holds the lane", async () => {
-    await new Promise((r) => setTimeout(r, 60));
+    await laneHeld;
   });
   const second = runQueued("revise", "stopped before it ever ran", async () => {
     taskRan = true;
@@ -1156,6 +1376,7 @@ test("stopping a queued job never spawns anything, and drain() skips it", async 
   // The caller's promise must settle, or the HTTP request that enqueued it hangs forever.
   await assert.rejects(second, /stopped/);
 
+  releaseLane();
   await first;
   await new Promise((r) => setTimeout(r, 30));
   assert.equal(taskRan, false, "drain() finds work by status === 'queued' — a stopped job is never picked");
@@ -1209,6 +1430,21 @@ test("stopping a task-closure job with no subprocess still settles as stopped an
   release!();
   await new Promise((r) => setTimeout(r, 30));
   assert.equal(job.status, "stopped", "its late result is discarded, not rendered as a green done");
+  jobs.length = 0;
+});
+
+test("a Venture delivery job cannot report stopped while its side effects may continue", async () => {
+  jobs.length = 0;
+  let release: (() => void) | null = null;
+  const run = runQueued("venture-delivery", "live delivery", async () => {
+    await new Promise<void>((r) => { release = r; });
+  });
+  const job = jobs.find((j) => j.label === "live delivery")!;
+  await waitForJobStatus(job, "running");
+  assert.deepEqual(stopJob(job.id), { error: "delivery cannot be stopped after it is queued; wait for its recorded outcome" });
+  assert.equal(job.status, "running");
+  release!();
+  await run;
   jobs.length = 0;
 });
 

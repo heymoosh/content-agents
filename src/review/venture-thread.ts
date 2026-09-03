@@ -121,15 +121,14 @@ export interface CardFinding {
  * there is only ever one copy of "what may happen next".
  *
  * Every id maps to a route that exists. venture-schema-contract.md §2.2 lists three actions, and
- * two of them still do not exist and are deliberately absent rather than drawn dead:
- *   Retry — no route; re-delivery goes through deliverVenture, which is out of scope by decision.
+ * Retry is routed through the bounded delivery job and offered only for retryable failures.
  *   Cancel / Give up — these ARE the discard route, so they render as discard under their own label
  *                      rather than as a fourth verb with nothing behind it.
  * Edit used to sit in that list. It has a route now (POST :slug/artifacts/:id/body), and it is
  * offered only where editArtifactBody would actually accept it — see `editable` above, whose
  * predicate is a mirror of that function's, never a second copy of the decision.
  */
-export const CARD_ACTION_IDS = ["approve", "discard", "restore", "retract", "confirm-live", "failed", "edit"] as const;
+export const CARD_ACTION_IDS = ["approve", "discard", "restore", "retract", "confirm-live", "failed", "edit", "deliver", "retry-delivery"] as const;
 
 export interface CardAction {
   id: (typeof CARD_ACTION_IDS)[number];
@@ -482,7 +481,7 @@ export function cardState(a: Pick<VentureArtifact, "editorial_status" | "deliver
  * be refused.
  */
 export function cardActions(
-  a: Pick<VentureArtifact, "editorial_status" | "delivery_status" | "delivery_mode" | "artifact_kind" | "body_path">,
+  a: Pick<VentureArtifact, "editorial_status" | "delivery_status" | "delivery_mode" | "artifact_kind" | "body_path" | "failure">,
   minEvidence: Record<string, "url" | "agent" | "attestation" | null>
 ): CardAction[] {
   const { editorial_status: ed, delivery_status: dl } = a;
@@ -498,9 +497,10 @@ export function cardActions(
   // approved
   if (dl === "live_confirmed") return [{ id: "retract", label: "It came down", destructive: true }];
   if (dl === "failed") {
-    // "Retry" has no route -- re-delivery runs through deliverVenture, deliberately out of scope.
-    // §2.2's "Give up" is the discard route wearing the label this state calls for.
-    return [{ id: "discard", label: "Give up on it", destructive: true }];
+    return [
+      ...(a.delivery_mode === "app" && a.failure?.retryable ? [{ id: "retry-delivery" as const, label: "Retry delivery" }] : []),
+      { id: "discard", label: "Give up on it", destructive: true },
+    ];
   }
   if (dl === "handed_off") {
     const out: CardAction[] = [];
@@ -510,12 +510,15 @@ export function cardActions(
       const min = minEvidence[a.artifact_kind] ?? null;
       if (min === "url" || min === "attestation") out.push({ id: "confirm-live", label: "It is live", proof: min });
       out.push({ id: "failed", label: "It did not work" });
+    } else if (a.delivery_mode === "app") {
+      out.push({ id: "deliver", label: "Check delivery" });
     }
     out.push({ id: "discard", label: "Cancel it", destructive: true });
     return out;
   }
   // approved x ready / not_applicable
   return [
+    ...(dl === "ready" && a.delivery_mode !== "none" ? [{ id: "deliver" as const, label: "Deliver" }] : []),
     ...edit,
     { id: "discard", label: "Put it aside", destructive: true },
     { id: "restore", label: "Back to drafts" },

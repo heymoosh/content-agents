@@ -136,6 +136,12 @@ function weekKey(y: number, mo: number, d: number, weekday: number): string {
   return new Date(Date.UTC(y, mo - 1, d - back)).toISOString().slice(0, 10);
 }
 
+/** LA calendar day (YYYY-MM-DD) of an instant, the ledger's `day` key. */
+export function laDayKey(d: Date): string {
+  const { year, month, day } = laParts(d);
+  return dayKey(year, month, day);
+}
+
 export function fmtLa(d: Date): string {
   return (
     new Intl.DateTimeFormat("en-US", {
@@ -247,6 +253,29 @@ export function releaseClaims(toRelease: Claim[]): { removed: number; removedCla
   if (removedClaims.length > 0) writeLedgerAtomic(remaining);
   return { removed: removedClaims.length, removedClaims };
   });
+}
+
+/**
+ * Move one claim to a new time in a single locked rewrite: the old identity is released and the
+ * new one appended, so a crash between the two steps cannot leave both or neither. `to.day` is the
+ * LA calendar day of `to.time`, computed by the caller the same way claimSlots labels days.
+ */
+export function moveClaim(from: Claim, to: { time: string; day: string }, opts: { dryRun?: boolean; schedule?: Record<string, PlatformSchedule> } = {}): { moved: boolean; claim: Claim } {
+  const claim: Claim = { ...from, time: to.time, day: to.day };
+  const apply = (): { moved: boolean; claim: Claim } => {
+    const claims = readLedger();
+    const index = claims.findIndex((c) => claimKey(c) === claimKey(from));
+    // The destination day must still have room under the platform's per-day cap, not counting the
+    // claim being moved; an explicit time is Muxin's choice but never a second post on a full day.
+    const maxPerDay = (opts.schedule ?? loadSchedule())[from.platform]?.maxSlotsPerDay ?? 1;
+    const taken = claims.filter((c, i) => i !== index && c.platform === from.platform && c.day === to.day).length;
+    if (taken >= maxPerDay) throw new Error(`${from.platform} already has ${taken} post${taken === 1 ? "" : "s"} claimed on ${to.day} (max ${maxPerDay}); pick another day`);
+    if (opts.dryRun) return { moved: index !== -1, claim };
+    if (index === -1) claims.push(claim); else claims.splice(index, 1, claim);
+    writeLedgerAtomic(claims);
+    return { moved: index !== -1, claim };
+  };
+  return opts.dryRun ? apply() : withLedgerLock(apply);
 }
 
 function appendLedger(claims: Claim[]): void {

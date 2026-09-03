@@ -3,12 +3,12 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { resolveSeriesDir, chapterPath, readChapter, pad2, characterSheets } from "./_series.js";
 import { buildContext } from "./context.js";
 import { buildEngineSpawn, ENGINE_COMMANDS, ENGINE_LABELS, isEngine, type Engine } from "../review/engines.js";
+import { configuredDataPathOrLegacy } from "../runtime/data-root.js";
 
 // Read a fresh chapter draft against the series canon and say what holds and what breaks.
 // Nothing in src/fiction/ did this before: canon.ts is a write-only ledger (it appends a summary
@@ -17,7 +17,7 @@ import { buildEngineSpawn, ENGINE_COMMANDS, ENGINE_LABELS, isEngine, type Engine
 //
 //   npx tsx src/fiction/continuity.ts <series> [--chapter N]
 //
-// It writes its findings to a JSON report OUTSIDE git (~/.content-agents/fiction-continuity/),
+// It writes its findings to the repository-scoped operational data root, outside git,
 // the same convention the GUI's job logs and Venture intake drafts already follow: this is a
 // reading of a draft in progress, not canon, and canon.md stays the only ledger.
 //
@@ -30,7 +30,7 @@ import { buildEngineSpawn, ENGINE_COMMANDS, ENGINE_LABELS, isEngine, type Engine
 const execFileP = promisify(execFile);
 const CHECK_TIMEOUT_MS = 240_000;
 
-export const CONTINUITY_ROOT = join(homedir(), ".content-agents", "fiction-continuity");
+export const CONTINUITY_ROOT = configuredDataPathOrLegacy("fiction-continuity");
 
 export type ContinuityKind = "conflict" | "hold";
 
@@ -53,6 +53,7 @@ export interface ContinuityItem {
 export interface ContinuityReport {
   series: string;
   chapter: number;
+  engine: Engine | null;
   checkedAt: string;
   rulesRead: number;
   holds: ContinuityItem[];
@@ -67,7 +68,8 @@ export function readContinuityReport(slug: string, chapter: number, root: string
   const p = continuityReportPath(slug, chapter, root);
   if (!existsSync(p)) return null;
   try {
-    return JSON.parse(readFileSync(p, "utf8")) as ContinuityReport;
+    const report = JSON.parse(readFileSync(p, "utf8")) as ContinuityReport;
+    return { ...report, engine: isEngine(report.engine) ? report.engine : null };
   } catch {
     return null; // a half-written or hand-mangled report reads as "not checked yet", never a crash
   }
@@ -300,6 +302,7 @@ export async function runContinuityCheck(seriesArg: string, chapter: number, opt
   const report: ContinuityReport = {
     series: slug,
     chapter,
+    engine,
     checkedAt: new Date().toISOString(),
     // The model's own count is a claim, not a measurement. Fall back to what this repo can
     // actually count (the character sheets it was handed) rather than showing an invented number.

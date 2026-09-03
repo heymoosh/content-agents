@@ -6,6 +6,7 @@ import { repoRoot } from "../db/db.js";
 import { dataPath } from "../runtime/data-root.js";
 import type { SignalsRecommendationType } from "./signals-decisions.js";
 import { withFileLock } from "../runtime/file-lock.js";
+import { isBrandId, type BrandId } from "../identity/brand.js";
 
 export type SignalsDelta =
   | { kind: "cadence"; file: "config/platforms.yaml"; platform: string; field: "posts_per_week"; before: number; after: number }
@@ -14,6 +15,8 @@ export type ProposalStatus = "pending" | "approved" | "applying" | "rejected" | 
 
 export interface SignalsChangeProposal {
   id: string;
+  /** New proposals carry the caller's canonical brand scope; legacy rows are unassigned. */
+  brandId?: BrandId;
   recommendation: { type: SignalsRecommendationType; title: string; rationale: string };
   status: ProposalStatus;
   configVersion: string;
@@ -112,16 +115,17 @@ export function readSignalsProposals(path = SIGNALS_PROPOSALS_PATH): SignalsChan
   return [...state.values()].sort((a, b) => b.proposedAt.localeCompare(a.proposedAt));
 }
 
-export function proposeSignalsChange(input: { type: SignalsRecommendationType; title: string; rationale: string; actor: "muxin" }, opts: { root?: string; path?: string; now?: string } = {}): SignalsChangeProposal {
+export function proposeSignalsChange(input: { type: SignalsRecommendationType; title: string; rationale: string; actor: "muxin"; brandId?: BrandId }, opts: { root?: string; path?: string; now?: string } = {}): SignalsChangeProposal {
+  if (input.brandId !== undefined && !isBrandId(input.brandId)) throw new Error("a Signals proposal needs a valid brand id");
   const root = opts.root ?? repoRoot, path = opts.path ?? SIGNALS_PROPOSALS_PATH, now = opts.now ?? new Date().toISOString();
   return withFileLock(`${path}.lock`, () => {
     const version = signalsConfigVersion(root);
-    const existing = readSignalsProposals(path).find(p => p.recommendation.type === input.type && p.recommendation.title === input.title && p.configVersion === version && ["pending", "approved", "applied", "blocked"].includes(p.status));
+    const existing = readSignalsProposals(path).find(p => p.brandId === input.brandId && p.recommendation.type === input.type && p.recommendation.title === input.title && p.configVersion === version && ["pending", "approved", "applied", "blocked"].includes(p.status));
     if (existing) return existing;
-    for (const old of readSignalsProposals(path).filter(p => p.recommendation.type === input.type && p.recommendation.title === input.title && ["pending", "approved"].includes(p.status)))
+    for (const old of readSignalsProposals(path).filter(p => p.brandId === input.brandId && p.recommendation.type === input.type && p.recommendation.title === input.title && ["pending", "approved"].includes(p.status)))
       appendUnlocked({ event: "superseded", proposalId: old.id, actor: "system", at: now, evidence: `superseded by a proposal against config ${version}` }, path);
     const delta = currentDelta(input.title.trim(), root);
-    const proposal: SignalsChangeProposal = { id: randomUUID(), recommendation: { type: input.type, title: input.title.trim(), rationale: input.rationale.trim() }, status: delta ? "pending" : "blocked", configVersion: version, delta, blockedReason: delta ? null : "Recommendation is outside the current allowlist. Supported forms are routing and posts/week cadence changes.", proposedBy: input.actor, proposedAt: now };
+    const proposal: SignalsChangeProposal = { id: randomUUID(), ...(input.brandId ? { brandId: input.brandId } : {}), recommendation: { type: input.type, title: input.title.trim(), rationale: input.rationale.trim() }, status: delta ? "pending" : "blocked", configVersion: version, delta, blockedReason: delta ? null : "Recommendation is outside the current allowlist. Supported forms are routing and posts/week cadence changes.", proposedBy: input.actor, proposedAt: now };
     appendUnlocked({ event: delta ? "proposed" : "blocked", proposalId: proposal.id, actor: input.actor, at: now, evidence: delta ? "intent recorded; exact allowlisted delta previewed" : proposal.blockedReason!, proposal }, path);
     return proposal;
   });
@@ -190,6 +194,7 @@ export function applySignalsProposal(id: string, actor: "muxin", opts: { root?: 
   if (p.status === "applied") return p;
   if (p.status === "apply_failed") throw new Error("incomplete apply recovery found a config conflict; create a new proposal");
   if (p.status !== "approved" || !p.delta) throw new Error("only an approved allowlisted proposal can be applied");
+  if (p.brandId !== undefined && p.brandId !== "human-inference") throw new Error("brand-specific configuration is not available; refusing to mutate shared configuration");
   if (signalsConfigVersion(root) !== p.configVersion) throw new Error("configuration changed since preview; create a new proposal");
   append({ event: "apply_intent", proposalId: id, actor, at: opts.now ?? new Date().toISOString(), evidence: `write-ahead intent for exact preview in ${p.delta.file}`, configVersion: p.configVersion, delta: p.delta }, path);
   updateConfig(p.delta, root);

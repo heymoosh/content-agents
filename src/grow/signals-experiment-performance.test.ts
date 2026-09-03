@@ -52,6 +52,26 @@ describe("Signals per-experiment performance view", () => {
     assert.equal(view.autoWinner, false);
   });
 
+  test("does not join identical provider identity from another account", () => {
+    const facts = performanceSubject.buildMetricFactsFromProviderAnalytics({
+      experimentId: "acct-bound", variantIds: ["variant:acct"],
+      requestedMetrics: [{ family: "attention", metric: "impressions" }],
+      publications: [{ rowId: "variant:acct", state: "published", providerObjectId: "same-post", providerAccountId: "human-inference/typefully", eventId: "pub-1" }],
+      analytics: [{ id: "foreign", platformPostId: "same-post", url: null, providerAccountId: "charles/typefully", capturedAt: "2026-08-30T00:00:00Z", impressions: 100, replies: 0, clicks: 0, newFollows: 0 }],
+    });
+    assert.deepEqual(facts, []);
+  });
+
+  test("does not join identical provider account identity from another brand", () => {
+    const facts = performanceSubject.buildMetricFactsFromProviderAnalytics({
+      experimentId: "brand-bound", variantIds: ["variant:brand"],
+      requestedMetrics: [{ family: "attention", metric: "impressions" }],
+      publications: [{ rowId: "variant:brand", state: "published", providerObjectId: "same-post", providerAccountId: "shared-account", brandId: "human-inference", eventId: "pub-1" }],
+      analytics: [{ id: "foreign", platformPostId: "same-post", url: null, providerAccountId: "shared-account", brandId: "charles", capturedAt: "2026-08-30T00:00:00Z", impressions: 100, replies: 0, clicks: 0, newFollows: 0 }],
+    });
+    assert.deepEqual(facts, []);
+  });
+
   test("builds a body-free Signals interpretation prompt with the original decision rule", () => {
     const experiment = record("ready", true, 12);
     const recommendation = recommendationFor("ready");
@@ -98,6 +118,7 @@ describe("Signals per-experiment performance view", () => {
       "analytics:guardrail-control", "analytics:guardrail-treatment", "analytics:primary-control-1",
       "analytics:primary-control-2", "analytics:primary-treatment-1", "analytics:primary-treatment-2",
     ]);
+    assert.deepEqual(row.primaryOutcomeRefs, { treatment: [], control: [] }, "provider observations never masquerade as outcome-ledger evidence");
   });
 
   test("keeps a one-sided or guardrail-free result collecting", () => {

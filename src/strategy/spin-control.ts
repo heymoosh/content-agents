@@ -2,6 +2,7 @@ import { existsSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb, repoRoot } from "../db/db.js";
+import { parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 import {
   CONTROL_RUN_SOURCE,
   PILLARS,
@@ -155,10 +156,11 @@ export function nextControlRun(
 // CONTROL_RUN_SOURCE rows only — the mirror image of loadData()'s exclusion, so a control run's
 // engagement is trackable as its own bucket without ever touching the main pillar/platform cells.
 // `db` is injectable for tests (see routing-drift.ts's hasNoSpinControl for the same pattern).
-export function loadControlData(db: ReturnType<typeof openDb>, range?: WindowRange): Map<string, Cell> {
+export function loadControlData(db: ReturnType<typeof openDb>, range?: WindowRange, context?: StrategyMeasurementContext): Map<string, Cell> {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const dateClause = range ? `AND p.posted_at >= ? AND p.posted_at < ?` : "";
   const dateParams = range ? [new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()] : [];
-  const rows = queryEngagementCells(db, "AND p.source = ?", [CONTROL_RUN_SOURCE], dateClause, dateParams);
+  const rows = queryEngagementCells(db, "AND p.source = ?", [CONTROL_RUN_SOURCE], dateClause, dateParams, context);
 
   const cells = new Map<string, Cell>();
   for (const r of rows) cells.set(`${r.platform}|${r.pillar}`, { n: r.n, avg_eng: r.avg_eng });
@@ -202,7 +204,7 @@ function main() {
   if (args.includes("--coverage")) {
     const db = openDb();
     try {
-      const cells = loadControlData(db);
+      const cells = loadControlData(db, undefined, parseStrategyMeasurementContext());
       console.log(formatControlCoverage(cells, cfg));
     } finally {
       db.close();

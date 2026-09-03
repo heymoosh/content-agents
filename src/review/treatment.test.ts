@@ -285,6 +285,43 @@ test("no pillar → an explicit no-pillar state, null fit, and reuse/slots still
   }
 });
 
+test("reviewed source-matched mechanism evidence is returned separately from source-fit distribution", () => {
+  const f = folderWith(null);
+  try {
+    writeFileSync(join(f.dir, "source.md"), "I used to think reach was the goal. Now I believe replies are the useful signal.\n");
+    const t = readTreatment("slug", base({
+      folder: f.dir,
+      mechanismBody: "I used to think reach was the goal. Now I believe replies are the useful signal.",
+      recommendMechanisms: (body) => [{
+        option: "belief-shift", kind: "treatment", recommended: true,
+        reason: `Reviewed hypothesis matched: ${body.slice(0, 15)}`,
+        source: `research-dossier:sha256:${"a".repeat(64)}`,
+      }],
+    }));
+    assert.equal(t.mechanismRecommendations[0]?.option, "belief-shift");
+    assert.equal(t.mechanismRecommendations[0]?.kind, "treatment");
+    assert.equal(t.distribution.evidence, "source-fit");
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("whole-source text cannot authorize a reviewed mechanism without a server-read approved cut", () => {
+  const f = folderWith(null);
+  try {
+    writeFileSync(join(f.dir, "source.md"), "I used to think reach was the goal. Now I believe replies matter more.\n");
+    let called = false;
+    const t = readTreatment("slug", base({
+      folder: f.dir,
+      recommendMechanisms: () => { called = true; return []; },
+    }));
+    assert.deepEqual(t.mechanismRecommendations, []);
+    assert.equal(called, false);
+  } finally {
+    f.cleanup();
+  }
+});
+
 test("a bad slug is rejected before any filesystem read", () => {
   assert.throws(() => readTreatment("../etc", base()), /bad slug/);
   assert.throws(() => readTreatment("a/b", base()), /bad slug/);

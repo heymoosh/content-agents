@@ -35,8 +35,21 @@ describe("Signals science agent experiment recommendation", () => {
     assert.match(built.prompt, /genuine former belief and correction/i);
     assert.match(built.prompt, /Never read or infer Venture survey/i);
     assert.match(built.prompt, /attention, conversation, audience, and business outcomes separate/i);
+    assert.match(built.prompt, /`evidenceRefs` may contain only exact values from `evidence\[\]\.id`/i);
+    assert.match(built.prompt, /never copy `inputContext\.sourceRefs` into `evidenceRefs`/i);
     assert.doesNotMatch(built.prompt, /candidate body/i);
     assert.match(built.evidenceDigest, /^sha256:/); assert.match(built.promptDigest, /^sha256:/);
+  });
+
+  test("can plan from an already-reviewed Venture learning recommendation without opening raw Venture evidence", () => {
+    const built = buildSignalsExperimentSciencePrompt(input(), { source: "venture-reviewed-learning" });
+    assert.match(built.prompt, /accepted Venture learning recommendation/i);
+    assert.match(built.prompt, /do not request or infer raw survey, response, or private message content/i);
+    assert.doesNotMatch(built.prompt, /Never read or infer Venture survey findings/);
+
+    const result = parseSignalsExperimentScienceResult(recommended, input(), "codex", { source: "venture-reviewed-learning" });
+    assert.equal(result.status, "recommended");
+    if (result.status === "recommended") assert.equal(result.recommendation.provenance.promptDigest, built.promptDigest);
   });
 
   test("parses a bounded recommendation with exact evidence and model provenance", () => {
@@ -47,6 +60,14 @@ describe("Signals science agent experiment recommendation", () => {
     assert.equal(result.recommendation.hypothesis.includes("will increase"), true);
     assert.equal(result.recommendation.provenance.mechanism, "signals-science-agent-v1");
     assert.match(result.recommendation.provenance.responseDigest, /^sha256:/);
+  });
+
+  test("accepts one whole-response JSON fence but rejects surrounding prose", () => {
+    assert.equal(parseSignalsExperimentScienceResult(`\`\`\`json\n${recommended}\n\`\`\``, input(), "claude").status, "recommended");
+    assert.throws(
+      () => parseSignalsExperimentScienceResult(`Here is the result:\n\`\`\`json\n${recommended}\n\`\`\``, input(), "claude"),
+      /invalid JSON/i,
+    );
   });
 
   test("allows an honest no-experiment result and rejects invented evidence or candidates", () => {

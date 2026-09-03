@@ -3,16 +3,20 @@ import { dirname } from "node:path";
 import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
 import type { AppliedExperimentContentHandoff, ExperimentPlan, ExperimentPlanDecision } from "../grow/experiment-content-handoff.js";
+import { assertVentureExperimentPlanIntegrity, type VentureExperimentContext, type VentureExperimentPlan } from "./venture-experiment-handoff.js";
+import { brandForOrigin, isBrandId, type BrandId } from "../identity/brand.js";
 
 export const SIGNALS_EXPERIMENT_PLANS_PATH = migrateLegacyDataFile(["signals-experiment-plans.jsonl"]);
 
 type PlanEvent =
-  | { kind: "proposal"; id: string; at: string; plan: ExperimentPlan }
+  | { kind: "proposal"; id: string; at: string; plan: ExperimentPlan; ventureContext?: VentureExperimentContext; ventureEnvelopeDigest?: string }
   | { kind: "decision"; id: string; at: string; decision: ExperimentPlanDecision }
   | { kind: "content-handoff"; id: string; at: string; handoff: Pick<AppliedExperimentContentHandoff, "experimentId" | "generatedIds" | "copyApproval"> };
 
 interface FoldedExperimentPlan {
   plan: ExperimentPlan;
+  ventureContext: VentureExperimentContext | null;
+  ventureEnvelopeDigest: string | null;
   decision: ExperimentPlanDecision | null;
   handoff: Pick<AppliedExperimentContentHandoff, "experimentId" | "generatedIds" | "copyApproval"> | null;
 }
@@ -20,6 +24,7 @@ interface FoldedExperimentPlan {
 export interface SignalsExperimentPlanRead {
   readonly experimentId: string;
   readonly contentRequestId: string;
+  readonly brandId: BrandId | null;
   readonly confidence: ExperimentPlan["recommendation"]["confidence"];
   readonly evidenceRefs: string[];
   readonly observation: string;
@@ -44,6 +49,7 @@ export interface SignalsExperimentPlanRead {
   readonly generatedIds: string[];
   readonly sourceBodyIncluded: false;
   readonly generatedCopyIncluded: false;
+  readonly ventureContext: VentureExperimentContext | null;
 }
 
 function readEvents(path: string): PlanEvent[] {
@@ -58,9 +64,15 @@ function fold(path: string): Map<string, FoldedExperimentPlan> {
   const result = new Map<string, FoldedExperimentPlan>();
   for (const event of readEvents(path)) {
     if (event.kind === "proposal") {
+      // Old ledgers predate brand binding. Recover only a durable origin; generic Studio
+      // records remain unassigned and are never eligible for measurement/actions.
+      if (!isBrandId((event.plan as Partial<ExperimentPlan>).brandId)) {
+        const recovered = brandForOrigin(event.plan.contentRequest?.origin);
+        event.plan = { ...event.plan, brandId: recovered } as ExperimentPlan;
+      }
       const prior = result.get(event.id);
-      if (prior && prior.plan.digest !== event.plan.digest) throw new Error(`conflicting experiment plan ${event.id}`);
-      if (!prior) result.set(event.id, { plan: event.plan, decision: null, handoff: null });
+      if (prior && (prior.plan.digest !== event.plan.digest || JSON.stringify(prior.ventureContext) !== JSON.stringify(event.ventureContext ?? null) || prior.ventureEnvelopeDigest !== (event.ventureEnvelopeDigest ?? null))) throw new Error(`conflicting experiment plan ${event.id}`);
+      if (!prior) result.set(event.id, { plan: event.plan, ventureContext: event.ventureContext ?? null, ventureEnvelopeDigest: event.ventureEnvelopeDigest ?? null, decision: null, handoff: null });
       continue;
     }
     const row = result.get(event.id);
@@ -85,11 +97,29 @@ export function recordExperimentPlan(plan: ExperimentPlan, path: string = SIGNAL
   return withFileLock(`${path}.lock`, () => {
     const prior = fold(path).get(plan.recommendation.id);
     if (prior) {
-      if (prior.plan.digest !== plan.digest) throw new Error(`conflicting experiment plan ${plan.recommendation.id}`);
+      if (prior.plan.digest !== plan.digest || prior.ventureContext !== null) throw new Error(`conflicting experiment plan ${plan.recommendation.id}`);
       return prior.plan;
     }
     append(path, { kind: "proposal", id: plan.recommendation.id, at: new Date().toISOString(), plan });
     return plan;
+  });
+}
+
+/** Persist a Venture-origin plan in the same queue while retaining its reviewed learning lineage. */
+export function recordVentureExperimentPlan(envelope: VentureExperimentPlan, path: string = SIGNALS_EXPERIMENT_PLANS_PATH): ExperimentPlan {
+  if (envelope.kind !== "venture_experiment_plan" || envelope.version !== "venture-experiment-handoff-v1") throw new Error("invalid Venture experiment envelope");
+  if (envelope.planApproval !== "pending-muxin" || envelope.copyApproval !== "pending-in-content") throw new Error("Venture experiment approval gates are invalid");
+  if (!/^sha256:[a-f0-9]{64}$/.test(envelope.digest)) throw new Error("Venture experiment envelope digest is invalid");
+  assertVentureExperimentPlanIntegrity(envelope);
+  return withFileLock(`${path}.lock`, () => {
+    const id = envelope.plan.recommendation.id;
+    const prior = fold(path).get(id);
+    if (prior) {
+      if (prior.plan.digest !== envelope.plan.digest || prior.ventureEnvelopeDigest !== envelope.digest || JSON.stringify(prior.ventureContext) !== JSON.stringify(envelope.ventureContext)) throw new Error(`conflicting experiment plan ${id}`);
+      return prior.plan;
+    }
+    append(path, { kind: "proposal", id, at: new Date().toISOString(), plan: envelope.plan, ventureContext: envelope.ventureContext, ventureEnvelopeDigest: envelope.digest });
+    return envelope.plan;
   });
 }
 
@@ -148,6 +178,7 @@ export function readExperimentPlans(path: string = SIGNALS_EXPERIMENT_PLANS_PATH
     return {
       experimentId: row.plan.recommendation.id,
       contentRequestId: row.plan.contentRequest.id,
+      brandId: row.plan.brandId ?? brandForOrigin(row.plan.contentRequest.origin),
       confidence: row.plan.recommendation.confidence,
       evidenceRefs: [...row.plan.recommendation.evidenceRefs],
       observation: row.plan.recommendation.observation,
@@ -176,6 +207,7 @@ export function readExperimentPlans(path: string = SIGNALS_EXPERIMENT_PLANS_PATH
       generatedIds: row.handoff ? [...row.handoff.generatedIds] : [],
       sourceBodyIncluded: false,
       generatedCopyIncluded: false,
+      ventureContext: row.ventureContext ? { ...row.ventureContext, evidenceRefs: [...row.ventureContext.evidenceRefs], caveats: [...row.ventureContext.caveats] } : null,
     };
   }).sort((left, right) => {
     const priority = { high: 0, medium: 1, deferred: 2 } as const;
@@ -187,7 +219,7 @@ export function readExperimentPlans(path: string = SIGNALS_EXPERIMENT_PLANS_PATH
 export function readExperimentPlansForPerformance(path: string = SIGNALS_EXPERIMENT_PLANS_PATH): ExperimentPlan[] {
   if (!existsSync(path)) return [];
   return withFileLock(`${path}.lock`, () => [...fold(path).values()]
-    .filter((row) => row.decision?.status === "approved" && row.handoff !== null)
+    .filter((row) => row.decision?.status === "approved" && row.handoff !== null && row.plan.brandId !== null)
     .map((row) => row.plan)
     .sort((left, right) => left.recommendation.id.localeCompare(right.recommendation.id)));
 }

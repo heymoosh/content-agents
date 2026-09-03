@@ -2,12 +2,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import {
   listFictionSeries, resolveDoc, saveFictionDoc, readFictionDoc,
   readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats,
-  listChapters, seriesDirFor, refuseSave,
+  listChapters, seriesDirFor, refuseSave, BEATS_ROOT,
 } from "./fiction.js";
+test("scene beats keep the legacy location shape, but never the real store under the test runner", () => {
+  // Unconfigured roots resolve to ~/.content-agents/<name> in production; under node:test the
+  // data-root guard swaps in a throwaway directory so the gate cannot write into Muxin's store.
+  assert.ok(BEATS_ROOT.endsWith(join("", "fiction-beats")), BEATS_ROOT);
+  assert.ok(!BEATS_ROOT.startsWith(join(homedir(), ".content-agents")), BEATS_ROOT);
+});
 
 function tmpSeries(): string {
   const root = mkdtempSync(join(tmpdir(), "fiction-test-"));
@@ -139,8 +145,19 @@ test("scene beats survive a reload, and starting a different scene drops the anc
     assert.equal(readSceneBeats("the-least-of-us", root), null);
     saveSceneBeats("the-least-of-us", "  Eli finds the cut line.  ", null, root);
     assert.equal(readSceneBeats("the-least-of-us", root)?.beats, "Eli finds the cut line.");
-    saveSceneBeats("the-least-of-us", "Eli finds the cut line.", 2, root);
-    assert.equal(readSceneBeats("the-least-of-us", root)?.chapter, 2);
+    assert.equal(readSceneBeats("the-least-of-us", root)?.initialEngine, null, "legacy/unstamped anchors stay honest");
+    saveSceneBeats("the-least-of-us", "Eli finds the cut line.", 2, root, "codex");
+    assert.deepEqual(readSceneBeats("the-least-of-us", root), {
+      beats: "Eli finds the cut line.", chapter: 2, initialEngine: "codex", revisionHistory: [],
+      savedAt: readSceneBeats("the-least-of-us", root)?.savedAt,
+    });
+    saveSceneBeats("the-least-of-us", "Eli finds the cut line.", 2, root, "grok", "repass-job-1");
+    saveSceneBeats("the-least-of-us", "Eli finds the cut line.", 2, root, "grok", "repass-job-1");
+    const provenance = readSceneBeats("the-least-of-us", root)!;
+    assert.equal(provenance.initialEngine, "codex");
+    assert.deepEqual(provenance.revisionHistory.map(({ operationId, engine }) => ({ operationId, engine })), [
+      { operationId: "repass-job-1", engine: "grok" },
+    ], "a repass preserves the initial engine and records its own engine idempotently");
     clearSceneBeats("the-least-of-us", root);
     assert.equal(readSceneBeats("the-least-of-us", root), null);
     assert.throws(() => saveSceneBeats("the-least-of-us", "   ", null, root), /say the beats/);

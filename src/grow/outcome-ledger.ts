@@ -1,5 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { isBrandId, type BrandId } from "../identity/brand.js";
+import { withFileLock } from "../runtime/file-lock.js";
 
 /**
  * A small, append-only measurement boundary. It accepts caller-supplied facts only. It does not
@@ -77,6 +79,8 @@ export interface OutcomeAttribution {
 
 export interface OutcomeCommonInput {
   readonly id: string;
+  /** Required on new ingestion; omitted historical rows normalize to visibly unassigned. */
+  readonly brandId?: BrandId | null;
   readonly observedAt: string;
   readonly collectedAt: string;
   readonly metric: string;
@@ -116,6 +120,7 @@ export interface BusinessOutcomeInput extends OutcomeCommonInput {
 
 interface OutcomeCommonRow {
   readonly id: string;
+  readonly brandId: BrandId | null;
   readonly observedAt: string;
   readonly collectedAt: string;
   readonly metric: string;
@@ -199,9 +204,10 @@ const STATUS_VALUES: readonly OutcomeRecordStatus[] = [
   "draft", "needs-human-judgment", "approved", "rejected", "scheduled", "published", "measured",
   "observed", "reported", "verified", "pending", "current", "superseded", "corrected",
 ];
+const FACT_BEARING_STATUSES: readonly OutcomeRecordStatus[] = ["measured", "observed", "reported", "verified", "current", "corrected"];
 
 const COMMON_KEYS = [
-  "id", "observedAt", "observed_at", "occurredAt", "occurred_at", "collectedAt", "collected_at", "metric", "value", "unit", "numerator", "denominator", "scope",
+  "id", "brandId", "brand_id", "observedAt", "observed_at", "occurredAt", "occurred_at", "collectedAt", "collected_at", "metric", "value", "unit", "numerator", "denominator", "scope",
   "window", "sourceNote", "source_note", "evidenceRefs", "evidence_refs", "lineage", "caveats", "status", "supersedesId",
   "supersedes_id", "recordType", "record_type", "family", "sideEffects",
 ] as const;
@@ -371,8 +377,13 @@ function normalizeCommon(source: Record<string, unknown>): OutcomeCommonRow {
   if (!(STATUS_VALUES as readonly string[]).includes(status)) fail(`status must be one of ${STATUS_VALUES.join(", ")}`);
   const observed = aliasValue(source, "observedAt", "observed_at", "observedAt")
     ?? aliasValue(source, "occurredAt", "occurred_at", "occurredAt");
+  const brandValue = aliasValue(source, "brandId", "brand_id", "brandId");
+  if (brandValue !== undefined && brandValue !== null && !isBrandId(brandValue)) {
+    fail("brandId must be one of human-inference, charles, fiction");
+  }
   return {
     id: text(source.id, "id"),
+    brandId: brandValue === undefined ? null : brandValue as BrandId | null,
     observedAt: isoDate(observed, "observedAt"),
     collectedAt: isoDate(aliasValue(source, "collectedAt", "collected_at", "collectedAt"), "collectedAt"),
     metric: text(source.metric, "metric"),
@@ -505,6 +516,7 @@ function attributionBlockers(attribution: readonly OutcomeAttribution[]): string
 /** Readiness is descriptive and conservative. It never upgrades an incomplete record. */
 export function assessOutcomeRow(row: OutcomeRow): OutcomeReadiness {
   const blockers: string[] = [];
+  if (!FACT_BEARING_STATUSES.includes(row.status as OutcomeRecordStatus)) blockers.push(`status ${row.status} is not a measured fact`);
   if (row.evidenceRefs.length === 0) blockers.push("evidence refs are missing");
   for (const ref of row.evidenceRefs) if (!validEvidenceRef(ref)) blockers.push(`invalid evidence ref ${ref}`);
   if (row.lineage.length === 0) blockers.push("lineage refs are missing");
@@ -512,6 +524,12 @@ export function assessOutcomeRow(row: OutcomeRow): OutcomeReadiness {
     if (!ref.recordType || !ref.id || !ref.relation) blockers.push("lineage ref is incomplete");
   }
   blockers.push(...attributionBlockers(row.attribution));
+  if (row.recordType === "funnel_event" && (row.eventType === "visit" || row.eventType === "opt_in") && row.metric === "event_count") {
+    if (row.unit !== "event" && row.unit !== "events") blockers.push(`${row.eventType} unit must be event or events`);
+    if (row.value === null || !Number.isInteger(row.value) || row.value < 0) blockers.push(`${row.eventType} value must be a non-negative integer count`);
+    if (row.numerator !== null && row.numerator !== row.value) blockers.push(`${row.eventType} numerator must equal value when present`);
+    if (row.denominator !== null) blockers.push(`${row.eventType} denominator must be null for an event count`);
+  }
   return { status: blockers.length === 0 ? "ready" : "blocked", blockers: uniqueStrings(blockers) };
 }
 
@@ -528,24 +546,35 @@ function revisionBlockers(rows: readonly OutcomeRow[]): string[] {
     if (row.supersedesId === row.id) blockers.push(`${row.id} cannot supersede itself`);
     const previous = byId.get(row.supersedesId);
     if (!previous) blockers.push(`${row.id} supersedes missing row ${row.supersedesId}`);
-    else if (previous.recordType !== row.recordType) blockers.push(`${row.id} supersedes a different row family`);
+    else {
+      if (previous.recordType !== row.recordType) blockers.push(`${row.id} supersedes a different row family`);
+      if (previous.brandId !== row.brandId) blockers.push(`${row.id} supersedes a row from a different brand`);
+    }
     if (successors.has(row.supersedesId)) blockers.push(`multiple revisions supersede ${row.supersedesId}`);
     successors.add(row.supersedesId);
   }
   return blockers;
 }
 
+/** Ledger-wide identity/revision integrity, separate from whether an individual fact is publishable. */
+export function outcomeLedgerStructureBlockers(rows: readonly OutcomeRow[]): string[] {
+  const blockers: string[] = [];
+  const ids = new Set<string>();
+  for (const row of rows) {
+    if (ids.has(row.id)) blockers.push(`duplicate outcome row ${row.id}`);
+    ids.add(row.id);
+  }
+  blockers.push(...revisionBlockers(rows));
+  return uniqueStrings(blockers);
+}
+
 /** Build a deterministic read model. It never chooses a winner or changes any input row. */
 export function buildOutcomeLedger(rows: readonly OutcomeRow[]): OutcomeLedger {
   const normalized = rows.map((row) => normalizeOutcomeRow(row));
-  const blockers: string[] = [];
-  const ids = new Set<string>();
+  const blockers: string[] = [...outcomeLedgerStructureBlockers(normalized)];
   for (const row of normalized) {
-    if (ids.has(row.id)) blockers.push(`duplicate outcome row ${row.id}`);
-    ids.add(row.id);
     blockers.push(...assessOutcomeRow(row).blockers.map((blocker) => `${row.id}: ${blocker}`));
   }
-  blockers.push(...revisionBlockers(normalized));
   const sorted = [...normalized].sort(compareRows);
   const familyCounts: OutcomeFamilyCounts = {
     attention: 0,
@@ -575,6 +604,7 @@ function assertAppendable(existing: readonly OutcomeRow[], row: OutcomeRow): voi
   const previous = existing.find((item) => item.id === row.supersedesId);
   if (!previous) fail(`supersedesId references missing row ${row.supersedesId}`);
   if (previous.recordType !== row.recordType) fail("supersedesId must reference the same row kind");
+  if (previous.brandId !== row.brandId) fail("supersedesId must reference a row in the same brand");
   if (existing.some((item) => item.supersedesId === row.supersedesId)) fail(`row ${row.supersedesId} already has a revision`);
 }
 
@@ -598,6 +628,29 @@ export function appendOutcomeRow(row: OutcomeRow, path: string): void {
   assertAppendable(existing, normalized);
   mkdirSync(dirname(path), { recursive: true });
   appendFileSync(path, `${JSON.stringify(normalized)}\n`, "utf8");
+}
+
+/**
+ * Append one reviewed import batch under one canonical brand. The whole batch is validated while
+ * holding the ledger lock, so a duplicate or conflicting row leaves the file byte-for-byte intact.
+ */
+export function appendOutcomeRowsForBrand(rows: readonly OutcomeRow[], brandId: BrandId, path: string): void {
+  if (!isBrandId(brandId)) fail("brandId must be one of human-inference, charles, fiction");
+  if (rows.length === 0) fail("outcome import requires at least one row");
+  withFileLock(`${path}.lock`, () => {
+    const existing = readOutcomeLedger(path);
+    const staged: OutcomeRow[] = [];
+    for (const source of rows) {
+      if (source.brandId !== null && source.brandId !== brandId) fail(`outcome row ${source.id} belongs to another brand`);
+      const normalized = normalizeOutcomeRow({ ...source, brandId });
+      const readiness = assessOutcomeRow(normalized);
+      if (readiness.status !== "ready") fail(`outcome row ${normalized.id} is not ready: ${readiness.blockers.join("; ")}`);
+      assertAppendable([...existing, ...staged], normalized);
+      staged.push(normalized);
+    }
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, staged.map((row) => JSON.stringify(row)).join("\n") + "\n", "utf8");
+  });
 }
 
 export const normalizeFunnelEventRecord = buildFunnelEvent;

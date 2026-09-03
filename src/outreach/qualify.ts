@@ -24,7 +24,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 // clears, the person is still recorded as an anchor in config/outreach/anchors.md instead of
 // being discarded.
 
-export type LeadKind = "client" | "platform";
+export type LeadKind = "client" | "platform" | "peer";
 export type LeadSource = "manual" | "jsa" | "discovered" | "ingested" | "boardy";
 export const LEAD_SOURCES: readonly LeadSource[] = ["manual", "jsa", "discovered", "ingested", "boardy"];
 
@@ -166,9 +166,9 @@ export interface QualifyResult {
 
 // Pure decision function, exported for unit testing without touching disk.
 export function evaluateQualify(input: QualifyInput, evidence: EvidenceItem[]): QualifyResult {
-  const fieldName: "classification" | "fit" = input.kind === "client" ? "classification" : "fit";
-  const claimed = (input.kind === "client" ? input.classification : input.fit) ?? "unclear";
-  const positiveSet = input.kind === "client" ? CLIENT_POSITIVE : PLATFORM_POSITIVE;
+  const fieldName: "classification" | "fit" = input.kind === "platform" ? "fit" : "classification";
+  const claimed = (input.kind === "platform" ? input.fit : input.classification) ?? "unclear";
+  const positiveSet = input.kind === "platform" ? PLATFORM_POSITIVE : CLIENT_POSITIVE;
   const reasons: string[] = [];
   let finalValue = claimed;
 
@@ -179,10 +179,10 @@ export function evaluateQualify(input: QualifyInput, evidence: EvidenceItem[]): 
   const worldviewMatch = findValidBySignal(evidence, "worldview-match");
   const personFit = findValidBySignal(evidence, "person-fit");
 
-  // "unclear" is only a legal value for kind: "client" (classification); kind: "platform"'s
+  // "unclear" is only a legal value for kind: "client"/"peer" (classification); kind: "platform"'s
   // fit field only accepts strong|partial|weak|disqualified, so a platform-kind downgrade must
   // land on "weak" instead (config/outreach VALID_FITS in validate.ts).
-  const downgradeTarget = input.kind === "client" ? "unclear" : "weak";
+  const downgradeTarget = input.kind === "platform" ? "weak" : "unclear";
 
   if (positiveSet.has(claimed)) {
     if (evidence.length === 0) {
@@ -276,7 +276,7 @@ export function runQualify(dirArg: string): QualifyRunResult {
   const raw = readFileSync(leadPath, "utf8");
   const { fm, body, header } = splitFrontmatter(raw);
 
-  const kind: LeadKind = fm.kind === "platform" ? "platform" : "client";
+  const kind: LeadKind = fm.kind === "platform" ? "platform" : fm.kind === "peer" ? "peer" : "client";
   const rawSource = String(fm.source ?? "manual");
   const source: LeadSource = (LEAD_SOURCES as string[]).includes(rawSource) ? (rawSource as LeadSource) : "manual";
   const relLeadFile = leadPath.startsWith(repoRoot) ? leadPath.slice(repoRoot.length + 1) : leadPath;

@@ -343,7 +343,7 @@ export interface RunResearchResult {
 // step 1: turnaround/greenfield/disqualifying = 3; buildPlatformResearchPrompt step 1:
 // topic-overlap/audience-reality/guest-friendliness/recency/disqualifying = 5). Exported so the
 // total-budget math is unit-testable without a subprocess.
-const SIGNAL_COUNT: Record<LeadKind, number> = { client: 3, platform: 5 };
+const SIGNAL_COUNT: Record<LeadKind, number> = { client: 3, platform: 5, peer: 2 };
 
 export function computeSearchBudgetTotal(kind: LeadKind, searchBudgetPerSignal: number): number {
   return searchBudgetPerSignal * SIGNAL_COUNT[kind];
@@ -446,7 +446,10 @@ export async function runResearch(dirArg: string): Promise<RunResearchResult> {
   const raw = readFileSync(leadPath, "utf8");
   const { fm, body, header } = splitFrontmatter(raw);
 
-  const kind: LeadKind = fm.kind === "platform" ? "platform" : "client";
+  const kind: LeadKind = fm.kind === "platform" ? "platform" : fm.kind === "peer" ? "peer" : "client";
+  if (kind === "peer") {
+    throw new Error("peers need no research pass (config/outreach/brief.md): a Boardy-style intro is drafted directly with `outreach draft`");
+  }
   const name = String(fm.name ?? dirArg);
   const url = String(fm.url ?? "");
   const existingProfile = extractSection(body, "## Profile");

@@ -101,7 +101,8 @@ async function main(): Promise<void> {
       feature: "Signals switches brand scope without turning missing evidence into zero",
       pr: "P2.4a",
       status: brandStates.every((state) => !state.endsWith(":")) && /not measured/i.test(scopedText)
-        && /Briefs, recommendations, and experiments are not yet brand-scoped/.test(scopedText) ? "pass" : "fail",
+        && /The selected brand scopes measurements, strategy recommendations, decisions, and experiments/.test(scopedText)
+        && /Unassigned legacy records stay excluded/.test(scopedText) ? "pass" : "fail",
       detail: `${brandStates.join(", ")}; ${scopedText.replace(/\s+/g, " ").slice(0, 140)}…`,
     });
 
@@ -180,7 +181,7 @@ async function main(): Promise<void> {
     const approvalText = ((await textOf(s.page, "#reviewSheet")) || "").replace(/\s+/g, " ").trim();
     record({
       feature: "Content opens request-grouped approval before the separate Publish step",
-      status: approvalText.includes("Approve Drafts") && approvalText.includes("Publish") ? "pass" : "fail",
+      status: approvalText.includes("Approve Drafts") && approvalText.includes("Approve selected and attempt scheduling") && approvalText.includes("provider accepted or published") ? "pass" : "fail",
       detail: approvalText.slice(0, 220),
     });
 

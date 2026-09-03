@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Content Studio Phase 4: Venture handoff review</title>
+  <style>
+    :root { color-scheme: light; --ink:#17211b; --muted:#657068; --line:#d8dfda; --paper:#fbfcfa; --card:#fff; --good:#17643a; --warn:#8a4d00; }
+    * { box-sizing:border-box } body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.55 system-ui,-apple-system,sans-serif }
+    main { max-width:980px; margin:auto; padding:48px 24px 80px } h1 { font:700 2.25rem/1.1 Georgia,serif; margin:.2rem 0 1rem } h2 { margin:2.2rem 0 .7rem }
+    .eyebrow { color:var(--good); font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:.78rem } .lede,.meta { color:var(--muted) }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:16px; margin:18px 0 }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px } .card h3 { margin:0 0 8px }
+    .old { border-top:5px solid var(--warn) } .new { border-top:5px solid var(--good) } code { background:#eef2ef; padding:.1rem .35rem; border-radius:4px }
+    ol li, ul li { margin:.45rem 0 } .gate { font-weight:700; color:var(--good) } .blocked { color:var(--warn); font-weight:700 }
+  </style>
+</head>
+<body><main>
+  <p class="eyebrow">Review evidence · Phase 4</p>
+  <h1>Content and reader learning can reach Venture without becoming an automatic business decision.</h1>
+  <p class="lede">This review shows the behavior change, the two human gates, and what the system deliberately refuses. It contains no generated private content.</p>
+  <div class="grid">
+    <section class="card old"><h3>Before</h3><p>The handoff was a read-only readiness view. Legacy callers could omit an explicit bundle, measured Content outcomes were not mandatory, and nothing created a durable Venture-owned receipt.</p></section>
+    <section class="card new"><h3>Now</h3><p>A handoff carries an evidence tier and honest claim ceiling. Source/evidence refs are always required; exact experiment lineage is required only for directional and controlled tiers. Decision state is append-only. Acceptance creates one internal, non-publishable Venture artifact and one canon decision.</p></section>
+  </div>
+
+  <h2>Normal path</h2>
+  <ol>
+    <li>Signals-origin learning comes from analytics or measured Content experiments. Ordinary active account-level metrics appear as engagement/attention receipts; redacted comments, replies, DMs, emails, and follow-up questions appear as qualitative/resonance receipts. Raw text and respondent hashes do not enter the evaluator.</li>
+    <li>Venture-native surveys, comments, emails, and DMs enter from their existing manually judged response intake. They do not need a redundant Signals decision.</li>
+    <li>Both paths retain the evidence ladder: engagement (attention), qualitative/comments (resonance), surveys (stated-need), directional (directional-comparison), controlled (bounded-comparison), funnel (behavioral-intent), and business (observed-demand).</li>
+    <li>Venture evaluates the input against its current hypotheses, lead-generation ideas, products, offers, and strategy, then recommends <strong>no change</strong>, <strong>change</strong>, or <strong>test</strong>.</li>
+    <li>Muxin separately chooses <strong>accept</strong>, <strong>decline</strong>, or <strong>request more evidence</strong> on that recommendation.</li>
+    <li class="gate">Acceptance retains a proposal only. It does not publish, clear a checkpoint, unlock a phase, mutate configuration, select a winner, or claim demand.</li>
+  </ol>
+
+  <h2>Example decision packet</h2>
+  <section class="card">
+    <p><strong>Hypothesis:</strong> A specific opening produces more qualified lead-magnet signups than the control opening.</p>
+    <p><strong>Evidence example:</strong> A survey may support a stated-need ceiling; a controlled two-arm experiment may support a bounded-comparison ceiling. Neither becomes observed demand without business evidence.</p>
+    <p><strong>Review context:</strong> Scope, treatment/control samples, plan digest, interpretation id, caveats, qualification, evidence status, named Venture and phase, and exact source/variant/experiment/content lineage remain visible at both gates.</p>
+    <p><strong>Signals recommendation:</strong> Adopt as a bounded input for Venture <code>example-venture</code>, current phase. Confidence and caveats remain visible.</p>
+    <p><strong>Venture effect after acceptance:</strong> Store the evidence-linked receipt. Learning may recommend no-change, change, or test; Muxin separately accepts, declines, or requests more evidence. A test flows through the canonical Experiment planner, normal plan approval, Content drafting/review/publishing/measurement, then back to Signals and Venture learning.</p>
+  </section>
+
+  <h2>Fail-closed examples</h2>
+  <ul>
+    <li><span class="blocked">Blocked:</span> Evidence refs missing, or a claim ceiling higher than the tier permits.</li>
+    <li><span class="blocked">Blocked:</span> Directional/controlled lineage missing its exact experiment, Content, treatment, or control references.</li>
+    <li><span class="blocked">Blocked:</span> A proposal line that tries to claim adoption without a separate Signals decision event, or any automatic phase/checkpoint/configuration/winner/demand mutation.</li>
+    <li><span class="blocked">Blocked:</span> A client request that tries to supply its own authority, evidence, approval identity, or gate reference.</li>
+    <li><span class="blocked">Blocked:</span> Concurrent or repeated writes that drift from the original identity. Exact retries collapse to the same artifact.</li>
+  </ul>
+  <p class="meta">Implementation evidence: Deterministic contract, lifecycle, tier/ceiling, tamper, acceptance, idempotency, and rules-parity tests. This artifact claims no live operational proof. “Observed demand” means attributable business evidence at the business ceiling; “winner” means an explicit, scoped, measured comparison fact with its declared sample, not an inference from any lower rung.</p>
+</main></body>
+</html>

@@ -20,8 +20,11 @@ test("poor-fit leads never enter main Outreach recommendations", () => {
     lead({ name: "Platform", kind: "platform", fit: "partial", classification: undefined }),
     lead({ name: "Bad platform", kind: "platform", fit: "weak", classification: undefined }),
     lead({ name: "Example", kind: "content-example", classification: undefined }),
+    lead({ name: "Peer", kind: "peer", classification: "unclear" }),
+    lead({ name: "Dropped peer", kind: "peer", classification: "disqualified" }),
   ]);
-  assert.deepEqual(result.map((item) => item.name), ["Acme", "Platform"]);
+  // A peer (a Boardy-style intro) is eligible unless explicitly disqualified; "unclear" is its normal state.
+  assert.deepEqual(result.map((item) => item.name), ["Acme", "Platform", "Peer"]);
 });
 
 test("selected lead gets a concise mutual-fit summary with a safe fallback", () => {

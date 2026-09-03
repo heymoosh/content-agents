@@ -11,6 +11,7 @@ import type Database from "better-sqlite3";
 import { repoRoot } from "../db/db.js";
 import { buildResearchReport, type ResearchReport } from "../research/read.js";
 import type { BrandId } from "../identity/brand.js";
+import { assessOutcomeRow, type OutcomeRow } from "../grow/outcome-ledger.js";
 
 export interface ChannelConfidence {
   channel: string;
@@ -70,12 +71,13 @@ export function parseBriefSignals(text: string): { confidence: ChannelConfidence
   return { confidence, recommendations };
 }
 
-export function readSignals(briefsDir: string = join(repoRoot, "briefs")): SignalsRead {
+export function readSignals(brandId: BrandId, briefsRoot: string = join(repoRoot, "briefs")): SignalsRead {
+  const briefsDir = join(briefsRoot, brandId);
   const file = latestBriefFile(briefsDir);
   if (!file) return { briefPath: null, briefDate: null, confidence: [], recommendations: [] };
   const parsed = parseBriefSignals(readFileSync(join(briefsDir, file), "utf8"));
   return {
-    briefPath: `briefs/${file}`,
+    briefPath: `briefs/${brandId}/${file}`,
     briefDate: file.slice(0, 10),
     ...parsed,
   };
@@ -223,7 +225,7 @@ export interface BusinessFamily {
   opportunities: MetricRead;
   purchases: MetricRead;
   /** The empty state IS the deliverable here — this copy is the whole card. */
-  empty_state: string;
+  empty_state: string | null;
 }
 
 export interface OutcomeFamilies {
@@ -241,7 +243,7 @@ export interface OutcomeFamilies {
    */
   never_collapsed: true;
   /** Rows retained only for audit visibility; legacy rows are never assigned to a brand. */
-  excluded_unassigned: { posts: number; metrics: number; audience: number; research: number };
+  excluded_unassigned: { posts: number; metrics: number; audience: number; research: number; outcomes: number };
   brand_id?: BrandId;
 }
 
@@ -394,21 +396,47 @@ function conversationResearch(db: Database.Database, brandId?: BrandId): { total
   };
 }
 
-// Why audience is only half measurable: there is no landing-page analytics ingest anywhere in this
-// repo — no source writes a visit, an opt-in or a survey response into data/analytics.db — so those
-// three read not_measured while follower growth reads as the real number it is.
-const NO_LANDING_INGEST =
-  "no landing-page analytics ingest exists in this repo. Nothing writes visits, opt-ins or survey responses to data/analytics.db, so this is unmeasured, not zero";
+// Landing/opt-in count cards read only explicit event_count facts. Exact rates remain available to
+// Experiment under their own metric names and never get relabeled as counts here.
+const NO_LANDING_COUNT =
+  "no eligible brand-scoped event_count fact exists for this metric in the canonical outcome ledger, so this count is unmeasured, not zero";
 
-// Why business is entirely empty: src/strategy/cta-fit.ts:10 and :166 (echoed at
-// src/strategy/frame-fit.ts:10) record that no click or conversion metric survives ingest — clicks
-// sums to about forty across 1,229 metric rows and is NULL on linkedin and bluesky. There is no
-// funnel-events record anywhere in the codebase to read a purchase or an inquiry from.
+// Business count cards likewise require explicit outcome-ledger facts. Engagement and sparse click
+// columns never stand in for a qualified inquiry, call, opportunity, or purchase.
 const NO_FUNNEL_SOURCE =
-  "no funnel record exists. Nothing in this repo captures a qualified inquiry, a call, an opportunity or a purchase, and no click/conversion metric survives ingest (src/strategy/cta-fit.ts:10)";
+  "no eligible reviewed business-outcome fact exists for this metric and selected brand in the canonical outcome ledger, so this count is unmeasured, not zero";
 
 const BUSINESS_EMPTY_STATE =
-  "Until the landing page is live and taking payment there is nothing to measure here. It stays this way, not a zero.";
+  "No eligible reviewed business-outcome facts are recorded for this selected brand. This is unmeasured, not zero.";
+
+function activeOutcomeRows(rows: readonly OutcomeRow[], brandId?: BrandId): OutcomeRow[] {
+  const scoped = rows.filter((row) => row.brandId === (brandId ?? null));
+  const superseded = new Set(scoped.map((row) => row.supersedesId).filter((id): id is string => id !== null));
+  return scoped.filter((row) => !superseded.has(row.id) && assessOutcomeRow(row).status === "ready");
+}
+
+function isCountFunnelRow(row: OutcomeRow, eventType?: "visit" | "opt_in"): boolean {
+  return row.recordType === "funnel_event" && (eventType === undefined || row.eventType === eventType)
+    && (row.eventType === "visit" || row.eventType === "opt_in") && row.metric === "event_count"
+    && (row.unit === "event" || row.unit === "events");
+}
+
+function funnelMetric(rows: readonly OutcomeRow[], eventType: "visit" | "opt_in", absent: string): MetricRead {
+  const matching = rows.filter((row) => isCountFunnelRow(row, eventType));
+  if (matching.length === 0) return { state: "not_measured", reason: absent };
+  return {
+    state: "measured",
+    value: matching.reduce((sum, row) => sum + (row.value as number), 0),
+    records_measured: matching.length,
+    records_unmeasured: 0,
+  };
+}
+
+function businessMetric(rows: readonly OutcomeRow[], outcomeType: "qualified_inquiry" | "call" | "opportunity" | "purchase", absent: string): MetricRead {
+  const matching = rows.filter((row) => row.recordType === "business_outcome" && row.outcomeType === outcomeType);
+  if (matching.length === 0) return { state: "not_measured", reason: absent };
+  return { state: "measured", value: matching.length, records_measured: matching.length, records_unmeasured: 0 };
+}
 
 /**
  * Follower growth from the `audience` table's scalar rows. `follower_total` takes the newest
@@ -459,7 +487,7 @@ function audienceTotals(db: Database.Database, brandId?: BrandId): { followerTot
  */
 export function readOutcomeFamilies(
   db: Database.Database,
-  opts: { generatedAt?: string; now?: number; brandId?: BrandId } = {}
+  opts: { generatedAt?: string; now?: number; brandId?: BrandId; outcomeRows?: readonly OutcomeRow[] } = {}
 ): OutcomeFamilies {
   const generatedAt = opts.generatedAt ?? new Date().toISOString();
   const now = opts.now ?? Date.parse(generatedAt);
@@ -482,11 +510,13 @@ export function readOutcomeFamilies(
     .all(...(opts.brandId ? [opts.brandId] : [])) as FamilyPostRow[];
   const research = conversationResearch(db, opts.brandId);
   const audienceRoll = audienceTotals(db, opts.brandId);
+  const outcomeRows = activeOutcomeRows(opts.outcomeRows ?? [], opts.brandId);
   const excluded_unassigned = {
     posts: Number((db.prepare("SELECT COUNT(*) AS count FROM posts WHERE brand_id IS NULL").get() as { count: number }).count),
     metrics: Number((db.prepare("SELECT COUNT(*) AS count FROM metrics WHERE brand_id IS NULL").get() as { count: number }).count),
     audience: Number((db.prepare("SELECT COUNT(*) AS count FROM audience WHERE brand_id IS NULL").get() as { count: number }).count),
     research: tableExists(db, "research_observations") ? Number((db.prepare("SELECT COUNT(*) AS count FROM research_observations WHERE brand_id IS NULL").get() as { count: number }).count) : 0,
+    outcomes: (opts.outcomeRows ?? []).filter((row) => row.brandId === null).length,
   };
 
   const result: OutcomeFamilies = {
@@ -520,24 +550,25 @@ export function readOutcomeFamilies(
       new_follows: sumColumn(rows, "new_follows"),
       follower_total: audienceRoll.followerTotal,
       follower_delta: audienceRoll.followerDelta,
-      landing_visits: { state: "not_measured", reason: NO_LANDING_INGEST },
-      opt_ins: { state: "not_measured", reason: NO_LANDING_INGEST },
+      landing_visits: funnelMetric(outcomeRows, "visit", NO_LANDING_COUNT),
+      opt_ins: funnelMetric(outcomeRows, "opt_in", NO_LANDING_COUNT),
       survey_responses: {
         state: "not_measured",
         reason:
           "survey responses live inside a venture's own responses.jsonl, which Signals must never read (docs/venture-schema-contract.md:1343-1347)",
       },
-      partial_note:
-        "Part of this family is measured and part has no source at all. Follower and subscriber growth are real numbers. Landing visits and opt-ins are not, so they are not summed into one audience figure.",
+      partial_note: outcomeRows.some((row) => isCountFunnelRow(row))
+        ? "Follower growth, landing visits, and opt-ins remain separate measurements. No combined audience score is computed."
+        : "Part of this family is measured and part has no source at all. Follower and subscriber growth are real numbers. Landing visits and opt-ins are not, so they are not summed into one audience figure.",
     },
     business: {
       family: "business",
       question: "Did it lead to a qualified inquiry, a call, an opportunity, or a purchase?",
-      qualified_inquiries: { state: "not_measured", reason: NO_FUNNEL_SOURCE },
-      calls: { state: "not_measured", reason: NO_FUNNEL_SOURCE },
-      opportunities: { state: "not_measured", reason: NO_FUNNEL_SOURCE },
-      purchases: { state: "not_measured", reason: NO_FUNNEL_SOURCE },
-      empty_state: BUSINESS_EMPTY_STATE,
+      qualified_inquiries: businessMetric(outcomeRows, "qualified_inquiry", NO_FUNNEL_SOURCE),
+      calls: businessMetric(outcomeRows, "call", NO_FUNNEL_SOURCE),
+      opportunities: businessMetric(outcomeRows, "opportunity", NO_FUNNEL_SOURCE),
+      purchases: businessMetric(outcomeRows, "purchase", NO_FUNNEL_SOURCE),
+      empty_state: outcomeRows.some((row) => row.recordType === "business_outcome") ? null : BUSINESS_EMPTY_STATE,
     },
     confidence: platformConfidence(rows, now),
     sample_rule: SAMPLE_RULE,

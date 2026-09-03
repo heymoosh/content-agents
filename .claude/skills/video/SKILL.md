@@ -1,9 +1,14 @@
 ---
 name: video
-description: Build 1 — turn ONE piece of Muxin's content into a vertical short (script → storyboard → review → render). The deliberate, heavier video path, split out of /atomize so atomize stays cheap. Usage - /video <content-folder | substack-url | file | audio-file | text>, or /video --revise <content-folder>.
+description: Build 1 — turn ONE brand-scoped piece of content into a vertical short. Usage - /video --brand <human-inference|charles|fiction> <content-folder | substack-url | file | audio-file | text>, or /video --brand <brand> --revise <content-folder>.
 ---
 
 # /video — short-form video generation
+
+Require one canonical brand at entry: `human-inference`, `charles`, or `fiction`. Reject a
+missing or unknown brand. There is no Human Inference fallback. Read optional strategy guidance
+only from `briefs/<brand>/`; legacy top-level `briefs/` and `briefs/bets.md` are unassigned and
+must not be read.
 
 Turn ONE piece of Muxin's content into a vertical short. This is the **deliberate, heavier**
 path, split out of `/atomize` on purpose: `/atomize` stays cheap (text + quote cards), and you
@@ -53,7 +58,7 @@ evaluated and rejected (no start→end interpolation on the Gemini key); see
    - If the arg is an existing content folder → use it (reuse its `source.md`/`extracts.md`).
    - Else (URL / file / audio / pasted text) → `npm run new-content -- <arg>` (for pasted text,
      pipe via a quoted `--text` heredoc as in `/atomize`), then read `source.md`.
-   - Optional: read the latest brief in `briefs/` and apply its hook/pillar emphasis.
+   - Optional: read the latest brief in `briefs/<brand>/` and apply its hook/pillar emphasis.
 
 2. **Tag + extract** (skip if the folder is already atomized and `extracts.md` exists). Identify
    the pillar (`config/pillars.yaml`); note the most video-worthy ideas.

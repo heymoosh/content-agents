@@ -11,7 +11,7 @@ import { repoRoot } from "../db/db.js";
 
 // Follow-up tracker buckets (plan §3 / card 659b50f0 / Phase 4 card 21a5eb84) -- the same four
 // reason-buckets data/outreach/tracker.jsonl events carry.
-export type FollowUpBucket = "client" | "platform" | "jobsearch" | "inbound";
+export type FollowUpBucket = "client" | "platform" | "peer" | "jobsearch" | "inbound";
 
 export interface FollowUpWindow {
   followUpAfterDays: number;
@@ -25,9 +25,14 @@ export interface OutreachConfig {
   searchBudgetPerSignal: number;
   channels: string[];
   followUp: Record<FollowUpBucket, FollowUpWindow>;
+  midTailCaps: {
+    podcastListenersMax: number;
+    newsletterSubscribersMax: number;
+    companyFundingStageExclude: string[];
+  };
 }
 
-const FOLLOW_UP_BUCKETS: readonly FollowUpBucket[] = ["client", "platform", "jobsearch", "inbound"];
+const FOLLOW_UP_BUCKETS: readonly FollowUpBucket[] = ["client", "platform", "peer", "jobsearch", "inbound"];
 
 const DEFAULTS: OutreachConfig = {
   jsaDbPathEnv: "JSA_DB_PATH",
@@ -40,8 +45,14 @@ const DEFAULTS: OutreachConfig = {
   followUp: {
     client: { followUpAfterDays: 7, abandonAfterDays: 30 },
     platform: { followUpAfterDays: 10, abandonAfterDays: 45 },
+    peer: { followUpAfterDays: 14, abandonAfterDays: 60 },
     jobsearch: { followUpAfterDays: 7, abandonAfterDays: 30 },
     inbound: { followUpAfterDays: 3, abandonAfterDays: 14 },
+  },
+  midTailCaps: {
+    podcastListenersMax: 50_000,
+    newsletterSubscribersMax: 50_000,
+    companyFundingStageExclude: ["series-b", "series-c", "series-d-plus", "growth", "public"],
   },
 };
 
@@ -57,6 +68,11 @@ interface RawConfig {
   search_budget_per_signal?: number;
   channels?: string[];
   follow_up?: Partial<Record<FollowUpBucket, RawFollowUpWindow>>;
+  mid_tail_caps?: {
+    podcast_listeners_max?: number;
+    newsletter_subscribers_max?: number;
+    company_funding_stage_exclude?: string[];
+  };
 }
 
 function parseFollowUp(raw: RawConfig["follow_up"]): OutreachConfig["followUp"] {
@@ -88,5 +104,10 @@ export function loadOutreachConfig(): OutreachConfig {
     searchBudgetPerSignal: raw.search_budget_per_signal ?? DEFAULTS.searchBudgetPerSignal,
     channels: raw.channels ?? DEFAULTS.channels,
     followUp: parseFollowUp(raw.follow_up),
+    midTailCaps: {
+      podcastListenersMax: raw.mid_tail_caps?.podcast_listeners_max ?? DEFAULTS.midTailCaps.podcastListenersMax,
+      newsletterSubscribersMax: raw.mid_tail_caps?.newsletter_subscribers_max ?? DEFAULTS.midTailCaps.newsletterSubscribersMax,
+      companyFundingStageExclude: raw.mid_tail_caps?.company_funding_stage_exclude ?? DEFAULTS.midTailCaps.companyFundingStageExclude,
+    },
   };
 }

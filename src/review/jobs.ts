@@ -25,10 +25,13 @@ import { briefRevisePrompt, latestBriefPath } from "./serve.js";
 import { logCost } from "../util/cost-log.js";
 import { buildEngineSpawn, enginePrompt, ENGINE_COMMANDS, ENGINE_LABELS, type Engine, type EngineSpawnOptions } from "./engines.js";
 import type { ContentRequest, ContentVariant } from "./content-request.js";
+import { assertReviewedMechanismGenerationAuthorization, containsPersonalBeliefReversal } from "./reviewed-mechanism-recommendations.js";
+import type { BrandId } from "../identity/brand.js";
 import { configuredMediaPlan, configuredMediaStage, type ConfiguredMediaPlan, type ConfiguredMediaSourceInputs, type ConfiguredMediaStage } from "./configured-media.js";
 import { acquireJobExecutionLease, readDurableJobs, recoverAbandonedJobs, removeDurableJobs, upsertDurableJob } from "../runtime/durable-jobs.js";
 import { processAlive, type FileLease } from "../runtime/file-lock.js";
 import { migrateLegacyDataDirectory } from "../runtime/data-root.js";
+import { muxinVoiceFindings } from "../voice/configured.js";
 import {
   createFictionJobs,
   fictionDraftPrompt as fictionDraftPromptImpl,
@@ -292,8 +295,8 @@ export async function reviseDerivative(slug: string, id: string, instruction: st
 // Same "revise with Claude" pattern as reviseDerivative, but for the latest strategy brief instead
 // of a derivative — briefRevisePrompt/latestBriefPath stay in serve.ts (part of the Strategy/
 // Analytics block), imported back here since this is the one place that spawns the subprocess.
-export async function reviseBrief(instruction: string, engine: Engine = "claude"): Promise<{ path: string; content: string }> {
-  const abs = latestBriefPath();
+export async function reviseBrief(instruction: string, engine: Engine = "claude", brandId: BrandId): Promise<{ path: string; content: string }> {
+  const abs = latestBriefPath(brandId);
   if (!abs) throw new Error("no strategy brief exists yet. Run /strategy first");
   if (!instruction.trim()) throw new Error("tell Claude what to change first");
   const relPath = abs.slice(repoRoot.length + 1);
@@ -338,27 +341,6 @@ export function configuredSourceSegments(folder: string, refs: readonly (number 
   return refs.map((ref) => ({ source_line: ref, text: extractSourceLines(folder, [ref]) }));
 }
 
-function configuredVoiceFindings(body: string): string[] {
-  const findings: string[] = [];
-  if (/[—–]/.test(body)) findings.push("contains an em dash or en dash");
-  const tells: readonly RegExp[] = [
-    /\bhere(?:'|’)?s the (?:thing|kicker)\b/i,
-    /\bthe thing is\b/i,
-    /\bit(?:'|’)?s not just\b/i,
-    /\bit(?:'|’)?s not about .{0,80}\bit(?:'|’)?s about\b/i,
-    /\b(?:isn(?:'|’)?t|more than) just\b/i,
-    /\blet(?:'|’)?s (?:dive in|unpack|break it down)\b/i,
-    /\b(?:in a world where|in an age of|in today(?:'|’)?s)\b/i,
-    /\b(?:at the end of the day|the reality is|the truth is|make no mistake|it(?:'|’)?s worth noting|that said|needless to say)\b/i,
-    /\b(?:delve|supercharge|game-changer|tapestry|testament|ever-evolving|robust|seamless|realm|landscape|foster|harness|elevate|empower|paradigm|journey)\b/i,
-    /\b(?:navigate the complexities|unlock(?:ing|ed|s)?|at scale)\b/i,
-  ];
-  if (tells.some((pattern) => pattern.test(body))) findings.push("contains an AI tell banned by config/voice.yaml");
-  if (/\[\^[^\]]+\]|^\[\^[^\]]+\]:/m.test(body)) findings.push("contains a markdown footnote marker");
-  if (/:\s+[a-z]/.test(body)) findings.push("starts a word lowercase after a colon");
-  return findings;
-}
-
 function configuredTreatmentInstruction(treatment: string): string {
   const instructions: Readonly<Record<string, string>> = {
     cta: "Build one compact point that earns a concrete invitation to read the essay.",
@@ -369,8 +351,22 @@ function configuredTreatmentInstruction(treatment: string): string {
     counterpoint: "Make Muxin's clearest qualification, tension, or correction of an easy assumption the post's standalone point.",
     summary: "Preserve the essay's central argument and practical direction as one coherent standalone post.",
     "hook-variants": "Use the strongest source-grounded opening, then complete the thought so the post works without prior context.",
+    "belief-shift": "Use a first-person belief reversal only because the approved source lines explicitly contain both the old and current belief. Keep those old-belief and current-belief clauses verbatim. Do not invent a prior belief, a new belief, a conclusion beyond the approved lines, or a causal performance claim.",
   };
   return instructions[treatment] ?? "Apply the named treatment as a source-grounded rewrite with one clear standalone point.";
+}
+
+function exactSourceSentences(text: string): string[] {
+  return (text.match(/[^.!?]+(?:[.!?]+|$)/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean);
+}
+
+function assertBeliefShiftBody(body: string, segments: readonly ConfiguredSourceSegment[], label: string): void {
+  if (!containsPersonalBeliefReversal(body)) throw new Error(`${label} must retain both explicit first-person belief clauses`);
+  const allowed = new Set(segments.flatMap((segment) => exactSourceSentences(segment.text)));
+  const output = exactSourceSentences(body);
+  if (!output.length || output.some((sentence) => !allowed.has(sentence))) {
+    throw new Error(`${label} may contain only exact sentences from its approved source_lines`);
+  }
 }
 
 export function configuredContentPrompt(request: ContentRequest, variants: readonly ContentVariant[], sourceSegments: readonly ConfiguredSourceSegment[] = []): string {
@@ -425,7 +421,11 @@ export function parseConfiguredVariantBodies(output: string, variants: readonly 
     // Resolve every cited range against the authoritative file. The body may be rewritten, but
     // its factual authorization boundary must remain inspectable and real.
     extractSourceLines(folder, sourceLines);
-    const voiceFindings = configuredVoiceFindings(body);
+    const variant = variants.find((candidate) => candidate.identity.id === id)!;
+    if (variant.treatments.includes("belief-shift")) {
+      assertBeliefShiftBody(body, configuredSourceSegments(folder, sourceLines), `selected engine belief-shift variant ${id}`);
+    }
+    const voiceFindings = muxinVoiceFindings(body);
     if (voiceFindings.length) throw new Error(`selected engine returned treated variant ${id} with source_lines [${sourceLines.join(", ")}] that failed the voice check: ${voiceFindings.join("; ")}`);
     const normalized = body.trim().replace(/\s+/g, " ").toLowerCase();
     if (normalizedBodies.has(normalized)) throw new Error("selected engine returned a duplicate treated body");
@@ -454,6 +454,7 @@ export function configuredColdFeedEditorPrompt(variants: readonly ContentVariant
       id: variant.identity.id,
       platform: variant.platform,
       max_characters: CONFIGURED_PLATFORM_LIMITS[variant.platform] ?? null,
+      editing_constraint: variant.treatments.includes("belief-shift") ? "Return this body byte-for-byte; the reviewed mechanism requires exact approved-source sentences." : null,
       body: bodies.get(variant.identity.id)?.body ?? "",
     }))),
   ].join("\n\n");
@@ -482,8 +483,11 @@ export function parseConfiguredEditorBodies(
     const variant = variants.find((candidate) => candidate.identity.id === id)!;
     const limit = CONFIGURED_PLATFORM_LIMITS[variant.platform];
     if (limit && body.length > limit) throw new Error(`selected editor exceeded the ${variant.platform} character limit`);
-    const voiceFindings = configuredVoiceFindings(body);
+    const voiceFindings = muxinVoiceFindings(body);
     if (voiceFindings.length) throw new Error(`selected editor returned variant ${id} that failed the voice check: ${voiceFindings.join("; ")}`);
+    if (variant.treatments.includes("belief-shift") && body !== original.body) {
+      throw new Error(`selected editor must preserve belief-shift variant ${id} byte-for-byte`);
+    }
     const normalized = body.trim().replace(/\s+/g, " ").toLowerCase();
     if (normalizedBodies.has(normalized)) throw new Error("selected editor returned a duplicate cold-feed body");
     normalizedBodies.add(normalized);
@@ -521,21 +525,34 @@ export function configuredQueueNote(request: ContentRequest, kind: "control" | "
  * a direct browser pass, and the caller's real checkout therefore always fall through to the real
  * selected CLI engine.
  */
-export function disposableConfiguredEngineOutput(request: ContentRequest, variants: readonly ContentVariant[]): string | null {
+function disposableConfiguredEngineAuthorized(): boolean {
   const token = process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
   const disposableRoot = process.env.E2E_REPO_ROOT;
-  if (!token || !disposableRoot) return null;
+  if (!token || !disposableRoot) return false;
   try {
-    if (realpathSync(disposableRoot) !== realpathSync(repoRoot)) return null;
-  } catch { return null; }
+    if (realpathSync(disposableRoot) !== realpathSync(repoRoot)) return false;
+  } catch { return false; }
   const marker = join(repoRoot, ".e2e-configured-engine-token");
-  if (!existsSync(marker) || readFileSync(marker, "utf8") !== token) return null;
+  return existsSync(marker) && readFileSync(marker, "utf8") === token;
+}
+
+export function disposableConfiguredEngineOutput(request: ContentRequest, variants: readonly ContentVariant[]): string | null {
+  if (!disposableConfiguredEngineAuthorized()) return null;
   const refs = request.sourceProvenance?.sourceLines;
   if (!refs?.length) throw new Error("disposable configured engine requires authoritative source provenance");
   return JSON.stringify(variants.map((variant, index) => ({
     id: variant.identity.id,
     body: `Fixture standalone point ${index + 1}.`,
     source_lines: [refs[0]],
+  })));
+}
+
+export function disposableVentureEngineOutput(request: ContentRequest, variants: readonly ContentVariant[]): string | null {
+  if (!disposableConfiguredEngineAuthorized()) return null;
+  if (request.origin !== "venture" || !request.ventureSource) throw new Error("disposable Venture engine requires approved Venture source provenance");
+  return JSON.stringify(variants.map((variant, index) => ({
+    id: variant.identity.id,
+    body: `Approved Venture premise, composed for ${variant.platform} as variant ${index + 1}.`,
   })));
 }
 
@@ -557,8 +574,14 @@ export function ventureConfiguredContentPrompt(request: ContentRequest, variants
 
 export function parseVentureConfiguredBodies(output: string, variants: readonly ContentVariant[]): Map<string, { body: string; sourceLines: [] }> {
   const expected = new Set(variants.map((variant) => variant.identity.id));
+  const trimmed = output.trim();
+  // Claude occasionally wraps an otherwise exact JSON response in one markdown fence despite the
+  // prompt. Accept only a fence that owns the complete response; surrounding narration remains a
+  // hard failure so the adapter never guesses which payload the engine intended.
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const source = fenced?.[1]?.trim() ?? trimmed;
   let parsed: unknown;
-  try { parsed = JSON.parse(output.trim()); } catch { throw new Error("selected engine returned invalid Venture configured-variant JSON"); }
+  try { parsed = JSON.parse(source); } catch { throw new Error("selected engine returned invalid Venture configured-variant JSON"); }
   if (!Array.isArray(parsed) || parsed.length !== expected.size) throw new Error("selected engine returned the wrong Venture configured-variant count");
   const bodies = new Map<string, { body: string; sourceLines: [] }>();
   for (const item of parsed) {
@@ -569,7 +592,7 @@ export function parseVentureConfiguredBodies(output: string, variants: readonly 
     if (keys.length !== 2 || !keys.includes("id") || !keys.includes("body") || !expected.has(id) || bodies.has(id) || !body) {
       throw new Error("selected engine returned a missing, duplicate, unknown, empty, or malformed Venture configured variant");
     }
-    const voiceFindings = configuredVoiceFindings(body);
+    const voiceFindings = muxinVoiceFindings(body);
     if (voiceFindings.length) throw new Error(`selected engine returned Venture variant ${id} that failed the voice check: ${voiceFindings.join("; ")}`);
     bodies.set(id, { body, sourceLines: [] });
   }
@@ -577,6 +600,9 @@ export function parseVentureConfiguredBodies(output: string, variants: readonly 
 }
 
 export function assertConfiguredTreatmentPolicy(request: ContentRequest, treated: readonly ContentVariant[]): void {
+  if (treated.some((variant) => variant.treatments.includes("belief-shift")) && request.origin !== "studio" && request.origin !== "human-inference") {
+    throw new Error("belief-shift treatment is available only for an authorized Human Inference approved cut");
+  }
   if (treated.length && (request.origin === "fiction" || request.origin === "charles")) {
     throw new Error(`configured ${request.origin} treatments are unavailable: no enforceable restricted transformation exists; request an untreated control only`);
   }
@@ -629,6 +655,17 @@ export function resolveConfiguredAuthoritative(folder: string, request: ContentR
     return { body: context.authoritativeBody, sourceLines: [], contextKind: context.kind, restrictionRefs };
   }
   return null;
+}
+
+export function preflightConfiguredGeneration(
+  folder: string,
+  request: ContentRequest,
+  treated: readonly ContentVariant[],
+): ConfiguredAuthoritativeBody | null {
+  assertConfiguredTreatmentPolicy(request, treated);
+  const authoritative = resolveConfiguredAuthoritative(folder, request);
+  if (authoritative) assertReviewedMechanismGenerationAuthorization(request, authoritative.body);
+  return authoritative;
 }
 
 export function resolveConfiguredProvenance(folder: string, request: ContentRequest): { body: string; sourceLines: (number | string)[] } {
@@ -748,17 +785,22 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
   const treated = request.variants.filter((variant) => variant.identity.kind === "treated");
   // This policy gate deliberately precedes runQueued and every mkdir/write/append: a refused
   // origin-specific treatment leaves zero jobs, files, and review rows behind.
-  assertConfiguredTreatmentPolicy(request, treated);
-  const authoritative = resolveConfiguredAuthoritative(folder, request);
+  const authoritative = preflightConfiguredGeneration(folder, request, treated);
   return runQueued("content-generate", `Create configured drafts: ${slug}`, async (job) => {
     let bodies = new Map<string, { body: string; sourceLines: (number | string)[] }>();
     let engineExecution: "disposable-injected" | undefined;
     let coldFeedEditorApplied = false;
     if (treated.length && request.origin === "venture") {
-      const result = await runClaudeSpawn(job, ventureConfiguredContentPrompt(request, treated), { timeoutMs: ATOMIZE_TIMEOUT_MS });
-      const failure = decodeSpawnFailure(result, job.id, { timeoutVerb: "Venture configured drafting", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`, exitVerb: "Venture configured drafting" });
-      if (failure) throw new Error(failure.replace(/Claude/g, engineName(job)));
-      bodies = parseVentureConfiguredBodies(result.stdout, treated);
+      const injected = disposableVentureEngineOutput(request, treated);
+      if (injected !== null) {
+        engineExecution = "disposable-injected";
+        bodies = parseVentureConfiguredBodies(injected, treated);
+      } else {
+        const result = await runClaudeSpawn(job, ventureConfiguredContentPrompt(request, treated), { timeoutMs: ATOMIZE_TIMEOUT_MS });
+        const failure = decodeSpawnFailure(result, job.id, { timeoutVerb: "Venture configured drafting", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`, exitVerb: "Venture configured drafting" });
+        if (failure) throw new Error(failure.replace(/Claude/g, engineName(job)));
+        bodies = parseVentureConfiguredBodies(result.stdout, treated);
+      }
     } else if (treated.length && authoritative?.sourceLines.length) {
       const injected = disposableConfiguredEngineOutput(request, treated);
       if (injected !== null) {
@@ -860,7 +902,7 @@ export type JobKind =
   | "revise" | "brief-revise" | "insights" | "ask-insights" | "venture-analysis" | "venture-step" | "duplicate" | "draft-follow-up"
   | "outreach-revise"
   | "pull" | "strategy" | "scout" | "charles-draft"
-  | "fiction-draft" | "fiction-continuity" | "fiction-promo" | "content-generate" | "configured-media-render";
+  | "fiction-draft" | "fiction-continuity" | "fiction-promo" | "content-generate" | "configured-media-render" | "venture-delivery";
 
 // Kinds whose stdout IS the deliverable, not a progress channel. `runDraft` takes the spawn's
 // stdout as the outreach message body, and `ask-insights` returns it as the answer Muxin reads.
@@ -1109,7 +1151,7 @@ export function runCommandSpawn(
   job: Job,
   command: string,
   args: string[],
-  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv; input?: string }
+  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv; input?: string; cwd?: string }
 ): Promise<CommandSpawnResult> {
   // A stopped job's future spawns are stillborn. A task job stopped between two spawns has no
   // child to signal, so stopJob settles it and hands the lane on immediately — without this guard
@@ -1129,7 +1171,7 @@ export function runCommandSpawn(
   };
   return new Promise((resolve) => {
     const child = spawn(command, args, {
-      cwd: repoRoot,
+      cwd: opts.cwd ?? repoRoot,
       timeout: opts.timeoutMs,
       killSignal: "SIGTERM",
       // Explicitly close the child's stdin (rather than leaving Node's default open, unwritten
@@ -1187,6 +1229,7 @@ export async function runAgentSpawn(
       timeoutMs: opts.timeoutMs,
       env: { ...opts.env, CONTENT_AGENT_ENGINE: engine },
       input: built.input,
+      cwd: opts.cwd,
     });
     logCost({ step: `agent:${engine}`, detail: job.label, engine });
     if (!outputFile) return result;
@@ -1209,12 +1252,14 @@ export async function runAgentSpawn(
 // default so every pre-existing caller is unaffected.
 export function buildClaudeSpawnArgs(
   prompt: string,
-  opts: { permissionMode?: string | null; model?: string; tools?: string }
+  opts: { permissionMode?: string | null; model?: string; restricted?: boolean; tools?: string; allowedTools?: string }
 ): string[] {
   const args = ["-p", prompt];
+  if (opts.restricted) args.push("--restricted");
   if (opts.permissionMode !== null) args.push("--permission-mode", opts.permissionMode ?? "acceptEdits");
   if (opts.model !== undefined) args.push("--model", opts.model);
   if (opts.tools !== undefined) args.push("--tools", opts.tools);
+  if (opts.allowedTools !== undefined) args.push("--allowedTools", opts.allowedTools);
   return args;
 }
 
@@ -1222,7 +1267,7 @@ export function buildClaudeSpawnArgs(
 export function runClaudeSpawn(
   job: Job,
   prompt: string,
-  opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv }
+  opts: { timeoutMs: number; permissionMode?: string | null; model?: string; restricted?: boolean; tools?: string; allowedTools?: string; env?: NodeJS.ProcessEnv; cwd?: string }
 ): Promise<CommandSpawnResult> {
   // Kept as a compatibility wrapper for existing callers. The job's selected engine is what
   // actually runs, so older call sites keep their name while picker-backed jobs can use Grok or
@@ -1879,6 +1924,9 @@ export function answerJob(id: string, answer: string): { error: string } | { job
 export function stopJob(id: string): { error: string } | { job: Job; stopped: boolean } {
   const job = jobs.find((j) => j.id === id);
   if (!job) return { error: "no such job" };
+  if (job.kind === "venture-delivery" && (job.status === "queued" || job.status === "running")) {
+    return { error: "delivery cannot be stopped after it is queued; wait for its recorded outcome" };
+  }
   if (job.status !== "queued" && job.status !== "running") return { job, stopped: false };
 
   job.stoppedByMuxin = true; // set BEFORE any signal — the settle path reads it first

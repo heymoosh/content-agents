@@ -5,12 +5,13 @@ import { parse } from "yaml";
 import { openDb, repoRoot } from "../db/db.js";
 import { runDriftCheck } from "./routing-drift.js";
 import { readSourceClass, readSourceKind, readSourceOrigin, triageEffects } from "../atomize/source-triage.js";
+import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 
 // Intelligent content router: decide which platforms a piece should be posted to,
 // from analytics (resonance) + editorial config (config/routing.yaml) + a graceful
 // cold-start. Routing GATES generation in /atomize; Muxin's review stays the final gate.
 //
-//   tsx src/strategy/route.ts --pillar civic-tech[,human-ai,...] [--folder content/<slug>] [--explore <platform>]
+//   tsx src/strategy/route.ts --brand human-inference --pillar civic-tech[,human-ai,...] [--folder content/<slug>] [--explore <platform>]
 //        → prints JSON decisions; writes <folder>/routing.md when --folder is given.
 //          Multiple comma-separated pillars are merged in ONE pass (include if any pillar
 //          includes, unless any pillar's `never` rule vetoes it) instead of overwriting
@@ -21,9 +22,9 @@ import { readSourceClass, readSourceKind, readSourceOrigin, triageEffects } from
 //          review-queue.md approval still gates publishing; the derivative drafted from this
 //          routing.md should be stamped `exploration_probe: true` in its frontmatter so
 //          tag-source.ts/loadData can exclude its eventual post from the main resonance figures.
-//   tsx src/strategy/route.ts --all
+//   tsx src/strategy/route.ts --brand <brand> --all
 //        → full pillar × platform routing-map markdown (for the strategy brief)
-//   tsx src/strategy/route.ts --flags
+//   tsx src/strategy/route.ts --brand <brand> --flags
 //        → routing-drift.ts's persistent divergence flags (data vs config/routing.yaml
 //          defaults, over two independent windows) — computed/printed only, never written back.
 
@@ -113,23 +114,21 @@ export function queryEngagementCells(
   sourceClause: string,
   sourceParams: unknown[],
   dateClause: string,
-  dateParams: unknown[]
+  dateParams: unknown[],
+  context: StrategyMeasurementContext
 ): EngagementCellRow[] {
+  const latest = latestMetricsJoin(context);
+  const scope = measurementScope(context, "p", "m");
   return db
     .prepare(
       `SELECT p.platform, p.pillar,
               COUNT(*) AS n,
               AVG(COALESCE(m.likes,0) + 3*COALESCE(m.replies,0) + 2*COALESCE(m.reposts,0)) AS avg_eng
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
-       WHERE p.pillar IS NOT NULL ${sourceClause} ${dateClause}
+       FROM posts p JOIN (${latest.sql}) m ON m.post_id = p.id
+       WHERE p.pillar IS NOT NULL AND ${scope.sql} ${sourceClause} ${dateClause}
        GROUP BY p.platform, p.pillar`
     )
-    .all(...sourceParams, ...dateParams) as EngagementCellRow[];
+    .all(...latest.params, ...scope.params, ...sourceParams, ...dateParams) as EngagementCellRow[];
 }
 
 // Pillar × platform engagement (same weighting + latest-metrics CTE as resonance.ts),
@@ -151,7 +150,8 @@ export function queryEngagementCells(
 // must never feed the pillar/platform resonance figures decideForPillar or routing-drift.ts's
 // detectDrift read. Their own separate buckets live in spin-control.ts's loadControlData and
 // exploration.ts's loadExplorationData, over the SAME posts but scoped to one source each.
-export function loadData(range?: WindowRange, injectedDb?: ReturnType<typeof openDb>): LoadedData {
+export function loadData(range?: WindowRange, injectedDb?: ReturnType<typeof openDb>, context?: StrategyMeasurementContext): LoadedData {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const db = injectedDb ?? openDb();
   const dateClause = range ? `AND p.posted_at >= ? AND p.posted_at < ?` : "";
   const dateParams = range ? [new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()] : [];
@@ -160,14 +160,16 @@ export function loadData(range?: WindowRange, injectedDb?: ReturnType<typeof ope
     "AND (p.source IS NULL OR p.source NOT IN (?, ?))",
     [CONTROL_RUN_SOURCE, EXPLORATION_SOURCE],
     dateClause,
-    dateParams
+    dateParams,
+    context
   );
 
+  const accountClause = context.providerAccountId ? " AND p.provider_account_id = ?" : "";
   const dates = db
     .prepare(
-      `SELECT platform, posted_at FROM posts p WHERE posted_at IS NOT NULL AND (p.source IS NULL OR p.source NOT IN (?, ?)) ${dateClause}`
+      `SELECT platform, posted_at FROM posts p WHERE posted_at IS NOT NULL AND p.brand_id = ?${accountClause} AND (p.source IS NULL OR p.source NOT IN (?, ?)) ${dateClause}`
     )
-    .all(CONTROL_RUN_SOURCE, EXPLORATION_SOURCE, ...dateParams) as { platform: string; posted_at: string }[];
+    .all(context.brandId, ...(context.providerAccountId ? [context.providerAccountId] : []), CONTROL_RUN_SOURCE, EXPLORATION_SOURCE, ...dateParams) as { platform: string; posted_at: string }[];
   if (!injectedDb) db.close();
 
   const cells = new Map<string, Cell>();
@@ -520,12 +522,12 @@ function main() {
   if (args.includes("--flags")) {
     // Persistent divergence flags: data vs config/routing.yaml's defaults, over two independent
     // windows. Computed/printed only — see routing-drift.ts; makes zero writes to any config file.
-    const { report } = runDriftCheck(PILLARS, cfg);
+    const { report } = runDriftCheck(PILLARS, cfg, parseStrategyMeasurementContext());
     console.log(report);
     return;
   }
 
-  const data = loadData();
+  const data = loadData(undefined, undefined, parseStrategyMeasurementContext());
 
   if (args.includes("--all")) {
     const targets = [...new Set(PILLARS.flatMap((p) => decideForPillar(p, cfg, data).map((d) => d.platform)))]
@@ -552,7 +554,7 @@ function main() {
   const pillars = pillarArg ? [...new Set(pillarArg.split(",").map((p) => p.trim()))] : undefined;
   if (!pillars || pillars.length === 0 || pillars.some((p) => !PILLARS.includes(p))) {
     console.error(
-      `usage: tsx src/strategy/route.ts --pillar <${PILLARS.join("|")}>[,<pillar2>,...] [--folder <content-folder>]  |  --all  |  --flags`
+      `usage: tsx src/strategy/route.ts --brand <human-inference|charles|fiction> --pillar <${PILLARS.join("|")}>[,<pillar2>,...] [--folder <content-folder>]  |  --all  |  --flags`
     );
     process.exit(1);
   }

@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, renameSync, mkdirSync } from "node:fs";
 import { join, basename, extname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { openDb, repoRoot } from "../db/db.js";
 import { sha256File } from "../util/hash.js";
 import { ImportRow, AudienceRow } from "./types.js";
@@ -13,6 +14,7 @@ import {
 } from "./parse-substack.js";
 import { parseLinkedIn, parseLinkedInAudience } from "./parse-linkedin.js";
 import { validateMeasurementBinding, type BrandId } from "../identity/brand.js";
+import { measurementAccountForBrand } from "../config/brand-accounts.js";
 
 const INBOX = join(repoRoot, "data", "inbox");
 const PROCESSED = join(repoRoot, "data", "processed");
@@ -68,8 +70,20 @@ async function parseAudienceFor(platform: string, path: string, isDir: boolean):
 
 export interface ImportMeasurementBinding { brandId: BrandId; providerAccountId: string }
 
-export async function runImport(binding: ImportMeasurementBinding): Promise<void> {
+/** Pure, side-effect-free guard for direct ingestion. The selected account must be the exact
+ * configured measurement identity for the selected brand, never merely a syntactically valid id. */
+export function validateImportMeasurementBinding(binding: ImportMeasurementBinding): ImportMeasurementBinding {
   const identity = validateMeasurementBinding(binding);
+  const configured = measurementAccountForBrand(identity.brandId);
+  if (!configured) throw new Error(`no measurement account configured for ${identity.brandId}; refusing unbound ingest`);
+  if (identity.providerAccountId !== configured) {
+    throw new Error(`measurement account ${identity.providerAccountId} is not configured for ${identity.brandId}; expected ${configured}`);
+  }
+  return identity;
+}
+
+export async function runImport(binding: ImportMeasurementBinding): Promise<void> {
+  const identity = validateImportMeasurementBinding(binding);
   const db = openDb();
   const now = new Date().toISOString();
 
@@ -193,10 +207,12 @@ async function main(): Promise<void> {
   if (!brandId || !providerAccountId) {
     throw new Error("analytics import requires --brand <human-inference|charles|fiction> and --account <non-secret-provider-account-id>");
   }
-  await runImport(validateMeasurementBinding({ brandId, providerAccountId }));
+  await runImport({ brandId: brandId as BrandId, providerAccountId });
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}

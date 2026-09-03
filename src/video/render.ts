@@ -19,6 +19,7 @@ import { charsOrWhisper } from "./align.js";
 import { renderMotionBg, renderCardAnimation } from "./hyperframes.js";
 import { resolveScheme } from "./card-schemes.js";
 import { readImagePrompt, withImageOutPath, buildQuoteImageProps } from "./quote-image-card.js";
+import { remotion, withRemotionJob, REMOTION_ENTRY } from "./remotion-job.js";
 
 // Render assets for a content folder.
 //   tsx src/video/render.ts --still <content-folder> --quote <derivative-name>
@@ -31,8 +32,8 @@ import { readImagePrompt, withImageOutPath, buildQuoteImageProps } from "./quote
 //   video/image-prompts.txt          (one image prompt per line)
 // --render-video derives both of those from an APPROVED video/storyboard.md, then runs --video.
 
-const PUBLIC_DIR = join(repoRoot, "remotion", "public");
-const ENTRY = join(repoRoot, "remotion", "index.ts");
+const ENTRY = REMOTION_ENTRY;
+const withJob = withRemotionJob;
 
 function resolveFolder(arg: string): string {
   const dir = isAbsolute(arg) ? arg : join(repoRoot, arg);
@@ -46,23 +47,6 @@ function readDerivative(folder: string, name: string): string {
   const path = join(folder, "derivatives", `${name}.md`);
   if (!existsSync(path)) throw new Error(`derivative not found: ${path}`);
   return splitFrontmatter(readFileSync(path, "utf8")).body;
-}
-
-function remotion(args: string[]): void {
-  execFileSync("npx", ["remotion", ...args], { cwd: repoRoot, stdio: "inherit" });
-}
-
-async function withJob<T>(fn: (jobDir: string, jobName: string) => Promise<T>): Promise<T> {
-  const jobName = `job-${Date.now().toString(36)}`;
-  const jobDir = join(PUBLIC_DIR, jobName);
-  mkdirSync(jobDir, { recursive: true });
-  try {
-    // await so the finally (jobDir cleanup) runs AFTER the async body finishes,
-    // not the instant fn() returns its pending promise.
-    return await fn(jobDir, jobName);
-  } finally {
-    rmSync(jobDir, { recursive: true, force: true });
-  }
 }
 
 // Quote-card color schemes + resolveScheme live in ./card-schemes.ts (shared with `npm run card`).

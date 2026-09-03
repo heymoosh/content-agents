@@ -4,6 +4,7 @@ import type { ContentOrigin } from "../review/content-request.js";
 import type { QueueRow } from "./queue.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { brandForOrigin, type BrandId } from "../identity/brand.js";
+import { providerAccountForBrand, type DeliveryProviderAccount } from "../config/brand-accounts.js";
 
 export const DELIVERY_POLICY_VERSION = "delivery-policy-v1" as const;
 
@@ -21,14 +22,6 @@ export interface DeliveryPolicyDecision {
   readonly reason: string;
 }
 
-const HUMAN_INFERENCE_ACCOUNTS: Readonly<Record<Exclude<DeliveryProvider, "manual">, string>> = {
-  postiz: "human-inference/postiz",
-  typefully: "human-inference/typefully",
-  postpeer: "human-inference/postpeer",
-  youtube: "human-inference/youtube",
-  substack: "human-inference/substack",
-};
-
 /**
  * The complete P0 policy matrix. An account id is a non-secret audit identity, never a credential.
  * Fiction is deliberately not mapped to Muxin's accounts: adding a label without account-selecting
@@ -45,7 +38,9 @@ export function decideDeliveryPolicy(origin: ContentOrigin | "missing" | "unknow
   }
   if (brand === "human-inference") {
     if (provider === "manual") return { ...base, brand: "human-inference", providerAccountId: null, mode: "manual", reason: "destination is intentionally manual" };
-    return { ...base, brand: "human-inference", providerAccountId: HUMAN_INFERENCE_ACCOUNTS[provider], mode: "provider", reason: `${origin} is explicitly bound to the Human Inference ${provider} account` };
+    const providerAccountId = providerAccountForBrand(brand, provider as DeliveryProviderAccount);
+    if (!providerAccountId) return { ...base, brand, providerAccountId: null, mode: "blocked", reason: `${brand} has no configured ${provider} provider account` };
+    return { ...base, brand, providerAccountId, mode: "provider", reason: `${origin} is explicitly bound to the Human Inference ${provider} account` };
   }
   return {
     ...base,

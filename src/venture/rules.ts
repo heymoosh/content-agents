@@ -23,13 +23,14 @@ export type ArtifactKind =
   | "price-decision"
   | "daily-operating-plan"
   | "day-14-review"
+  | "signals-input"
   | "thank-you-note";
 
 export interface ArtifactKindRule {
   delivery_mode: "manual" | "app" | "none";
   publishable: boolean;
   min_evidence: "url" | "agent" | "attestation" | null;
-  phase: number;
+  phase: number | "current";
 }
 
 // venture-schema-contract.md §4 calls min_evidence a MINIMUM, so this is a floor, not an exact

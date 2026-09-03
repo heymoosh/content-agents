@@ -27,6 +27,68 @@ use `AGENTS.md` so any agent can discover them consistently.
 - Maturity: when you finish a feature or open a PR (not small fixes), check the next rung in `docs/maturity.md` and propose it if its trigger fires — never auto-apply.
 - Living document: when a correction recurs, add the rule here.
 
+## Keeping the state clean
+
+These bind every agent — Claude, Codex, Grok, or any other — working anywhere in this repository
+or its worktrees. They exist because stale state is what actually confuses a later session, and
+none of it comes from having a long commit log.
+
+**Commit depth costs nothing. Never rewrite history to reduce noise.** Git materializes only the
+tip: check out a branch and the files on disk are the newest version of each file. The commits
+behind them do not co-exist with them, do not get read, and do not dilute anything. A later commit
+to a file fully replaces the earlier one. Squashing or pruning to "clean up" buys nothing and
+destroys the provenance that makes a reversed decision auditable later. Do not offer it, do not do
+it unasked.
+
+What actually rots is the working tree and the prose. Three rules, in the order they bite:
+
+1. **One on-disk copy per artifact.** This is the only real poison: the same filename existing
+   twice with contradictory content, both greppable, either one reachable by a search. Whenever a
+   file appears in two places, ask which one is committed. The uncommitted one is either newer
+   (commit it) or stale (delete it). Never both. A variant that needs to survive belongs on a
+   branch, never as an untracked shadow beside the committed file.
+2. **Nothing valuable stays uncommitted.** Untracked work is the only work git cannot recover — a
+   `git clean` destroys it irrecoverably, and nothing warns you first. Committing early is the
+   protection and it is cheap. `git status --short` showing untracked source files is the smell;
+   commit them, even as work in progress, rather than leaving them stranded. This is the opposite
+   of pruning: the fix is more commits, sooner.
+3. **When a decision reverses, edit the sentence that states it.** A file is overwritten by its
+   successor; a sentence is not. A document that still asserts a retired gate stays wrong until
+   somebody edits that assertion, and appending a correction underneath leaves both claims live and
+   equally readable. Edit the claim in place. Where the superseded fact is still worth keeping,
+   keep it labelled — "retired as of <date>, diagnostic only" — so the record survives and cannot
+   be mistaken for the current rule. `docs/content-studio-master-status.md` and
+   `docs/content-room-alignment-plan.md` are the two documents most likely to need this.
+
+Two consequences for how work is arranged:
+
+- **Leave the primary checkout on `main`.** Do feature work in a branch or worktree. A primary
+  checkout sitting on a feature branch makes "which version is current?" genuinely hard to answer
+  for the next session that opens the repository cold.
+- **A planning document that lives only on an unpushed branch is invisible to anyone reading
+  `main`.** Land decision records promptly, or say plainly which branch holds the current one.
+
+## Bounded verification contract
+
+For context-heavy or authenticated model workflows, keep proof of behavior separate from adjacent
+hardening. Fix the verification budget before work begins (normally one authenticated canary per
+workflow and at most one retry), and use this order:
+
+1. Run an early `claude -p` architecture/threat review when private-repository export has been
+   authorized for the session.
+2. Run focused red/green tests, then a fake-model end-to-end orchestration test.
+3. Run the cross-family security audit before the authenticated canary. Auditors must classify each
+   finding as introduced blocker, pre-existing problem, or optional hardening.
+4. Fix P0/P1 findings only. Record P2 hardening unless it directly threatens data or invalidates
+   the canary.
+5. Run one isolated authenticated canary, with at most one retry.
+6. Run `npm run check` once, at the end, then commit or stop.
+
+The disposable harness must isolate Git, operational data, secrets, ports, and model permissions.
+Preserve successful model output when later validation fails. Keep long-command updates to concise
+progress/final summaries. Time-box a newly discovered adjacent issue to 30 minutes; if it cannot be
+resolved within that window, stop with evidence and ask before broadening scope.
+
 ## Repository delivery policy
 
 - This is a private, local-first repository. The declared merge gate is

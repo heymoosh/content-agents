@@ -101,7 +101,7 @@ describe("hasNoSpinControl: requires a DELIBERATE control run (source='spin-cont
 
   function insertPost(db: Database.Database, platform: string, pillar: string, source: string, postedAt: string) {
     db.prepare(
-      `INSERT INTO posts (platform, platform_post_id, posted_at, pillar, source) VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO posts (platform, platform_post_id, posted_at, pillar, source, brand_id, provider_account_id) VALUES (?, ?, ?, ?, ?, 'human-inference', 'test/account')`
     ).run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, pillar, source);
   }
 
@@ -109,7 +109,7 @@ describe("hasNoSpinControl: requires a DELIBERATE control run (source='spin-cont
     const db = freshDb();
     insertPost(db, "x", "human-ai", "spin-control-run", "2026-06-15T00:00:00.000Z");
     const range = { startMs: new Date("2026-06-01").getTime(), endMs: new Date("2026-07-01").getTime() };
-    assert.equal(hasNoSpinControl(db, "human-ai", "x", range), true);
+    assert.equal(hasNoSpinControl(db, "human-ai", "x", range, { brandId: "human-inference" }), true);
     db.close();
   });
 
@@ -117,7 +117,7 @@ describe("hasNoSpinControl: requires a DELIBERATE control run (source='spin-cont
     const db = freshDb();
     insertPost(db, "x", "human-ai", "atomized", "2026-06-15T00:00:00.000Z");
     const range = { startMs: new Date("2026-06-01").getTime(), endMs: new Date("2026-07-01").getTime() };
-    assert.equal(hasNoSpinControl(db, "human-ai", "x", range), false);
+    assert.equal(hasNoSpinControl(db, "human-ai", "x", range, { brandId: "human-inference" }), false);
     db.close();
   });
 
@@ -126,7 +126,7 @@ describe("hasNoSpinControl: requires a DELIBERATE control run (source='spin-cont
     insertPost(db, "x", "human-ai", "atomized-spin", "2026-06-15T00:00:00.000Z");
     insertPost(db, "x", "human-ai", "organic", "2026-06-16T00:00:00.000Z");
     const range = { startMs: new Date("2026-06-01").getTime(), endMs: new Date("2026-07-01").getTime() };
-    assert.equal(hasNoSpinControl(db, "human-ai", "x", range), false);
+    assert.equal(hasNoSpinControl(db, "human-ai", "x", range, { brandId: "human-inference" }), false);
     db.close();
   });
 
@@ -134,7 +134,7 @@ describe("hasNoSpinControl: requires a DELIBERATE control run (source='spin-cont
     const db = freshDb();
     insertPost(db, "x", "human-ai", "spin-control-run", "2026-01-01T00:00:00.000Z");
     const range = { startMs: new Date("2026-06-01").getTime(), endMs: new Date("2026-07-01").getTime() };
-    assert.equal(hasNoSpinControl(db, "human-ai", "x", range), false);
+    assert.equal(hasNoSpinControl(db, "human-ai", "x", range, { brandId: "human-inference" }), false);
     db.close();
   });
 });
@@ -147,7 +147,7 @@ describe("zero-write guarantee: --flags mode never touches config/routing.yaml o
     const beforeMtime = { routing: statSync(routingPath).mtimeMs, platforms: statSync(platformsPath).mtimeMs };
 
     const cfgForRun = cfg({ defaults: { "human-ai": ["x", "linkedin", "bluesky"] } });
-    runDriftCheck(["human-ai"], cfgForRun);
+    runDriftCheck(["human-ai"], cfgForRun, { brandId: "human-inference" });
 
     assert.equal(readFileSync(routingPath, "utf8"), before.routing, "routing.yaml must be byte-for-byte unchanged");
     assert.equal(readFileSync(platformsPath, "utf8"), before.platforms, "platforms.yaml must be byte-for-byte unchanged");

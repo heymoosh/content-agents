@@ -57,6 +57,7 @@ import {
   BOOT_ROOM,
   CAPTURE_RAIL_ASKING,
   CAPTURE_RAIL_IDLE,
+  captureVerdict as sharedCaptureVerdict,
 } from "./page-capture.js";
 export * from "./page-outreach.js";
 export * from "./page-fiction.js";
@@ -188,13 +189,10 @@ export function captureHandoffSummary(capture: CaptureHandoff | null): {
 }
 
 // Start on it saves first, then advances to the safest real next action each build can accept.
-export function captureHandoffVerdict(room: "Content" | "Fiction" | "Outreach" | "Venture"): {
+export function captureHandoffVerdict(room: "Content" | "Fiction" | "Outreach" | "Venture" | "Charles"): {
   room: string; line: string; actionLabel: string | null;
 } {
-  if (room === "Content") return { room, line: "I read this as Content. Start on it opens an advisor round. Approval and publishing stay separate.", actionLabel: "Start on it" };
-  if (room === "Fiction") return { room, line: "I read this as Fiction. Start on it puts these beats in Write next for you to review before drafting.", actionLabel: "Start on it" };
-  if (room === "Outreach") return { room, line: "I read this as Outreach. Start on it opens the lead chooser; you still choose the person before any draft.", actionLabel: "Start on it" };
-  return { room, line: "I read this as Venture. Start on it opens the current human-gated venture step. It does not run or approve it.", actionLabel: "Start on it" };
+  return sharedCaptureVerdict(room);
 }
 
 
@@ -279,6 +277,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .capture textarea.dimmed { opacity:.6; }
   .capture-verdict { margin:12px 0 0; padding:11px 14px; border:1px solid #e3d9c3; background:#fffdf8;
     border-radius:8px; font-size:13.5px; line-height:1.55; color:var(--ink); max-width:640px; }
+  .capture-verdict .cv-note { margin-top:6px; font-size:12.5px; color:#5a5346; }
   .capture-verdict .cv-row { margin-top:9px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;
     font-size:12.5px; color:#8a7f6d; }
   .capture-verdict button { font-size:12.5px; padding:4px 11px; }
@@ -396,6 +395,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .seg-chip { font:700 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em;
     text-transform:uppercase; padding:2px 8px; border-radius:5px; }
   .seg-chip.platform { background:var(--blue-bg); color:var(--blue); }
+  .seg-chip.peer { background:#ece6f5; color:#6b4fa0; }
   .seg-chip.org-role { background:var(--amber-bg); color:var(--amber); }
   .seg-chip.org-mission { background:var(--green-bg); color:var(--green); }
   .seg-chip.content-example { background:#efeae0; color:#5a5346; }
@@ -1020,9 +1020,9 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <h2>Approve Drafts</h2>
         <span class="grow"></span>
         <button type="button" class="cw-back" id="reviewSelectAll">Select all</button>
-        <button type="button" class="primary" id="reviewApproveSelected">Approve selected for publishing</button>
+        <button type="button" class="primary" id="reviewApproveSelected">Approve selected and attempt scheduling</button>
       </div>
-      <div class="sheet-sub">Review related outputs together by input request. Approval moves work into the publishing workflow; it does not claim that a provider accepted it.</div>
+      <div class="sheet-sub">Review related outputs together by input request. Each approval immediately attempts scheduling when that destination has a provider. Approval is still recorded if scheduling needs attention; it never claims that a provider accepted or published the work.</div>
       <div class="cw-tabs" aria-label="Draft filters">
         <label style="flex-basis:100%">Input request <input class="request-search" id="reviewRequestFilter" list="reviewRequestOptions" type="search" placeholder="Search or choose an input request" autocomplete="off"><datalist id="reviewRequestOptions"></datalist></label>
         <label>Media <select id="reviewMediaFilter"><option value="">All</option></select></label>
@@ -1035,6 +1035,23 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="cw-steps" id="publishedSteps"></div>
       <div class="sheet-head"><h2>Publishing status</h2><span class="grow"></span></div>
       <div class="sheet-sub">Scheduling and publication status by input request. Text and cards go through Typefully, TikTok through PostPeer, Shorts through YouTube, and Notes through Substack. A provider is only shown as complete after its recorded result can be read back.</div>
+      <div class="sheet-sub" id="batchMovePanel" style="border:1px solid var(--line,#ccc);border-radius:6px;padding:10px">
+        <strong>Move a batch</strong>
+        <div class="cw-tabs" style="margin-top:8px">
+          <label>Pillar <input type="text" id="batchPillar" placeholder="e.g. human-ai"></label>
+          <label>Slug <input type="text" id="batchSlug" placeholder="content slug"></label>
+          <label>Platform <input type="text" id="batchPlatform" placeholder="e.g. linkedin"></label>
+        </div>
+        <div class="cw-tabs" style="margin-top:8px">
+          <label><input type="radio" name="batchMode" value="shift" checked> Shift <input type="number" id="batchShiftDays" value="1" style="width:60px"> days</label>
+          <label><input type="radio" name="batchMode" value="after"> Re-flow after <input type="date" id="batchAfterDate"></label>
+        </div>
+        <div class="actions" style="margin-top:8px">
+          <button type="button" id="batchPreviewBtn">Preview</button>
+          <button type="button" class="primary" id="batchMoveBtn">Move</button>
+        </div>
+        <div id="batchMoveResult" style="margin-top:8px"></div>
+      </div>
       <div id="publishedMain" style="margin-top:14px"><div class="empty">Nothing has entered publishing yet.</div></div>
     </div>
   </section>
@@ -1141,6 +1158,12 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           <div class="sheet-sub" style="margin-top:10px">Muxin's original brief, verbatim, for copying into her other persona tools.</div>
           <button id="charlesBriefCopyBtn" style="margin-top:10px">Copy persona brief</button>
           <textarea id="charlesBriefText" readonly style="width:100%;min-height:140px;margin-top:10px;font:400 11px/1.5 ui-monospace,monospace;padding:10px;border:1px dashed #e0d6c0;border-radius:8px;background:#fcfbf7;resize:vertical;"></textarea>
+          <div class="wb-margin-cap" style="margin-top:22px">PRODUCTION PERSONA YAML</div>
+          <div class="sheet-sub" style="margin-top:8px">This is the persona Charles drafts from. Saving creates an exact old/new proposal. It does not change production until you approve that proposal.</div>
+          <textarea id="charlesPersonaYaml" spellcheck="false" style="width:100%;min-height:300px;margin-top:10px;font:400 11px/1.5 ui-monospace,monospace;padding:10px;border:1px solid #cfc4ad;border-radius:8px;background:#fff;resize:vertical;"></textarea>
+          <button id="charlesPersonaProposeBtn" style="margin-top:10px">Save persona change for review</button>
+          <div id="charlesPersonaDigest" class="src" style="margin-top:8px"></div>
+          <div id="charlesPersonaProposals" style="margin-top:12px"></div>
         </details>
       </div>
       </div>
@@ -1198,7 +1221,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" id="signalsReads">
     <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><label class="src">Brand <select id="signalsBrand"><option value="human-inference">Human Inference</option><option value="charles">Charles</option><option value="fiction">Fiction</option></select></label><span class="src" id="signalsBriefDate"></span></div>
     <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
-    <div class="src" style="margin-top:8px">Brand scope applies to measured outcome families and the redacted research read. Briefs, recommendations, and experiments are not yet brand-scoped for Charles or Fiction.</div>
+    <div class="src" style="margin-top:8px">The selected brand scopes measurements, strategy recommendations, decisions, and experiments. Unassigned legacy records stay excluded.</div>
     <div id="signalsTop"><div class="empty">Loading…</div></div>
     <details style="margin-top:26px"><summary class="wb-label">Measurement inventory</summary><div style="margin-top:18px">
       <div style="font:italic 400 14px/1.5 Georgia,serif;color:#a89a80">This read</div>
@@ -1209,7 +1232,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
     <div class="strategy" style="max-width:none;margin-top:14px">
       <div class="strategy-actions">
-        <label class="engine-choice"><span>Run analysis with</span><select class="engine-select" id="signalsAnalysisEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option><option value="ollama-gpt-oss">GPT-OSS (local)</option></select></label>
+        <label class="engine-choice"><span>Run analysis with</span><select class="engine-select" id="signalsAnalysisEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
         <button class="primary" id="insightsBtn">Generate insights</button>
         <span class="hint">Runs the analytics reports live, then asks your selected engine for a short skim. Nothing here writes data or publishes anything.</span>
       </div>
@@ -1346,6 +1369,21 @@ function rememberEngine(value){
 }
 function engineSelectHtml(id){ return '<label class="engine-choice"><span>Run with</span><select class="engine-select"'+(id?' id="'+id+'"':'')+'>'+ENGINE_OPTIONS+'</select></label>'; }
 function outreachEngineSelectHtml(){ return '<label class="engine-choice"><span>Draft with</span><select class="engine-select outreach-engine">'+OUTREACH_ENGINE_OPTIONS+'</select></label>'; }
+// ── begin Outreach request mirror ──
+// Browser code cannot import page-outreach.ts. Keep these executable mirrors aligned with its
+// strict engine-aware request builders; page.test.ts evaluates this exact emitted block.
+function requireOutreachEngine(engine){
+  if(engine===undefined) return "codex";
+  if(engine!=="codex"&&engine!=="grok") throw new Error("Outreach engine must be ChatGPT or Grok; received "+String(engine));
+  return engine;
+}
+function outreachDraftRequest(dir,direction,recipient,engine){
+  return {dir:dir,direction:direction,...(recipient?{recipient:recipient}:{}),engine:requireOutreachEngine(engine)};
+}
+function outreachMessageReviseRequest(dir,file,instruction,engine){
+  return {dir:dir,file:file,instruction:instruction,engine:requireOutreachEngine(engine)};
+}
+// ── end Outreach request mirror ──
 function refreshEngineControls(root=document){
   const preferred = preferredEngine();
   root.querySelectorAll(".engine-select").forEach(sel=>{
@@ -1561,6 +1599,20 @@ function reviewStateLabel(status){
   if(status==="discard") return "Rejected";
   return "Draft";
 }
+// ── begin the Content approval-result mirror ──
+// One interpretation for both Focus Mode and ordinary review cards. In particular, a manual
+// ready-to-paste artifact is a completed handoff, not evidence that any provider accepted an item.
+function approvalResultView(kind,result){
+  if(result&&result.scheduled){
+    if(kind==="outreach-message") return {status:"locked",message:"Locked"};
+    if(result.scheduled.readyToPaste) return {status:"approve",message:"Approved · ready-to-paste handoff created"};
+    if(result.scheduled.autoPublishes===false) return {status:"published",scheduledWhen:result.scheduled.when,manualComment:result.scheduled.manualComment||"",message:"Uploaded (still PRIVATE: flip it manually in YouTube Studio) · "+result.scheduled.when};
+    return {status:"published",scheduledWhen:result.scheduled.when,manualComment:result.scheduled.manualComment||"",message:"Scheduled · "+(result.scheduled.when||"provider accepted")};
+  }
+  if(result&&result.scheduleError) return {status:"approve",message:"Approved, scheduling needs attention: "+result.scheduleError};
+  return {status:"approve",message:"Approved"};
+}
+// ── end of the Content approval-result mirror ──
 function contentRequestPieces(pieces){ return (pieces||[]).filter(p=>p.originalInput||p.requestId); }
 function reviewVisiblePieces(){
   const real=contentRequestPieces(DATA.pieces);
@@ -1572,13 +1624,14 @@ function openReviewFocus(piece,row,returnTo){
   body.innerHTML='<div class="rowhead"><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span class="fmt">'+esc(row.format||row.kind||"content")+' · '+esc(row.id)+'</span><span class="pill '+pillClass(row.status)+'">'+esc(reviewStateLabel(row.status))+'</span></div>'+
     '<label class="wb-label" for="reviewFocusEditor" style="display:block;margin-top:18px">EDIT THE DRAFT DIRECTLY</label>'+
     '<textarea id="reviewFocusEditor" class="review-focus-editor">'+esc(row.body||"")+'</textarea>'+
-    '<div class="actions"><button type="button" id="reviewFocusSave"'+(row.editable?'':' disabled')+'>Save edit</button><button type="button" class="approve" data-focus-act="approve">Approve</button><button type="button" class="revise" data-focus-act="revise">Request changes</button><button type="button" class="discard" data-focus-act="discard">Discard</button></div>'+
+    '<div class="actions"><button type="button" id="reviewFocusSave"'+(row.editable?'':' disabled')+'>Save edit</button><button type="button" class="approve" data-focus-act="approve">Approve and attempt scheduling</button><button type="button" class="revise" data-focus-act="revise">Request changes</button><button type="button" class="discard" data-focus-act="discard">Discard</button></div>'+
+    '<div class="src">Approval immediately attempts scheduling when this destination has a provider. A scheduling problem does not erase your approval, and provider acceptance is reported separately.</div>'+
     (row.editable?'':'<div class="src">This asset is not text-editable here.</div>');
   $("#reviewFocusTitle").textContent=piece.title+" · "+row.platform;
   $("#reviewFocus").hidden=false; $("#reviewFocus .focus-dialog").focus();
   const editor=$("#reviewFocusEditor"); if(row.editable) editor.focus();
   $("#reviewFocusSave").addEventListener("click",async ()=>{ const result=await post("/api/derivative",{slug:piece.slug,id:row.id,body:editor.value}); if(result.ok===false){flash(result.error||"Could not save");return;} row.body=editor.value.trim(); flash("Saved"); closeReviewFocus(); rerender(); });
-  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flash("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flash(result.error||"Could not update status");return;} if(act==="approve"&&result.scheduled){ row.status=row.kind==="outreach-message"?"locked":"published"; row.scheduledWhen=result.scheduled.when; flash(row.kind==="outreach-message"?"Locked":"Scheduled · "+(result.scheduled.when||"provider accepted")); } else if(act==="approve"&&result.scheduleError){ row.status="approve"; flash("Approved, scheduling needs attention: "+result.scheduleError); } else { row.status=act; flash(act==="approve"?"Approved": "Discarded"); } closeReviewFocus(); rerender(); }));
+  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flash("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flash(result.error||"Could not update status");return;} if(act==="approve"){ const view=approvalResultView(row.kind,result); row.status=view.status; row.scheduledWhen=view.scheduledWhen; row.manualComment=view.manualComment||""; flash(view.message); } else { row.status=act; flash("Discarded"); } closeReviewFocus(); rerender(); }));
 }
 function closeReviewFocus(){
   $("#reviewFocus").hidden=true; $("#reviewFocusBody").innerHTML="";
@@ -1602,15 +1655,11 @@ async function onAction(e, piece, row, el){
         row.status="locked";
         flash("Locked");
       }
-      else if (r.scheduled){
-        row.status="published"; row.scheduledWhen=r.scheduled.when; row.manualComment=r.scheduled.manualComment||"";
-        // A YouTube Short with no "youtube" cadence configured uploads PRIVATE instead of on a real
-        // publish schedule (see publishShorts) — flag that distinctly instead of a generic "Scheduled"
-        // that reads the same as an actually-scheduled post.
-        flash(r.scheduled.autoPublishes === false ? "Uploaded (still PRIVATE: flip it manually in YouTube Studio) · "+r.scheduled.when : "Scheduled · "+r.scheduled.when);
+      else {
+        const view=approvalResultView(row.kind,r);
+        row.status=view.status; row.scheduledWhen=view.scheduledWhen; row.manualComment=view.manualComment||"";
+        flash(view.message);
       }
-      else if (r.scheduleError){ row.status="approve"; flash("Approved, schedule failed: "+r.scheduleError); }
-      else { row.status="approve"; flash("Approved"); }
     } else { row.status="discard"; flash("Discarded"); }
     rerender();
   } else if (act === "revise"){
@@ -1807,15 +1856,47 @@ function renderPublished(){
       const error=(row.publishingStatus&&row.publishingStatus.error)||row.scheduleError||(row.reconciled&&row.reconciled.reason)||"";
       const provider=publishingProvider(row);
       const planned=(row.reconciled&&row.reconciled.when)||(row.publishingStatus&&row.publishingStatus.plannedFor)||row.scheduledWhen||"No planned time recorded";
+      const movable=row.publishingStatus&&row.publishingStatus.provider==="postiz"&&row.publishingStatus.state==="planned";
+      const moveBtn=movable ? ' <button type="button" class="link-btn" data-move-slug="'+esc(piece.slug)+'" data-move-id="'+esc(row.id)+'">Move</button>' : '';
       const ref=row.publishingStatus&&row.publishingStatus.ref ? ' · '+esc(row.publishingStatus.ref) : '';
       const reconcile=row.publishingStatus&&(row.publishingStatus.state==="uncertain"||row.publishingStatus.state==="scheduling") ? '<div class="actions"><button data-publish-resolve="exists" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">I found it at the provider</button><button data-publish-resolve="not-created" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">Provider has nothing · allow retry</button></div>' : '';
-      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(planned)+'</span></span><span class="src"><strong>'+esc(provider)+'</strong>'+ref+'<br>'+(error?esc(error):state==="Pending"?'Waiting for the provider to accept it.':'Provider result recorded; live publication is not yet confirmed.')+reconcile+'</span>';
+      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(planned)+moveBtn+'</span></span><span class="src"><strong>'+esc(provider)+'</strong>'+ref+'<br>'+(error?esc(error):state==="Pending"?'Waiting for the provider to accept it.':'Provider result recorded; live publication is not yet confirmed.')+reconcile+'</span>';
       sec.appendChild(item);
     }
     main.appendChild(sec);
   }
   main.querySelectorAll("[data-publish-resolve]").forEach(button=>button.addEventListener("click",()=>resolvePublishing(button.dataset.slug,button.dataset.id,button.dataset.publishResolve,button)));
+  main.querySelectorAll("[data-move-slug]").forEach(button=>button.addEventListener("click",()=>moveRow(button.dataset.moveSlug,button.dataset.moveId,button)));
   if(!shown) main.innerHTML='<div class="empty">Nothing has entered publishing yet.</div>';
+}
+async function moveRow(slug,id,button){
+  const entered=prompt("New date/time (or \\"after <date>\\" for the first free slot on/after that date)","");
+  if(entered===null) return;
+  const trimmed=entered.trim();
+  if(!trimmed){ flash("Enter a date/time"); return; }
+  const afterMatch=/^after\\s+(.+)$/i.exec(trimmed);
+  const body={slug,id};
+  if(afterMatch){
+    const at=new Date(afterMatch[1].trim());
+    if(isNaN(at.getTime())){ flash("Could not read that date"); return; }
+    body.notBefore=at.toISOString();
+  } else {
+    const at=new Date(trimmed);
+    if(isNaN(at.getTime())){ flash("Could not read that date/time"); return; }
+    body.to=at.toISOString();
+  }
+  button.disabled=true;
+  const r=await post("/api/publishing/reschedule",body);
+  if(!r.ok){ button.disabled=false; flash(r.error||"Could not move this post"); return; }
+  const piece=(DATA.pieces||[]).find(p=>p.slug===slug);
+  const row=piece&&(piece.rows||[]).find(item=>item.id===id);
+  const to=r.to||(r.publishing&&r.publishing.plannedFor);
+  if(row){
+    if(row.publishingStatus&&to) row.publishingStatus.plannedFor=to;
+    if(to) row.scheduledWhen=to;
+  }
+  flash(to?"Moved to "+to:"Moved");
+  rerender();
 }
 async function resolvePublishing(slug,id,resolution,button){
   if(resolution==="not-created"&&!confirm("Only allow a retry after you checked the named provider and confirmed that no draft, upload, or post exists. Continue?")) return;
@@ -1825,6 +1906,48 @@ async function resolvePublishing(slug,id,resolution,button){
   const result=await post("/api/publishing/resolve",{slug,id,resolution,ref,plannedFor});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not record the reconciliation"); return; }
   flash(resolution==="exists"?"Provider item recorded. No retry will run.":"Provider check recorded. You may approve again to retry.");
+  await load();
+}
+function batchSelection(){
+  const sel={};
+  const pillar=($("#batchPillar")?.value||"").trim(); if(pillar) sel.pillars=[pillar];
+  const slug=($("#batchSlug")?.value||"").trim(); if(slug) sel.slugs=[slug];
+  const platform=($("#batchPlatform")?.value||"").trim(); if(platform) sel.platforms=[platform];
+  return sel;
+}
+function batchPlan(){
+  const checked=document.querySelector('input[name="batchMode"]:checked');
+  const mode=checked?checked.value:"shift";
+  if(mode==="after"){
+    const date=$("#batchAfterDate")?.value||"";
+    if(!date) return null;
+    const at=new Date(date);
+    if(isNaN(at.getTime())) return null;
+    return {mode:"after",notBefore:at.toISOString()};
+  }
+  const days=Number($("#batchShiftDays")?.value);
+  if(!Number.isFinite(days)||days===0) return null;
+  return {mode:"shift",days};
+}
+function batchCandidateLine(c){
+  return '<div class="src">'+esc(c.slug)+' · '+esc(c.id)+' · '+esc(c.platform)+' · '+esc(c.pillar||"no pillar")+' · '+esc(c.plannedFor||"no planned time")+'</div>';
+}
+async function batchPreview(){
+  const result=$("#batchMoveResult"); if(!result) return;
+  const plan=batchPlan()||{mode:"shift",days:0};
+  const r=await post("/api/publishing/batch-reschedule",{selection:batchSelection(),plan,dryRun:true});
+  if(!r.ok){ result.innerHTML='<div class="empty">'+esc(r.error||"Could not preview")+'</div>'; return; }
+  if(!r.candidates.length){ result.innerHTML='<div class="empty">No matching scheduled posts.</div>'; return; }
+  result.innerHTML='<div class="src">'+r.candidates.length+' would move:</div>'+r.candidates.map(batchCandidateLine).join("");
+}
+async function batchMove(){
+  const result=$("#batchMoveResult"); if(!result) return;
+  const plan=batchPlan();
+  if(!plan){ flash("Enter a shift amount or a re-flow date"); return; }
+  const r=await post("/api/publishing/batch-reschedule",{selection:batchSelection(),plan});
+  if(r.error&&!r.results){ result.innerHTML='<div class="empty">'+esc(r.error)+'</div>'; return; }
+  const results=r.results||[];
+  result.innerHTML='<div class="src">'+results.length+' processed:</div>'+results.map(x=>'<div class="src">'+esc(x.slug)+' · '+esc(x.id)+' · '+esc(x.platform)+' · '+(x.ok?"moved to "+esc(x.to||"same time"):"error: "+esc(x.error||"unknown"))+'</div>').join("");
   await load();
 }
 async function approveReviewSelection(){
@@ -1968,7 +2091,7 @@ function openSignalsBrief(){
 }
 async function loadBrief(){
   briefLoaded = true;
-  const r = await fetch("/api/strategy/brief"); const d = await r.json();
+  const r = await fetch("/api/strategy/brief?brand="+encodeURIComponent(signalsBrand())); const d = await r.json();
   if(!d.ok){ $("#briefBody").textContent = d.error; $("#briefPath").textContent = ""; return; }
   $("#briefBody").innerHTML = mdToHtml(d.content);
   $("#briefPath").textContent = d.path;
@@ -2001,7 +2124,7 @@ async function askBrief(){
   const prevHtml = $("#briefBody").innerHTML;
   const engine = $("#strategyEngine").value;
   $("#briefBody").textContent = engineLabel(engine)+" is revising the brief. The room strip carries the live clock.";
-  const r = await post("/api/strategy/ask", {instruction, engine});
+  const r = await post("/api/strategy/ask", {instruction, engine, brand:signalsBrand()});
   $("#briefAskBtn").disabled = false;
   if(r.ok){ $("#briefBody").innerHTML = mdToHtml(r.content); $("#briefPath").textContent = r.path; inp.value = ""; flash("Brief revised with "+engineLabel(engine)); }
   else { $("#briefBody").innerHTML = prevHtml; flash("Revise failed: "+(r.error||"error")); }
@@ -2023,7 +2146,7 @@ async function refreshBriefRun(){
   body.innerHTML = '<p class="thinking">Running /strategy with '+esc(engineLabel(engine))+'. It grades your bets and writes a new dated brief. The room strip carries the live clock.</p>';
   loadJobs(); // make the strategy job visible in the Studio room right away
   try {
-    const r = await post("/api/strategy/refresh-brief", {engine});
+    const r = await post("/api/strategy/refresh-brief", {engine, brand:signalsBrand()});
     if(r.ok){ flash("Brief refreshed: "+(r.path||"")); await loadBrief(); }
     else { body.innerHTML = prevHtml; flash(r.error || "Refresh failed: see the job log"); }
   } catch (e) {
@@ -2066,7 +2189,7 @@ async function generateInsights(){
   const engine = $("#signalsAnalysisEngine").value;
   const intro = engine === "claude" ? "Running the reports, then asking Claude for a synthesis." : "Running the reports, then asking "+engineLabel(engine)+" for a synthesis.";
   $("#insightsOut").innerHTML = '<p class="hint">'+esc(intro)+' The room strip carries the live clock.</p>';
-  const r = await post("/api/strategy/insights", {engine});
+  const r = await post("/api/strategy/insights", {engine, brand:signalsBrand()});
   $("#insightsBtn").disabled = false;
   if(r.ok){ $("#insightsOut").innerHTML = renderInsightsMeta(r) + mdToHtml(r.summary); insightsHistory = [{role:"assistant", content:r.summary}]; }
   else { $("#insightsOut").innerHTML = "<p>Failed: "+esc(r.error||"error")+"</p>"; }
@@ -2098,7 +2221,7 @@ async function askInsights(){
   const engine = $("#signalsAnalysisEngine").value;
   thinking.innerHTML = esc(engineLabel(engine))+' is looking into it. It may re-run a report first. The room strip carries the live clock.';
   $("#insightsThread").appendChild(thinking);
-  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory, engine});
+  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory, engine, brand:signalsBrand()});
   $("#insightsAskBtn").disabled = false;
   insightsHistory.push({role:"assistant", content: r.ok ? r.answer : "Failed: "+(r.error||"error")});
   renderThread();
@@ -2141,7 +2264,7 @@ async function pullFresh(){
   const box = $("#rawList");
   const prevHtml = box.innerHTML;
   box.innerHTML = '<div class="empty">Pulling fresh analytics through real Chrome. It can take a few minutes. The strip at the top of this room carries the clock.</div>';
-  const r = await post("/api/strategy/pull", {});
+  const r = await post("/api/strategy/pull", {brand: signalsBrand()});
   btn.disabled = false; $("#rawRefreshBtn").disabled = false;
   if(r.ok){ flash("Pull complete"); await loadRaw(); }
   else { box.innerHTML = prevHtml; flash("Pull failed: "+(r.error||"error")); await loadRaw(); }
@@ -2156,6 +2279,7 @@ $("#rawPullBtn").addEventListener("click", pullFresh);
 // tell the page you sent it by hand. Nothing here contacts anyone.
 // The helpers below mirror the exported ones in page.ts; keep both sides in step by hand.
 let OUTREACH_LEADS = null;
+let OUTREACH_GMAIL = null;
 let OUTREACH_TOUCH = {};       // lead dir → newest tracker lastTouch, from /api/followups
 let activeLeadDir = null;      // null = the triage queue; a dir = that lead's thread
 let scoutInFlight = false;
@@ -2170,17 +2294,20 @@ const outSaid = new Map();       // lead dir → the direction she sent with the
 function leadSegment(l){
   if (l.segment) return l.segment;
   if (l.kind === "platform") return "platform";
+  if (l.kind === "peer") return "peer";
   if (l.kind === "client") return l.source === "jsa" ? "org-role" : "org-mission";
   return "content-example";
 }
 const SEG_INFO = {
   "platform":        { label:"Platform",      dot:"#2f5d9a", line:"a stage or audience that could host you" },
+  "peer":            { label:"Peer",          dot:"#6b4fa0", line:"someone worth knowing, not a pitch" },
   "org-role":        { label:"Org · role",    dot:"#9a6b12", line:"values fit with an open role behind it" },
   "org-mission":     { label:"Org · mission", dot:"#2f7d46", line:"values-aligned, worth knowing" },
   "content-example": { label:"Example",       dot:"#7a7266", line:"raw material for a writing angle" },
 };
 const OUT_SEGMENTS = [
   { key:"platform",        name:"PLATFORMS",                   note:"Where the audience already is. Bring the work, not a pitch." },
+  { key:"peer",            name:"PEERS",                        note:"People to know. An intro, not a pitch." },
   { key:"org-mission",     name:"ORGANIZATIONS · MISSION FIT", note:"They do the thing you write about. Bring the overlap." },
   { key:"org-role",        name:"ORGANIZATIONS · OPEN ROLES",  note:"They are hiring for what you already built. Bring the receipt." },
   { key:"content-example", name:"EXAMPLES",                    note:"raw material for a writing angle" },
@@ -2195,6 +2322,7 @@ function lastPitchedLabel(lastTouch){
 }
 function threadSegLabel(seg){
   if(seg==="platform") return "PLATFORM · SELECTED";
+  if(seg==="peer") return "PEER · SELECTED";
   if(seg==="org-mission") return "MISSION FIT · SELECTED";
   if(seg==="org-role") return "OPEN ROLE · SELECTED";
   return "EXAMPLE · SELECTED";
@@ -2286,6 +2414,7 @@ function outreachGoodFit(l){
   const fit=String(l.classificationOrFit||l.fit||l.classification||"").trim().toLowerCase();
   if(l.kind==="platform") return fit==="strong"||fit==="partial";
   if(l.kind==="client") return fit==="turnaround"||fit==="greenfield";
+  if(l.kind==="peer") return fit!=="disqualified";
   return false;
 }
 
@@ -2406,7 +2535,10 @@ function sendStepsHtml(l){
   if(state === "draft"){
     return '<div class="send-steps"><button class="primary out-lock" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'"'+(pending?" disabled":"")+'>'+(pending?"Locking…":"Lock this message")+'</button>'+note+'</div>';
   }
-  return '<div class="send-steps"><button type="button" class="out-copy" data-dir="'+esc(l.dir)+'">Copy message</button><button type="button" class="primary out-mark-sent" data-dir="'+esc(l.dir)+'">I sent this by hand</button>'+note+'</div>';
+  const gmail = OUTREACH_GMAIL && OUTREACH_GMAIL.account === "muxin.li.pro@gmail.com" && OUTREACH_GMAIL.authenticated === true && OUTREACH_GMAIL.sendPermission === true && String(msg.channel||"").toLowerCase() === "email"
+    ? '<div class="gmail-send"><input class="gmail-to" type="email" autocomplete="off" placeholder="recipient@example.com" aria-label="Recipient email"><input class="gmail-subject" autocomplete="off" placeholder="Subject" aria-label="Email subject"><button type="button" class="primary out-send-gmail" data-dir="'+esc(l.dir)+'">Send with Gmail</button><span class="send-note">Sends from muxin.li.pro@gmail.com only after confirmation.</span></div>'
+    : "";
+  return '<div class="send-steps"><button type="button" class="out-copy" data-dir="'+esc(l.dir)+'">Copy message</button><button type="button" class="primary out-mark-sent" data-dir="'+esc(l.dir)+'">I sent this by hand</button>'+gmail+note+'</div>';
 }
 
 function whoBoxHtml(l){
@@ -2436,8 +2568,8 @@ function threadHtml(l){
   const outreachEngine = l.kind!=="content-example" ? outreachEngineSelectHtml() : "";
   const decideBtns = l.kind==="content-example" ? "" :
     '<div class="wb-handoff" style="margin-top:18px">'+
-      (undecided ? '<button class="primary out-pursue" data-dir="'+esc(l.dir)+'">Interested</button><button class="out-pass" data-dir="'+esc(l.dir)+'">Not for me</button>' : '<span class="pill">'+esc(l.status)+'</span>')+
-      '<span class="note">This only records your yes or no.</span>'+
+      (undecided ? '<button class="primary out-pursue" data-dir="'+esc(l.dir)+'">Interested</button><input class="out-pass-reason" maxlength="240" placeholder="Why not? Scout learns from this" aria-label="Reason for passing" /><button class="out-pass" data-dir="'+esc(l.dir)+'">Not for me</button>' : '<span class="pill">'+esc(l.status)+'</span>')+
+      '<span class="note">This records your decision and, when passing, a brief reason.</span>'+
     '</div>';
   const recommendation = l.kind==="content-example" ? "" :
     '<div class="outreach-recommendation" style="margin-top:18px;padding:14px 16px;border-left:2px solid var(--green);background:#f5f9f4">'+
@@ -2485,11 +2617,12 @@ function renderOutreachBox(){
     const btn = wrap ? wrap.querySelector("button.dir-send") : null;
     if(btn) btn.disabled = !t.value.trim();
   }));
-  box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue")));
-  box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass")));
+  box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue","")));
+  box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass",b.closest(".wb-handoff")?.querySelector(".out-pass-reason")?.value||"")));
   box.querySelectorAll("button.out-lock").forEach(b=>b.addEventListener("click", ()=>outreachLock(b.dataset.dir, b.dataset.file)));
   box.querySelectorAll("button.out-copy").forEach(b=>b.addEventListener("click", ()=>outreachCopy(b.dataset.dir)));
   box.querySelectorAll("button.out-mark-sent").forEach(b=>b.addEventListener("click", ()=>outreachMarkSent(b.dataset.dir, b)));
+  box.querySelectorAll("button.out-send-gmail").forEach(b=>b.addEventListener("click", ()=>outreachSendGmail(b.dataset.dir, b)));
   box.querySelectorAll("button.lead-note-save").forEach(b=>b.addEventListener("click", ()=>outreachSaveNote(b)));
   box.querySelectorAll("button.msg-save").forEach(b=>b.addEventListener("click", ()=>outreachMsgSave(b)));
   box.querySelectorAll("button.msg-revise").forEach(b=>b.addEventListener("click", ()=>{
@@ -2523,6 +2656,26 @@ async function outreachMarkSent(dir, button){
     const r = await post("/api/outreach/mark-sent", {dir:lead.dir});
     if(!r.ok){ button.disabled=false; flash(r.error||"Could not record the send"); return; }
     flash("Send recorded. Follow-ups will remind you when it is time to check back.");
+    await loadOutreach();
+  } catch (e) {
+    button.disabled=false;
+    flash(e instanceof Error ? e.message : String(e));
+  }
+}
+
+async function outreachSendGmail(dir, button){
+  const lead = (OUTREACH_LEADS||[]).find(l=>l.dir===dir);
+  const wrap = button.closest(".gmail-send");
+  const to = wrap ? wrap.querySelector(".gmail-to").value.trim() : "";
+  const subject = wrap ? wrap.querySelector(".gmail-subject").value.trim() : "";
+  if(!lead || !lead.latestMessage){ flash("No locked email to send"); return; }
+  if(!to || !subject){ flash("Enter the recipient email and subject"); return; }
+  if(!window.confirm("Send this locked message now from muxin.li.pro@gmail.com to "+to+"?")) return;
+  button.disabled = true;
+  try {
+    const r = await post("/api/outreach/send-gmail", {dir:lead.dir, to, subject, confirm:true});
+    if(!r.ok){ button.disabled=false; flash(r.error||"Could not send with Gmail"); return; }
+    flash("Sent with Gmail. Follow-ups now reflect the confirmed send.");
     await loadOutreach();
   } catch (e) {
     button.disabled=false;
@@ -2637,6 +2790,7 @@ async function loadOutreach(){
     if(!leadsRes.ok) throw new Error("outreach "+leadsRes.status);
     const d = await leadsRes.json();
     OUTREACH_LEADS = d.leads || [];
+    OUTREACH_GMAIL = d.gmail || null;
     OUTREACH_TOUCH = {};
     if(fuRes && fuRes.ok){
       try {
@@ -2715,7 +2869,7 @@ async function loadContent(){
 //     Nothing in src/ clusters Muxin's own audience, so none of it has a source.
 //   * the VENTURE source tag. Nothing hands a Venture artifact to content/. See develop.ts.
 // CW.pane picks either the configuration wizard or the grouped review surface.
-let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, signalDefaults:null, launching:false, loading:false, yesErrors:[], pane:"wizard", config:null, approvedLens:null };
+let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, request:null, requestFor:null, signalDefaults:null, launching:false, loading:false, yesErrors:[], pane:"wizard", config:null, approvedLens:null };
 
 // ── begin the treatment mirror ──
 // Rule 5: written twice, once exported from page.ts for DOM-free tests and once here. Keep both.
@@ -2798,7 +2952,7 @@ const CONTENT_CONFIG_OPTIONS = {
   treatment: [
     ["cta","CTA"],["viral-rewrite","Viral rewrite"],["platform-framing","Platform-specific framing"],
     ["shorter-version","Shorter version"],["thread","Thread"],["counterpoint","Counterpoint"],
-    ["summary","Summary"],["hook-variants","Hook variants"],
+    ["summary","Summary"],["hook-variants","Hook variants"],["belief-shift","Belief shift"],
   ],
   media: [
     ["static-quote-card","Static quote card"],["animated-quote-card","Animated quote card"],
@@ -2828,7 +2982,8 @@ function cwEnsureConfig(){
   const defaults = CW.signalDefaults || {};
   const sourceDistribution = CW.treat && CW.treat.distribution || {platforms:[],media:[]};
   const recommended = key => (defaults[key]||[]).filter(x=>x.recommended).map(x=>x.option);
-  const treatments = recommended("treatments").filter(x=>CONTENT_CONFIG_OPTIONS.treatment.some(o=>o[0]===x));
+  const mechanismTreatments = (CW.treat&&CW.treat.mechanismRecommendations||[]).filter(x=>x.recommended&&x.kind==="treatment").map(x=>x.option);
+  const treatments = [...new Set([...mechanismTreatments,...recommended("treatments")])].filter(x=>CONTENT_CONFIG_OPTIONS.treatment.some(o=>o[0]===x));
   const sourceMedia = (sourceDistribution.media||[]).map(x=>x.option).filter(x=>CONTENT_CONFIG_OPTIONS.media.some(o=>o[0]===x));
   const sourcePlatforms = (sourceDistribution.platforms||[]).map(x=>x.option).filter(x=>supported.includes(x));
   const platformRequiredMedia = (sourceDistribution.platforms||[]).filter(x=>sourcePlatforms.includes(x.option) && x.requiredMedia).map(x=>x.requiredMedia);
@@ -2949,6 +3104,26 @@ function cwPickedHtml(s){
     '<span class="src">'+esc(cwSourceMeta(s))+'</span></span>'+
     '<button class="cw-back" data-step="1">Pick a different one</button></div>';
 }
+function cwCrossRoomContextHtml(){
+  const request=CW.requestFor===CW.slug ? CW.request : null;
+  if(!request||request.origin==="studio"||request.origin==="human-inference") return "";
+  const context=request.sourceContext||null, venture=request.ventureSource||null;
+  let facts=[];
+  if(context&&context.kind==="fiction-approved-promotion"){
+    facts=["Series: "+context.series.title+" · chapter "+context.chapter.number+" · "+context.chapter.title]
+      .concat((context.sourcePassages||[]).map(p=>"Locked passage: "+p.ref))
+      .concat((context.restrictions&&context.restrictions.canon||[]).map(x=>"Canon: "+x))
+      .concat((context.restrictions&&context.restrictions.provenance||[]).map(x=>"Provenance: "+x));
+  } else if(context&&context.kind==="charles-approved-post"){
+    facts=["Persona: "+context.identity,"Persona source: "+context.personaRef].concat((context.restrictions||[]).map(x=>"Restriction: "+x));
+  } else if(venture){
+    facts=["Venture: "+request.ventureId,"Approved artifact: "+venture.artifactId+" · "+venture.artifactKind,"Body path: "+venture.bodyPath,"Approval: "+venture.approval.editorialStatus+" · "+venture.approval.provenance]
+      .concat((venture.claimRefs||[]).map(x=>"Claim authority: "+x.claim+" · "+x.ref));
+  }
+  if(!facts.length) return "";
+  const body=String(context&&context.authoritativeBody||request.originalInput||"");
+  return '<section class="cw-cross-context" style="margin-top:18px;padding:16px;border:1px solid #d8cfbb;border-radius:8px;background:#fffdf8"><div class="fam-ask">APPROVED CROSS-ROOM SOURCE</div><div class="src" style="margin-top:6px">Content preserves this owning-room authority. Configuration cannot replace it.</div><pre style="white-space:pre-wrap;font:14px/1.55 Georgia,serif">'+esc(body)+'</pre><ul class="src">'+facts.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></section>';
+}
 function cwChannelHtml(c){
   const fit = fitLine(c, CW.treat.floor);
   const reuse = reuseLine(c);
@@ -2989,14 +3164,16 @@ function cwStep2Html(){
   // Fiction, Charles, or Venture.
   if(contentRequestOrigin(s)!=="human-inference"){ const crossCfg=cwEnsureConfig(); crossCfg.open=true; }
   if(!CW.config || !CW.config.open) return cwAdvisorHtml(s);
-  if(CW.treatErr) return cwPickedHtml(s)+'<div class="fam-note t-amber" style="margin-top:16px">Could not read recommendations for this piece: '+esc(CW.treatErr)+'</div>';
-  if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+'<div class="empty">Reading recommendations…</div>';
+  const crossContext=cwCrossRoomContextHtml();
+  if(CW.treatErr) return cwPickedHtml(s)+crossContext+'<div class="fam-note t-amber" style="margin-top:16px">Could not read recommendations for this piece: '+esc(CW.treatErr)+'</div>';
+  if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+crossContext+'<div class="empty">Reading recommendations…</div>';
   const cfg = cwEnsureConfig();
   const dist=CW.treat.distribution||{platforms:[],media:[],mediaRationale:""};
   const platformWhy=(dist.platforms||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
   const mediaWhy=(dist.media||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
-  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these platforms and media?</summary><div style="margin-top:8px;max-width:680px">'+platformWhy+(mediaWhy||'<div class="src" style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<div class="src" style="margin-top:10px">Source fit supplies the cold-start recommendation. Existing routing and measured performance evidence remain stronger when available. Every checkbox remains yours to change.</div></div></details>';
-  return cwPickedHtml(s)+
+  const mechanismWhy=(CW.treat.mechanismRecommendations||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div><div class="src">'+esc(x.source)+'</div></div>').join('');
+  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these recommendations?</summary><div style="margin-top:8px;max-width:680px">'+mechanismWhy+platformWhy+(mediaWhy||'<div class="src" style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<div class="src" style="margin-top:10px">Reviewed mechanisms are hypotheses matched to this source, never winner claims. Source fit supplies the cold-start distribution recommendation. Existing measured performance evidence remains stronger when available. Every checkbox remains yours to change.</div></div></details>';
+  return cwPickedHtml(s)+crossContext+
     '<div class="src" style="margin-top:18px;max-width:640px">Choose treatments, media, and platforms independently. Recommendations preselect a starting point; they never remove your control.</div>'+
     cwConfigSectionHtml("treatment","TREATMENTS",CONTENT_CONFIG_OPTIONS.treatment,s)+
     cwConfigSectionHtml("media","MEDIA",CONTENT_CONFIG_OPTIONS.media,s)+
@@ -3033,12 +3210,14 @@ async function cwLoadTreatment(){
   if(!slug) return;
   CW.loading = true; CW.treatErr = null;
   try {
-    const [r, signals] = await Promise.all([
-      fetch("/api/content/treatment?slug="+encodeURIComponent(slug)),
-      fetch("/api/signals").then(x=>x.json()).catch(()=>null),
+    const [r, signals, requestResult] = await Promise.all([
+      fetch("/api/content/treatment?slug="+encodeURIComponent(slug)+(CW.approvedLens?"&lens="+encodeURIComponent(CW.approvedLens):"")),
+      fetch("/api/signals?brand=human-inference").then(x=>x.json()).catch(()=>null),
+      fetch("/api/content/request?slug="+encodeURIComponent(slug)).then(x=>x.json()).catch(()=>null),
     ]);
     const d = await r.json();
     CW.signalDefaults = signals && signals.contentDefaults || null;
+    CW.request = requestResult&&requestResult.ok ? requestResult.request : null; CW.requestFor=slug;
     if(d && d.error){ CW.treat = null; CW.treatFor = null; CW.treatErr = d.error; }
     else { CW.treat = d; CW.treatFor = slug; CW.treatErr = null; }
   } catch(e){
@@ -3067,7 +3246,11 @@ async function cwSaveConfig(){
     ...((CW.treat&&CW.treat.distribution&&CW.treat.distribution.platforms)||[]).map(x=>({option:x.option,kind:"platform",reason:x.reason,source:"source-fit",recommended:true})),
     ...((CW.treat&&CW.treat.distribution&&CW.treat.distribution.media)||[]).map(x=>({option:x.option,kind:"media",reason:x.reason,source:"source-fit",recommended:true})),
   ];
+  const mechanismEvidence = (CW.treat&&CW.treat.mechanismRecommendations||[]).filter(x=>x.recommended).map(x=>({
+    option:x.option,kind:x.kind,reason:x.reason,source:x.source,recommended:true,
+  }));
   const evidence = [
+    ...mechanismEvidence,
     ...distributionEvidence,
     ...signalEvidence,
     ...recommendedPlatforms.map(option=>({option,kind:"platform",reason:"Current routing includes this platform",source:"routing",recommended:true})),
@@ -3113,12 +3296,14 @@ $("#contentWizard").addEventListener("click", (e)=>{
     return;
   }
   if(t.dataset.slug !== undefined){
-    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = []; CW.pane = "wizard"; CW.config = null; CW.approvedLens=null;
-    renderContentWizard(); return;
+    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.request=null; CW.requestFor=null; CW.yesErrors = []; CW.pane = "wizard"; CW.config = null; CW.approvedLens=null;
+    renderContentWizard();
+    if(contentRequestOrigin(cwSession())!=="human-inference") cwLoadTreatment();
+    return;
   }
   if(t.dataset.step !== undefined){
     const n = Number(t.dataset.step);
-    if(n > 1 && !CW.slug) return;
+    if(n === 2 && !CW.slug) return;
     if(n === 3){ CW.pane = "review"; renderContentWizard(); return; }
     if(n === 4){ CW.pane = "published"; renderContentWizard(); return; }
     CW.step = n; CW.yesErrors = []; CW.pane = "wizard";
@@ -3172,8 +3357,8 @@ async function outreachDraft(dir, btn, engine){
   }
 }
 
-async function outreachDecide(dir, decision){
-  const r = await post("/api/outreach/decide", {dir, decision});
+async function outreachDecide(dir, decision, reason){
+  const r = await post("/api/outreach/decide", {dir, decision, reason});
   if(r.ok){ flash(decision==="pursue" ? "Marked worth pursuing" : "Passed"); loadOutreach(); }
   else flash(r.error || "Failed");
 }
@@ -3192,13 +3377,16 @@ let ficDocData = null;
 let ficScene = null;      // { beats, chapter, continuity } from /api/fiction/scene
 let ficPassNote = "";
 let ficFixed = {};        // spans fixed in this session, so the rail says "fixed" until the next check
-let ficPage = "write";
+let ficPage = "inbox";
 let ficPromoRequest = "";
 let ficPromoObjective = "Invite readers into the series with a spoiler-light chapter preview.";
 let ficPromoChapter = null;
 let ficPromoDraft = null;
 let ficPromoBusy = false;
 let ficPromoError = "";
+let ficInbox = [];
+let ficPrNumber = "";
+let ficPrError = "";
 // ── Venture room ────────────────────────────────────────────────────────────────────────────────
 //
 // The thread is read-only except for explicit, server-gated controls: the selected-engine analysis
@@ -3223,6 +3411,10 @@ function renderVentureSheets(){
 let VENTURE_SLUGS = [];
 let ventureSlug = null;
 let VENTURE_THREAD = null;
+let VENTURE_SIGNALS = null;
+let VENTURE_LEARNING_EVALUATIONS = [];
+let VENTURE_LEARNING_SOURCES = [];
+let VENTURE_RESPONSE_EVALUATE_ID = null;
 let VENTURE_SUMMARIES = {};
 let VENTURE_DOCUMENTS = [];
 let ventureDocument = null;
@@ -3383,12 +3575,17 @@ async function loadVenture(){
   const requestedSlug = ventureSlug;
   showRoomLoading("ventureThread");
   try {
-    const r = await fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread");
+    const [r, signalsResponse, learningResponse, sourceResponse] = await Promise.all([fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread"), fetch("/api/signals?brand=human-inference").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-evaluations").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-sources").catch(()=>null)]);
     if(!r.ok) throw new Error("venture "+r.status);
     const j = await r.json();
     if(requestedSlug !== ventureSlug){ hideRoomLoading("ventureThread"); return; }
     if(!j.ok) throw new Error(j.error || "could not read this venture");
     VENTURE_THREAD = j.thread;
+    VENTURE_SIGNALS = signalsResponse&&signalsResponse.ok ? await signalsResponse.json() : null;
+    const learning = learningResponse&&learningResponse.ok ? await learningResponse.json() : null;
+    VENTURE_LEARNING_EVALUATIONS = learning&&Array.isArray(learning.evaluations) ? learning.evaluations : [];
+    const sourceData = sourceResponse&&sourceResponse.ok ? await sourceResponse.json() : null;
+    VENTURE_LEARNING_SOURCES = sourceData&&Array.isArray(sourceData.sources) ? sourceData.sources : [];
     VENTURE_SUMMARIES[requestedSlug] = j.thread;
     $("#ventureRunStepBtn").disabled = false;
     renderVenture();
@@ -3495,7 +3692,7 @@ async function ventureWrite(path, body, okMsg, key){
     ventureBusy = false;
     $("#ventureAnalysisPanel").hidden = true;
     await loadVenture();
-    if(okMsg) flash(okMsg);
+    if(okMsg) flash(typeof okMsg === "function" ? okMsg(j) : okMsg);
     return j;
   } catch(e){
     ventureBusy = false;
@@ -3512,7 +3709,17 @@ function vCardAction(artifactId, action){
   if(action.id === "failed") return vOpen(key, "failed", "");
   if(action.id === "retract") return vOpen(key, "retract", "");
   if(action.destructive && !confirm(action.label + ": " + artifactId + "?")) return;
-  ventureWrite("/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id, {}, (action.label+": done"), key);
+  const deliveryMessage = j => {
+    const result = j && j.result;
+    if(!result) return action.label+": done";
+    if(result.action === "handed_off") return "Ready to paste. Publish it yourself, then confirm it here.";
+    if(result.action === "claimed") return result.detail;
+    if(result.action === "waiting") return result.detail;
+    if(result.action === "posted") return "Published and confirmed by the delivery agent.";
+    return result.detail || (action.label+": done");
+  };
+  ventureWrite("/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id, {},
+    (action.id === "deliver" || action.id === "retry-delivery") ? deliveryMessage : (action.label+": done"), key);
 }
 
 // The reason field the override discipline raises. Rendered from the server's own
@@ -3658,6 +3865,8 @@ function vSubmitResponse(){
     const counted = (typeof g.have === "number" && typeof g.need === "number")
       ? " " + g.have + " of " + g.need + " people count toward the goal."
       : "";
+    if(res.response_id) VENTURE_RESPONSE_EVALUATE_ID = res.response_id;
+    renderVenture();
     flash((res.likely_duplicate
       ? "Written down. Same identifier as one already in the log, so they count once."
       : "Written down.") + counted);
@@ -3959,11 +4168,33 @@ function vClusters(m){
       + '</div>').join("")
     + '</div>';
 }
+function ventureLearningHtml(){
+  const evaluations=Array.isArray(VENTURE_LEARNING_EVALUATIONS)?VENTURE_LEARNING_EVALUATIONS:[];
+  const sources=[];
+  const adopted=(VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).filter(p=>p.ventureSlug===ventureSlug&&p.status==="adopted"&&p.ventureDecision&&p.ventureDecision.outcome==="accept");
+  adopted.forEach(p=>sources.push('<button data-learning-source="signals-input" data-learning-id="'+esc("signals-input-"+p.id)+'">Evaluate learning from accepted Signals input</button>'));
+  if(VENTURE_RESPONSE_EVALUATE_ID) sources.push('<button class="vacts" data-learning-source="response" data-learning-id="'+esc(VENTURE_RESPONSE_EVALUATE_ID)+'">Evaluate learning from the recorded response</button>');
+  (Array.isArray(VENTURE_LEARNING_SOURCES)?VENTURE_LEARNING_SOURCES:[]).slice(0,20).forEach(s=>{
+    const id=String(s.id||"").replace(/^research:/,"");
+    if(id) sources.push('<button data-learning-source="research-observation" data-learning-id="'+esc(id)+'">Evaluate '+esc(s.evidenceTier)+' learning · '+esc(s.scope)+'</button>');
+  });
+  const sourceHtml=sources.length?'<div class="vblock"><div class="vmono">LEARNING</div><div class="vnote">Review one accepted learning receipt at a time. Evaluation never changes Venture state by itself.</div><div class="vacts">'+sources.join('')+'</div></div>':'';
+  const cards=evaluations.map(e=>{
+    const status=String(e.status||"pending");
+    const controls=status==="pending"?'<div class="vacts"><button class="primary" data-learning-decision="accept" data-learning-id="'+esc(e.evaluationId||e.id)+'">Accept</button><button data-learning-decision="request-more-evidence" data-learning-id="'+esc(e.evaluationId||e.id)+'">Request more evidence</button><button data-learning-decision="decline" data-learning-id="'+esc(e.evaluationId||e.id)+'">Decline</button></div>':'';
+    const experiment=status==="accepted"&&e.recommendation==="test"?'<div class="vform learning-experiment" data-learning-experiment="'+esc(e.evaluationId||e.id)+'"><div class="lbl">PROPOSE EXPERIMENT</div><div class="sub">Use an existing Venture Content request. The normal Experiment approval queue remains separate.</div><input data-learning-field="contentRequestId" placeholder="Content request ID" /><input data-learning-field="evidenceFamily" placeholder="outcome family" /><div class="pair"><input data-learning-field="minimumSample" placeholder="minimum sample" /><input data-learning-field="minimumDays" placeholder="minimum days" /></div><div class="pair"><input data-learning-field="availablePublishingUnits" placeholder="publishing units" /><input data-learning-field="availableDays" placeholder="available days" /></div><button class="primary" data-learning-experiment-submit="'+esc(e.evaluationId||e.id)+'">Propose Experiment</button></div>':'';
+    const acceptedNote=status==="accepted"&&e.recommendation==="change"?'<div class="vnote">Accepted as a proposal. It does not mutate Venture automatically.</div>':status==="accepted"&&e.recommendation==="test"?'<div class="vnote">Accepted as a test recommendation. Nothing is run until you propose it and approve the normal Experiment plan.</div>':'';
+    return '<div class="vblock learning-card"><div class="vmono">LEARNING EVALUATION · '+esc(status)+'</div><div class="vtitle" style="font-size:19px">'+esc(e.recommendation)+' · '+esc(e.target)+'</div><div class="vnote" style="margin-top:7px"><strong>Evidence tier:</strong> '+esc(e.evidenceTier)+' · <strong>Claim ceiling:</strong> '+esc(e.claimCeiling)+'</div><div class="vnote" style="margin-top:7px"><strong>Rationale:</strong> '+esc(e.rationale)+'</div><div class="vnote" style="margin-top:7px"><strong>Proposed change:</strong> '+esc(e.proposedChange)+'</div><div class="vnote" style="margin-top:7px"><strong>Caveats:</strong> '+(e.caveats||[]).map(esc).join('; ')+'</div>'+controls+acceptedNote+experiment+'</div>';
+  }).join('');
+  return sourceHtml+(cards?'<div class="vblock"><div class="vmono">RECORDED LEARNING</div>'+cards+'</div>':'');
+}
 function renderVenture(){
   const t = VENTURE_THREAD;
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
   $("#ventureDay").textContent = vDayLine(t.elapsedDays);
-  $("#ventureThread").innerHTML = t.messages.map(m=>{
+  const signals = (VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).filter(p=>p.ventureSlug===ventureSlug&&p.status==="adopted");
+  const signalsHtml = signals.map(p=>'<div class="vblock" data-signals-input="'+esc(p.id)+'"><div class="vmono">SIGNALS INPUT · '+(p.ventureDecision?'DECIDED IN VENTURE':'ADOPTED IN SIGNALS')+'</div><div class="vtitle" style="font-size:20px">'+esc(p.title)+'</div><div class="vnote" style="margin-top:8px">'+esc(p.proposedInput)+' · measured '+esc(p.evidenceStatus)+' evidence · phase '+esc(p.phase)+(p.ventureDecision?' · Venture decision: '+esc(p.ventureDecision.outcome):'')+'</div>'+signalsHandoffMetaHtml(p, null, null)+'<div class="vnote" style="margin-top:6px"><strong>Venture:</strong> '+esc(p.ventureSlug)+' · <strong>Phase:</strong> '+esc(p.phase)+'</div>'+(p.ventureDecision?'':'<div class="vacts"><button class="primary" data-signals-input-action="accept" data-signals-input-id="'+esc(p.id)+'">Accept in Venture</button><button data-signals-input-action="request-more-evidence" data-signals-input-id="'+esc(p.id)+'">Request more evidence</button><button data-signals-input-action="reject" data-signals-input-id="'+esc(p.id)+'">Reject</button></div>')+'</div>').join('');
+  $("#ventureThread").innerHTML = ventureLearningHtml() + signalsHtml + t.messages.map(m=>{
     if(m.kind==="rail") return '<div class="vmono">'+esc(m.text)+'</div>';
     if(m.kind==="said") return '<div class="vsaid">'+esc(m.text)+'</div>';
     if(m.kind==="receipt") return '<div class="vreceipt"><i style="background:'+vDot(m.dot)+'"></i><span>'+esc(m.text)+'</span></div>';
@@ -4007,7 +4238,7 @@ function renderVentureExample(){
   $("#ventureRail").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE HISTORY</div><p class="vnote">Every selection, approval, delivery confirmation, and checkpoint appears here as an audit trail. Earlier phases stay available without crowding the current work screen.</p></div>';
   $("#ventureIntakeSections").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE GUARDRAILS</div><p class="vnote"><strong>Voice:</strong> plainspoken, specific, and skeptical of inflated claims.</p><p class="vnote"><strong>Truth boundary:</strong> treat demand as a hypothesis until real replies or purchases support it.</p><p class="vnote"><strong>Day 14:</strong> three live probes, a sustainable posting pace, and at least five substantive replies from the intended audience.</p><p class="from">Read-only. Start your own venture to record real guardrails.</p></div>';
 }
-document.addEventListener("click", e=>{
+document.addEventListener("click", async e=>{
   const target=e.target && e.target.closest ? e.target.closest("[data-venture-slug]") : null;
   if(target){ switchVenture(target.dataset.ventureSlug); return; }
   const doc=e.target && e.target.closest ? e.target.closest("[data-venture-document]") : null;
@@ -4020,6 +4251,9 @@ function switchVenture(slug){
   intakeTimers.clear();
   ventureSlug=slug;
   VENTURE_THREAD=null;
+  VENTURE_LEARNING_EVALUATIONS=[];
+  VENTURE_LEARNING_SOURCES=[];
+  VENTURE_RESPONSE_EVALUATE_ID=null;
   VENTURE_DOCUMENTS=[];
   ventureDocument=null;
   ventureAnalysisPending=false;
@@ -4044,6 +4278,30 @@ document.addEventListener("click", e=>{
   const t = e.target;
   if(!t || !t.closest || !t.closest("#roomVenture")) return;
   const val = ()=> { const el = $("#vFormVal"); return el ? el.value : ""; };
+
+  const learningSource = t.closest("[data-learning-source]");
+  if(learningSource){
+    const source=learningSource.dataset.learningSource, id=learningSource.dataset.learningId;
+    if(source&&id) post("/api/venture/"+encodeURIComponent(ventureSlug)+"/learning/"+source+"/"+encodeURIComponent(id)+"/evaluate",{engine:$("#ventureEngine").value||"codex"}).then(r=>{ if(r.ok){ flash("Learning evaluation is ready for your review."); loadVenture(); } else flash(r.error||"Could not evaluate learning"); });
+    return;
+  }
+  const learningDecision = t.closest("[data-learning-decision]");
+  if(learningDecision){
+    const rationale=prompt("Why record this Venture learning decision?")||"";
+    if(!rationale.trim()) return;
+    learningDecision.disabled=true;
+    post("/api/venture/"+encodeURIComponent(ventureSlug)+"/learning-evaluations/"+encodeURIComponent(learningDecision.dataset.learningId)+"/decision",{decision:learningDecision.dataset.learningDecision,rationale}).then(r=>{ if(r.ok){ flash("Learning decision recorded."); loadVenture(); } else { learningDecision.disabled=false; flash(r.error||"Could not record learning decision"); } });
+    return;
+  }
+  const experimentSubmit = t.closest("[data-learning-experiment-submit]");
+  if(experimentSubmit){
+    const form=experimentSubmit.closest("[data-learning-experiment]");
+    const field=(name)=>form&&form.querySelector('[data-learning-field="'+name+'"]')?.value||"";
+    post("/api/venture/"+encodeURIComponent(ventureSlug)+"/learning-evaluations/"+encodeURIComponent(experimentSubmit.dataset.learningExperiment||"")+"/experiment/propose",{
+      contentRequestId:field("contentRequestId"), evidenceFamily:field("evidenceFamily"), minimumSample:Number(field("minimumSample")), minimumDays:Number(field("minimumDays")), availablePublishingUnits:Number(field("availablePublishingUnits")), availableDays:Number(field("availableDays")), engine:$("#ventureEngine").value||"codex"
+    }).then(r=>{ if(r.ok){ flash("Moved into the normal Experiment approval queue. Nothing runs or publishes automatically."); loadVenture(); } else flash(r.error||"Could not propose Experiment"); });
+    return;
+  }
 
   if(t.id === "vFormCancel") return vClose();
   const handoff = t.closest("[data-vhandoff]");
@@ -4071,6 +4329,19 @@ document.addEventListener("click", e=>{
     if(o.kind === "pace") return ventureWrite("/pace", { postsPerWeek: val() }, "Pace recorded", o.key);
     if(o.kind === "editing") return vSaveBody(id, val());
     if(o.kind === "response") return vSubmitResponse();
+    return;
+  }
+
+  const signalsInput = t.closest("[data-signals-input-action]");
+  if(signalsInput){
+    const proposal = (VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).find(p=>p.id===signalsInput.dataset.signalsInputId&&p.ventureSlug===ventureSlug);
+    if(!proposal) return;
+    const reason = prompt(signalsInput.dataset.signalsInputAction==="accept"?"Why accept this Signals input in Venture?":signalsInput.dataset.signalsInputAction==="reject"?"Why reject this Signals input?":"What evidence is still needed?")||"";
+    if(!reason.trim()) return;
+    signalsInput.disabled=true;
+    ventureWrite("/signals-input/"+encodeURIComponent(proposal.id)+"/decision", {
+      outcome: signalsInput.dataset.signalsInputAction, reason,
+    }, "Signals input decision recorded", "signals-input:"+proposal.id).then(result=>{ if(result) loadVenture(); });
     return;
   }
 
@@ -4556,6 +4827,7 @@ async function loadFiction(){
   ficDocData = await dr.json();
   const sr = await fetch("/api/fiction/scene?series="+encodeURIComponent(ficSeries));
   ficScene = await sr.json();
+  try { const ir = await fetch("/api/fiction/inbox?series="+encodeURIComponent(ficSeries)); const inbox = await ir.json(); ficInbox = inbox.ok ? (inbox.ideas||[]) : []; } catch { ficInbox = []; }
   if(ficPage==="promotion") await loadFictionPromotion();
   renderFiction();
   renderCaptureHandoff();
@@ -4602,7 +4874,7 @@ function ficCheckRow(item, fixed){
 function ficCanonStamp(rep){
   if(!rep) return "";
   const holds = (rep.holds||[]).length, conflicts = (rep.conflicts||[]).length;
-  return "checked "+(rep.checkedAt||"").slice(0,10)+" · "+holds+" holding · "+conflicts+" breaking";
+  return "checked "+(rep.checkedAt||"").slice(0,10)+(rep.engine?" with "+engineLabel(rep.engine):"")+" · "+holds+" holding · "+conflicts+" breaking";
 }
 function ficParagraphs(body){
   return String(body||"").replace(/\\r\\n/g,"\\n").trim().split(/\\n\\s*\\n/)
@@ -4678,7 +4950,7 @@ function renderFiction(){
   const scene = !hasScene ? '' :
     '<div style="display:flex;align-items:baseline;gap:10px;margin:32px 0 11px">'+
       '<span style="font:600 13px/1 Georgia,serif;color:'+JC.ai+'">The scene, from your beats</span>'+
-      '<span class="src" style="font-style:italic">chapter '+chapter.number+(chapter.title?' · '+esc(chapter.title):'')+' · your beats, its prose</span>'+
+      '<span class="src" style="font-style:italic">chapter '+chapter.number+(chapter.title?' · '+esc(chapter.title):'')+' · your beats, its prose'+(sc.initialEngine?' · drafted with '+esc(engineLabel(sc.initialEngine)):'')+((sc.revisionHistory||[]).length?' · revised with '+(sc.revisionHistory||[]).map(x=>esc(engineLabel(x.engine))).join(", "):'')+'</span>'+
     '</div>'+
     '<div style="max-width:600px;display:flex;flex-direction:column;gap:15px;padding-left:18px;border-left:2px solid '+JC.ai+'">'+
       spans.map((t,i)=>'<div data-passage="'+i+'"><div style="font:400 18px/1.8 Georgia,serif;color:'+JC.ai+';white-space:pre-wrap">'+esc(t)+'</div><button type="button" data-edit-passage="'+i+'" style="margin-top:5px;border:none;background:none;padding:0;color:#756b9a;font-size:12px;cursor:pointer">Edit passage</button></div>').join("")+
@@ -4687,6 +4959,17 @@ function renderFiction(){
       '<button id="ficRecheck">Check the canon again</button>'+
       engineSelectHtml()+
       '<span class="src" style="max-width:340px">It is written to stories/'+esc(ficSeries)+'/'+esc(chapter.path)+'. A passage edit saves to this draft, but final acceptance and commit history stay in the story PR.</span>'+
+    '</div>'+
+    '<div style="margin-top:20px;max-width:600px;border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:15px 17px">'+
+      '<div class="wb-margin-cap">STORY PR · EXPLICIT REVIEW BRIDGE</div>'+
+      '<p class="src" style="margin:8px 0">Open a draft PR for this landed chapter, then apply unresolved line comments after you review them in GitHub. This action never locks or publishes the story.</p>'+
+      '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">'+
+        '<button type="button" class="primary" id="ficPrCreate">Open draft PR</button>'+
+        '<label class="src" for="ficPrNumber">PR #</label><input id="ficPrNumber" inputmode="numeric" value="'+esc(ficPrNumber)+'" placeholder="e.g. 42" style="width:75px">'+
+        engineSelectHtml("ficPrEngine")+
+        '<button type="button" id="ficPrRevise">Apply unresolved comments</button>'+
+      '</div>'+
+      (ficPrError?'<div class="fam-note t-amber" style="margin-top:9px">'+esc(ficPrError)+'</div>':'')+
     '</div>'+
     '<div style="margin-top:26px;max-width:600px">'+
       '<div class="wb-margin-cap">SECOND PASS · SAY WHAT TO CHANGE</div>'+
@@ -4701,7 +4984,25 @@ function renderFiction(){
     '</div>'+
     '<div style="margin:38px 0 0;display:flex;align-items:center;gap:12px"><span style="height:1px;flex:1;background:#efe7d6"></span><span style="font:italic 400 14px/1 Georgia,serif;color:#a89a80">the canon underneath it</span><span style="height:1px;flex:1;background:#efe7d6"></span></div>';
 
-  const stageNav='<nav class="room-pages" aria-label="Fiction pages">'+[["write","Write next"],["review","Review drafts"],["promotion","Promotion"]].map(([id,label])=>'<button type="button" class="'+(ficPage===id?'on':'')+'" data-fiction-page="'+id+'">'+label+'</button>').join('')+'</nav>';
+  const stageNav='<nav class="room-pages" aria-label="Fiction pages">'+[["inbox","Idea inbox"],["write","Write next"],["review","Review drafts"],["promotion","Promotion"]].map(([id,label])=>'<button type="button" class="'+(ficPage===id?'on':'')+'" data-fiction-page="'+id+'">'+label+'</button>').join('')+'</nav>';
+  const inboxTargets=series.docs.filter(x=>x.editable).map(x=>'<option value="'+esc(x.path)+'">'+esc(x.label)+'</option>').join('');
+  const inboxCards=(ficInbox||[]).map(idea=>{
+    const proposal=idea.proposal;
+    const turns=(idea.clarificationTurns||[]).map((turn,i)=>'<div class="src" style="margin-top:6px"><strong>'+String(i+1)+'.</strong> '+esc(turn.text)+'</div>').join('');
+    const canClarify=!proposal&&(idea.classification==='clarify'||(idea.classification==='character'&&!idea.targetPath));
+    const clarifyPanel=canClarify
+      ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #efe7d6"><div class="wb-margin-cap">ADD CLARIFICATION</div><textarea id="ficClarify-'+esc(idea.id)+'" rows="3" placeholder="Add the missing context in your own words." style="width:100%;box-sizing:border-box;margin-top:6px"></textarea><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:8px"><select id="ficClarifyTarget-'+esc(idea.id)+'"><option value="">Target only when needed</option>'+inboxTargets+'</select><button type="button" data-inbox-clarify="'+esc(idea.id)+'" class="primary">Continue the conversation</button></div></div>'
+      : '';
+    return '<article style="margin-top:14px;border:1px solid #d8cfbb;border-radius:8px;padding:16px 18px;background:#fffdf8">'+
+      '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><span class="wb-label" style="margin:0">'+esc(idea.classification||'clarify')+'</span><span class="pill">'+esc(idea.status||'needs-review')+'</span>'+(idea.targetPath?'<span class="src">→ '+esc(idea.targetPath)+'</span>':'')+'</div>'+
+      '<div class="wb-margin-cap" style="margin-top:13px">RAW IDEA · NEVER REWRITTEN</div><div style="white-space:pre-wrap;font:400 16px/1.55 Georgia,serif;margin-top:5px">'+esc(idea.rawText||'')+'</div>'+
+      (turns?'<div class="wb-margin-cap" style="margin-top:13px">CLARIFICATION TURNS · AUTHOR SUPPLIED</div>'+turns:'')+
+      (proposal?'<div class="wb-margin-cap" style="margin-top:14px">CLEANUP PROPOSAL · REVIEW BEFORE CANON</div><div style="white-space:pre-wrap;font:400 16px/1.55 Georgia,serif;margin-top:5px">'+esc(proposal.cleanedText||'')+'</div><div class="src" style="margin-top:8px">Provenance: '+esc(proposal.provenance.engine)+' · '+esc(proposal.provenance.targetPath||'default target')+'</div>' : '<div class="src" style="margin-top:10px">The classifier abstained. Clarify the destination before a cleanup proposal can be made.</div>')+
+      clarifyPanel+
+      (proposal&&idea.status==='needs-review'?'<div class="actions" style="margin-top:13px"><button class="primary" data-inbox-approve="'+esc(idea.id)+'">Approve for '+(idea.classification==='chapter'?'chapter drafting':'canonical update')+'</button><button data-inbox-reject="'+esc(idea.id)+'">Reject</button></div>':'')+
+      '</article>';
+  }).join('');
+  const inboxPage='<div class="wb-label" style="margin-top:28px">FICTION INBOX · ONE SAFE FRONT DOOR</div><div style="font:400 27px/1.35 Georgia,serif;margin:2px 0 9px">Where does this belong?</div><p class="src" style="max-width:650px">Your raw idea is stored byte-for-byte outside git. The selected engine classifies it, then proposes a cleanup for your review. Approval is the only action that can update a selected world, plot, or character document. Chapter ideas go to the existing draft flow.</p><div style="max-width:650px;border:1px solid #d8cfbb;border-radius:8px;padding:18px;background:#fffdf8"><textarea id="ficIdea" rows="5" placeholder="Drop in a world, character, plot, chapter, or imagery idea." style="width:100%;box-sizing:border-box;font:400 17px/1.6 Georgia,serif"></textarea><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px"><select id="ficIdeaTarget"><option value="">Choose a target when needed</option>'+inboxTargets+'</select>'+engineSelectHtml("ficIdeaEngine")+'<button class="primary" id="ficIdeaSubmit">Classify and prepare review</button></div></div><div style="max-width:700px;margin-top:23px">'+(inboxCards||'<div class="empty">No ideas in this inbox yet.</div>')+'</div>';
   const chapterOptions=(series.chapters||[]).map(ch=>'<option value="'+ch.chapter+'"'+(Number(ficPromoChapter)===ch.chapter?' selected':'')+'>'+esc(ch.label)+'</option>').join("");
   if(ficPromoChapter==null&&series.chapters&&series.chapters.length) ficPromoChapter=series.chapters[0].chapter;
   const intake='<div style="margin-top:24px"><div class="wb-label">OPTIONAL STORY PROMOTION</div><h3>Promote a finished chapter</h3><p class="src">This is separate from writing the story. Choose a locked chapter and say what the promotion should do; approved copy can then move to Content.</p><label class="wb-label" for="ficPromoChapter">SERIES / CHAPTER</label><select id="ficPromoChapter" style="width:100%;max-width:520px">'+chapterOptions+'</select><label class="wb-label" for="ficPromoRequest" style="display:block;margin-top:18px">WHAT SHOULD THIS PROMOTION DO?</label><textarea id="ficPromoRequest" rows="5" style="width:100%;max-width:600px" placeholder="Describe the launch note, audience, and spoiler boundary.">'+esc(ficPromoRequest)+'</textarea><label class="wb-label" for="ficPromoObjective" style="display:block;margin-top:18px">SUGGESTED OBJECTIVE</label><input id="ficPromoObjective" style="width:100%;max-width:600px" value="'+esc(ficPromoObjective)+'"></div>';
@@ -4733,7 +5034,7 @@ function renderFiction(){
   const promotionPage=intake+promoDraftPanel+(ficPromoDraft&&ficPromoDraft.state==='Approved'?finalPanel:'');
   const reviewPage=head+(hasScene?anchor+failCard+scene:'<div class="empty">No draft yet. Add your direction in Write next, then draft a first pass.</div>')+
     '<div class="src" style="max-width:680px;margin-top:24px;padding-top:16px;border-top:1px solid #efe7d6">Direct line edits and final acceptance happen in the story PR. Use the revision note here to ask for another focused pass; the canonical chapter is never silently overwritten.</div>';
-  $("#fictionMain").innerHTML = stageNav+(ficPage==="write"?head+composer+failCard:ficPage==="review"?reviewPage:ficPage==="canon"?canonPanel:promotionPage);
+  $("#fictionMain").innerHTML = stageNav+(ficPage==="inbox"?inboxPage:ficPage==="write"?head+composer+failCard:ficPage==="review"?reviewPage:ficPage==="canon"?canonPanel:promotionPage);
 
   const rows = [].concat(rep?rep.conflicts||[]:[], rep?rep.holds||[]:[]);
   const checks = rows.length
@@ -4766,6 +5067,23 @@ function renderFiction(){
     ficPage=button.dataset.fictionPage;
     if(ficPage==="promotion") await loadFictionPromotion();
     renderFiction();
+  }));
+  $("#ficIdeaSubmit")?.addEventListener("click",async ()=>{
+    const raw=$("#ficIdea").value; if(!raw){flash("Add the idea first");return;}
+    const button=$("#ficIdeaSubmit"); button.disabled=true; button.textContent="Preparing…";
+    const result=await post("/api/fiction/inbox",{series:ficSeries,rawText:raw,targetPath:$("#ficIdeaTarget")?.value||undefined,engine:$("#ficIdeaEngine")?.value||"claude"});
+    if(result.ok){flash(result.needsClarification?"I need a clearer destination":result.needsTarget?"Choose the character document":"Review proposal ready");await loadFiction();}else{button.disabled=false;button.textContent="Classify and prepare review";flash(result.error||"Could not classify idea");}
+  });
+  document.querySelectorAll("#fictionMain [data-inbox-approve]").forEach(button=>button.addEventListener("click",async ()=>{const result=await post("/api/fiction/inbox/approve",{series:ficSeries,id:button.dataset.inboxApprove});if(result.ok){flash("Approved through the Fiction workflow");await loadFiction();}else flash(result.error||"Could not approve idea");}));
+  document.querySelectorAll("#fictionMain [data-inbox-reject]").forEach(button=>button.addEventListener("click",async ()=>{const result=await post("/api/fiction/inbox/reject",{series:ficSeries,id:button.dataset.inboxReject});if(result.ok){flash("Rejected; canonical documents were untouched");await loadFiction();}else flash(result.error||"Could not reject idea");}));
+  document.querySelectorAll("#fictionMain [data-inbox-clarify]").forEach(button=>button.addEventListener("click",async ()=>{
+    const id=button.dataset.inboxClarify; const followUp=$("#ficClarify-"+id)?.value||"";
+    if(!followUp.trim()){flash("Add the clarification first");return;}
+    button.disabled=true;
+    const target=$("#ficClarifyTarget-"+id)?.value||undefined;
+    const result=await post("/api/fiction/inbox/clarify",{series:ficSeries,id,followUp,targetPath:target});
+    if(result.ok){flash(result.needsClarification?"I still need a clearer destination":result.needsTarget?"Choose the character document":"Review proposal ready");await loadFiction();}
+    else {button.disabled=false;flash(result.error||"Could not continue the conversation");}
   }));
   $("#ficPromoRequest")?.addEventListener("input",e=>{ ficPromoRequest=e.target.value; });
   $("#ficPromoObjective")?.addEventListener("input",e=>{ ficPromoObjective=e.target.value; });
@@ -4842,6 +5160,26 @@ function renderFiction(){
       if(r.ok){ flash("Reading it against your canon with "+engineLabel(engine)); loadFiction(); } else flash(r.error||"Could not start it");
     });
   });
+  const prCreate = $("#ficPrCreate");
+  if(prCreate) prCreate.addEventListener("click",async ()=>{
+    prCreate.disabled=true; ficPrError="";
+    const result=await post("/api/fiction/pr/create",{series:ficSeries,chapter:chapter.number});
+    if(result.ok){ ficPrNumber=String(result.pr.number); flash("Draft story PR ready · "+result.pr.url); }
+    else ficPrError=result.error||"Could not open the story PR";
+    renderFiction();
+  });
+  const prRevise = $("#ficPrRevise");
+  if(prRevise) prRevise.addEventListener("click",async ()=>{
+    const number=Number($("#ficPrNumber")?.value||ficPrNumber);
+    if(!Number.isSafeInteger(number)||number<1){ficPrError="Enter the GitHub PR number first";renderFiction();return;}
+    ficPrNumber=String(number); ficPrError=""; prRevise.disabled=true;
+    const engine=$("#ficPrEngine")?.value||"claude";
+    const result=await post("/api/fiction/pr/revise",{series:ficSeries,chapter:chapter.number,prNumber:number,engine});
+    if(result.ok&&!result.result.blocked){ flash("Processed "+result.result.processed+" unresolved review comments"); }
+    else if(result.ok) ficPrError=result.result.blockReason||"Review comments were blocked without changing the chapter";
+    else ficPrError=result.error||"Could not apply story PR comments";
+    renderFiction();
+  });
   document.querySelectorAll("#fictionSide [data-fix]").forEach(b=>b.addEventListener("click", ()=>{
     const it = rows[Number(b.dataset.fix)];
     post("/api/fiction/fix",{series:ficSeries, chapter:chapter.number, span:it.span, replacement:it.replacement}).then(r=>{
@@ -4914,6 +5252,7 @@ renderCharlesReplySource();
 $("#charlesDraftBtn").addEventListener("click", draftCharles);
 
 let charlesBriefLoaded = false;
+let CHARLES_PERSONA = null;
 async function loadCharlesBrief(){
   if(charlesBriefLoaded) return;
   const r = await fetch("/api/charles/persona-brief");
@@ -4924,6 +5263,47 @@ async function loadCharlesBrief(){
 $("#charlesBriefCopyBtn").addEventListener("click", async ()=>{
   try{ await navigator.clipboard.writeText($("#charlesBriefText").value); flash("Copied"); }
   catch(e){ $("#charlesBriefText").select(); flash("Select-all + Cmd/Ctrl-C to copy"); }
+});
+function renderCharlesPersona(){
+  if(!CHARLES_PERSONA) return;
+  $("#charlesPersonaYaml").value=CHARLES_PERSONA.yaml;
+  $("#charlesPersonaDigest").textContent="Production digest: "+CHARLES_PERSONA.digest.slice(0,12);
+  const proposals=CHARLES_PERSONA.proposals||[];
+  $("#charlesPersonaProposals").innerHTML=proposals.length ? proposals.map(proposal=>
+    '<details class="lead-details" style="margin-top:10px" '+(proposal.status==="pending"?'open':'')+'>'+
+      '<summary>'+esc(proposal.status.toUpperCase())+' · '+esc(proposal.afterDigest.slice(0,12))+'</summary>'+
+      '<div class="src" style="margin-top:8px">Exact reviewed change: '+esc(proposal.beforeDigest.slice(0,12))+' → '+esc(proposal.afterDigest.slice(0,12))+'</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'+
+        '<label class="src">OLD YAML<textarea readonly style="width:100%;height:150px;font:400 10px/1.4 ui-monospace,monospace">'+esc(proposal.beforeYaml)+'</textarea></label>'+
+        '<label class="src">NEW YAML<textarea readonly style="width:100%;height:150px;font:400 10px/1.4 ui-monospace,monospace">'+esc(proposal.afterYaml)+'</textarea></label>'+
+      '</div>'+
+      ((proposal.status==="pending"||proposal.status==="approved")?'<div class="actions" style="margin-top:8px"><button data-persona-decision="approve" data-proposal-id="'+esc(proposal.id)+'">'+(proposal.status==="approved"?'Finish approved apply':'Approve and apply exact YAML')+'</button>'+(proposal.status==="pending"?'<button data-persona-decision="reject" data-proposal-id="'+esc(proposal.id)+'">Reject</button>':'')+'</div>':'')+
+    '</details>'
+  ).join("") : '<div class="src">No persona changes awaiting review.</div>';
+  $("#charlesPersonaProposals").querySelectorAll("[data-persona-decision]").forEach(button=>button.addEventListener("click",async()=>{
+    const decision=button.dataset.personaDecision;
+    const evidence=window.prompt(decision==="approve" ? "What did you verify in this exact persona change?" : "Why are you rejecting this change?");
+    if(evidence===null) return;
+    button.disabled=true;
+    const result=await post("/api/charles/persona/proposals/"+encodeURIComponent(button.dataset.proposalId)+"/"+decision,{evidence});
+    button.disabled=false;
+    if(!result.ok){ flash(result.error||"Persona decision failed"); return; }
+    CHARLES_PERSONA=result.persona; renderCharlesPersona();
+    flash(decision==="approve"?"Exact reviewed persona is now live for the next Charles draft":"Persona proposal rejected; production was unchanged");
+  }));
+}
+async function loadCharlesPersona(){
+  const r=await fetch("/api/charles/persona");
+  const d=await r.json();
+  if(!d.ok){ flash(d.error||"Could not load production persona"); return; }
+  CHARLES_PERSONA=d.persona; renderCharlesPersona();
+}
+$("#charlesPersonaProposeBtn").addEventListener("click",async()=>{
+  const button=$("#charlesPersonaProposeBtn"); button.disabled=true;
+  const result=await post("/api/charles/persona/proposals",{yaml:$("#charlesPersonaYaml").value});
+  button.disabled=false;
+  if(!result.ok){ flash(result.error||"Persona proposal failed validation"); return; }
+  CHARLES_PERSONA=result.persona; renderCharlesPersona(); flash("Persona change saved for explicit review; production is unchanged");
 });
 
 // ── Charles desk (Build 4) ──
@@ -4952,6 +5332,7 @@ document.querySelectorAll("[data-charles-page]").forEach(button=>button.addEvent
 function typeLabel(t){ return t==="one-liner" ? "One-liner" : t==="essay" ? "Essay" : t==="reply" ? "Reply" : t; }
 async function loadCharles(){
   loadCharlesBrief();
+  loadCharlesPersona();
   const r = await fetch("/api/charles");
   CHARLES_POSTS = (await r.json()).posts || [];
   if(!CHARLES_POSTS.length){
@@ -4971,13 +5352,17 @@ function renderCharles(){
     $("#charlesDraftList").innerHTML=""; return;
   }
   charlesId=post.id;
-  const reviewHistory=(post.comments||[]).length
+  const engineProvenance=post.engine ? "Drafted with "+engineLabel(post.engine) : "Engine not recorded (legacy draft)";
+  const reviewHistory=post.historyWarning
+    ? '<div class="aierr" role="status" style="margin-top:14px">'+esc(post.historyWarning)+'</div>'
+    : (post.comments||[]).length
     ? '<details class="lead-details" open style="margin-top:18px"><summary>Review history · '+post.comments.length+'</summary>'+post.comments.map(item=>'<div class="src" style="margin-top:9px"><strong>'+esc(String(item.createdAt||"").slice(0,16).replace("T"," "))+'</strong><br>'+esc(item.body)+'</div>').join("")+'</details>'
     : '<div class="src" style="margin-top:14px">Review history starts when you save a revision note.</div>';
   $("#charlesMain").innerHTML =
     '<div class="wb-label">Charles Lord Featherbottom · '+esc(typeLabel(post.type))+'</div>'+
     '<div style="display:flex;align-items:center;gap:10px;margin:2px 0 14px;">'+
       '<span class="pill '+pillClass(post.status)+'">'+esc(statusLabel(post.status))+'</span>'+
+      '<span class="src">'+esc(engineProvenance)+'</span>'+
       (post.notes ? '<span class="src">'+esc(post.notes)+'</span>' : "")+
     '</div>'+
     '<div id="charlesBody" style="font:400 16px/1.75 Georgia,serif;border:1px dashed #e0d6c0;border-radius:8px;padding:20px 22px;background:#fcfbf7;white-space:pre-wrap;max-height:460px;overflow:auto;">'+esc(post.body)+'</div>'+
@@ -4995,6 +5380,7 @@ function renderCharles(){
     '<div class="wb-margin-cap">DRAFTS · CLICK TO OPEN</div>'+
     visible.map(p=>'<div class="lead-chip'+(p.id===charlesId?" on":"")+'" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px" data-id="'+esc(p.id)+'">'+
       '<span>'+esc(typeLabel(p.type))+' · '+esc(p.id)+'</span>'+
+      '<span class="src" style="font-size:10px">'+esc(p.engine ? "Drafted with "+engineLabel(p.engine) : "Engine not recorded (legacy draft)")+'</span>'+
       '<span class="pill '+pillClass(p.status)+'" style="font-size:10px">'+esc(statusLabel(p.status))+'</span>'+
     '</div>').join("");
   document.querySelectorAll("#charlesDraftList .lead-chip").forEach(c=>c.addEventListener("click",()=>{ charlesId=c.dataset.id; renderCharles(); }));
@@ -5048,6 +5434,7 @@ async function onCharlesAction(act, item){
 // foot controls and the insights "Brief:" link share one switch. The last two sheets are
 // pre-prototype developer surfaces relocated behind those controls so the room opens on the reads.
 let SIGNALS = null;
+function signalsBrand(){ return document.getElementById("signalsBrand")?.value || "human-inference"; }
 // The server returns the latest append-only decision for each recommendation. A reload therefore
 // keeps the user's choice without changing routing, configuration, or the repository backlog.
 function signalKey(r){ return r.type+":"+r.title; }
@@ -5083,6 +5470,43 @@ function signalsPracticalHtml(){
 function displayLabel(value){
   const normalized=String(value||"").replaceAll("-"," ");
   return normalized ? normalized[0].toUpperCase()+normalized.slice(1) : "";
+}
+// Handoff cards are deliberately metadata-only. Keep this renderer shared between the Signals
+// experiment card and the Venture room's projected Signals input so neither surface can silently
+// drop the scope, measured arms, provenance, caveats, qualification, or exact lineage needed to
+// review a handoff. Every value is escaped here; in particular, never render a draft body.
+function signalsHandoffMetaHtml(p, perf, interpretation){
+  const sample=(p&&p.sampleSize)||{};
+  const comparison=perf&&perf.primaryComparison;
+  const treatment=sample.treatment ?? (comparison&&comparison.treatment&&comparison.treatment.sample);
+  const control=sample.control ?? (comparison&&comparison.control&&comparison.control.sample);
+  const provenance=(p&&p.provenance)||{};
+  const lineage=(p&&p.lineage)||{};
+  const caveats=(p&&p.caveats)||((interpretation&&interpretation.caveats)||[]);
+  const qualification=p&&p.qualification || (interpretation&&interpretation.qualification) || "not recorded";
+  const evidenceStatus=p&&p.evidenceStatus || (interpretation&&interpretation.evidenceStatus) || "not recorded";
+  const scope=p&&p.scope || (p&&p.contentRequestId) || "not recorded";
+  const sourceId=p&&p.sourceId || (lineage&&lineage.sourceId) || "not recorded";
+  const variantId=p&&p.variantId || (lineage&&lineage.variantId) || "not recorded";
+  const experimentId=p&&p.experimentId || (lineage&&lineage.experimentId) || "not recorded";
+  return '<div class="src handoff-meta">'+
+    '<strong>Scope:</strong> '+esc(scope)+
+    ' · <strong>Sample:</strong> treatment '+esc(treatment==null?"not measured":treatment)+' · control '+esc(control==null?"not measured":control)+
+    ' · <strong>Qualification:</strong> '+esc(qualification)+
+    ' · <strong>Evidence:</strong> '+esc(evidenceStatus)+
+    '<br><strong>Provenance:</strong> plan digest '+esc(provenance.planDigest||(p&&p.digest)||"not recorded")+' · interpretation '+esc(provenance.interpretationId||(interpretation&&interpretation.id)||"not recorded")+
+    '<br><strong>Caveats:</strong> '+esc(caveats.length?caveats.join("; "):"none recorded")+
+    '<br><strong>Lineage:</strong> source '+esc(sourceId)+' · variant '+esc(variantId)+' · experiment '+esc(experimentId)+
+    (((p&&p.contentItemRefs)||[]).length?' · content '+((p.contentItemRefs||[]).map(esc).join(", ")):'')+
+    '</div>';
+}
+function experimentCanProposeVenture(perf, interpretation){
+  const family=perf&&perf.primaryMetric&&perf.primaryMetric.family;
+  const refs=perf&&perf.primaryOutcomeRefs;
+  return !!(interpretation&&interpretation.reviewStatus==="accepted"&&interpretation.recommendation!=="reject"&&
+    perf&&perf.analysisStatus==="ready"&&(family==="audience"||family==="business")&&
+    refs&&Array.isArray(refs.treatment)&&refs.treatment.some(ref=>String(ref).startsWith("outcome:"))&&
+    Array.isArray(refs.control)&&refs.control.some(ref=>String(ref).startsWith("outcome:")));
 }
 function signalsExperimentsHtml(){
   const plans=(SIGNALS&&SIGNALS.experimentPlans)||[];
@@ -5121,7 +5545,7 @@ function signalsExperimentsHtml(){
         '<div class="src">Confidence: '+esc(displayLabel(interpretation.confidence))+' · Evidence: '+(interpretation.evidenceRefs||[]).map(esc).join(', ')+'</div>'+
         ((interpretation.caveats||[]).length?'<div class="src">Caveats: '+interpretation.caveats.map(esc).join('; ')+'</div>':'')+
         (reviewStatus==="pending"?'<div class="actions"><button class="sig-experiment-interpret-review primary" data-id="'+esc(p.experimentId)+'" data-action="accept">Accept interpretation</button><button class="sig-experiment-interpret-review" data-id="'+esc(p.experimentId)+'" data-action="reject">Reject analysis</button><span class="src">Your review records the learning. It does not change routing or select a winner.</span></div>'
-          : '<div class="src">Interpretation review: '+esc(reviewStatus)+' by Muxin. Winner remains unset.</div>');
+          : '<div class="src">Interpretation review: '+esc(reviewStatus)+' by Muxin. Winner remains unset.</div>'+(experimentCanProposeVenture(perf, interpretation)?'<div class="actions"><button class="sig-venture-propose primary" data-id="'+esc(p.experimentId)+'">Propose as Venture input</button><span class="src">Requires a named Venture and phase. Signals records the proposal only.</span></div>':'') );
     }
     return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(confidence)+' confidence</span><span style="font-weight:600;font-size:14px;">'+esc(p.hypothesis)+'</span></div>'+
       '<div class="dev-summary"><strong>Observation:</strong> '+esc(p.observation)+'</div>'+
@@ -5138,7 +5562,19 @@ function signalsExperimentsHtml(){
       '<div class="src"><strong>Capacity:</strong> '+esc(p.capacityRationale)+(p.capacity?' · '+esc(p.capacity.availablePublishingUnits)+' units / '+esc(p.capacity.availableDays)+' days declared':'')+'</div>'+
       ((p.caveats||[]).length?'<div class="src"><strong>Caveats:</strong> '+p.caveats.map(esc).join('; ')+'</div>':'')+
       (p.planDecision&&p.planDecision.rationale?'<div class="src"><strong>Decision rationale:</strong> '+esc(p.planDecision.rationale)+'</div>':'')+
+      signalsHandoffMetaHtml(p, perf, interpretation)+
       '<div class="actions">'+controls+'</div>'+measurement+'</div>';
+  }).join('')+'</section>';
+}
+function signalsVentureHandoffsHtml(){
+  const rows=(SIGNALS&&SIGNALS.ventureHandoffs)||[];
+  if(!rows.length) return '';
+  return '<section style="margin-top:26px"><div class="wb-label">VENTURE INPUTS</div><div class="src" style="margin:5px 0 12px">Learning proposals stay in Signals until you decide. This never creates Venture artifacts or accepts a Venture gate.</div>'+rows.map(p=>{
+    const status=String(p.status||"pending");
+    const controls=status==="pending"
+      ? '<button class="sig-venture-decision primary" data-id="'+esc(p.id)+'" data-action="adopt">Adopt for Venture</button><button class="sig-venture-decision" data-id="'+esc(p.id)+'" data-action="request-more-evidence">Request more evidence</button><button class="sig-venture-decision" data-id="'+esc(p.id)+'" data-action="decline">Decline</button>'
+      : status==="adopted" ? '<button class="sig-venture-open primary" data-slug="'+esc(p.ventureSlug)+'">Open '+esc(p.ventureSlug)+'</button>' : '<span class="src">'+esc(status.replaceAll("-"," "))+'</span>';
+    return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(p.confidence)+' confidence</span><span style="font-weight:600;font-size:14px;">'+esc(p.title)+'</span></div><div class="dev-summary"><strong>Observed:</strong> '+esc(p.factualSummary)+'</div><div class="dev-summary"><strong>Proposed Venture input:</strong> '+esc(p.proposedInput)+'</div>'+signalsHandoffMetaHtml(p, null, null)+'<div class="src"><strong>Evidence refs:</strong> '+p.evidenceRefs.map(esc).join(', ')+'</div>'+ (p.muxinRationale?'<div class="src"><strong>Your decision:</strong> '+esc(p.muxinRationale)+'</div>':'') +'<div class="src"><strong>Venture:</strong> '+esc(p.ventureSlug)+' · <strong>Phase:</strong> '+esc(p.phase)+'</div><div class="actions">'+controls+'</div></div>';
   }).join('')+'</section>';
 }
 function renderSignals(){
@@ -5146,8 +5582,11 @@ function renderSignals(){
   $("#signalsBriefDate").textContent = SIGNALS.briefDate ? "data through "+SIGNALS.briefDate : "";
   const box = $("#signalsTop");
   if(!SIGNALS.briefPath){
-    box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+'<div class="empty">No live strategy brief yet. The clearly labeled sample above demonstrates the intended read; open the latest strategy brief below to replace it with evidence.</div>';
+    box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+'<div class="empty">No live strategy brief yet. The clearly labeled sample above demonstrates the intended read; open the latest strategy brief below to replace it with evidence.</div>';
     bindSignalsExperimentActions(box);
+    box.querySelectorAll(".sig-venture-decision").forEach(b=>b.addEventListener("click", ()=>decideSignalsVenture(b)));
+    box.querySelectorAll(".sig-venture-open").forEach(b=>b.addEventListener("click", ()=>{ setRoom("venture"); switchVenture(b.dataset.slug); }));
+    box.querySelectorAll(".sig-venture-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsVenture(b)));
     return;
   }
   const fitCards = (SIGNALS.confidence||[]).map(c=>{
@@ -5182,7 +5621,7 @@ function renderSignals(){
     ? '<div class="src" style="margin-top:10px">Too weak to trust yet: '+weak.map(c=>esc(c.channel)).join(", ")+'. We will not build on those.</div>'
     : "";
   const briefNote = '<div class="src" style="margin-bottom:6px">Straight from the latest brief. These do not change anything by themselves.</div>';
-  box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+
+  box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+
     '<div style="margin-top:16px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Where you fit, so far</div><div class="stat-tiles" style="margin-top:8px">'+fitCards+'</div></div>'+
     weakHtml+
     '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+briefNote+
@@ -5193,6 +5632,28 @@ function renderSignals(){
   box.querySelectorAll(".sig-proposal-apply").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"apply",b)));
   box.querySelectorAll(".sig-proposal-rollback").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"rollback",b)));
   bindSignalsExperimentActions(box);
+  box.querySelectorAll(".sig-venture-decision").forEach(b=>b.addEventListener("click", ()=>decideSignalsVenture(b)));
+  box.querySelectorAll(".sig-venture-open").forEach(b=>b.addEventListener("click", ()=>{ setRoom("venture"); switchVenture(b.dataset.slug); }));
+  box.querySelectorAll(".sig-venture-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsVenture(b)));
+}
+async function proposeSignalsVenture(button){
+  const ventureSlug=(prompt("Named Venture slug:")||"").trim();
+  const phase=Number(prompt("Venture phase:","2")||"");
+  if(!ventureSlug||!Number.isInteger(phase)||phase<1){flash("A named Venture and positive phase are required.");return;}
+  button.disabled=true;
+  const result=await post("/api/signals/experiments/"+encodeURIComponent(button.dataset.id)+"/venture-handoff/propose",{ventureSlug,phase});
+  if(!result.ok){button.disabled=false;flash(result.error||"Could not propose Venture input");return;}
+  flash("Venture input proposal saved in Signals. Venture remains separately gated.");
+  await loadSignals();
+}
+async function decideSignalsVenture(button){
+  const rationale=prompt(button.dataset.action==="adopt"?"Why adopt this Venture input?":button.dataset.action==="decline"?"Why decline this Venture input?":"What evidence is still needed?")||"";
+  if(!rationale.trim()) return;
+  button.disabled=true;
+  const result=await post("/api/signals/venture-handoff/"+encodeURIComponent(button.dataset.id)+"/decision",{decision:button.dataset.action,rationale});
+  if(!result.ok){button.disabled=false;flash(result.error||"Could not record the Signals decision");return;}
+  flash(button.dataset.action==="adopt"?"Signals decision saved. Venture remains separately gated.":"Signals decision saved.");
+  await loadSignals();
 }
 function bindSignalsExperimentActions(box){
   box.querySelectorAll(".sig-experiment-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsExperiment(b)));
@@ -5215,7 +5676,7 @@ async function proposeSignalsExperiment(button){
   const selected=$("#signalsAnalysisEngine").value||"codex";
   if(selected==="ollama-gpt-oss"){flash("Choose Claude, Grok, or Codex for experiment proposals.");return;}
   button.disabled=true;
-  const result=await post("/api/signals/experiments/propose",{contentRequestId,evidenceDossierPath,evidenceFamily,minimumSample,minimumDays,availablePublishingUnits,availableDays,engine:selected});
+  const result=await post("/api/signals/experiments/propose",{contentRequestId,evidenceDossierPath,evidenceFamily,minimumSample,minimumDays,availablePublishingUnits,availableDays,engine:selected,brand:signalsBrand()});
   if(!result.ok){button.disabled=false;flash(result.error||"Could not evaluate the experiment.");return;}
   flash(result.result&&result.result.status==="no-experiment"?"Signals found no experiment worth the capacity.":"Signals experiment proposal is ready for review.");
   await loadSignals();
@@ -5224,14 +5685,14 @@ async function actOnSignalsExperiment(id,action,button){
   let rationale="";
   if(action==="decline") rationale=prompt("Why decline this experiment?")||"";
   button.disabled=true;
-  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/"+action,{approvedBy:"muxin",rationale});
+  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/"+action,{approvedBy:"muxin",rationale,brand:signalsBrand()});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not update experiment"); await loadSignals(); return; }
   flash(action==="decline"?"Experiment declined.":"Experiment drafts are pending review in Content.");
   await loadSignals();
 }
 async function interpretSignalsExperiment(id,button){
   button.disabled=true;
-  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/interpret",{engine:$("#signalsAnalysisEngine").value||"codex"});
+  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/interpret",{engine:$("#signalsAnalysisEngine").value||"codex",brand:signalsBrand()});
   if(!result.ok){button.disabled=false;flash(result.error||"Could not interpret experiment");return;}
   flash("Signals interpretation is ready for your review.");
   await loadSignals();
@@ -5240,7 +5701,7 @@ async function reviewSignalsExperimentInterpretation(id,action,button){
   const rationale=prompt(action==="accept"?"Why accept this interpretation?":"Why reject this analysis?")||"";
   if(!rationale.trim()) return;
   button.disabled=true;
-  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/interpretation/"+action,{rationale});
+  const result=await post("/api/signals/experiments/"+encodeURIComponent(id)+"/interpretation/"+action,{rationale,brand:signalsBrand()});
   if(!result.ok){button.disabled=false;flash(result.error||"Could not review interpretation");return;}
   flash(action==="accept"?"Interpretation recorded.":"Analysis rejected.");
   await loadSignals();
@@ -5257,7 +5718,7 @@ async function reviewSignalProposal(id,action,button){
   const evidence=prompt(action==="approve" ? "Why is this exact change approved?" : "Why reject this proposal?");
   if(!evidence) return;
   button.disabled=true;
-  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence});
+  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence,brand:signalsBrand()});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not review proposal"); return; }
   flash(action==="approve" ? "Proposal approved. It has not been applied." : "Proposal rejected."); await loadSignals();
 }
@@ -5265,7 +5726,7 @@ async function actOnSignalProposal(id,action,button){
   let evidence="";
   if(action==="rollback"){ evidence=prompt("Why roll this change back?")||""; if(!evidence) return; }
   button.disabled=true;
-  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence});
+  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence,brand:signalsBrand()});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not "+action+" proposal"); return; }
   flash(action==="apply" ? "Approved Signals change applied." : "Signals change rolled back."); await loadSignals();
 }
@@ -5273,22 +5734,28 @@ async function saveSignalDecision(index, decision, button){
   const recommendation=SIGNALS&&SIGNALS.recommendations ? SIGNALS.recommendations[index] : null;
   if(!recommendation) return;
   button.disabled=true;
-  const result=await post("/api/signals/decision",{decision,type:recommendation.type,title:recommendation.title,rationale:recommendation.rationale});
+  const result=await post("/api/signals/decision",{decision,type:recommendation.type,title:recommendation.title,rationale:recommendation.rationale,brand:signalsBrand()});
   if(!result.ok){ button.disabled=false; flash(result.error||"Could not save the decision"); return; }
   flash("Decision saved. No configuration changed.");
   await loadSignals();
 }
 async function loadSignals(){
-  const r = await fetch("/api/signals");
+  const brand=signalsBrand();
+  const r = await fetch("/api/signals"+"?brand="+encodeURIComponent(brand));
   SIGNALS = await r.json();
   renderSignals();
   await loadOutcomes();
 }
-document.getElementById("signalsBrand")?.addEventListener("change", () => { loadOutcomes(); });
+document.getElementById("signalsBrand")?.addEventListener("change", () => {
+  briefLoaded=false;
+  insightsHistory=[];
+  loadSignals();
+  if(SIG.pane==="brief") loadBrief();
+});
 
 // ── Signals: the four outcome families + the redacted research read ──
 //
-// GET /api/signals/outcomes groups what data/analytics.db really holds into the four families of
+// GET /api/signals/outcomes groups analytics.db plus the canonical outcome ledger into the four families of
 // docs/venture-schema-contract.md §5.8; GET /api/research/report is the redacted account-level
 // research read. Nothing here adds a family to another one, and nothing here computes a number.
 //
@@ -5375,7 +5842,7 @@ function renderOutcomes(){
   if(OUTCOMES.error){ box.innerHTML = '<div class="empty">Could not read the outcome families: '+esc(OUTCOMES.error)+'</div>'; return; }
   const conf = OUTCOMES.confidence || [];
   const excluded = OUTCOMES.excluded_unassigned || {};
-  const excludedLine = ["posts","metrics","audience","research"].map(k=>k+" "+(Number(excluded[k])||0)).join(", ");
+  const excludedLine = ["posts","metrics","audience","research","outcomes"].map(k=>k+" "+(Number(excluded[k])||0)).join(", ");
   const plats = conf.map(c=>
     '<div class="sig-plat"><span style="font-weight:600">'+esc(c.platform)+'</span>'+
     '<span class="t-'+(c.sufficient?"green":"amber")+'" style="font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace">'+esc(c.sufficient?"enough data":"insufficient")+'</span>'+
@@ -5422,7 +5889,7 @@ function renderResearch(){
     (replies?'<div class="src" style="margin-top:10px">A few redacted lines, as stored:</div>'+replies:"");
 }
 async function loadOutcomes(){
-  const brand = document.getElementById("signalsBrand")?.value || "human-inference";
+  const brand = signalsBrand();
   const [o, rr] = await Promise.all([
     fetch("/api/signals/outcomes"+"?brand="+encodeURIComponent(brand)).then(r=>r.json()).catch(e=>({error:String(e)})),
     fetch("/api/research/report"+"?brand="+encodeURIComponent(brand)).then(r=>r.json()).catch(()=>null),
@@ -5437,12 +5904,24 @@ async function loadOutcomes(){
 // owns each item.
 let STUDIO = null;
 let PUBLISH_RECONCILIATION_HEALTH = null;
+let PUBLISH_DRAIN_HEALTH = null;
 function publishingHealthLine(health){
   if(!health) return "Delivery checks unavailable";
   if(health.state==="failed") return "Delivery checks stopped: "+(health.error||"provider reconciliation failed");
   if(health.state==="running") return "Delivery checks running now";
   if(health.state==="ok") return "Delivery checks current"+(health.lastCompletedAt?" · "+String(health.lastCompletedAt).slice(0,16).replace("T"," "):"");
   return "Delivery checks waiting for the first run";
+}
+function publishDrainLine(health){
+  if(!health||health.state==="idle") return "";
+  if(health.state==="failed") return "Postiz queue drain stopped: "+(health.error||"unknown error");
+  if(health.waitingRows>0){
+    const when = health.resumeAt ? new Date(health.resumeAt) : null;
+    const hhmm = when && !isNaN(when) ? when.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}) : "the next check";
+    return health.waitingRows+(health.waitingRows===1?" row":" rows")+" waiting for Postiz (90 posts per hour), resumes at "+hhmm+" while Studio stays open";
+  }
+  if(health.drained>0) return "Postiz queue drained: "+health.drained+" waiting "+(health.drained===1?"row":"rows")+" scheduled";
+  return "";
 }
 function studioDateLine(){
   const now = new Date();
@@ -5472,6 +5951,7 @@ function renderStudio(){
     '<div style="font:400 30px/1.25 Georgia,serif;margin:0 0 22px;">Needs you today</div>'+
     (rows || '<div class="empty" style="padding:20px 0">Nothing needs you right now.</div>')+
     '<div id="publishingReconciliationHealth" class="src" style="margin-top:18px">'+esc(publishingHealthLine(PUBLISH_RECONCILIATION_HEALTH))+'</div>'+
+    (publishDrainLine(PUBLISH_DRAIN_HEALTH) ? '<div id="publishingDrainHealth" class="src" style="margin-top:6px">'+esc(publishDrainLine(PUBLISH_DRAIN_HEALTH))+'</div>' : '')+
     closing;
   renderTeamRail();
   document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
@@ -5484,13 +5964,15 @@ function renderStudio(){
 }
 async function loadStudio(){
   try {
-    const [r, healthResponse] = await Promise.all([
+    const [r, healthResponse, drainResponse] = await Promise.all([
       fetch("/api/studio"),
       fetch("/api/publishing/reconciliation-health").catch(()=>null),
+      fetch("/api/publishing/drain-health").catch(()=>null),
     ]);
     if(!r.ok) throw new Error("studio "+r.status);
     STUDIO = await r.json();
     PUBLISH_RECONCILIATION_HEALTH = healthResponse&&healthResponse.ok ? await healthResponse.json() : null;
+    PUBLISH_DRAIN_HEALTH = drainResponse&&drainResponse.ok ? await drainResponse.json() : null;
     renderStudio();
     connectionRecovered();
   } catch(e) {
@@ -5504,7 +5986,7 @@ async function loadStudio(){
 // Everything sent, and what's next — every row tied back to its origin: why you reached out,
 // what you said, the dossier. Two people at one org are two rows with two clocks (the tracker
 // folds per person). Calm copy from nextActionLabel; nothing here sends anything.
-const FU_FILTERS = [["all","All"],["platform","Platform"],["client","Org"],["jobsearch","Job search"],["inbound","Inbound"]];
+const FU_FILTERS = [["all","All"],["platform","Platform"],["client","Org"],["peer","Peer"],["jobsearch","Job search"],["inbound","Inbound"]];
 let fuFilter = "all";
 let FOLLOWUPS_DATA = null;
 const fuPending = new Set();
@@ -5525,7 +6007,7 @@ function fuAllRows(){
   const d = FOLLOWUPS_DATA;
   if(!d || !d.buckets) return [];
   const rows = [];
-  for(const bucket of ["client","platform","jobsearch","inbound"]) for(const r of (d.buckets[bucket]||[])) rows.push(r);
+  for(const bucket of ["client","platform","peer","jobsearch","inbound"]) for(const r of (d.buckets[bucket]||[])) rows.push(r);
   return rows;
 }
 function followupRowHtml(row){
@@ -5548,7 +6030,7 @@ function followupRowHtml(row){
   return '<div class="fu-row">'+
     '<div class="fu-head"><span class="fu-dot" style="background:'+fuDotColor(row.status)+'"></span>'+
       '<div><span class="fu-name">'+esc(nameParts[0])+'</span>'+(row.person?' <span class="fu-org">· '+esc(nameParts[1])+'</span>':"")+
-      ' <span class="seg-chip '+(row.bucket==="platform"?"platform":row.bucket==="client"?"org-role":"content-example")+'">'+esc(row.bucket==="client"?"org":row.bucket)+'</span>'+
+      ' <span class="seg-chip '+(row.bucket==="platform"?"platform":row.bucket==="client"?"org-role":row.bucket==="peer"?"peer":"content-example")+'">'+esc(row.bucket==="client"?"org":row.bucket)+'</span>'+
       '<div class="fu-meta">'+sentLine+' · <button type="button" class="wb-link fu-toggle" data-key="'+esc(row.key)+'">'+(open?"hide why":"show why")+'</button></div></div>'+
       '<span class="fu-next" style="color:'+fuNextColor(row.status)+'">'+esc(row.nextAction)+'</span></div>'+
     origin + status +
@@ -5644,18 +6126,18 @@ function jobAwaitingAnswer(j){ return j.status==="blocked" && !j.answer; }
 function jobSettled(j){ return j.status==="done" || j.status==="stopped" || (j.status==="blocked" && !!j.answer); }
 // Stop is offered only where it can act: queued or running. Everything else has already settled,
 // where the route no-ops, and a blocked job's stop would discard a question she has not answered.
-function jobStopOffered(j){ return j.status==="queued" || j.status==="running"; }
+function jobStopOffered(j){ return j.kind!=="venture-delivery" && (j.status==="queued" || j.status==="running"); }
 function jobsPollDue(jobs, now, armedUntil){
   if(now < (armedUntil||0)) return true;
   if(jobs.some(j=>j.status==="queued"||j.status==="running")) return true;
   return jobs.some(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS + JOBS_POLL_MS);
 }
 const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/content/generate","/api/content/media/render","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check","/api/fiction/promotion/draft","/api/fiction/promotion/revise"];
-function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path) || /^\\/api\\/venture\\/[^/]+\\/(analyze|run-step)$/.test(path); }
+function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path) || /^\\/api\\/venture\\/[^/]+\\/(analyze|run-step)$/.test(path) || /^\\/api\\/venture\\/[^/]+\\/artifacts\\/[^/]+\\/(deliver|retry-delivery)$/.test(path); }
 function jobRoom(kind){
   if(kind==="scout"||kind==="draft-follow-up"||kind==="outreach-revise") return "Outreach";
   if(kind==="pull"||kind==="strategy"||kind==="insights"||kind==="ask-insights"||kind==="brief-revise") return "Signals";
-  if(kind==="venture-analysis"||kind==="venture-step") return "Venture";
+  if(kind==="venture-analysis"||kind==="venture-step"||kind==="venture-delivery") return "Venture";
   if(kind==="charles-draft") return "Charles";
   if(kind==="fiction-draft"||kind==="fiction-continuity"||kind==="fiction-promo") return "Fiction";
   return "Content";
@@ -6011,6 +6493,7 @@ function classifyCapture(text){
   const t = String(text==null?"":text).trim();
   if(!t) return {kind:"empty"};
   const low = t.toLowerCase();
+  if(/\\bcharles\\b|\\bfeatherbottom\\b/.test(low)) return {kind:"room", room:"Charles"};
   if(/follow up|reply to|email|intro|reach out|met /.test(low)) return {kind:"room", room:"Outreach"};
   if(/chapter|scene|elias|character|plot/.test(low)) return {kind:"room", room:"Fiction"};
   if(/price|offer|landing|magnet|survey|venture|phase|response|repl/.test(low)) return {kind:"room", room:"Venture"};
@@ -6021,7 +6504,9 @@ function captureVerdict(room){
   if(room==="Content") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Content").line)}, actionLabel:"Start on it"};
   if(room==="Fiction") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Fiction").line)}, actionLabel:"Start on it"};
   if(room==="Outreach") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Outreach").line)}, actionLabel:"Start on it"};
-  return {room:room, line:${JSON.stringify(captureHandoffVerdict("Venture").line)}, actionLabel:"Start on it"};
+  if(room==="Venture") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Venture").line)}, actionLabel:"Start on it"};
+  if(room==="Charles") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Charles").line)}, actionLabel:"Start on it"};
+  throw new Error("Unsupported capture room: "+room);
 }
 // ── end of the capture mirror ──
 
@@ -6069,11 +6554,12 @@ function closeLinkAsk(clearText){
   setCaptureRail(false);
 }
 // States the room it picked, then offers the explicit action that makes a durable handoff.
-function showCaptureVerdict(room){
+function showCaptureVerdict(room, note){
   const v = captureVerdict(room);
   const box = $("#captureVerdict");
-  const others = ["Content","Fiction","Outreach","Venture"].filter(r=>r!==room);
+  const others = ["Content","Fiction","Outreach","Venture","Charles"].filter(r=>r!==room);
   box.innerHTML = '<div>'+esc(v.line)+'</div>'+
+      (note?'<div class="cv-note">'+esc(note)+'</div>':'')+
       '<div class="cv-row"><button class="primary cap-go">Start on it</button></div>'+
     '<div class="cv-row"><span>Wrong room?</span>'+
       others.map(r=>'<button class="cap-move" data-room="'+r+'">'+r+'</button>').join("")+'</div>';
@@ -6095,23 +6581,40 @@ async function advanceCaptureSafely(room, text){
   await Promise.resolve(setRoom(room.toLowerCase()));
   if(room==="Fiction"){
     await loadFiction();
-    ficPage="write"; renderFiction();
-    const beats=$("#ficBeats"); if(beats&&!beats.value.trim()) beats.value=text;
-    beats?.focus();
-    return "Your beats are in Write next. Review them before drafting.";
+    ficPage="inbox"; renderFiction();
+    const idea=$("#ficIdea"); if(idea&&!idea.value.trim()) idea.value=text;
+    idea?.focus();
+    return "Your idea is in the Fiction inbox. Review it before classification.";
   }
   if(room==="Outreach"){
     setOutreachSub("leads");
     $("#outreachList button, #outreachList [tabindex]")?.focus();
     return "Choose the lead this belongs to before drafting.";
   }
-  await loadVenture();
-  $("#ventureRunStepBtn")?.focus();
-  return "The current venture step is open. Review its human gate before running it.";
+  if(room==="Charles"){
+    await loadCharles();
+    charlesPage="input"; renderCharlesPages();
+    const input=$("#charlesInput");
+    if(!input) throw new Error("Charles Input is unavailable");
+    if(input.value.trim()&&input.value!==text){
+      input.focus();
+      throw new Error("Charles Input already has an unsaved idea. Clear it, then start this saved capture again.");
+    }
+    input.value=text;
+    input?.focus();
+    return "Your exact idea is in Charles Input. Review it before drafting.";
+  }
+  if(room==="Venture"){
+    await loadVenture();
+    $("#ventureRunStepBtn")?.focus();
+    return "The current venture step is open. Review its human gate before running it.";
+  }
+  throw new Error("Unsupported capture room: "+room);
 }
 async function takeCaptureTo(room){
   const t = captureText();
   if(!t){ flash("Write or paste something first"); return; }
+  if(t!==ROUTED_TEXT){ hideCaptureVerdict(); flash("The text changed after it was read. Reading it again."); return routeCapture(); }
   const saved = await post("/api/captures", {room:room, text:t});
   if(!saved.ok){ flash(saved.error||"Could not save this capture. It is still in the box."); return; }
   try {
@@ -6161,12 +6664,34 @@ function renderCaptureHandoff(){
     });
   }
 }
-function routeCapture(){
-  const v = classifyCapture(captureText());
-  if(v.kind==="empty"){ flash("Write or paste something first"); return; }
-  if(v.kind==="ask-link"){ openLinkAsk(v.url); return; }
-  showCaptureVerdict(v.room);
-  flash("I read this as "+v.room+".");
+// The room read asks the server (a model judgment on the subscription route, keyword sniff as
+// fallback). The inline classifyCapture mirror above still answers instantly for empty text and
+// bare links, and stands in when the server cannot be reached.
+let ROUTE_GEN = 0;         // in-flight guard: only the newest read may show its verdict
+let ROUTED_TEXT = null;    // the exact text the shown verdict was read from
+async function routeCapture(){
+  const text = captureText();
+  const quick = classifyCapture(text);
+  if(quick.kind==="empty"){ flash("Write or paste something first"); return; }
+  if(quick.kind==="ask-link"){ openLinkAsk(quick.url); return; }
+  const gen = ++ROUTE_GEN;
+  const btn = $("#routeBtn"); if(btn) btn.disabled = true;
+  flash("Reading this…");
+  let room = quick.room, note = "Keyword guess. Pick the room yourself if this is wrong.";
+  try {
+    const r = await post("/api/captures/classify", {text:text});
+    if(gen!==ROUTE_GEN) return; // a newer read superseded this one
+    if(r.ok && r.verdict && r.verdict.kind==="room"){
+      room = r.verdict.room;
+      note = r.method==="model" ? (r.reason||"Read by "+(r.engine||"the model")+".") : "Keyword guess ("+(r.fallbackReason||"model unavailable")+"). Pick the room yourself if this is wrong.";
+    } else if(r && r.error){
+      note = "Keyword guess. The server could not read this: "+r.error+". Pick the room yourself if this is wrong.";
+    }
+  } catch(e) { if(gen!==ROUTE_GEN) return; note = "Keyword guess. The server could not be reached. Pick the room yourself if this is wrong."; }
+  if(btn) btn.disabled = false;
+  ROUTED_TEXT = text;
+  showCaptureVerdict(room, note);
+  flash("I read this as "+room+".");
 }
 // "Versions for Content" holds the link in Content for Muxin to decide what to do with it next.
 async function linkReadForContent(){
@@ -6280,6 +6805,8 @@ for(const id of ["reviewMediaFilter","reviewPlatformFilter","reviewTreatmentFilt
 $("#reviewRequestFilter").addEventListener("input",render);
 $("#reviewSelectAll").addEventListener("click",()=>{ document.querySelectorAll("#reviewMain .review-check").forEach(box=>{ box.checked=true; reviewSelected.add(box.closest(".scan-row").dataset.reviewKey); }); });
 $("#reviewApproveSelected").addEventListener("click",approveReviewSelection);
+$("#batchPreviewBtn")?.addEventListener("click",batchPreview);
+$("#batchMoveBtn")?.addEventListener("click",batchMove);
 $("#reviewSheet").addEventListener("click", (e)=>{
   const t = e.target.closest ? e.target.closest("[data-step]") : null;
   if(!t) return; const n=Number(t.dataset.step);

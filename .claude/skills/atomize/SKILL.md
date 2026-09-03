@@ -1,9 +1,14 @@
 ---
 name: atomize
-description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Proposes cut/version options from the same inspiration before formatting anything (step 1.5) — every cut's text is Muxin's own; Muxin approves a set conversationally, then each cut atomizes independently. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), /atomize --no-spin <arg> (strict verbatim, no audience spin), /atomize --continue <content-folder> [--cut <lens>] (resume steps 2-8 on an already-scaffolded folder or cut), or /atomize --revise <content-folder>.
+description: Build 1 — atomize one piece of original content into cheap, brand-scoped platform assets. Usage - /atomize --brand <human-inference|charles|fiction> <source>, /atomize --brand <brand> notes, /atomize --brand <brand> --no-spin <source>, /atomize --brand <brand> --continue <content-folder> [--cut <lens>], or /atomize --brand <brand> --revise <content-folder>.
 ---
 
 # /atomize — content atomization pipeline
+
+Require one canonical brand at entry: `human-inference`, `charles`, or `fiction`. Reject a
+missing or unknown brand. There is no Human Inference fallback. Read strategy directives only
+from `briefs/<brand>/` (highest dated brief), and stamp `from_brief` with that scoped path.
+Legacy top-level `briefs/` files, including `briefs/bets.md`, are unassigned and unread.
 
 Turn ONE piece of Muxin's original content into platform-specific assets, scored and queued
 for review. Muxin wrote the thinking; you package it.
@@ -113,7 +118,7 @@ to the same `source.md` and the same platform-fit decision.
      Muxin's verbatim `source.md` lines). Its "Format for platforms" button then runs
      `/atomize --continue <folder> [--cut <lens>]`, picking up from step 2 exactly as below.
 
-2. **Read the latest strategy brief** in `briefs/` (highest date). **Propose** applying its
+2. **Read the latest strategy brief** in `briefs/<brand>/` (highest date). **Propose** applying its
    `Directives for atomization` — pillar priority, channel emphasis, format notes, hooks that
    worked — as an opt-in at step 1.5 or here, rather than always silently applying them: name which
    directive(s) look relevant to this piece and ask before acting on them. **Record which brief and
@@ -181,7 +186,8 @@ to the same `source.md` and the same platform-fit decision.
    later, if this piece becomes a short).
 
 3.5. **Route — decide which platforms this piece is for.** Run
-   `npm run route -- --pillar <pillar> --folder <folder>` — pass **all** tagged pillars in ONE
+   `npm run route -- --brand <brand> --pillar <pillar> --folder <folder>` — `--brand` is required
+   (`human-inference` for Muxin's own writing); pass **all** tagged pillars in ONE
    call, comma-separated (e.g. `--pillar civic-tech,human-ai`), not one invocation per pillar.
    The router merges across pillars itself (include if *either* pillar includes it, unless
    *any* pillar's `config/routing.yaml` `never` rule vetoes it — that veto is a hard stop no
@@ -201,7 +207,7 @@ to the same `source.md` and the same platform-fit decision.
    **Exploration probe (card 92bb2ae6):** if the latest strategy brief's [TEST] recommendations
    name an off-assignment platform + pillar probe still due this month, and this piece's tagged
    pillar matches, add `--explore <platform>` to the same route call (e.g.
-   `--pillar civic-tech --explore linkedin --folder <folder>`) to force that ONE platform's
+   `--brand human-inference --pillar civic-tech --explore linkedin --folder <folder>`) to force that ONE platform's
    decision to `include` for this piece only, even though `config/routing.yaml` doesn't default
    it there. Draft that platform's derivative same as any other in step 4, but stamp its
    frontmatter `exploration_probe: true`. Everything else about the piece (other platforms,
@@ -231,7 +237,7 @@ to the same `source.md` and the same platform-fit decision.
      project_url: https://example.com/my-project   # OPTIONAL, per-post: only set when Muxin confirmed a SPECIFIC project genuinely relevant to THIS post's content (step 4.5 — ask her, never guess/reuse a project just because the content type matched). Omit when she has none or none applies — that CTA line is simply dropped, never defaulted to the essay link or an unrelated project.
      cta: source            # OPTIONAL override: source | <literal-url> | none — wins over content_type when set (e.g. civic-tech's voting-tool link, or a deliberate none). Omit to let content_type drive the CTA.
      cta_label: "Full essay (free to subscribe):"   # with an explicit cta override, this is its label. With content_type instead (no explicit cta), this OPTIONALLY overrides just the work_with_me line's text on the 4 work-flavored types (card d2746598, step 4.5) -- a tactical, source-topic-tied line instead of the generic "Connect on LinkedIn." Omit to keep the generic default; other stacked CTA lines (source/project) are never affected by it.
-     from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)
+     from_brief: briefs/<brand>/2026-06-14-strategy-brief.md   # the scoped brief whose directives shaped this (or omit if none)
      directives_applied: [prioritize_pillar:claude-code, format:short-single]  # which directives you acted on
      control_run: true      # only on the one derivative drafted for a due spin-control pick (card f444f440); omit otherwise
      exploration_probe: true   # only on the one derivative routed via step 3.5's --explore flag (card 92bb2ae6)

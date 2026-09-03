@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
 import type { Engine } from "./engines.js";
+import { isBrandId, type BrandId } from "../identity/brand.js";
 
 export const SIGNALS_EXPERIMENT_RESULTS_PATH = migrateLegacyDataFile(["signals-experiment-results.jsonl"]);
 export const SIGNALS_EXPERIMENT_INTERPRETATION_VERSION = "signals-experiment-interpretation-v1" as const;
@@ -13,6 +14,7 @@ export type ExperimentInterpretationReviewStatus = "pending" | "accepted" | "rej
 
 export interface ExperimentInterpretationInput {
   readonly experimentId: string;
+  readonly brandId?: BrandId;
   readonly recommendation: ExperimentInterpretationRecommendation;
   readonly rationale: string;
   readonly evidenceRefs: readonly string[];
@@ -32,6 +34,7 @@ export interface ExperimentInterpretation {
   readonly version: typeof SIGNALS_EXPERIMENT_INTERPRETATION_VERSION;
   readonly id: string;
   readonly experimentId: string;
+  readonly brandId?: BrandId;
   readonly recommendation: ExperimentInterpretationRecommendation;
   readonly rationale: string;
   readonly evidenceRefs: string[];
@@ -146,11 +149,12 @@ export function recordExperimentInterpretation(
   const experimentId = text(input.experimentId, "experimentId");
   if (!["keep", "revise", "reject"].includes(input.recommendation)) throw new Error("interpretation recommendation is invalid");
   if (!["low", "medium", "high"].includes(input.confidence)) throw new Error("interpretation confidence is invalid");
-  if (!["claude", "grok", "codex", "ollama-gpt-oss"].includes(input.engine)) throw new Error("interpretation engine is invalid");
+  if (!["claude", "grok", "codex"].includes(input.engine)) throw new Error("GPT-OSS is read-only and cannot interpret or persist experiment results");
   const identity = {
     kind: "signals_experiment_interpretation" as const,
     version: SIGNALS_EXPERIMENT_INTERPRETATION_VERSION,
     experimentId,
+    ...(input.brandId ? { brandId: input.brandId } : {}),
     recommendation: input.recommendation,
     rationale: text(input.rationale, "rationale"),
     evidenceRefs: strings(input.evidenceRefs, "evidenceRefs", true),
@@ -160,6 +164,7 @@ export function recordExperimentInterpretation(
     winner: null,
     autoWinner: false as const,
   };
+  if (input.brandId !== undefined && !isBrandId(input.brandId)) throw new Error("interpretation brand id is invalid");
   const proposal = { ...identity, id: digest(identity), createdAt: now };
   return withFileLock(`${path}.lock`, () => {
     const prior = fold(path).get(experimentId);

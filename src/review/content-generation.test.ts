@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildContentRequest } from "./content-request.js";
-import { assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredColdFeedEditorPrompt, configuredContentPrompt, configuredDerivativeText, configuredExperimentFrontmatter, configuredQueueNote, configuredSourceCtaLabel, configuredSourceSupportsCta, configuredSourceSegments, parseConfiguredEditorBodies, parseConfiguredVariantBodies, parseVentureConfiguredBodies, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
+import { assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredColdFeedEditorPrompt, configuredContentPrompt, configuredDerivativeText, configuredExperimentFrontmatter, configuredQueueNote, configuredSourceCtaLabel, configuredSourceSupportsCta, configuredSourceSegments, parseConfiguredEditorBodies, parseConfiguredVariantBodies, parseVentureConfiguredBodies, preflightConfiguredGeneration, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
 
 const request = buildContentRequest({
   id: "request-1", origin: "studio", descriptor: "A useful idea", originalInput: "The exact source.",
@@ -34,6 +34,85 @@ test("configured drafting prompt carries every selected treated identity and pre
   assert.match(prompt, /No em dashes/i);
   assert.match(prompt, /AI tells/i);
   assert.doesNotMatch(prompt, new RegExp(request.variants.find((variant) => variant.identity.kind === "control")!.identity.id));
+});
+
+test("belief-shift drafting is constrained to a real source-grounded change of mind", () => {
+  const beliefShift = buildContentRequest({
+    id: "belief-shift", origin: "human-inference", descriptor: "A real change of mind",
+    originalInput: "I used to think reach mattered most. Now I believe replies matter more.",
+    treatments: ["belief-shift"], media: [], platforms: ["linkedin"], includeUntreatedControl: true,
+    sourceProvenance: { kind: "source", sourceLines: [1] },
+  });
+  const prompt = configuredContentPrompt(
+    beliefShift,
+    beliefShift.variants.filter((variant) => variant.identity.kind === "treated"),
+    [{ source_line: 1, text: beliefShift.originalInput }],
+  );
+  assert.match(prompt, /first-person belief reversal/i);
+  assert.match(prompt, /old-belief and current-belief clauses verbatim/i);
+  assert.match(prompt, /Do not invent a prior belief/i);
+  assert.match(prompt, /conclusion beyond the approved lines/i);
+
+  const variants = beliefShift.variants.filter((variant) => variant.identity.kind === "treated");
+  const exact = JSON.stringify(variants.map((variant) => ({
+    id: variant.identity.id, body: beliefShift.originalInput, source_lines: [1],
+  })));
+  const folder = mkdtempSync(join(tmpdir(), "belief-shift-enforcement-"));
+  writeFileSync(join(folder, "source.md"), `${beliefShift.originalInput}\n`);
+  const parsed = parseConfiguredVariantBodies(exact, variants, folder, [1]);
+  assert.equal(parsed.get(variants[0]!.identity.id)?.body, beliefShift.originalInput);
+  assert.throws(() => parseConfiguredVariantBodies(JSON.stringify(variants.map((variant) => ({
+    id: variant.identity.id,
+    body: `${beliefShift.originalInput} This proves replies always win.`,
+    source_lines: [1],
+  }))), variants, folder, [1]), /only exact sentences/i);
+  assert.throws(() => parseConfiguredVariantBodies(JSON.stringify(variants.map((variant) => ({
+    id: variant.identity.id,
+    body: "I once cared about reach. Now I value replies.",
+    source_lines: [1],
+  }))), variants, folder, [1]), /exact sentences|belief clauses/i);
+  assert.throws(() => parseConfiguredVariantBodies(JSON.stringify(variants.map((variant) => ({
+    id: variant.identity.id,
+    body: "Now I believe replies are the useful signal. I used to think reach was the goal.",
+    source_lines: [1],
+  }))), variants, folder, [1]), /retain both explicit first-person belief clauses/i);
+
+  const editedExact = JSON.stringify(variants.map((variant) => ({
+    id: variant.identity.id, recommendation: "Preserve exact reviewed mechanism copy.", body: beliefShift.originalInput,
+  })));
+  assert.equal(parseConfiguredEditorBodies(editedExact, variants, parsed).get(variants[0]!.identity.id)?.body, beliefShift.originalInput);
+  assert.throws(() => parseConfiguredEditorBodies(JSON.stringify(variants.map((variant) => ({
+    id: variant.identity.id, recommendation: "Sharpen it.", body: `${beliefShift.originalInput} Extra conclusion.`,
+  }))), variants, parsed), /preserve belief-shift.*byte-for-byte/i);
+
+  mkdirSync(join(folder, "cuts", "belief-audit"), { recursive: true });
+  writeFileSync(join(folder, "cuts", "belief-audit", "cut.md"), `---\nsource_lines: [1]\n---\n\n${beliefShift.originalInput}\n`);
+  const missingEvidence = buildContentRequest({
+    id: beliefShift.id, origin: "human-inference", descriptor: beliefShift.descriptor, originalInput: beliefShift.originalInput,
+    treatments: ["belief-shift"], media: [], platforms: ["linkedin"],
+    sourceProvenance: { kind: "approved-cut", lens: "belief-audit", sourceLines: [1] },
+  });
+  assert.throws(
+    () => preflightConfiguredGeneration(folder, missingEvidence, missingEvidence.variants.filter((variant) => variant.identity.kind === "treated")),
+    /persisted belief-shift evidence.*canonical|canonical.*authorization/i,
+  );
+  assert.equal(existsSync(join(folder, "derivatives")), false, "authorization fails before artifact creation");
+  assert.equal(existsSync(join(folder, "media-stages")), false, "authorization fails before media-stage creation");
+
+  const ventureBeliefShift = buildContentRequest({
+    id: "venture-belief-shift", origin: "venture", ventureId: "test-venture", descriptor: "Cross-room bypass attempt",
+    originalInput: beliefShift.originalInput, treatments: ["belief-shift"], media: [], platforms: ["linkedin"],
+    ventureSource: {
+      artifactId: "probe-1", phase: 1, artifactKind: "text-post-note", messageId: "message-1",
+      bodyPath: "phase-1-attention/probe-1.md", claimRefs: [],
+      approval: { editorialStatus: "approved", provenance: "muxin-editorial-approval" },
+    },
+  });
+  assert.throws(
+    () => preflightConfiguredGeneration(folder, ventureBeliefShift, ventureBeliefShift.variants.filter((variant) => variant.identity.kind === "treated")),
+    /belief-shift.*only.*Human Inference/i,
+  );
+  assert.equal(existsSync(join(folder, "derivatives")), false, "cross-room refusal precedes artifact creation");
 });
 
 test("configured source segments preserve exact source text and treated output fails closed on formatting and voice violations", () => {
@@ -178,6 +257,12 @@ test("Venture treated variants use a dedicated engine-body contract with claim a
   const engineBody = "Engine-produced treatment of the approved claim.";
   const parsed = parseVentureConfiguredBodies(JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: engineBody }))), ventureTreated);
   assert.equal(parsed.get(ventureTreated[0]!.identity.id)?.body, engineBody);
+  const fenced = parseVentureConfiguredBodies(`\`\`\`json\n${JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: engineBody })))}\n\`\`\``, ventureTreated);
+  assert.equal(fenced.get(ventureTreated[0]!.identity.id)?.body, engineBody);
+  assert.throws(
+    () => parseVentureConfiguredBodies(`Here you go:\n\`\`\`json\n${JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: engineBody })))}\n\`\`\``, ventureTreated),
+    /invalid Venture configured-variant JSON/,
+  );
   assert.notEqual(parsed.get(ventureTreated[0]!.identity.id)?.body, venture.originalInput);
   assert.throws(
     () => parseVentureConfiguredBodies(JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: "Here’s the thing — this unlocks a new paradigm." }))), ventureTreated),

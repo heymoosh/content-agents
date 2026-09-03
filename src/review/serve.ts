@@ -24,6 +24,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { repoRoot, openDb } from "../db/db.js";
+import { measurementAccountForBrand } from "../config/brand-accounts.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { fetchNotesList, humanInferenceSubstackMeasurementBinding, scaffoldPicked } from "../atomize/new-notes.js";
@@ -33,7 +34,10 @@ import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { handleVentureRead } from "./venture-reads.js";
 import { handleVentureWrite } from "./venture-writes.js";
+import { deliverVenture } from "../venture/deliver.js";
 import { buildFollowups, markResponded, markContacted, markSent, moveOn, isBucket, type TrackerEvent } from "../outreach/tracker.js";
+import { deliverLockedGmailMessage, reconcileLockedGmailMessage } from "../outreach/gmail-delivery.js";
+import type { GmailSendRequest, GmailSendResult } from "../providers/email/gmail.js";
 import {
   enrich,
   listPieces,
@@ -47,6 +51,7 @@ import {
   getLiveStateAsOf,
   cancelScheduled,
 } from "./rows.js";
+import { routeCapture as routeCaptureWithModel } from "./capture-router.js";
 import {
   classifySource,
   sourceDispatch,
@@ -83,21 +88,25 @@ import { listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyB
 import { renderPage } from "./page.js";
 import { fixturesEnabled, FIXTURE_ENV_VAR, FIXTURE_WRITE_REFUSAL } from "./fixtures.js";
 import { buildStudioHome } from "./studio.js";
-import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, ollamaAvailability, type Engine } from "./engines.js";
+import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, type Engine } from "./engines.js";
 import { readTreatment } from "./treatment.js";
 import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts, saveIntakeSectionDraft, readIntakeSections, clearIntakeDrafts } from "./intake-draft.js";
 import { enqueueVentureStep } from "./venture-runner.js";
 import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
 import { providerForKind, publishingRetryBlock, resolvePublishingAttempt, scheduleApprovedOnce, type PublishingResolution } from "./publishing-status.js";
+import { batchReschedule, listBatchCandidates, rescheduleRow, type BatchPlan, type BatchSelection } from "./reschedule.js";
 import { handleFictionRoute } from "./serve-fiction.js";
 import { handleCharlesRoute } from "./serve-charles.js";
 import { handleSignalsRoute, prepareLiveExperimentInterpretation } from "./serve-signals.js";
+import { handleVentureLearningRoute } from "./serve-venture-learning.js";
+import { buildVentureLearningEvaluationPrompt, parseVentureLearningEvaluation, type VentureLearningContext, type VentureLearningReceipt } from "./venture-learning-evaluator.js";
+import { proposeVentureLearningExperiment, type VentureLearningExperimentRequest } from "./venture-learning-experiment-proposal.js";
 import { parseExperimentInterpretationResult, type ExperimentInterpretationInput } from "./signals-experiment-result-store.js";
 import { proposeSignalsExperiment, type SignalsExperimentProposalRequest } from "./signals-experiment-proposal.js";
 import { createApprovedVentureHandoff, findExistingVentureContentFolder } from "./venture-content-handoff-store.js";
 import { toContentRequestInput as ventureToContentRequestInput } from "./venture-content-handoff.js";
 import { isOutreachEngine, type OutreachEngine } from "./page-outreach.js";
-import { authorizeGuiContentRequest, readContentRequest, writeContentRequest } from "./content-request-store.js";
+import { authorizeGuiContentRequest, readAuthoritativeApprovedCut, readContentRequest, writeContentRequest } from "./content-request-store.js";
 import type { ContentRequestInput } from "./content-request.js";
 import { createLockedChapterHandoff } from "./fiction-content-handoff-store.js";
 import { toContentRequestInput } from "./fiction-content-handoff.js";
@@ -108,7 +117,10 @@ import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
 import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
 import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
 import { saveCutBody, addCutComment } from "./rows.js";
+import { isBrandId, type BrandId } from "../identity/brand.js";
 import { providerReconciliationHealth, startProviderReconciliationLoop } from "./provider-reconciliation-runner.js";
+import { publishDrainHealth, startPublishDrainLoop } from "./publish-drain.js";
+import { readLearningEvaluations } from "../venture/learning-evaluation.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich), jobs.ts (classifySource,
@@ -122,17 +134,18 @@ const PORT = Number(process.env.REVIEW_PORT ?? 4600);
 
 /** File-writing and tool-using routes deliberately exclude the plain local Ollama runner. */
 export function requestEngine(value: unknown): Engine {
-  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is read-only and cannot run an agentic or file-writing route");
+  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is paused; choose Claude, Grok, or GPT (Codex)");
   return isEngine(value) ? value : "claude";
 }
 
-/** Read-only, self-contained analysis can use every installed engine, including local GPT-OSS. */
+/** Read-only analysis still honors the product pause; an installed local model is not authorization. */
 export function requestAnalysisEngine(value: unknown): Engine {
+  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is paused; choose Claude, Grok, or GPT (Codex)");
   return isEngine(value) ? value : "claude";
 }
 
 export function requestInteractiveAnalysisEngine(value: unknown): Engine {
-  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is limited to the self-contained initial analysis; choose another engine for report-reading follow-up questions");
+  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is paused; choose Claude, Grok, or GPT (Codex)");
   return requestEngine(value);
 }
 
@@ -172,25 +185,52 @@ async function createSignalsExperimentProposal(input: SignalsExperimentProposalR
   }, engine));
 }
 
+async function evaluateVentureLearning(receipt: VentureLearningReceipt, context: VentureLearningContext, engine: Engine) {
+  const prompt = buildVentureLearningEvaluationPrompt(receipt, context);
+  const output = await runQueued("venture-analysis", `Evaluate Venture learning with ${ENGINE_LABELS[engine]}`, async (job) => {
+    const result = await runAgentSpawn(job, engine, prompt, {
+      timeoutMs: 180_000,
+      permissionMode: null,
+      tools: engine === "codex" ? undefined : "",
+      sandbox: "read-only",
+    });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: `${ENGINE_LABELS[engine]} Venture learning evaluation`, timeoutLabel: "180s",
+      exitVerb: `${ENGINE_LABELS[engine]} Venture learning evaluation`, command: ENGINE_COMMANDS[engine],
+    });
+    if (failure) throw new Error(failure);
+    return result.stdout.trim();
+  }, engine);
+  return parseVentureLearningEvaluation(output, receipt, context, engine);
+}
+
+async function createVentureLearningExperiment(input: VentureLearningExperimentRequest) {
+  return proposeVentureLearningExperiment(input, async (prompt, engine) => runQueued("insights", `Plan Venture experiment with ${ENGINE_LABELS[engine]}`, async (job) => {
+    const result = await runAgentSpawn(job, engine, prompt, {
+      timeoutMs: 180_000,
+      permissionMode: null,
+      tools: engine === "codex" ? undefined : "",
+      sandbox: "read-only",
+    });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: `${ENGINE_LABELS[engine]} Venture experiment plan`, timeoutLabel: "180s",
+      exitVerb: `${ENGINE_LABELS[engine]} Venture experiment plan`, command: ENGINE_COMMANDS[engine],
+    });
+    if (failure) throw new Error(failure);
+    return result.stdout.trim();
+  }, engine));
+}
+
 type SyncEngineProbe = (file: string, args: readonly string[], options: { encoding?: BufferEncoding; stdio?: "ignore" | "pipe"; timeout: number }) => string | Buffer;
 
 export function availableEngines(probe: SyncEngineProbe = execFileSync as SyncEngineProbe) {
   return ENGINES.map((engine) => {
     if (engine === "ollama-gpt-oss") {
-      try {
-        const availability = ollamaAvailability({ listOutput: String(probe("ollama", ["list"], { encoding: "utf8", stdio: "pipe", timeout: 2_000 })) });
-        return {
-          id: engine, label: ENGINE_LABELS[engine], description: ENGINE_METADATA[engine].description,
-          roleHint: ENGINE_METADATA[engine].roleHint, installed: availability.state === "ready",
-          note: availability.state === "ready" ? `${availability.model} is available locally.` : `${availability.model} is not installed in Ollama.`,
-        };
-      } catch {
-        return {
-          id: engine, label: ENGINE_LABELS[engine], description: ENGINE_METADATA[engine].description,
-          roleHint: ENGINE_METADATA[engine].roleHint, installed: false,
-          note: "Ollama is not reachable on this server.",
-        };
-      }
+      return {
+        id: engine, label: ENGINE_LABELS[engine], description: ENGINE_METADATA[engine].description,
+        roleHint: ENGINE_METADATA[engine].roleHint, installed: false,
+        note: "Paused by product decision. Choose Claude, Grok, or GPT (Codex).",
+      };
     }
     let installed = false;
     try {
@@ -268,17 +308,23 @@ const REPORTS: Record<string, string[]> = {
 // actually spawns the `claude -p` subprocess to revise the brief, and it needs both of these — but
 // they stay defined here since they're part of the cohesive Strategy/Analytics tab (scope decision,
 // see the top-of-file re-export comment).
-export function latestBriefPath(): string | null {
-  if (!existsSync(BRIEFS_DIR)) return null;
-  const files = readdirSync(BRIEFS_DIR).filter((f) => /^\d{4}-\d{2}-\d{2}-strategy-brief\.md$/.test(f)).sort();
-  return files.length ? join(BRIEFS_DIR, files[files.length - 1]) : null;
+export function latestBriefPath(brandId: BrandId, briefsRoot: string = BRIEFS_DIR): string | null {
+  const brandDir = join(briefsRoot, brandId);
+  if (!existsSync(brandDir)) return null;
+  const files = readdirSync(brandDir).filter((f) => /^\d{4}-\d{2}-\d{2}-strategy-brief\.md$/.test(f)).sort();
+  return files.length ? join(brandDir, files[files.length - 1]) : null;
 }
 
-async function runReport(cmd: string): Promise<string> {
+export function requestBrand(value: unknown): BrandId {
+  if (!isBrandId(value)) throw new Error("brand must be one of human-inference, charles, fiction");
+  return value;
+}
+
+async function runReport(cmd: string, brandId: BrandId): Promise<string> {
   const args = REPORTS[cmd];
   if (!args) throw new Error(`unknown report "${cmd}"`);
   try {
-    const { stdout } = await execFileP("npm", args, {
+    const { stdout } = await execFileP("npm", [...args, "--", "--brand", brandId], {
       cwd: repoRoot,
       timeout: STRATEGY_TIMEOUT_MS,
       maxBuffer: 20_000_000,
@@ -290,19 +336,19 @@ async function runReport(cmd: string): Promise<string> {
   }
 }
 
-function postCount(): number {
+function postCount(brandId: BrandId): number {
   const db = openDb();
   try {
-    return (db.prepare("SELECT COUNT(*) AS n FROM posts").get() as { n: number }).n;
+    return (db.prepare("SELECT COUNT(*) AS n FROM posts WHERE brand_id = ?").get(brandId) as { n: number }).n;
   } finally {
     db.close();
   }
 }
 
-function untaggedCount(): number {
+function untaggedCount(brandId: BrandId): number {
   const db = openDb();
   try {
-    return (db.prepare("SELECT COUNT(*) AS n FROM posts WHERE pillar IS NULL").get() as { n: number }).n;
+    return (db.prepare("SELECT COUNT(*) AS n FROM posts WHERE brand_id = ? AND pillar IS NULL").get(brandId) as { n: number }).n;
   } finally {
     db.close();
   }
@@ -370,8 +416,8 @@ type BriefReference = {
   scorecard: string | null;
 };
 
-function briefReference(nowMs: number = Date.now()): BriefReference | null {
-  const abs = latestBriefPath();
+function briefReference(brandId: BrandId, nowMs: number = Date.now()): BriefReference | null {
+  const abs = latestBriefPath(brandId);
   if (!abs) return null;
   const filename = basename(abs);
   const date = parseBriefDate(filename);
@@ -385,11 +431,12 @@ function briefReference(nowMs: number = Date.now()): BriefReference | null {
   };
 }
 
-function dataFreshness(nowMs: number = Date.now()): Freshness | null {
+function dataFreshness(brandId: BrandId, nowMs: number = Date.now()): Freshness | null {
   const db = openDb();
   try {
-    const metricsRow = db.prepare("SELECT MAX(captured_at) AS d FROM metrics").get() as { d: string | null };
-    const importsRow = db.prepare("SELECT MAX(imported_at) AS d FROM imports").get() as { d: string | null };
+    const metricsRow = db.prepare(`SELECT MAX(m.captured_at) AS d FROM metrics m JOIN posts p ON p.id = m.post_id
+      WHERE p.brand_id = ? AND m.brand_id = p.brand_id AND m.provider_account_id = p.provider_account_id`).get(brandId) as { d: string | null };
+    const importsRow = db.prepare("SELECT MAX(imported_at) AS d FROM imports WHERE brand_id = ?").get(brandId) as { d: string | null };
     return computeFreshness([metricsRow.d, importsRow.d], nowMs);
   } finally {
     db.close();
@@ -411,13 +458,13 @@ export type InsightsResult = {
 // LLM-dependent) so the GUI can show an "as of" stamp and a dated link instead of trusting the
 // summary text to mention how current anything is. This is otherwise a pure text answer (nothing
 // written to disk), shown straight in the GUI.
-async function generateInsights(engine: Engine = "claude"): Promise<InsightsResult> {
+async function generateInsights(brandId: BrandId, engine: Engine = "claude"): Promise<InsightsResult> {
   // Fail loud and fast, before spending a Claude call: an empty posts table almost always means
   // this checkout's data/analytics.db is a stale/isolated copy (gitignored, never synced between
   // checkouts — see IS_DEV_WORKTREE), not that there's genuinely no data.
-  if (postCount() === 0) {
+  if (postCount(brandId) === 0) {
     const summary =
-      `**No analytics data in this checkout (0 posts in data/analytics.db).**\n\n` +
+      `**No assigned analytics data for ${brandId} in this checkout (0 posts in data/analytics.db).**\n\n` +
       (IS_DEV_WORKTREE
         ? `This GUI is running from a Claude Code dev worktree, which has its own empty, gitignored ` +
           `data/analytics.db. It's never synced with your real checkout. Run \`npm run review\` from ` +
@@ -430,20 +477,21 @@ async function generateInsights(engine: Engine = "claude"): Promise<InsightsResu
   const sections: string[] = [];
   for (const key of Object.keys(REPORTS)) {
     try {
-      sections.push(`### ${key}\n${await runReport(key)}`);
+      sections.push(`### ${key}\n${await runReport(key, brandId)}`);
     } catch (e) {
       sections.push(`### ${key}\n(failed: ${e instanceof Error ? e.message : String(e)})`);
     }
   }
-  const freshness = dataFreshness();
-  const brief = briefReference();
-  const untagged = untaggedCount();
+  const freshness = dataFreshness(brandId);
+  const brief = briefReference(brandId);
+  const untagged = untaggedCount(brandId);
   const briefLabel = brief ? `${brief.date ?? "undated"}${brief.ageDays != null ? `, ${brief.ageDays}d old` : ""}` : null;
   const briefExcerpt = brief
     ? [brief.scorecard, brief.directives].filter(Boolean).join("\n\n") || "(no directives/scorecard section found)"
     : null;
   const prompt = [
     `Muxin Li wants a quick read on his content pipeline's analytics. Below is LIVE raw output from`,
+    `the explicitly selected ${brandId} brand only. Do not infer or mix another brand's data.`,
     `the pipeline's own report scripts (run just now, against the current database) — this is the`,
     `primary source. Below that is a short excerpt from his prior-cycle strategy brief`,
     `(${briefLabel ?? "none exists yet"}) for context only: it may be stale, so prefer the live`,
@@ -506,17 +554,18 @@ async function generateInsights(engine: Engine = "claude"): Promise<InsightsResu
 // Deep-dive follow-up: unlike generateInsights (which we feed pre-fetched data), Claude is allowed
 // to go run one of the same read-only reports itself, or read briefs/config, if the question needs
 // something not already in the conversation. Read-only: it's told never to edit/write/delete.
-async function askInsights(question: string, history: { role: string; content: string }[], engine: Engine = "claude"): Promise<string> {
+async function askInsights(question: string, history: { role: string; content: string }[], brandId: BrandId, engine: Engine = "claude"): Promise<string> {
   if (!question.trim()) throw new Error("ask something first");
   const transcript = history
     .map((h) => `${h.role === "user" ? "Muxin" : "Claude"}: ${h.content}`)
     .join("\n\n");
   const prompt = [
-    `You are Muxin Li's analytics assistant for his content pipeline (data/analytics.db via`,
-    `npm run snapshot/resonance/audience/origin-compare, briefs/, config/*.yaml). He's asking a`,
+    `You are Muxin Li's analytics assistant for the ${brandId} brand in his content pipeline`,
+    `(data/analytics.db via npm run snapshot/resonance/audience/origin-compare -- --brand ${brandId},`,
+    `briefs/${brandId}/, config/*.yaml). He's asking a`,
     `follow-up question after an insights summary. You MAY run those npm scripts, or read briefs/`,
     `and config files, if the question needs something not already in the conversation below. Do`,
-    `NOT edit, write, or delete any file — this is read-only Q&A.`,
+    `NOT edit, write, or delete any file. Do not read or mix another brand's state. This is read-only Q&A.`,
     ``,
     `## Conversation so far`,
     transcript || "(nothing yet)",
@@ -552,7 +601,7 @@ function ventureThreadForAnalysis(slug: string): unknown {
   }
   const body = read.body as { thread?: unknown };
   if (!body.thread) throw new Error("this venture has no readable thread yet");
-  return body.thread;
+  return { ...(body.thread as Record<string, unknown>), learningEvaluations: readLearningEvaluations(slug) };
 }
 
 export function ventureAnalysisPrompt(slug: string, thread: unknown): string {
@@ -563,6 +612,7 @@ export function ventureAnalysisPrompt(slug: string, thread: unknown): string {
     `You are giving Muxin a read-only judgment about the current venture state.`,
     `Identify what is ready now, the next decision or action that belongs to Muxin, the strongest risks or evidence gaps,`,
     `and what must not happen yet. Keep recommendations grounded only in the supplied server-derived state.`,
+    `Treat accepted learning evaluations as evidence-bounded proposals. Pending, declined, or more-evidence evaluations do not authorize a change, and no evaluation auto-mutates Venture.`,
     `Return plain markdown with short headings and bullets. No em dashes and no invented claims, numbers, or evidence.`,
     ``,
     `## Venture`,
@@ -603,20 +653,23 @@ async function analyzeVenture(slug: string, engine: Engine = "claude"): Promise<
 // what a terminal /strategy run does (Muxin's pick, 2026-07-16: the full run, not a brief-only
 // synthesis). Verified by artifact like every atomize-family job: a new-or-updated brief file must
 // actually exist afterward, or the job fails with the log tail.
-async function refreshBrief(engine: Engine = "claude"): Promise<{ path: string }> {
-  const before = latestBriefPath();
+async function refreshBrief(brandId: BrandId, engine: Engine = "claude"): Promise<{ path: string }> {
+  const before = latestBriefPath(brandId);
   const beforeMtime = before && existsSync(before) ? statSync(before).mtimeMs : 0;
   return runQueued("strategy", `Refresh strategy brief with ${engine}`, async (job) => {
-    const result = await runClaudeSpawn(job, enginePrompt(engine, "strategy", "/strategy"), { timeoutMs: STRATEGY_RUN_TIMEOUT_MS });
+    const result = await runClaudeSpawn(job, enginePrompt(engine, "strategy", `/strategy for ${brandId}`), {
+      timeoutMs: STRATEGY_RUN_TIMEOUT_MS,
+      env: { CONTENT_AGENTS_STRATEGY_BRAND: brandId },
+    });
     const failure = decodeSpawnFailure(result, job.id, {
       timeoutVerb: "/strategy", timeoutLabel: `${STRATEGY_RUN_TIMEOUT_MS / 60_000} min`,
       exitVerb: "/strategy", includeTailOnTimeout: true,
     });
     if (failure) throw new Error(failure);
-    const after = latestBriefPath();
+    const after = latestBriefPath(brandId);
     const changed = after && (after !== before || statSync(after).mtimeMs > beforeMtime);
     if (!after || !changed) {
-      throw new Error("/strategy ran but no new or updated brief landed in briefs/. Check the job log");
+      throw new Error(`/strategy ran but no new or updated brief landed in briefs/${brandId}/. Check the job log`);
     }
     return { path: after.slice(repoRoot.length + 1) };
   }, engine);
@@ -651,9 +704,12 @@ function jobInFlight(kind: "strategy" | "scout"): boolean {
 // lets Muxin trigger the same `npm run pull -- --ingest` on demand between cron runs. Scope is
 // pull+ingest only (no bluesky, no brief regen) — Muxin still runs Generate insights / /strategy
 // himself once fresh data is in.
-async function pullFreshAnalytics(): Promise<string> {
+async function pullFreshAnalytics(brandId: BrandId): Promise<string> {
+  if (!measurementAccountForBrand(brandId)) {
+    throw new Error(`no measurement account configured for ${brandId}; refusing unbound pull/ingest`);
+  }
   return runQueued("pull", "Pull fresh analytics", async (job) => {
-    const result = await runCommandSpawn(job, "npm", ["run", "pull", "--", "--ingest"], {
+    const result = await runCommandSpawn(job, "npm", ["run", "pull", "--", "--brand", brandId, "--ingest"], {
       timeoutMs: PULL_TIMEOUT_MS,
     });
     const failure = decodeSpawnFailure(result, job.id, {
@@ -715,14 +771,26 @@ export function isValidMessageFile(file: string): boolean {
   return /^messages\/message-\d+\.md$/.test(file);
 }
 
+export function outreachGmailAvailability(env: NodeJS.ProcessEnv = process.env): { configured: boolean; account: string } {
+  const clientId = env.GMAIL_CLIENT_ID ?? env.GOOGLE_CLIENT_ID;
+  const clientSecret = env.GMAIL_CLIENT_SECRET ?? env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = env.GMAIL_REFRESH_TOKEN ?? env.GOOGLE_REFRESH_TOKEN;
+  return { configured: Boolean(clientId && clientSecret && refreshToken), account: "muxin.li.pro@gmail.com" };
+}
+
+export function outreachGmailConnection(env: NodeJS.ProcessEnv = process.env): { account: string; authenticated: boolean; sendPermission: boolean } {
+  const availability = outreachGmailAvailability(env);
+  return { account: availability.account, authenticated: availability.configured, sendPermission: availability.configured };
+}
+
 /** Record the first manual send from server-owned lead/message facts; this never transmits data. */
 export function recordOutreachInitialSend(
   dir: string,
   detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
-  record: (bucket: "client" | "platform", lead: string, opts: { person?: string; channel?: string; message?: string; note?: string }) => TrackerEvent = markSent,
+  record: (bucket: "client" | "platform" | "peer", lead: string, opts: { person?: string; channel?: string; message?: string; note?: string }) => TrackerEvent = markSent,
 ): TrackerEvent {
   if (!isValidLeadDir(dir)) throw new Error("not a valid outreach lead folder");
-  if (detail.kind !== "client" && detail.kind !== "platform") throw new Error("this item is not an outreach lead");
+  if (detail.kind !== "client" && detail.kind !== "platform" && detail.kind !== "peer") throw new Error("this item is not an outreach lead");
   const message = detail.latestMessage;
   if (!message || message.status !== "locked") throw new Error("lock the outreach message before recording its initial send");
   return record(detail.kind, basename(dir), {
@@ -731,6 +799,65 @@ export function recordOutreachInitialSend(
     message: message.file || undefined,
     note: "Sent by hand from the Outreach composer",
   });
+}
+
+export function recordOutreachGmailSend(
+  dir: string,
+  detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
+  providerMessageId: string | undefined,
+  record: (bucket: "client" | "platform" | "peer", lead: string, opts: { person?: string; channel?: string; message?: string; note?: string }) => TrackerEvent = markSent,
+): TrackerEvent {
+  if (!isValidLeadDir(dir)) throw new Error("not a valid outreach lead folder");
+  if (detail.kind !== "client" && detail.kind !== "platform" && detail.kind !== "peer") throw new Error("this item is not an outreach lead");
+  const message = detail.latestMessage;
+  if (!message || message.status !== "locked") throw new Error("lock the outreach message before sending it");
+  return record(detail.kind, basename(dir), {
+    person: message.recipient || detail.contacts[0]?.name || undefined,
+    channel: "email",
+    message: message.file,
+    note: providerMessageId ? `Delivered by Gmail (${providerMessageId})` : "Delivered by Gmail",
+  });
+}
+
+type GmailDeliveryResult = GmailSendResult | { status: "already_delivered" | "uncertain" };
+
+function lockedGmailRequest(dir: string, detail: Pick<LeadDetail, "latestMessage">, input: { to: string; subject: string }): GmailSendRequest {
+  const message = detail.latestMessage;
+  if (!message || message.status !== "locked") throw new Error("lock the outreach message before sending it");
+  return { to: input.to.trim(), subject: input.subject.trim(), body: message.body, messageId: `${basename(dir)}:${message.file}` };
+}
+
+export async function sendLockedOutreachEmail(
+  dir: string,
+  detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
+  input: { to: string; subject: string },
+  deliver: (request: GmailSendRequest) => Promise<GmailDeliveryResult> = deliverLockedGmailMessage,
+  record: Parameters<typeof recordOutreachGmailSend>[3] = markSent,
+): Promise<{ delivery: GmailDeliveryResult; event: TrackerEvent | null }> {
+  if (!isValidLeadDir(dir)) throw new Error("not a valid outreach lead folder");
+  const message = detail.latestMessage;
+  if (!message || message.status !== "locked") throw new Error("lock the outreach message before sending it");
+  if (message.channel.toLowerCase() !== "email") throw new Error("Gmail delivery is available only for email messages");
+  const to = input.to.trim();
+  const subject = input.subject.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error("enter a valid recipient email address");
+  if (!subject) throw new Error("enter an email subject");
+  const delivery = await deliver(lockedGmailRequest(dir, detail, { to, subject }));
+  if ("status" in delivery && delivery.status === "uncertain") return { delivery, event: null };
+  const providerMessageId = "providerMessageId" in delivery ? delivery.providerMessageId : undefined;
+  return { delivery, event: recordOutreachGmailSend(dir, detail, providerMessageId, record) };
+}
+
+export async function reconcileLockedOutreachEmail(
+  dir: string,
+  detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
+  input: { to: string; subject: string },
+  reconcile: (request: GmailSendRequest) => Promise<GmailSendResult | { status: "uncertain" }> = reconcileLockedGmailMessage,
+  record: Parameters<typeof recordOutreachGmailSend>[3] = markSent,
+): Promise<{ delivery: GmailSendResult | { status: "uncertain" }; event: TrackerEvent | null }> {
+  const delivery = await reconcile(lockedGmailRequest(dir, detail, input));
+  if ("status" in delivery) return { delivery, event: null };
+  return { delivery, event: recordOutreachGmailSend(dir, detail, delivery.providerMessageId, record) };
 }
 
 // A typed direction is a sentence or two about what she wants said, not a pasted document. The cap
@@ -943,6 +1070,10 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       json(res, 200, { engines: availableEngines(), default: "claude" });
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/publishing/drain-health") {
+      json(res, 200, publishDrainHealth());
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/api/publishing/reconciliation-health") {
       json(res, 200, providerReconciliationHealth());
       return;
@@ -1063,6 +1194,59 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       json(res, 200, result);
       return;
     }
+    if (req.method === "POST" && url.pathname === "/api/publishing/reschedule") {
+      // Move one scheduled Postiz row to an exact time or the first free cadence slot on/after a date.
+      const b = await readBody(req);
+      const slug = String(b.slug ?? "");
+      const id = String(b.id ?? "");
+      let folder: string;
+      try { folder = safeFolder(slug); }
+      catch (e) { json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) }); return; }
+      const row = readQueue(folder).rows.find((r) => r.id === id);
+      if (!row) { json(res, 404, { ok: false, error: "no such row" }); return; }
+      const inFlightKey = `${slug}/${id}`;
+      if (schedulingInFlight.has(inFlightKey)) { json(res, 200, { ok: false, error: "already scheduling/moving this row. Try again in a moment" }); return; }
+      schedulingInFlight.add(inFlightKey);
+      try {
+        json(res, 200, await rescheduleRow(folder, slug, row, { to: b.to === undefined ? undefined : String(b.to), notBefore: b.notBefore === undefined ? undefined : String(b.notBefore) }));
+      } finally { schedulingInFlight.delete(inFlightKey); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/publishing/batch-reschedule") {
+      // Move a theme cluster: selection by slug / pillar / platform / explicit ids; plan = shift N
+      // days or re-flow after a date. `dryRun` lists what would move without touching anything.
+      const b = await readBody(req);
+      const raw = (b.selection && typeof b.selection === "object" ? b.selection : {}) as Record<string, unknown>;
+      const list = (value: unknown): string[] | undefined => {
+        if (value === undefined) return undefined;
+        if (!Array.isArray(value) || !value.every((item) => typeof item === "string" && item.trim())) throw new Error("selection fields must be arrays of non-empty strings");
+        return value.map((item) => item.trim());
+      };
+      let selection: BatchSelection;
+      try { selection = { slugs: list(raw.slugs), pillars: list(raw.pillars), platforms: list(raw.platforms), ids: list(raw.ids) }; }
+      catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); return; }
+      if (!Object.values(selection).some((values) => values?.length)) { json(res, 400, { ok: false, error: "select at least one pillar, slug, platform, or id; an empty selection would move every scheduled post" }); return; }
+      const planRaw = (b.plan && typeof b.plan === "object" ? b.plan : {}) as Record<string, unknown>;
+      let plan: BatchPlan;
+      if (planRaw.mode === "shift" && typeof planRaw.days === "number" && Number.isFinite(planRaw.days) && planRaw.days !== 0) plan = { mode: "shift", days: planRaw.days };
+      else if (planRaw.mode === "after" && typeof planRaw.notBefore === "string" && Number.isFinite(Date.parse(planRaw.notBefore))) plan = { mode: "after", notBefore: planRaw.notBefore };
+      else if (b.dryRun) plan = { mode: "shift", days: 0 };
+      else { json(res, 400, { ok: false, error: "plan must be {mode:'shift', days:N} or {mode:'after', notBefore:ISO}" }); return; }
+      if (b.dryRun) {
+        const candidates = listBatchCandidates(selection).map((c) => ({ slug: c.slug, id: c.row.id, platform: c.platform, pillar: c.pillar, plannedFor: c.status.plannedFor ?? null }));
+        json(res, 200, { ok: true, dryRun: true, candidates });
+        return;
+      }
+      const keys = listBatchCandidates(selection).map((c) => `${c.slug}/${c.row.id}`);
+      const busy = keys.filter((key) => schedulingInFlight.has(key));
+      if (busy.length) { json(res, 200, { ok: false, error: `already scheduling/moving ${busy.join(", ")}. Try again in a moment` }); return; }
+      for (const key of keys) schedulingInFlight.add(key);
+      try {
+        const result = await batchReschedule(selection, plan);
+        json(res, 200, { ok: result.results.every((r) => r.ok), ...result });
+      } finally { for (const key of keys) schedulingInFlight.delete(key); }
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/publishing/resolve") {
       const b = await readBody(req);
       const slug = String(b.slug ?? "");
@@ -1154,6 +1338,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       return;
     }
     if (await handleCharlesRoute({ req, res, url, readBody, json, requestEngine })) return;
+    if (await handleVentureLearningRoute({ req, res, url, readBody, json, evaluateLearning: evaluateVentureLearning, proposeExperiment: createVentureLearningExperiment })) return;
     if (await handleSignalsRoute({ req, res, url, readBody, json, interpretExperiment: interpretSignalsExperiment, proposeExperiment: createSignalsExperimentProposal })) return;
     // Approved Venture primary copy enters the ordinary Content configuration cycle. This keeps
     // its Venture provenance and does not generate or deliver anything. A retry recovers the
@@ -1204,6 +1389,17 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       json(res, 200, { ok: true, captures: listCaptures() });
       return;
     }
+    // The front door's room read: a subscription-route model judgment with the keyword sniff as
+    // fallback (src/review/capture-router.ts). Pure read: it creates and queues nothing; the desk
+    // still shows the verdict with "Wrong room?" buttons and waits for Start on it.
+    if (req.method === "POST" && url.pathname === "/api/captures/classify") {
+      const b = await readBody(req);
+      try {
+        const routed = await routeCaptureWithModel(String(b.text ?? ""));
+        json(res, 200, { ok: true, ...routed });
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/captures") {
       const b = await readBody(req);
       const room = String(b.room ?? "") as CaptureRoom;
@@ -1242,7 +1438,13 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     if (req.method === "GET" && url.pathname === "/api/content/treatment") {
       const slug = (url.searchParams.get("slug") ?? "").trim();
       try {
-        json(res, 200, readTreatment(slug, { folder: safeFolder(slug) }));
+        const folder = safeFolder(slug);
+        const lens = (url.searchParams.get("lens") ?? "").trim();
+        let mechanismBody: string | null = null;
+        if (lens) {
+          mechanismBody = (await readAuthoritativeApprovedCut(folder, lens)).body;
+        }
+        json(res, 200, readTreatment(slug, { folder, mechanismBody }));
       } catch (e) {
         json(res, 400, { error: String((e as Error)?.message ?? e) });
       }
@@ -1560,9 +1762,12 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/strategy/brief") {
-      const abs = latestBriefPath();
+      let brandId: BrandId;
+      try { brandId = requestBrand(url.searchParams.get("brand")); }
+      catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); return; }
+      const abs = latestBriefPath(brandId);
       if (!abs) {
-        json(res, 200, { ok: false, error: "no strategy brief exists yet. Run /strategy first" });
+        json(res, 200, { ok: false, error: `no ${brandId} strategy brief exists yet. Run /strategy for this brand first` });
         return;
       }
       json(res, 200, { ok: true, path: abs.slice(repoRoot.length + 1), content: readFileSync(abs, "utf8") });
@@ -1571,7 +1776,8 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     if (req.method === "POST" && url.pathname === "/api/strategy/ask") {
       const b = await readBody(req);
       try {
-        const { path, content } = await reviseBrief(String(b.instruction ?? ""), requestEngine(b.engine));
+        const brandId = requestBrand(b.brand);
+        const { path, content } = await reviseBrief(String(b.instruction ?? ""), requestEngine(b.engine), brandId);
         json(res, 200, { ok: true, path, content });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1588,7 +1794,9 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         return;
       }
       try {
-        const { path } = await refreshBrief(requestEngine((await readBody(req)).engine));
+        const b = await readBody(req);
+        const brandId = requestBrand(b.brand);
+        const { path } = await refreshBrief(brandId, requestEngine(b.engine));
         json(res, 200, { ok: true, path });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1598,7 +1806,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     if (req.method === "POST" && url.pathname === "/api/strategy/insights") {
       const b = await readBody(req);
       try {
-        const result = await generateInsights(requestAnalysisEngine(b.engine));
+        const result = await generateInsights(requestBrand(b.brand), requestAnalysisEngine(b.engine));
         json(res, 200, { ok: true, ...result });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1610,7 +1818,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       const question = String(b.question ?? "");
       const history = Array.isArray(b.history) ? b.history : [];
       try {
-        const answer = await askInsights(question, history, requestInteractiveAnalysisEngine(b.engine));
+        const answer = await askInsights(question, history, requestBrand(b.brand), requestInteractiveAnalysisEngine(b.engine));
         json(res, 200, { ok: true, answer });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1619,7 +1827,9 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     }
     if (req.method === "POST" && url.pathname === "/api/strategy/pull") {
       try {
-        const log = await pullFreshAnalytics();
+        const body = await readBody(req);
+        const brandId = requestBrand(body.brand);
+        const log = await pullFreshAnalytics(brandId);
         json(res, 200, { ok: true, log });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1641,7 +1851,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     // CLI-only (`/outreach` skill, `npm run outreach:*`, `/scout` for discovery) -- this endpoint
     // only reads; the two POST endpoints below are the entire write surface this tab gets.
     if (req.method === "GET" && url.pathname === "/api/outreach/leads") {
-      json(res, 200, { ok: true, leads: listLeadDetails() });
+      json(res, 200, { ok: true, leads: listLeadDetails(), gmail: outreachGmailConnection() });
       return;
     }
     // Muxin's own pursue/pass call on a lead -- the token-spend gate: nothing downstream (a draft
@@ -1654,8 +1864,17 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       const b = await readBody(req);
       const dir = String(b.dir ?? "");
       const decision = String(b.decision ?? "");
+      const reason = String(b.reason ?? "").trim().replace(/\s+/g, " ");
       if (!isValidLeadDir(dir) || (decision !== "pursue" && decision !== "pass")) {
         json(res, 400, { ok: false, error: "dir must be a valid lead folder and decision must be pursue|pass" });
+        return;
+      }
+      if (decision === "pass" && !reason) {
+        json(res, 400, { ok: false, error: "A short pass reason is required so Scout can avoid similar leads next time." });
+        return;
+      }
+      if (reason.length > 240) {
+        json(res, 400, { ok: false, error: "The decision reason must be 240 characters or fewer." });
         return;
       }
       try {
@@ -1665,7 +1884,8 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         const status = decision === "pursue" ? "pursue" : "passed";
         const newHeader = setFrontmatterField(header, "status", status);
         const date = new Date().toISOString().slice(0, 10);
-        const newBody = `${body.replace(/\n+$/, "")}\n- ${date}: Muxin decided ${decision} (manual, review GUI)\n`;
+        const reasonSuffix = decision === "pass" ? `: ${reason}` : "";
+        const newBody = `${body.replace(/\n+$/, "")}\n- ${date}: Muxin decided ${decision} (manual, review GUI)${reasonSuffix}\n`;
         writeFileSync(leadPath, `${newHeader}\n${newBody}`);
         json(res, 200, { ok: true, dir, status });
       } catch (e) {
@@ -1789,6 +2009,38 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         json(res, 200, { ok: true, event });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/outreach/send-gmail") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      if (!isValidLeadDir(dir)) {
+        json(res, 400, { ok: false, error: "not a valid outreach lead folder" });
+        return;
+      }
+      if (b.confirm !== true) {
+        json(res, 400, { ok: false, error: "explicit Gmail send confirmation is required" });
+        return;
+      }
+      if (!outreachGmailAvailability().configured) {
+        json(res, 503, { ok: false, error: "Gmail is not configured. Use the manual send fallback." });
+        return;
+      }
+      try {
+        const result = await sendLockedOutreachEmail(dir, readLeadDetail(dir), { to: String(b.to ?? ""), subject: String(b.subject ?? "") });
+        if ("status" in result.delivery && result.delivery.status === "uncertain") {
+          const reconciled = await reconcileLockedOutreachEmail(dir, readLeadDetail(dir), { to: String(b.to ?? ""), subject: String(b.subject ?? "") });
+          if (!("status" in reconciled.delivery)) {
+            json(res, 200, { ok: true, reconciled: true, delivery: reconciled.delivery, event: reconciled.event });
+            return;
+          }
+          json(res, 202, { ok: false, uncertain: true, error: "Gmail delivery is uncertain. Sent mail has no authoritative match yet. Do not retry; use this same control later to reconcile again." });
+          return;
+        }
+        json(res, 200, { ok: true, delivery: result.delivery, event: result.event });
+      } catch (e) {
+        json(res, 502, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
       return;
     }
@@ -1975,6 +2227,24 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       }
       return;
     }
+    if (req.method === "POST" && (/^\/api\/venture\/[^/]+\/artifacts\/[^/]+\/deliver$/.test(url.pathname) ||
+      /^\/api\/venture\/[^/]+\/artifacts\/[^/]+\/retry-delivery$/.test(url.pathname))) {
+      const parts = url.pathname.split("/");
+      const slug = decodeURIComponent(parts[3]);
+      const artifactId = decodeURIComponent(parts[5]);
+      try {
+        const result = await runQueued("venture-delivery", `Deliver Venture artifact ${slug}/${artifactId}`, async (job) => {
+          job.slugs = [slug];
+          const outcomes = await deliverVenture(slug, { onlyIds: [artifactId] });
+          if (outcomes.length !== 1) throw new Error(`${artifactId} is not eligible for delivery`);
+          return outcomes[0];
+        }, "codex");
+        json(res, 200, { ok: true, result });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
     // The Venture room's write side (twelve POSTs). Every one wraps the function that already
     // owns the rule -- see src/review/venture-writes.ts. Placed before the read dispatcher below
     // (they cannot collide: one is POST-only, the other GET-only) and after the intake-draft
@@ -2022,6 +2292,7 @@ export function startReviewServer(): void {
   // widening the default.
   server.listen(PORT, "127.0.0.1", () => {
     if (!FIXTURES_ON) startProviderReconciliationLoop();
+    if (!FIXTURES_ON) startPublishDrainLoop();
     if (FIXTURES_ON) {
       console.log(`\n  ⚠ FIXTURE MODE (${FIXTURE_ENV_VAR}=1) — the desk can serve fake data and every write is refused.`);
     }

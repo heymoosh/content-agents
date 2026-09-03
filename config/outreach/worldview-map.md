@@ -3,10 +3,10 @@
 Brand-element language (positioning, pledge, signature line, altitudes) is canonical in
 `config/brand.yaml` — keep these statements in agreement with it.
 
-docs/outreach-engine-plan.md §9b's full version (10-20 belief statements, each with paraphrase
-variants per community dialect, refreshed suggest-only and rotated across discovery runs) is
-Phase 5 scope (`discover.ts`, not built yet). This Phase 1 file is a smaller, static seed: the
-five statements the plan itself already worked out as examples, distilled from
+docs/outreach-engine-plan.md §9b's target is 10-20 belief statements, each with paraphrase
+variants per community dialect and refreshed suggest-only. Phase 5 Scout now rotates the current
+smaller seed across discovery runs; expanding the approved map remains an editorial choice. It
+currently contains the five statements the plan worked out as examples, distilled from
 `config/platforms.yaml` `home_brand` and `spin_angles`. `qualify.ts` and the research prompt read
 this file directly (never a copy) as the canonical statement of what "shares the worldview" means
 for the quote-required match in plan §9f.

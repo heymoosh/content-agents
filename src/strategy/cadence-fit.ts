@@ -6,6 +6,7 @@ import { openDb, repoRoot } from "../db/db.js";
 import { loadPlatforms } from "../config/platforms.js";
 import { CORE_TEXT, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE, loadConfig, type RoutingConfig } from "./route.js";
 import { loadStrategyConfig, type StrategyConfig } from "./platform-fit.js";
+import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 
 // Strategy lever C (card ed23f712, epic 2ce597d7 "Close the loop"): UNLIKE levers A/B, this one
 // really can change /publish's live scheduler -- but only through config/schedule-overrides.yaml,
@@ -31,21 +32,19 @@ interface Row {
 // Raw per-post rows for CORE_TEXT platforms, excluding BOTH CONTROL_RUN_SOURCE and
 // EXPLORATION_SOURCE (route.ts's loadData policy) -- a deliberate control/probe post never skews
 // a cadence or peak-hour read.
-export function loadRows(injectedDb?: ReturnType<typeof openDb>): Row[] {
+export function loadRows(injectedDb?: ReturnType<typeof openDb>, context?: StrategyMeasurementContext): Row[] {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const db = injectedDb ?? openDb();
+  const latest = latestMetricsJoin(context);
+  const scope = measurementScope(context, "p", "m");
   const rows = db
     .prepare(
       `SELECT p.platform, p.posted_at, m.likes, m.replies, m.reposts
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
+       FROM posts p JOIN (${latest.sql}) m ON m.post_id = p.id
        WHERE p.platform IN (${CORE_TEXT.map(() => "?").join(",")})
-         AND (p.source IS NULL OR p.source NOT IN (?, ?))`
+         AND ${scope.sql} AND (p.source IS NULL OR p.source NOT IN (?, ?))`
     )
-    .all(...CORE_TEXT, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as Row[];
+    .all(...latest.params, ...CORE_TEXT, ...scope.params, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as Row[];
   if (!injectedDb) db.close();
   return rows;
 }
@@ -196,22 +195,20 @@ export interface FollowRow {
 // appendBetPlacement's cadenceSource param). Excludes BOTH CONTROL_RUN_SOURCE and
 // EXPLORATION_SOURCE, same policy as loadRows() above, so a deliberate control/probe post never
 // skews this comparison.
-export function loadFollowRows(injectedDb?: ReturnType<typeof openDb>): FollowRow[] {
+export function loadFollowRows(injectedDb?: ReturnType<typeof openDb>, context?: StrategyMeasurementContext): FollowRow[] {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const db = injectedDb ?? openDb();
+  const latest = latestMetricsJoin(context);
+  const scope = measurementScope(context, "p", "m");
   const rows = db
     .prepare(
       `SELECT p.platform, p.cadence_source, p.posted_at, m.likes, m.replies, m.reposts
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
+       FROM posts p JOIN (${latest.sql}) m ON m.post_id = p.id
        WHERE p.platform IN (${CORE_TEXT.map(() => "?").join(",")})
          AND p.cadence_source IS NOT NULL
-         AND (p.source IS NULL OR p.source NOT IN (?, ?))`
+         AND ${scope.sql} AND (p.source IS NULL OR p.source NOT IN (?, ?))`
     )
-    .all(...CORE_TEXT, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as FollowRow[];
+    .all(...latest.params, ...CORE_TEXT, ...scope.params, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as FollowRow[];
   if (!injectedDb) db.close();
   return rows;
 }
@@ -433,7 +430,7 @@ function main() {
   const write = process.argv.includes("--write");
   const cfg = loadConfig();
   const strategyCfg = loadStrategyConfig();
-  const rows = loadRows();
+  const rows = loadRows(undefined, parseStrategyMeasurementContext());
   const trends = rankTrend(rows, cfg, strategyCfg);
   const peakHours = rankPeakHour(rows, cfg, strategyCfg);
 

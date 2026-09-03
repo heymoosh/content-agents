@@ -8,6 +8,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { logCost } from "../util/cost-log.js";
 import { appendRow } from "../publish/queue.js";
+import { muxinVoiceFindings } from "../voice/configured.js";
 import { parseEvidence, type EvidenceItem } from "./qualify.js";
 
 // outreach:draft: stage 6 DRAFT (docs/outreach-engine-plan.md §5/§6 Phase 2). Composes ONE
@@ -51,6 +52,72 @@ const POSITIVE_FITS = new Set(["strong", "partial"]);
 export function selectEvidenceForDraft(evidence: EvidenceItem[], classification: string): EvidenceItem[] {
   const picked = evidence.filter((e) => e.signal === classification || e.signal === "worldview-match");
   return picked.length ? picked : evidence;
+}
+
+export interface UnauthorizedOutreachClaim {
+  kind: "population-quantifier" | "prevalence-predicate" | "muxin-interest";
+  sentence: string;
+  span: string;
+}
+
+function normalizedClaimText(value: string): string {
+  return value.toLowerCase().replace(/[’]/g, "'").replace(/\s+/g, " ").trim();
+}
+
+function claimSentences(value: string): string[] {
+  return value.split(/(?<=[.!?])\s+/u).map(normalizedClaimText).filter(Boolean);
+}
+
+/**
+ * Deterministically reject two bounded classes of unsupported model claims: population-wide
+ * prevalence/comparison language, and enumerated claims that Muxin read/saw/liked/followed or
+ * worked on something. This does not pretend to prove arbitrary semantic entailment; Muxin's
+ * pending-review gate still owns broader truthfulness review. Population claims require the full
+ * normalized sentence in evidence or direction. Muxin-interest claims require the full normalized
+ * generated sentence in her direction, so a shared verb cannot authorize a changed object or
+ * polarity.
+ */
+export function findUnauthorizedOutreachClaims(
+  body: string,
+  evidence: EvidenceItem[],
+  direction = "",
+): UnauthorizedOutreachClaim[] {
+  const authorized = new Set([
+    ...evidence.flatMap((item) => [item.quote, item.description]),
+    direction,
+  ].filter(Boolean).flatMap(claimSentences));
+  const patterns: Array<{ kind: UnauthorizedOutreachClaim["kind"]; re: RegExp }> = [
+    {
+      kind: "prevalence-predicate",
+      re: /\b(?:that|this|which|it)(?:['’]s| is)\s+(?:rare|unusual|uncommon|not common|the exception|the norm|typical)\b/giu,
+    },
+    {
+      kind: "population-quantifier",
+      re: /\b(?:almost all|the majority of|hardly any|most|many|few|some|all|no|nobody|everyone)\s+(?:teams?|companies|people|founders|startups|products?|pms|leaders|orgs?|organizations|engineers|builders|folks)\b/giu,
+    },
+  ];
+  const findings: UnauthorizedOutreachClaim[] = [];
+  for (const sentence of body.split(/(?<=[.!?])\s+/u).map((part) => part.trim()).filter(Boolean)) {
+    for (const pattern of patterns) {
+      for (const match of sentence.matchAll(pattern.re)) {
+        const span = match[0];
+        if (!authorized.has(normalizedClaimText(sentence))) findings.push({ kind: pattern.kind, sentence, span });
+      }
+    }
+  }
+  const interestActions = "worked on|read|saw|seen|liked|loved|enjoyed|followed";
+  const interestAdverbs = "(?:(?:just|recently|long|always|actually|personally)\\s+){0,3}";
+  const authorizedInterestSentences = new Set(claimSentences(direction));
+  const explicitInterest = new RegExp(`\\bi(?:'ve| have)?\\s+${interestAdverbs}(?:${interestActions})\\b`, "iu");
+  const bareInterest = new RegExp(`^${interestAdverbs}(?:${interestActions})\\b`, "iu");
+  const ellipticalInterest = new RegExp(`^(?:hi\\s+)?[\\p{L}][\\p{L}\\p{M}'-]*,\\s*${interestAdverbs}(?:${interestActions})\\b`, "iu");
+  for (const sentence of body.split(/(?<=[.!?])\s+/u).map((part) => part.trim()).filter(Boolean)) {
+    const match = explicitInterest.exec(sentence) ?? bareInterest.exec(sentence) ?? ellipticalInterest.exec(sentence);
+    if (match && !authorizedInterestSentences.has(normalizedClaimText(sentence))) {
+      findings.push({ kind: "muxin-interest", sentence, span: match[0] });
+    }
+  }
+  return findings;
 }
 
 // The fence Muxin's typed direction sits inside. Exported so the test can assert her words land
@@ -120,6 +187,8 @@ export function buildDraftPrompt(opts: {
     `RULES:`,
     `- Two-sided: the message must name something concrete and true about ${opts.leadName} from the evidence above. Do not write a generic template that could go to anyone; do not lead with flattery about shared values alone.`,
     `- Do not invent a fact, statistic, or quote beyond what is given above.`,
+    `- Do not compare the lead with unnamed groups or claim what most, many, few, all, or no teams, companies, people, or founders do. Do not label their behavior rare, unusual, typical, or the norm. Use such a claim only when that complete claim is explicitly present in the evidence above or Muxin's direction.`,
+    `- Never say Muxin read, saw, liked, loved, enjoyed, followed, or worked on something unless Muxin's typed direction explicitly says she did. Evidence about the lead does not prove Muxin's actions or interests. Open directly with the lead's evidenced practice (for example, "You test...") rather than an encounter claim such as "I saw..." or "I read...".`,
     // Reinforced AFTER her typed text, because the last word in a prompt is the one that sticks:
     // the vision doc's line is "It never invents interest I don't have," and that is the whole
     // point of letting her type direction at all.
@@ -129,6 +198,7 @@ export function buildDraftPrompt(opts: {
         ]
       : []),
     `- Follow config/voice.yaml: Muxin's plain, direct voice. No em dashes anywhere (use periods, commas, colons, or parentheses instead). No AI tells ("here's the thing", "I hope this finds you well", hedging, thought-leader cadence).`,
+    `- Do not use prose colons in this short message. Avoid antithetical AI cadence such as "it's not about X, it's about Y" or "This isn't X. It's Y."`,
     `- Short. A real person writing a real note, not a marketing email. No hashtags, no emoji.`,
     `- End with a low-pressure, specific ask (a short call, a reply), not a hard sell.`,
     `- Print ONLY the message body. Nothing else.`,
@@ -193,6 +263,8 @@ export async function runDraft(
     channel?: string;
     recipient?: string;
     direction?: string;
+    /** Selected adapter provenance for the zero-cost execution log; CLI calls default to Claude. */
+    engine?: string;
     callClaude?: (prompt: string) => Promise<string>;
   } = {},
 ): Promise<DraftResult> {
@@ -202,11 +274,16 @@ export async function runDraft(
   const raw = readFileSync(leadPath, "utf8");
   const { fm, body } = splitFrontmatter(raw);
 
-  const kind = fm.kind === "platform" ? "platform" : "client";
+  const kind = fm.kind === "platform" ? "platform" : fm.kind === "peer" ? "peer" : "client";
 
   let classification: string;
   let classificationLabel: string | undefined;
-  if (kind === "platform") {
+  if (kind === "peer") {
+    // Boardy-style intro: no fit classification to clear, only an explicit disqualification blocks it.
+    classification = String(fm.classification ?? "unclear");
+    if (classification === "disqualified") throw new Error("refusing to draft: this peer is marked disqualified");
+    classificationLabel = "Peer";
+  } else if (kind === "platform") {
     const fit = String(fm.fit ?? "unclear");
     if (!POSITIVE_FITS.has(fit)) {
       throw new Error(
@@ -246,6 +323,14 @@ export async function runDraft(
   // -- same model/tools/prompt/timeout either way, only the transport differs. The CLI path below
   // (main()) and every test always use the default execFile-based callClaudeDraft.
   const messageBody = await (opts.callClaude ?? callClaudeDraft)(prompt);
+  const unauthorized = findUnauthorizedOutreachClaims(messageBody, selected, opts.direction);
+  if (unauthorized.length) {
+    throw new Error(`refusing to write draft: unauthorized outreach claim(s): ${unauthorized.map((finding) => `"${finding.span}"`).join(", ")}`);
+  }
+  const voiceFindings = muxinVoiceFindings(messageBody);
+  if (voiceFindings.length) {
+    throw new Error(`refusing to write draft: config/voice.yaml violation(s): ${voiceFindings.join(", ")}`);
+  }
 
   const messagesDir = join(absDir, "messages");
   mkdirSync(messagesDir, { recursive: true });
@@ -282,7 +367,7 @@ export async function runDraft(
 
   writeFileSync(messageFile, `${frontmatter}\n${messageBody}\n`);
 
-  logCost({ step: "outreach:draft", detail: leadName, costUsd: 0 });
+  logCost({ step: "outreach:draft", detail: leadName, costUsd: 0, engine: opts.engine ?? "claude" });
 
   return { dir: dirArg, messageFile, messageId, channel, evidenceIds };
 }

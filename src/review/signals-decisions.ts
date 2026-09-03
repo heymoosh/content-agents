@@ -2,11 +2,14 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
+import { isBrandId, type BrandId } from "../identity/brand.js";
 
 export type SignalsRecommendationType = "DO MORE" | "TEST" | "DO LESS";
 export type SignalsDecisionKind = "adopt" | "decline";
 
 export interface SignalsDecision {
+  /** Present on new records; absent legacy rows are unassigned. */
+  brandId?: BrandId;
   type: SignalsRecommendationType;
   title: string;
   rationale: string;
@@ -17,13 +20,14 @@ export interface SignalsDecision {
 export const SIGNALS_DECISIONS_PATH = migrateLegacyDataFile(["signals-decisions.jsonl"]);
 
 /** Stable identity shared by the UI and the append-only ledger. */
-export function recommendationKey(type: SignalsRecommendationType, title: string): string {
-  return `${type}:${title}`;
+export function recommendationKey(type: SignalsRecommendationType, title: string, brandId?: BrandId): string {
+  return brandId ? `${brandId}:${type}:${title}` : `${type}:${title}`;
 }
 
 export function appendSignalsDecision(decision: SignalsDecision, path: string = SIGNALS_DECISIONS_PATH): { ok: true } {
   if (!decision.title.trim()) throw new Error("a Signals decision needs a title");
   if (!decision.rationale.trim()) throw new Error("a Signals decision needs its rationale");
+  if (decision.brandId !== undefined && !isBrandId(decision.brandId)) throw new Error("a Signals decision needs a valid brand id");
   withFileLock(`${path}.lock`, () => {
     mkdirSync(dirname(path), { recursive: true });
     if (existsSync(path)) {
@@ -47,8 +51,9 @@ function readSignalsDecisionsUnlocked(path: string): Record<string, SignalsDecis
     try {
       const value = JSON.parse(line) as Partial<SignalsDecision>;
       if (!value.title || !value.type || !value.rationale || !value.decision || !value.date) continue;
+      if (value.brandId !== undefined && !isBrandId(value.brandId)) continue;
       if (!["DO MORE", "TEST", "DO LESS"].includes(value.type) || !["adopt", "decline"].includes(value.decision)) continue;
-      result[recommendationKey(value.type, value.title)] = value as SignalsDecision;
+      result[recommendationKey(value.type, value.title, value.brandId)] = value as SignalsDecision;
     } catch { /* append-only files can end mid-write; preserve earlier valid state */ }
   }
   return result;

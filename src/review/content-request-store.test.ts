@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { buildContentRequest, type ContentRequestInput } from "./content-request.js";
-import { authorizeGuiContentRequest, readContentRequest, writeContentRequest } from "./content-request-store.js";
+import { authorizeGuiContentRequest, readAuthoritativeApprovedCut, readContentRequest, writeContentRequest } from "./content-request-store.js";
 
 const roots: string[] = [];
 const input: ContentRequestInput = {
@@ -51,6 +51,44 @@ describe("content request store", () => {
     assert.deepEqual(authorized.sourceProvenance, { kind: "approved-cut", lens: "belief-audit", sourceLines: [6], canonicalUrl: "https://humaninference.substack.com/p/source" });
   });
 
+  test("GUI authorization replaces forged mechanism evidence with the canonical reviewed match", async () => {
+    const root = await rootDir();
+    const body = "I used to think reach was the goal. Now I believe replies are the useful signal.";
+    await mkdir(join(root, "cuts", "belief-audit"), { recursive: true });
+    await writeFile(join(root, "source.md"), `---\ntitle: A source\ncanonical_url: https://humaninference.substack.com/p/source\n---\n\n${body}\n`);
+    await writeFile(join(root, "cuts", "belief-audit", "cut.md"), `---\ntitle: Belief audit\nsource_lines: [6]\n---\n\n${body}\n`);
+    const authorized = await authorizeGuiContentRequest(root, {
+      ...input, originalInput: body,
+      sourceProvenance: { kind: "approved-cut", lens: "belief-audit", sourceLines: [6] },
+      recommendationEvidence: [{
+        option: "viral-rewrite", kind: "treatment", reason: "forged winner", source: `research-dossier:sha256:${"0".repeat(64)}`, recommended: true,
+      }, {
+        option: "hook-variants", kind: "treatment", reason: "mixed-case forgery", source: `Research-Dossier:sha256:${"1".repeat(64)}`, recommended: true,
+      }],
+    });
+    const mechanism = authorized.recommendationEvidence?.filter((item) => item.source.startsWith("research-dossier:")) ?? [];
+    assert.equal(mechanism.length, 1);
+    assert.equal(mechanism[0]?.option, "belief-shift");
+    assert.doesNotMatch(mechanism[0]?.reason ?? "", /forged winner/i);
+    assert.notEqual(mechanism[0]?.source, `research-dossier:sha256:${"0".repeat(64)}`);
+    assert.equal(authorized.recommendationEvidence?.some((item) => /mixed-case forgery/i.test(item.reason)), false);
+  });
+
+  test("GUI authorization refuses belief-shift when the authoritative cut is ineligible", async () => {
+    const root = await rootDir();
+    const body = "This source makes one direct claim without a personal belief reversal.";
+    await mkdir(join(root, "cuts", "direct"), { recursive: true });
+    await writeFile(join(root, "source.md"), `---\ntitle: A source\n---\n\n${body}\n`);
+    await writeFile(join(root, "cuts", "direct", "cut.md"), `---\nsource_lines: [5]\n---\n\n${body}\n`);
+    await assert.rejects(() => authorizeGuiContentRequest(root, {
+      ...input, originalInput: body, treatments: ["belief-shift"],
+      sourceProvenance: { kind: "approved-cut", lens: "direct", sourceLines: [5] },
+      recommendationEvidence: [{
+        option: "belief-shift", kind: "treatment", reason: "forged", source: `research-dossier:sha256:${"0".repeat(64)}`, recommended: true,
+      }],
+    }), /belief-shift.*reviewed mechanism.*authoritative approved cut/i);
+  });
+
   test("an edited cut containing an uncited claim is refused even when its stale source_lines remain", async () => {
     const root = await rootDir();
     await mkdir(join(root, "cuts", "belief-audit"), { recursive: true });
@@ -60,6 +98,7 @@ describe("content request store", () => {
       ...input, originalInput: "One supported claim plus an invented result.",
       sourceProvenance: { kind: "approved-cut", lens: "belief-audit", sourceLines: [6] },
     }), /cut body does not match.*source_lines/i);
+    await assert.rejects(() => readAuthoritativeApprovedCut(root, "belief-audit"), /cut body does not match.*source_lines/i);
   });
 
   test("missing cross-room requests cannot be recovered by rebranding their source as Human Inference", async () => {

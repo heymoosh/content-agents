@@ -49,3 +49,15 @@ test("concurrent legacy decision appends preserve every complete transaction", a
     assert.equal(Object.keys(readSignalsDecisions(path)).length, 8);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("brand-scoped decisions with the same recommendation title do not overwrite each other", () => {
+  const root = mkdtempSync(join(tmpdir(), "signals-decisions-brands-"));
+  const path = join(root, "decisions.jsonl");
+  try {
+    appendSignalsDecision({ brandId: "human-inference", type: "TEST", title: "Same title", rationale: "Human", decision: "adopt", date: "2026-08-31" }, path);
+    appendSignalsDecision({ brandId: "charles", type: "TEST", title: "Same title", rationale: "Charles", decision: "decline", date: "2026-08-31" }, path);
+    const rows = readSignalsDecisions(path);
+    assert.equal(rows[recommendationKey("TEST", "Same title", "human-inference")]?.decision, "adopt");
+    assert.equal(rows[recommendationKey("TEST", "Same title", "charles")]?.decision, "decline");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

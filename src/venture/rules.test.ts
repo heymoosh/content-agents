@@ -73,6 +73,16 @@ describe("rules.yaml parity with rules.md prose", () => {
     assert.match(rulesMd, /Phase 1 — test the problem \| Reply prompt by default/);
   });
 
+  test("Signals input is an internal current-phase receipt and never a publishable checkpoint artifact", () => {
+    const kind = artifactKindRule(rules, "signals-input");
+    assert.deepEqual(kind, { delivery_mode: "none", publishable: false, min_evidence: null, phase: "current" });
+    assert.match(rulesMd, /internal `signals-input` artifact in the\s*\n?\s*Venture's current phase/);
+    for (const checkpoint of Object.values(rules.checkpoints)) {
+      assert.ok(!checkpoint.required_artifact_kinds?.includes("signals-input"));
+    }
+    assert.ok(!rules.phase4_completion.required_artifact_kinds.includes("signals-input"));
+  });
+
   test("research-plan gate: confirmed_by_muxin required, four unknown dimensions", () => {
     assert.equal(rules.research_plan.require_confirmed_by_muxin, true);
     assert.equal(rules.research_plan.unknown_dimensions.length, 4);

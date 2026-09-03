@@ -97,6 +97,11 @@ artifact_kinds:
     publishable: false
     min_evidence: null
     phase: 4
+  signals-input:
+    delivery_mode: none # accepted Signals evidence; internal only, never published or checkpoint-counted
+    publishable: false
+    min_evidence: null
+    phase: current
 
 # rules.md §5.1 -- the platform-recommendation decision. Single primary platform only; the
 # system MUST NOT recommend a multi-platform launch.

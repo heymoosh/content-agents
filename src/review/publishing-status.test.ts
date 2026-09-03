@@ -5,7 +5,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { after, afterEach, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { publishingRetryBlock, readPublishingHistory, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce } from "./publishing-status.js";
+import { disposableProviderOutcome, publishingRetryBlock, readPublishingHistory, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce } from "./publishing-status.js";
 import type { QueueRow } from "../publish/queue.js";
 
 const roots: string[] = [];
@@ -38,10 +38,39 @@ function contentFolder(origin = "human-inference"): string {
   writeFileSync(join(root, "derivatives", "x-1.md"), "---\nplatform: x\n---\n\nApproved body.\n");
   return root;
 }
+
+test("disposable provider outcomes require the matching token, marker, and repository root", () => {
+  const root = mkdtempSync(join(tmpdir(), "disposable-provider-")); roots.push(root);
+  writeFileSync(join(root, ".e2e-scheduling-token"), "one-run-secret");
+  const env = { CONTENT_AGENTS_E2E_SCHEDULING_TOKEN: "one-run-secret", E2E_REPO_ROOT: root };
+  assert.equal(disposableProviderOutcome({ id: "e2e-provider-success" }, {}, root), null);
+  assert.equal(disposableProviderOutcome({ id: "e2e-provider-success" }, { ...env, CONTENT_AGENTS_E2E_SCHEDULING_TOKEN: "wrong" }, root), null);
+  assert.equal(disposableProviderOutcome({ id: "e2e-provider-success" }, { ...env, E2E_REPO_ROOT: tmpdir() }, root), null);
+  assert.equal(disposableProviderOutcome({ id: "ordinary-row" }, env, root), null);
+  assert.deepEqual(disposableProviderOutcome({ id: "e2e-provider-success" }, env, root), {
+    provider: "typefully", scheduled: { draftId: "e2e-provider-object", when: "Sep 2 at 9:00 AM", plannedFor: "2026-09-02T14:00:00.000Z" }, scheduleError: null,
+  });
+  assert.deepEqual(disposableProviderOutcome({ id: "e2e-provider-failure" }, env, root), {
+    provider: "typefully", scheduled: null, scheduleError: "injected provider timeout",
+  });
+});
 const row: QueueRow = { id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", notes: "", lineIndex: 2 };
 const execFileAsync = promisify(execFile);
 
 describe("durable publishing status", () => {
+  test("a Postiz rate limit records failed with the resume time and stays retry-eligible", async () => {
+    const path = ledger();
+    const folder = contentFolder();
+    const message = "Postiz rate limit reached (429): the create-post endpoint allows 90 requests per hour across the whole instance, and each schedule or move counts as one. Nothing was created. Studio resumes the waiting rows automatically after 2026-09-02T19:10:00.000Z.";
+    const result = await scheduleApprovedOnce(folder, "piece", row, async () => ({ scheduled: null, scheduleError: message }), path);
+    assert.equal(result.publishing.state, "failed");
+    assert.match(result.publishing.error ?? "", /after 2026-09-02T19:10:00.000Z/);
+    assert.equal(publishingRetryBlock("piece", { ...row, status: "approve" }, path), null);
+    const second = await scheduleApprovedOnce(folder, "piece", { ...row, status: "approve" }, async () => ({ scheduled: { draftId: "p-1", when: "later", plannedFor: "2026-09-10T16:00:00.000Z" }, scheduleError: null }), path);
+    assert.notEqual(second.publishing.state, "failed");
+    assert.equal(second.scheduleError, null);
+  });
+
   test("records provider, reference, planned time, and prevents a repeat schedule", async () => {
     const path = ledger(); let calls = 0;
     const folder = contentFolder();

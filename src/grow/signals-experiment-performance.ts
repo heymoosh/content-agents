@@ -3,6 +3,7 @@ import { buildExperimentRecord, type ExperimentRecord, type SuccessObservation }
 import type { ExperimentPlan } from "./experiment-content-handoff.js";
 import type { OutcomeLedger } from "./outcome-ledger.js";
 import type { SignalsExperimentRecommendationInput } from "./experiment-slice.js";
+import { brandForOrigin, type BrandId } from "../identity/brand.js";
 
 export const SIGNALS_EXPERIMENT_PERFORMANCE_VERSION = "signals-experiment-performance-v1" as const;
 
@@ -12,6 +13,7 @@ export interface SignalsExperimentPerformanceInput {
   readonly ledgers: readonly ExperimentOutcomeLedger[];
   /** Immutable, evidence-linked measurements normalized from providers or an outcome ledger. */
   readonly metricFacts?: readonly ExperimentMetricFact[];
+  readonly brandByExperiment?: Readonly<Record<string, BrandId | null>>;
   readonly now: string;
 }
 
@@ -49,6 +51,8 @@ export interface ExperimentProviderPublication {
   readonly canonicalUrl?: string | null;
   readonly providerPublishedAt?: string | null;
   readonly eventId: string;
+  readonly providerAccountId?: string | null;
+  readonly brandId?: BrandId | null;
 }
 
 export interface LiveExperimentPublication extends ExperimentProviderPublication {
@@ -65,6 +69,8 @@ export interface ExperimentAnalyticsObservation {
   readonly replies: number | null;
   readonly clicks: number | null;
   readonly newFollows: number | null;
+  readonly providerAccountId?: string | null;
+  readonly brandId?: BrandId | null;
 }
 
 export interface ProviderAnalyticsMetricInput {
@@ -93,6 +99,7 @@ export interface LiveSignalsExperimentPerformanceInput {
 
 export interface SignalsExperimentPerformanceRow {
   readonly experimentId: string;
+  readonly brandId: BrandId | null;
   readonly confidence: SignalsExperimentRecommendationInput["confidence"];
   readonly hypothesis: string;
   readonly primaryMetric: SignalsExperimentRecommendationInput["primaryMetric"];
@@ -104,6 +111,8 @@ export interface SignalsExperimentPerformanceRow {
   readonly elapsedDays: number | null;
   readonly observation: SuccessObservation | null;
   readonly primaryComparison: Pick<ExperimentMetricComparison, "treatment" | "control"> | null;
+  /** Outcome-ledger evidence attached to each primary arm; provider analytics never populate this. */
+  readonly primaryOutcomeRefs: { readonly treatment: readonly string[]; readonly control: readonly string[] };
   readonly guardrailComparisons: ExperimentMetricComparison[];
   readonly outcomeRefs: string[];
   readonly analysisStatus: "collecting" | "ready" | "closed" | "insufficient-evidence";
@@ -236,8 +245,14 @@ export function buildMetricFactsFromProviderAnalytics(input: ProviderAnalyticsMe
     const canonicalUrl = publication.canonicalUrl?.trim() || null;
     if (!providerObjectId && !canonicalUrl) continue;
     const matches = input.analytics.filter((row) =>
-      (providerObjectId !== null && row.platformPostId === providerObjectId)
-      || (canonicalUrl !== null && row.url === canonicalUrl));
+      ((providerObjectId !== null && row.platformPostId === providerObjectId)
+      || (canonicalUrl !== null && row.url === canonicalUrl))
+      && (publication.providerAccountId === undefined && row.providerAccountId === undefined
+        ? true
+        : Boolean(publication.providerAccountId && row.providerAccountId && publication.providerAccountId === row.providerAccountId))
+      && (publication.brandId === undefined && row.brandId === undefined
+        ? true
+        : Boolean(publication.brandId && row.brandId && publication.brandId === row.brandId)));
     if (!matches.length) continue;
     const latest = [...matches].sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt))[0]!;
     if (Number.isNaN(Date.parse(latest.capturedAt))) throw new Error(`analytics ${latest.id} capturedAt is invalid`);
@@ -273,7 +288,7 @@ export function buildMetricFactsFromOutcomeLedger(input: OutcomeLedgerMetricInpu
   const variants = new Set(input.variantIds.map((id, index) => requiredText(id, `variantIds[${index}]`)));
   const requested = new Set(input.requestedMetrics.map((item, index) => `${item.family}:${requiredText(item.metric, `requestedMetrics[${index}].metric`)}`));
   const superseded = new Set(input.ledger.rows.map((row) => row.supersedesId).filter((id): id is string => id !== null));
-  const measurableStatuses = new Set(["measured", "observed", "reported", "verified", "current"]);
+  const measurableStatuses = new Set(["measured", "observed", "reported", "verified", "current", "corrected"]);
   const facts: ExperimentMetricFact[] = [];
   for (const row of input.ledger.rows) {
     if (superseded.has(row.id) || !measurableStatuses.has(row.status) || row.value === null || row.value < 0) continue;
@@ -370,7 +385,10 @@ export function buildLiveSignalsExperimentPerformance(input: LiveSignalsExperime
     records.push(record);
     ledgers.push(buildExperimentOutcomeLedger({ experiment: record, commentObservations: [], funnelEvents: [], businessOutcomes: [] }));
   }
-  return buildSignalsExperimentPerformance({ recommendations, records, ledgers, metricFacts, now: input.now });
+  return buildSignalsExperimentPerformance({ recommendations, records, ledgers, metricFacts, brandByExperiment: Object.fromEntries(input.plans.map((plan) => {
+    const derived = brandForOrigin(plan.contentRequest.origin);
+    return [plan.recommendation.id, plan.brandId === derived ? derived : null];
+  })), now: input.now });
 }
 
 /** Join multiple active experiment records without collapsing their metrics or selecting a winner. */
@@ -386,12 +404,17 @@ export function buildSignalsExperimentPerformance(input: SignalsExperimentPerfor
     const experimentFacts = facts.filter((fact) => fact.experimentId === recommendation.id);
     const usesFacts = input.metricFacts !== undefined;
     const blockers: string[] = [];
+    if (input.brandByExperiment && Object.hasOwn(input.brandByExperiment, recommendation.id) && input.brandByExperiment[recommendation.id] === null) blockers.push("experiment brand lineage is unassigned or inconsistent");
     if (!record) blockers.push("experiment record is missing");
     if (!ledger) blockers.push("experiment outcome ledger is missing");
     if (record && ledger && ledger.experimentId !== record.id) blockers.push("outcome ledger does not match experiment");
     if (ledger?.readiness.status === "blocked") blockers.push(...ledger.readiness.blockers);
     const observation = record?.successObservations.find((item) => item.family === recommendation.primaryMetric.family && item.metric === recommendation.primaryMetric.metric) ?? null;
     const primary = usesFacts ? comparison(experimentFacts, recommendation, recommendation.primaryMetric.family, recommendation.primaryMetric.metric) : null;
+    const primaryOutcomeFacts = experimentFacts.filter((fact) => fact.source === "outcome-ledger"
+      && fact.family === recommendation.primaryMetric.family && fact.metric === recommendation.primaryMetric.metric);
+    const primaryOutcomeRefs = (variantId: string): string[] => [...new Set(primaryOutcomeFacts
+      .filter((fact) => fact.variantId === variantId).flatMap((fact) => fact.evidenceRefs))].sort();
     const guardrails = usesFacts ? recommendation.guardrails.map((guardrail) => comparison(experimentFacts, recommendation, guardrail.family, guardrail.metric)) : [];
     if (usesFacts) {
       if (!primary?.treatment) blockers.push("primary metric treatment arm is missing");
@@ -412,6 +435,7 @@ export function buildSignalsExperimentPerformance(input: SignalsExperimentPerfor
     const terminal = record?.status === "closed" ? "closed" : record?.status === "insufficient-evidence" ? "insufficient-evidence" : null;
     return {
       experimentId: recommendation.id,
+      brandId: input.brandByExperiment?.[recommendation.id] ?? null,
       confidence: recommendation.confidence,
       hypothesis: recommendation.hypothesis,
       primaryMetric: { ...recommendation.primaryMetric },
@@ -423,6 +447,10 @@ export function buildSignalsExperimentPerformance(input: SignalsExperimentPerfor
       elapsedDays: days,
       observation: observation ? { ...observation, outcomeRefs: [...observation.outcomeRefs] } : null,
       primaryComparison: primary ? { treatment: primary.treatment, control: primary.control } : null,
+      primaryOutcomeRefs: {
+        treatment: primaryOutcomeRefs(recommendation.expectedOutcome.variantId),
+        control: primaryOutcomeRefs(recommendation.expectedOutcome.comparisonRef),
+      },
       guardrailComparisons: guardrails,
       outcomeRefs: usesFacts
         ? [...new Set(experimentFacts.flatMap((fact) => fact.evidenceRefs))].sort()

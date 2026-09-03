@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { cancelPostizPost, createPostizPost, fetchPostizCapabilities, readPostizPost, reconcilePostizPost, resolveConfiguredPostizCapability, selectDeliveryRoute, type PostizTransport } from "./postiz.js";
+import { cancelPostizPost, createPostizPost, defaultProviderSettings, fetchPostizCapabilities, readPostizPost, reconcilePostizPost, reschedulePostizPost, resolveConfiguredPostizCapability, selectDeliveryRoute, supportsPostiz, createPostizTransport, updatePostizPost, uploadPostizMedia, type PostizTransport, rateLimitRetryAt, PostizRateLimitError, postizRateLimitRetryAt } from "./postiz.js";
 import { assertLiveCanaryGate, runPostizLifecycleCanary } from "./postiz-canary.js";
 import { runCanaryMatrix } from "./canary-matrix.js";
 
@@ -25,29 +25,166 @@ describe("Postiz capability-first routing", () => {
     assert.throws(() => resolveConfiguredPostizCapability(registry, "x", "video", { POSTIZ_ACCOUNT_ID: "acct-1" }), /does not advertise/);
   });
 
-  test("refuses inferred capabilities", async () => {
-    const { client } = transport([{ integrations: [{ platform: "x", id: "acct-1", name: "HI" }] }]);
+  test("refuses a malformed explicit capability list", async () => {
+    const { client } = transport([{ integrations: [{ platform: "x", id: "acct-1", name: "HI", media: "text" }] }]);
     await assert.rejects(fetchPostizCapabilities(client), /explicit media capabilities/);
+  });
+
+  test("maps the real public integrations shape to text-only, drops disabled rows, records unknown identifiers", async () => {
+    // Exact shape of GET /public/v1/integrations in postiz-app (public.integrations.controller.ts): a bare
+    // array with no media field.
+    const { client, calls } = transport([[
+      { id: "int-x", name: "Muxin Li", identifier: "x", picture: "p", disabled: false, profile: "muxin", customer: undefined },
+      { id: "int-th", name: "human_inference", identifier: "threads", picture: "p", disabled: false, profile: "hi" },
+      { id: "int-off", name: "Old", identifier: "linkedin", picture: "p", disabled: true, profile: "old" },
+      { id: "int-fb", name: "Human Inference", identifier: "facebook", picture: "p", disabled: false, profile: "hi" },
+      { id: "int-off2", name: "Old2", identifier: "bluesky", disabled: true, media: ["text", "image"] },
+      { id: "int-yt", name: "Human Inference", identifier: "youtube", picture: "p", disabled: false, profile: "hi" },
+      { id: "int-ig", name: "Muxin Li", identifier: "instagram", disabled: false },
+      { id: "int-tt", name: "Human Inference", identifier: "tiktok", disabled: false },
+    ]]);
+    const registry = await fetchPostizCapabilities(client, new Date("2026-09-02T12:00:00Z"));
+    assert.deepEqual(registry.capabilities, [
+      { destination: "x", media: ["text"], accountId: "int-x", accountLabel: "Muxin Li" },
+      { destination: "threads", media: ["text"], accountId: "int-th", accountLabel: "human_inference" },
+      { destination: "facebook", media: ["text"], accountId: "int-fb", accountLabel: "Human Inference" },
+    ]);
+    assert.deepEqual(registry.unrecognized, [
+      { identifier: "linkedin", accountId: "int-off", accountLabel: "Old", reason: "disabled" },
+      { identifier: "bluesky", accountId: "int-off2", accountLabel: "Old2", reason: "disabled" },
+      { identifier: "youtube", accountId: "int-yt", accountLabel: "Human Inference", reason: "no-text-baseline" },
+      { identifier: "instagram", accountId: "int-ig", accountLabel: "Muxin Li", reason: "no-text-baseline" },
+      { identifier: "tiktok", accountId: "int-tt", accountLabel: "Human Inference", reason: "no-text-baseline" },
+    ]);
+    assert.equal(supportsPostiz(registry, "x", "image"), false, "image stays unsupported without a verified upload path");
+    assert.equal(calls.length, 1);
+    assert.equal(selectDeliveryRoute(registry, "facebook", "image"), "unsupported", "facebook has no non-Postiz fallback");
+  });
+
+  test("advertises provider media only once the instance's upload lifecycle is verified", async () => {
+    const rows = [
+      { id: "int-yt", name: "HI", identifier: "youtube", disabled: false },
+      { id: "int-x", name: "Muxin Li", identifier: "x", disabled: false },
+      { id: "int-lp", name: "HI", identifier: "linkedin-page", disabled: false },
+    ];
+    const verified = await fetchPostizCapabilities(transport([rows]).client, new Date("2026-09-02T12:00:00Z"), { mediaUploadVerified: true });
+    assert.deepEqual(verified.capabilities, [
+      { destination: "youtube", media: ["video"], accountId: "int-yt", accountLabel: "HI", localMediaUpload: true },
+      { destination: "x", media: ["text", "image", "video"], accountId: "int-x", accountLabel: "Muxin Li", localMediaUpload: true },
+    ]);
+    assert.deepEqual(verified.unrecognized, [{ identifier: "linkedin-page", accountId: "int-lp", accountLabel: "HI", reason: "unknown-identifier" }]);
+    assert.equal(selectDeliveryRoute(verified, "youtube", "video", { requiresLocalMediaUpload: true }), "postiz");
+  });
+
+  test("multipart uploads omit the JSON content type so fetch writes the boundary", async () => {
+    const seen: RequestInit[] = [];
+    const client = createPostizTransport({ POSTIZ_BASE_URL: "http://postiz.test", POSTIZ_API_KEY: "k" }, (async (_url: string | URL | Request, init?: RequestInit) => { seen.push(init ?? {}); return new Response(JSON.stringify({ id: "m", path: "p" }), { status: 200 }); }) as typeof fetch);
+    await uploadPostizMedia(client, { bytes: new Uint8Array([1]), filename: "a.png", mime: "image/png" });
+    assert.equal((seen[0]?.headers as Record<string, string>)["Content-Type"], undefined);
+    assert.equal((seen[0]?.headers as Record<string, string>).Authorization, "k");
+  });
+
+  test("sends the bare API key: Postiz's public middleware rejects a Bearer prefix", async () => {
+    const seen: Array<{ url: string; headers: Record<string, string> }> = [];
+    const fakeFetch = (async (url: string, init?: RequestInit) => {
+      seen.push({ url, headers: init?.headers as Record<string, string> });
+      return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as unknown as typeof fetch;
+    const client = createPostizTransport({ POSTIZ_BASE_URL: "http://localhost:4007/", POSTIZ_API_KEY: " key-1 " }, fakeFetch);
+    await fetchPostizCapabilities(client);
+    assert.equal(seen[0]?.url, "http://localhost:4007/api/public/v1/integrations");
+    assert.equal(seen[0]?.headers.Authorization, "key-1");
   });
 });
 
 describe("Postiz stable lifecycle contract", () => {
-  test("create/read/cancel/reconcile preserve stable ids, urls, and statuses", async () => {
+  test("create/read/cancel/reconcile follow the real public API: array create, windowed list read, soft delete", async () => {
     const { client, calls } = transport([
-      { id: "post-7", url: "https://social.example/post-7", status: "scheduled", scheduledAt: "2026-09-01T12:00:00Z" },
-      { id: "post-7", postUrl: "https://social.example/post-7", state: "private", publishDate: "2026-09-01T12:00:00Z" },
-      { id: "post-7", status: "canceled" },
-      { id: "post-7", status: "canceled" },
+      [{ postId: "post-7", integration: "acct-1" }],
+      { posts: [{ id: "post-7", state: "QUEUE", publishDate: "2026-09-01T12:00:00.000Z", releaseURL: "https://social.example/post-7", group: "g-1" }] },
+      { id: "post-7" },
+      { posts: [] },
     ]);
     const input = { destination: "x", accountId: "acct-1", content: "approved canary", scheduledAt: "2026-09-01T12:00:00Z", visibility: "scheduled" } as const;
-    assert.equal((await createPostizPost(client, input, new Date("2026-08-30T12:00:00Z"))).id, "post-7");
-    assert.equal((await readPostizPost(client, "post-7")).url, "https://social.example/post-7");
+    const created = await createPostizPost(client, input, new Date("2026-08-30T12:00:00Z"));
+    assert.deepEqual(created, { id: "post-7", url: null, status: "scheduled", scheduledAt: "2026-09-01T12:00:00Z" });
+    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), {
+      type: "schedule", date: "2026-09-01T12:00:00Z", shortLink: false, tags: [],
+      posts: [{ integration: { id: "acct-1" }, value: [{ content: "approved canary", image: [] }], settings: { who_can_reply_post: "everyone" } }],
+    });
+    const read = await readPostizPost(client, "post-7", input.scheduledAt);
+    assert.equal(read.url, "https://social.example/post-7");
+    assert.equal(read.status, "scheduled");
+    assert.equal(read.group, "g-1");
     assert.equal((await cancelPostizPost(client, "post-7")).status, "canceled");
-    assert.equal((await reconcilePostizPost(client, "post-7")).id, "post-7");
-    assert.deepEqual(calls.map((call) => [call.init?.method ?? "GET", call.path]), [
-      ["POST", "/api/public/v1/posts"], ["GET", "/api/public/v1/posts/post-7"],
-      ["DELETE", "/api/public/v1/posts/post-7"], ["GET", "/api/public/v1/posts/post-7"],
+    assert.equal((await reconcilePostizPost(client, "post-7", input.scheduledAt)).status, "canceled");
+    assert.deepEqual(calls.map((call) => [call.init?.method ?? "GET", call.path.replace(/\?.*$/, "")]), [
+      ["POST", "/api/public/v1/posts"], ["GET", "/api/public/v1/posts"],
+      ["DELETE", "/api/public/v1/posts/post-7"], ["GET", "/api/public/v1/posts"],
     ]);
+    assert.match(calls[1]?.path ?? "", /startDate=2026-07-18T12%3A00%3A00\.000Z&endDate=2026-10-16T12%3A00%3A00\.000Z/);
+  });
+
+  test("draft maps to Postiz type draft; private and media are refused before any request", async () => {
+    const { client, calls } = transport([[{ postId: "d-1", integration: "acct-1" }]]);
+    const base = { destination: "x", accountId: "acct-1", content: "c", scheduledAt: "2026-09-01T12:00:00Z" } as const;
+    const now = new Date("2026-08-30T12:00:00Z");
+    assert.equal((await createPostizPost(client, { ...base, visibility: "draft" }, now)).status, "draft");
+    assert.equal(JSON.parse(String(calls[0]?.init?.body)).type, "draft");
+    assert.equal(JSON.parse(String(calls[0]?.init?.body)).posts[0].settings, undefined, "drafts skip provider settings: Postiz validates them only for non-draft saves");
+    await assert.rejects(createPostizPost(client, { ...base, visibility: "private" }, now), /no private visibility/);
+    await assert.rejects(createPostizPost(client, { ...base, visibility: "draft", mediaUrls: ["https://x/y.png"] }, now), /remote URLs are refused/);
+    assert.equal(calls.length, 1);
+  });
+
+  test("non-draft saves carry each channel's required provider settings from the live integration-settings schemas", async () => {
+    assert.deepEqual(defaultProviderSettings("x"), { who_can_reply_post: "everyone" });
+    assert.deepEqual(defaultProviderSettings("bluesky"), {});
+    assert.equal(defaultProviderSettings("tiktok").content_posting_method, "DIRECT_POST");
+    const { client, calls } = transport([[{ postId: "p-1" }], [{ postId: "p-2" }]]);
+    const now = new Date("2026-08-30T12:00:00Z");
+    const media = [{ id: "m-1", path: "http://postiz/uploads/m-1.png" }];
+    await createPostizPost(client, { destination: "instagram", accountId: "ig", content: "caption", media, scheduledAt: "2026-09-01T12:00:00Z", visibility: "scheduled", providerSettings: { post_type: "story" } }, now);
+    const body = JSON.parse(String(calls[0]?.init?.body));
+    assert.deepEqual(body.posts[0].settings, { post_type: "story" });
+    assert.deepEqual(body.posts[0].value[0].image, media);
+    await assert.rejects(createPostizPost(client, { destination: "instagram", accountId: "ig", content: "caption", scheduledAt: "2026-09-01T12:00:00Z", visibility: "scheduled" }, now), /require media/);
+    await assert.rejects(createPostizPost(client, { destination: "youtube", accountId: "yt", content: "c", media, scheduledAt: "2026-09-01T12:00:00Z", visibility: "scheduled" }, now), /providerSettings\.title/);
+    await createPostizPost(client, { destination: "facebook", accountId: "fb", content: "text only", scheduledAt: "2026-09-01T12:00:00Z", visibility: "scheduled" }, now);
+    assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)).posts[0].settings, { post_type: "post" });
+  });
+
+  test("reschedule re-POSTs the full body in place with type schedule; update keeps the date and never restarts the workflow", async () => {
+    const { client, calls } = transport([[{ postId: "post-7" }], [{ postId: "post-7" }], [{ postId: "other" }]]);
+    const now = new Date("2026-08-30T12:00:00Z");
+    const input = { destination: "x", accountId: "acct-1", content: "approved", scheduledAt: "2026-09-01T12:00:00Z", visibility: "scheduled" } as const;
+    const moved = await reschedulePostizPost(client, { id: "post-7", group: "g-1" }, input, "2026-09-03T12:00:00Z", now);
+    assert.deepEqual(moved, { id: "post-7", url: null, status: "scheduled", scheduledAt: "2026-09-03T12:00:00Z" });
+    const body = JSON.parse(String(calls[0]?.init?.body));
+    assert.equal(body.type, "schedule");
+    assert.equal(body.date, "2026-09-03T12:00:00Z");
+    assert.equal(body.posts[0].group, "g-1");
+    assert.equal(body.posts[0].value[0].id, "post-7");
+    assert.equal(body.republish, undefined);
+    await updatePostizPost(client, { id: "post-7", scheduledAt: input.scheduledAt }, { ...input, content: "edited" }, now);
+    assert.equal(JSON.parse(String(calls[1]?.init?.body)).type, "update");
+    await assert.rejects(updatePostizPost(client, { id: "post-7", scheduledAt: "2026-09-02T12:00:00Z" }, input, now), /cannot change the date/);
+    await assert.rejects(reschedulePostizPost(client, { id: "post-7" }, input, "2026-09-04T12:00:00Z", now), /different stable id/);
+    await assert.rejects(reschedulePostizPost(client, { id: "post-7" }, input, "2026-08-01T12:00:00Z", now), /future/);
+  });
+
+  test("upload posts multipart to the public upload route and returns the media ref", async () => {
+    const { client, calls } = transport([{ id: "m-9", name: "x.png", path: "http://postiz/uploads/m-9.png" }]);
+    const ref = await uploadPostizMedia(client, { bytes: new Uint8Array([137, 80, 78, 71]), filename: "x.png", mime: "image/png" });
+    assert.deepEqual(ref, { id: "m-9", path: "http://postiz/uploads/m-9.png" });
+    assert.equal(calls[0]?.path, "/api/public/v1/upload");
+    assert.ok(calls[0]?.init?.body instanceof FormData);
+    await assert.rejects(uploadPostizMedia(client, { bytes: new Uint8Array(), filename: "x.png", mime: "image/png" }), /non-empty/);
+  });
+
+  test("read fails closed when the post is absent from the window", async () => {
+    const { client } = transport([{ posts: [{ id: "other", state: "DRAFT" }] }]);
+    await assert.rejects(readPostizPost(client, "post-7", "2026-09-01T12:00:00Z"), /not found/);
   });
 
   test("never creates an immediate or past post", async () => {
@@ -64,13 +201,52 @@ describe("live-canary gate", () => {
     assert.throws(() => assertLiveCanaryGate(input, approval, {}, new Date("2026-08-30T00:00:00Z")), /CANARY_I_MEAN_IT/);
     assert.throws(() => assertLiveCanaryGate(input, { ...approval, evidence: "" }, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z")), /approval evidence/);
     assert.doesNotThrow(() => assertLiveCanaryGate(input, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z")));
-    assert.throws(() => assertLiveCanaryGate({ ...input, visibility: "scheduled" }, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z")), /scheduled is prohibited/);
+    assert.throws(() => assertLiveCanaryGate({ ...input, visibility: "scheduled" }, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z")), /allowScheduled=true/);
+    const farOut = { ...input, visibility: "scheduled" as const, scheduledAt: "2026-09-10T00:00:00Z" };
+    assert.throws(() => assertLiveCanaryGate({ ...farOut, scheduledAt: "2026-09-03T00:00:00Z" }, { ...approval, allowScheduled: true }, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z")), /at least 7 days out/);
+    assert.doesNotThrow(() => assertLiveCanaryGate(farOut, { ...approval, allowScheduled: true }, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z")));
+  });
+
+  test("approved scheduled canary proves schedule, reschedule, read-back, cancel, and terminal reconcile", async () => {
+    const { client, calls } = transport([
+      [{ postId: "canary-2", integration: "acct-1" }],
+      { posts: [{ id: "canary-2", state: "QUEUE", publishDate: "2026-09-10T00:00:00.000Z", group: "g-2" }] },
+      [{ postId: "canary-2", integration: "acct-1" }],
+      { posts: [{ id: "canary-2", state: "QUEUE", publishDate: "2026-09-10T01:00:00.000Z", group: "g-3" }] },
+      { id: "canary-2" }, { posts: [] },
+    ]);
+    const root = mkdtempSync(join(tmpdir(), "postiz-canary-"));
+    const scheduled = { ...input, visibility: "scheduled" as const, scheduledAt: "2026-09-10T00:00:00Z" };
+    const result = await runPostizLifecycleCanary(client, scheduled, { ...approval, allowScheduled: true }, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"),
+      { cleanupLedgerPath: join(root, "cleanup.jsonl"), emitRecovery: () => {}, rescheduleTo: "2026-09-10T01:00:00Z" });
+    assert.equal(result.rescheduled?.scheduledAt, "2026-09-10T01:00:00Z");
+    assert.equal(result.reconciled.status, "canceled");
+    const move = JSON.parse(String(calls[2]?.init?.body));
+    assert.equal(move.type, "schedule"); assert.equal(move.posts[0].group, "g-2"); assert.equal(move.posts[0].value[0].id, "canary-2");
+    assert.equal(calls.length, 6);
+    const ledger = readFileSync(join(root, "cleanup.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    assert.equal(ledger.at(-1).cleanupRequired, false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a reschedule that does not land keeps cleanupRequired and still cancels", async () => {
+    const { client, calls } = transport([
+      [{ postId: "canary-3" }], { posts: [{ id: "canary-3", state: "QUEUE", publishDate: "2026-09-10T00:00:00.000Z" }] },
+      [{ postId: "canary-3" }], { posts: [{ id: "canary-3", state: "QUEUE", publishDate: "2026-09-10T00:00:00.000Z" }] },
+      { id: "canary-3" }, { posts: [] },
+    ]);
+    const root = mkdtempSync(join(tmpdir(), "postiz-canary-"));
+    const scheduled = { ...input, visibility: "scheduled" as const, scheduledAt: "2026-09-10T00:00:00Z" };
+    await assert.rejects(runPostizLifecycleCanary(client, scheduled, { ...approval, allowScheduled: true }, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"),
+      { cleanupLedgerPath: join(root, "cleanup.jsonl"), emitRecovery: () => {}, rescheduleTo: "2026-09-10T01:00:00Z" }), /after a reschedule/);
+    assert.equal(calls.filter((call) => call.init?.method === "DELETE").length, 1);
+    rmSync(root, { recursive: true, force: true });
   });
 
   test("composes a gated create/read/cancel/reconcile harness lifecycle", async () => {
     const { client, calls } = transport([
-      { id: "canary-1", status: "draft" }, { id: "canary-1", status: "draft" },
-      { id: "canary-1", status: "canceled" }, { id: "canary-1", status: "canceled" },
+      [{ postId: "canary-1", integration: "acct-1" }], { posts: [{ id: "canary-1", state: "DRAFT" }] },
+      { id: "canary-1" }, { posts: [] },
     ]);
     const root = mkdtempSync(join(tmpdir(), "postiz-canary-"));
     const result = await runPostizLifecycleCanary(client, input, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"), { cleanupLedgerPath: join(root, "cleanup.jsonl"), emitRecovery: () => {} });
@@ -85,16 +261,17 @@ describe("live-canary gate", () => {
       const ledger = join(root, "cleanup.jsonl"); const emitted: string[] = []; const calls: string[] = [];
       const client: PostizTransport = { async request(path, init) {
         calls.push(`${init?.method ?? "GET"} ${path}`);
-        if (init?.method === "POST") return { id: "recover-7", status: "draft" };
+        if (init?.method === "POST") return [{ postId: "recover-7", integration: "acct-1" }];
         if (init?.method === "DELETE") {
           if (scenario === "cancel failure") throw new Error("cancel offline");
-          return { id: "recover-7", status: "canceled" };
+          return { id: "recover-7" };
         }
         if (calls.filter((call) => call.startsWith("GET")).length === 1) {
           if (scenario === "read throw") throw new Error("read offline");
-          return { id: scenario === "ID mismatch" ? "wrong-id" : "recover-7", status: "draft" };
+          // "ID mismatch" models a list that lacks the created id: read must fail closed, never match another row.
+          return { posts: [{ id: scenario === "ID mismatch" ? "wrong-id" : "recover-7", state: "DRAFT" }] };
         }
-        return { id: "recover-7", status: "canceled" };
+        return { posts: [] };
       } };
       await assert.rejects(runPostizLifecycleCanary(client, input, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"), {
         cleanupLedgerPath: ledger, emitRecovery: (event) => emitted.push(event.providerObjectId),
@@ -108,7 +285,7 @@ describe("live-canary gate", () => {
 
   test("recovery id is process-visible and cleanup runs even when durable evidence persistence fails", async () => {
     const root = mkdtempSync(join(tmpdir(), "postiz-canary-")); const emitted: string[] = [];
-    const { client, calls } = transport([{ id: "recover-9", status: "draft" }, { id: "recover-9", status: "canceled" }, { id: "recover-9", status: "canceled" }]);
+    const { client, calls } = transport([[{ postId: "recover-9", integration: "acct-1" }], { id: "recover-9" }, { posts: [] }]);
     await assert.rejects(runPostizLifecycleCanary(client, input, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"), {
       cleanupLedgerPath: root, emitRecovery: (event) => emitted.push(event.providerObjectId),
     }));
@@ -121,8 +298,8 @@ describe("live-canary gate", () => {
     const root = mkdtempSync(join(tmpdir(), "postiz-canary-"));
     const ledger = join(root, "cleanup.jsonl");
     const { client } = transport([
-      { id: "pending-1", status: "draft" }, { id: "pending-1", status: "draft" },
-      { id: "pending-1", status: "canceled" }, { id: "pending-1", status: "draft" },
+      [{ postId: "pending-1", integration: "acct-1" }], { posts: [{ id: "pending-1", state: "DRAFT" }] },
+      { id: "pending-1" }, { posts: [{ id: "pending-1", state: "DRAFT" }] },
     ]);
     await assert.rejects(runPostizLifecycleCanary(client, input, approval, { CANARY_I_MEAN_IT: "1" }, new Date("2026-08-30T00:00:00Z"), { cleanupLedgerPath: ledger, emitRecovery: () => {} }), /not terminal/);
     const events = readFileSync(ledger, "utf8").trim().split("\n").map((line) => JSON.parse(line) as { cleanupRequired: boolean });
@@ -178,4 +355,26 @@ describe("attended publish canary matrix", () => {
     ], approval, runner, env), /must explicitly declare youtube/);
     await assert.rejects(runCanaryMatrix({ fetchedAt: registry.fetchedAt, capabilities: [] }, [], approval, runner, env), /advertises no capabilities/);
   });
+});
+
+test("transport turns a 429 into an actionable rate-limit error", async () => {
+  const fetchImpl = (async () => new Response(JSON.stringify({ statusCode: 429, message: "ThrottlerException: Too Many Requests" }), { status: 429 })) as unknown as typeof fetch;
+  const transport = createPostizTransport({ POSTIZ_BASE_URL: "http://postiz.test", POSTIZ_API_KEY: "k" }, fetchImpl);
+  await assert.rejects(transport.request("/public/v1/posts", { method: "POST", body: "{}" }), /90 requests per hour.*each schedule or move counts as one.*resumes the waiting rows automatically after \d{4}-/);
+});
+
+test("a 429 carries the provider's resume time when it sends one, else one hour", async () => {
+  const now = new Date("2026-09-02T18:10:00.000Z");
+  assert.equal(rateLimitRetryAt({ "Retry-After": "120" }, now), "2026-09-02T18:12:00.000Z");
+  assert.equal(rateLimitRetryAt({ "X-RateLimit-Reset": String(Math.floor(Date.parse("2026-09-02T18:30:00Z") / 1000)) }, now), "2026-09-02T18:30:00.000Z");
+  assert.equal(rateLimitRetryAt(undefined, now), "2026-09-02T19:10:00.000Z");
+  const fetchImpl = (async () => new Response("{}", { status: 429, headers: { "Retry-After": "60" } })) as unknown as typeof fetch;
+  const transport = createPostizTransport({ POSTIZ_BASE_URL: "http://postiz.test", POSTIZ_API_KEY: "k" }, fetchImpl);
+  let caught: unknown;
+  try { await transport.request("/public/v1/posts", { method: "POST", body: "{}" }); } catch (e) { caught = e; }
+  assert.ok(caught instanceof PostizRateLimitError);
+  assert.equal(postizRateLimitRetryAt(caught.message), caught.retryAt);
+  assert.equal(postizRateLimitRetryAt("Postiz POST /x failed (500)"), null);
+  // Only the create endpoint is throttled; a 429 anywhere else stays an ordinary transport error.
+  await assert.rejects(transport.request("/public/v1/upload", { method: "POST", body: "{}" }), /Postiz POST \/public\/v1\/upload failed \(429\)/);
 });

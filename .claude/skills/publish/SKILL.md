@@ -1,9 +1,14 @@
 ---
 name: publish
-description: Push approved assets from a content folder's review queue out - Typefully scheduled drafts (X/LinkedIn/Bluesky), YouTube Short upload, TikTok scheduled post (PostPeer), ready-to-paste files. Usage - /publish <content-folder>.
+description: Push approved, brand-scoped assets from a content folder's review queue out. Usage - /publish --brand <human-inference|charles|fiction> <content-folder>.
 ---
 
 # /publish — act on the review queue
+
+Require one canonical brand at entry: `human-inference`, `charles`, or `fiction`. Reject a
+missing or unknown brand. There is no Human Inference fallback. The content folder and every
+delivery/account choice must belong to that brand. Legacy top-level `briefs/` files, including
+`briefs/bets.md`, are unassigned and unread.
 
 Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never publish
 `pending`, `revise`, or `discard` rows. Never bypass the queue.
@@ -80,7 +85,7 @@ Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never pu
 
 7. Each script flips published rows to `published` and appends to `publish-log.md` —
    re-running /publish is a no-op for already-published rows. Each script also appends a `Placed
-   log` row to `briefs/bets.md` (carrying the derivative's `from_brief` + `directives_applied`), so
+   log` row to `briefs/<brand>/bets.md` (carrying the derivative's scoped `from_brief` + `directives_applied`), so
    next cycle `/strategy` can match the post back to its analytics outcome and grade the bet. This
    is deterministic and deduped on `(folder, row id)` — do not edit those rows by hand.
 

@@ -1,0 +1,193 @@
+{
+  "ranAt": "2026-09-02T20:50:40.580Z",
+  "scheduledAt": "2026-09-10T20:50:40.580Z",
+  "rescheduleTo": "2026-09-10T21:50:40.580Z",
+  "unrecognized": [],
+  "uploaded": {
+    "image": {
+      "id": "9bad0124-efb8-4a0a-b5e1-2d0ad4300aed",
+      "path": "https://postiz-threads.meta:4443/uploads/2026/09/02/56e7bf7687ad10be8b511d1827932a14d.png"
+    },
+    "video": {
+      "id": "5e0cfc16-f9a1-4dc1-86fa-d7813578f314",
+      "path": "https://postiz-threads.meta:4443/uploads/2026/09/02/37f54b5554126a9e6ffe3d110ea374840.mp4"
+    },
+    "image2": {
+      "id": "8e25efa2-2ca9-4883-bf1f-c244c432fdb9",
+      "path": "https://postiz-threads.meta:4443/uploads/2026/09/02/c28499aab2b2c8b6137a36eef738ead8.png"
+    }
+  },
+  "channels": [
+    {
+      "destination": "tiktok",
+      "accountId": "cmtit6t5j0001mt7b13s0vhkh",
+      "accountLabel": "Human Inference",
+      "media": "video",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm0fp000kmn8m516ubvxl"
+    },
+    {
+      "destination": "tiktok",
+      "accountId": "cmtit6t5j0001mt7b13s0vhkh",
+      "accountLabel": "Human Inference",
+      "media": "carousel",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm0iz000mmn8mjlh5h0do"
+    },
+    {
+      "destination": "mastodon",
+      "accountId": "cmtixajea0001kbj7sthero4s",
+      "accountLabel": "Human Inference",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm0ls000omn8mq2kfvue4"
+    },
+    {
+      "destination": "mastodon",
+      "accountId": "cmtixajea0001kbj7sthero4s",
+      "accountLabel": "Human Inference",
+      "media": "carousel",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm0om000qmn8m031ci411"
+    },
+    {
+      "destination": "facebook",
+      "accountId": "cmthbq1db0003p67hqq50nqhv",
+      "accountLabel": "Human Inference",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm0ri000smn8m1b1ddpp9"
+    },
+    {
+      "destination": "facebook",
+      "accountId": "cmthbq1db0003p67hqq50nqhv",
+      "accountLabel": "Human Inference",
+      "media": "carousel",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm2b4000umn8mj7fgx6n8"
+    },
+    {
+      "destination": "instagram",
+      "accountId": "cmthb8bye0001p67hfr1y6dux",
+      "accountLabel": "Muxin Li",
+      "media": "image",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm2e6000wmn8m7ysv1bcv"
+    },
+    {
+      "destination": "instagram",
+      "accountId": "cmthb8bye0001p67hfr1y6dux",
+      "accountLabel": "Muxin Li",
+      "media": "carousel",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm2i5000ymn8muaslg1r8"
+    },
+    {
+      "destination": "linkedin",
+      "accountId": "cmthonsqy0001mo7yshp6q0wi",
+      "accountLabel": "Muxin Li",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm2lf0010mn8ml8aludtb"
+    },
+    {
+      "destination": "linkedin",
+      "accountId": "cmthonsqy0001mo7yshp6q0wi",
+      "accountLabel": "Muxin Li",
+      "media": "carousel",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm2qg0012mn8mqus8w9h8"
+    },
+    {
+      "destination": "threads",
+      "accountId": "cmtjnmg9k0001lo8l59pc7vgx",
+      "accountLabel": "human_inference",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm2uh0014mn8m965htohf"
+    },
+    {
+      "destination": "threads",
+      "accountId": "cmtjnmg9k0001lo8l59pc7vgx",
+      "accountLabel": "human_inference",
+      "media": "carousel",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm45n0016mn8myftqev8w"
+    },
+    {
+      "destination": "x",
+      "accountId": "cmthyiizd0001pg8oasxci8p9",
+      "accountLabel": "Muxin Li",
+      "media": "text",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm49f0018mn8m0hojasv8"
+    },
+    {
+      "destination": "x",
+      "accountId": "cmthyiizd0001pg8oasxci8p9",
+      "accountLabel": "Muxin Li",
+      "media": "carousel",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm4h3001amn8mko0jsjjs"
+    },
+    {
+      "destination": "youtube",
+      "accountId": "cmti3w8p50003nt8jzktxn5ye",
+      "accountLabel": "Human Inference",
+      "media": "video",
+      "ok": true,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "postId": "cmtkkm4mg001cmn8mfyspvnmw"
+    },
+    {
+      "destination": "bluesky",
+      "accountId": "cmtgn0kdg0001oz8bki0xjw05",
+      "accountLabel": "heymoosh",
+      "media": "text",
+      "ok": false,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "error": "Postiz POST /api/public/v1/posts failed (429): {\"statusCode\":429,\"message\":\"ThrottlerException: Too Many Requests\"}"
+    },
+    {
+      "destination": "bluesky",
+      "accountId": "cmtgn0kdg0001oz8bki0xjw05",
+      "accountLabel": "heymoosh",
+      "media": "carousel",
+      "ok": false,
+      "scheduledAt": "2026-09-10T20:50:40.580Z",
+      "rescheduledTo": "2026-09-10T21:50:40.580Z",
+      "error": "Postiz POST /api/public/v1/posts failed (429): {\"statusCode\":429,\"message\":\"ThrottlerException: Too Many Requests\"}"
+    }
+  ],
+  "leftovers": []
+}

@@ -26,6 +26,8 @@ describe("buildClientPlatformDiscoveryPrompt", () => {
     assert.match(prompt, /RUBRIC TEXT/);
     assert.match(prompt, /PERSON FIT TEXT/);
     assert.match(prompt, /No em dashes anywhere/);
+    assert.match(prompt, /Start with reflective founders or executives/i);
+    assert.match(prompt, /research the company only after/i);
   });
 
   test("platform kind: mentions strong/partial/weak vocabulary, no person-fit step", () => {
@@ -43,6 +45,30 @@ describe("buildClientPlatformDiscoveryPrompt", () => {
     assert.match(prompt, /None on file yet -- propose freely\./);
     assert.doesNotMatch(prompt, /Person-fit pass/);
     assert.match(prompt, /SPIN ANGLES TEXT/);
+  });
+
+  test("grounds each run in its rotated lens, anchor graph, pass feedback, and calibration", () => {
+    const prompt = buildClientPlatformDiscoveryPrompt({
+      kind: "platform",
+      theme: "participatory technology",
+      maxCandidates: 2,
+      rubric: "platform rubric",
+      worldviewMap: "worldview map",
+      extraContext: "positioning",
+      excludeNames: [],
+      searchBudgetPerSignal: 2,
+      lens: { belief: "systems should distribute agency", dialect: "civic tech", modality: "podcast" },
+      anchorContext: "Anchor: Audrey Tang. Expand 1-2 public hops through co-appearance.",
+      antiExamples: ["Big Generic Show: audience too large."],
+      calibration: "platform pursue rate 10% (cold; tighten fit before searching)",
+    });
+    assert.match(prompt, /ACTIVE DISCOVERY LENS/);
+    assert.match(prompt, /systems should distribute agency/);
+    assert.match(prompt, /civic tech/);
+    assert.match(prompt, /podcast/);
+    assert.match(prompt, /Audrey Tang/);
+    assert.match(prompt, /Big Generic Show: audience too large/);
+    assert.match(prompt, /pursue rate 10%/);
   });
 });
 
@@ -161,4 +187,17 @@ describe("buildContentExampleDiscoveryPrompt", () => {
     assert.match(prompt, /TENTATIVE/);
     assert.match(prompt, /a separate tool composes that analysis later/);
   });
+});
+
+test("buildClientPlatformDiscoveryPrompt: Muxin's brief leads the prompt and is declared to win over the rubric", () => {
+  const base = {
+    kind: "platform" as const, theme: "civic tech shows", maxCandidates: 3, rubric: "RUBRIC BODY",
+    worldviewMap: "MAP BODY", extraContext: "SPIN BODY", excludeNames: [], searchBudgetPerSignal: 2,
+  };
+  const withBrief = buildClientPlatformDiscoveryPrompt({ ...base, brief: "BRIEF BODY: platforms that would feature her." });
+  assert.ok(withBrief.includes("MUXIN'S BRIEF (config/outreach/brief.md)"));
+  assert.ok(withBrief.indexOf("BRIEF BODY") < withBrief.indexOf("RUBRIC BODY"), "brief comes before the rubric");
+  assert.match(withBrief, /the brief wins/);
+  const without = buildClientPlatformDiscoveryPrompt(base);
+  assert.ok(!without.includes("MUXIN'S BRIEF"), "no block when no brief is supplied");
 });

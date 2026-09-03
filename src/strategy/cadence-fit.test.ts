@@ -48,9 +48,9 @@ function freshDb(): Database.Database {
 
 function insertPost(db: Database.Database, platform: string, source: string | null, postedAt: string, likes: number): void {
   const info = db
-    .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, source) VALUES (?, ?, ?, ?)`)
+    .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, source, brand_id, provider_account_id) VALUES (?, ?, ?, ?, 'human-inference', 'test/account')`)
     .run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, source);
-  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
+  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts, brand_id, provider_account_id) VALUES (?, ?, ?, 0, 0, 'human-inference', 'test/account')`).run(
     info.lastInsertRowid,
     postedAt,
     likes
@@ -69,9 +69,9 @@ function insertPostCadence(
   source: string | null = "atomized"
 ): void {
   const info = db
-    .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, source, cadence_source) VALUES (?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, source, cadence_source, brand_id, provider_account_id) VALUES (?, ?, ?, ?, ?, 'human-inference', 'test/account')`)
     .run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, source, cadenceSource);
-  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
+  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts, brand_id, provider_account_id) VALUES (?, ?, ?, 0, 0, 'human-inference', 'test/account')`).run(
     info.lastInsertRowid,
     postedAt,
     likes
@@ -254,7 +254,7 @@ describe("loadRows: excludes deliberate spin-control-run and exploration-probe r
     insertPost(db, "x", "organic", "2026-06-01T00:00:00.000Z", 10);
     insertPost(db, "x", CONTROL_RUN_SOURCE, "2026-06-08T00:00:00.000Z", 1000);
     insertPost(db, "x", EXPLORATION_SOURCE, "2026-06-15T00:00:00.000Z", 1000);
-    const rows = loadRows(db);
+    const rows = loadRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 1);
     assert.equal(rows[0].likes, 10);
     db.close();
@@ -264,7 +264,7 @@ describe("loadRows: excludes deliberate spin-control-run and exploration-probe r
     const db = freshDb();
     insertPost(db, "x", "organic", "2026-06-01T00:00:00.000Z", 10);
     insertPost(db, "community:democratic-resilience", "organic", "2026-06-01T00:00:00.000Z", 10);
-    const rows = loadRows(db);
+    const rows = loadRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 1);
     assert.equal(rows[0].platform, "x");
     db.close();
@@ -289,7 +289,7 @@ describe("loadFollowRows: only cadence_source-tagged CORE_TEXT rows, excludes co
     const db = freshDb();
     insertPostCadence(db, "x", null, "2026-06-01T00:00:00.000Z", 10);
     insertPostCadence(db, "x", "default", "2026-06-08T00:00:00.000Z", 10);
-    const rows = loadFollowRows(db);
+    const rows = loadFollowRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 1);
     assert.equal(rows[0].cadence_source, "default");
     db.close();
@@ -300,7 +300,7 @@ describe("loadFollowRows: only cadence_source-tagged CORE_TEXT rows, excludes co
     insertPostCadence(db, "x", "default", "2026-06-01T00:00:00.000Z", 10, CONTROL_RUN_SOURCE);
     insertPostCadence(db, "x", "default", "2026-06-08T00:00:00.000Z", 10, EXPLORATION_SOURCE);
     insertPostCadence(db, "x", "default", "2026-06-15T00:00:00.000Z", 10, "atomized");
-    const rows = loadFollowRows(db);
+    const rows = loadFollowRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 1);
     db.close();
   });
@@ -309,7 +309,7 @@ describe("loadFollowRows: only cadence_source-tagged CORE_TEXT rows, excludes co
     const db = freshDb();
     insertPostCadence(db, "x", "default", "2026-06-01T00:00:00.000Z", 10);
     insertPostCadence(db, "community:democratic-resilience", "default", "2026-06-01T00:00:00.000Z", 10);
-    const rows = loadFollowRows(db);
+    const rows = loadFollowRows(db, { brandId: "human-inference" });
     assert.equal(rows.length, 1);
     assert.equal(rows[0].platform, "x");
     db.close();

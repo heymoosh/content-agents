@@ -14,10 +14,15 @@ import {
 import type { SourceEvidenceRow } from "../patterns/source-evidence.js";
 import { buildCommentLearningView, type CommentLearningView } from "./comment-learning.js";
 import { buildLearningBundle, type LearningBundle, type LearningBundleProposalInput } from "./learning-bundle.js";
-import { buildVentureHandoffView } from "./venture-handoff.js";
+import { buildVentureHandoffView, type MeasuredContentEvidence } from "./venture-handoff.js";
 
 const lineage: BlueprintLineage = { sourceId: "source-1", variantId: "variant-1", experimentId: "experiment-1" };
 const evidence = { status: "observed" as const, refs: ["ref-1"], note: null };
+const measuredEvidence: MeasuredContentEvidence = {
+  sourceId: "source-1", variantId: "variant-1", experimentId: "experiment-1", measured: true, sampleSize: 20,
+  evidenceRefs: ["metric:1"], outcomeRefs: ["outcome:1"], contentItemRefs: ["content:1"],
+  provenance: "provider measurement", caveats: ["fixture"],
+};
 
 const feedEvidence = (overrides: Partial<SourceEvidenceRow> = {}): SourceEvidenceRow => ({
   id: "feed-1", sourceId: "source-1", postId: "post-1", accountId: "account-1",
@@ -127,19 +132,27 @@ describe("Venture/Signals handoff view", () => {
     assert.ok(result.readiness.blockers.includes("Venture gate is blocked"));
   });
 
-  test("is ready only for an adopted proposal with a ready or accepted Venture gate", () => {
-    for (const ventureGate of ["ready", "accepted"] as const) {
-      const result = view("adopted", ventureGate);
-      assert.equal(result.readiness.status, "ready");
-      assert.deepEqual(Object.keys(result.families), ["comment", "funnel", "business"]);
-      assert.equal(result.families.comment[0]?.type, "product");
-      assert.equal(result.families.funnel[0]?.type, "lead");
-      assert.equal(result.families.business[0]?.type, "product");
-      assert.deepEqual(result.families.comment[0]?.lineage, lineage);
-      assert.deepEqual(result.families.comment[0]?.evidenceRefs, ["ref-1"]);
-      assert.equal(result.qualifiedHypotheses.length, 3);
-    }
+test("requires an accepted Venture gate, explicit proposal, and measured evidence before ready", () => {
+  const legacy = view("adopted", "accepted");
+  assert.equal(legacy.readiness.status, "blocked");
+
+  const packetValue = packet("adopted", "accepted");
+  const learningView = buildCommentLearningView({
+    commentObservations: packetValue.commentObservations, funnelEvents: packetValue.funnelEvents,
+    businessOutcomes: packetValue.businessOutcomes, muxinDecision: "adopted",
   });
+  const result = buildVentureHandoffView({
+    packet: packetValue, learningView, learningBundle: bundleFor(packetValue), proposalId: "proposal-1", measuredEvidence,
+  });
+  assert.equal(result.readiness.status, "ready");
+  assert.deepEqual(Object.keys(result.families), ["comment", "funnel", "business"]);
+  assert.equal(result.families.comment[0]?.type, "product");
+  assert.equal(result.families.funnel[0]?.type, "lead");
+  assert.equal(result.families.business[0]?.type, "product");
+  assert.deepEqual(result.families.comment[0]?.lineage, lineage);
+  assert.deepEqual(result.families.comment[0]?.evidenceRefs, ["ref-1"]);
+  assert.equal(result.qualifiedHypotheses.length, 3);
+});
 
   test("does not expose comment body copy, create artifacts, or mutate inputs", () => {
     const packetValue = packet("adopted", "ready");
@@ -167,7 +180,7 @@ describe("Venture/Signals handoff view", () => {
   });
 
   test("selects the exact bundle proposal and preserves only body-free metadata", () => {
-    const packetValue = packet("adopted", "ready");
+    const packetValue = packet("adopted", "accepted");
     const bundle = bundleFor(packetValue);
     const learningView = buildCommentLearningView({
       commentObservations: packetValue.commentObservations,
@@ -175,7 +188,7 @@ describe("Venture/Signals handoff view", () => {
       businessOutcomes: packetValue.businessOutcomes,
       muxinDecision: "adopted",
     });
-    const result = buildVentureHandoffView({ packet: packetValue, learningView, learningBundle: bundle, proposalId: "proposal-1" });
+    const result = buildVentureHandoffView({ packet: packetValue, learningView, learningBundle: bundle, proposalId: "proposal-1", measuredEvidence });
 
     assert.equal(result.readiness.status, "ready");
     assert.equal(result.proposalId, "proposal-1");
@@ -268,4 +281,39 @@ describe("Venture/Signals handoff view", () => {
     assert.deepEqual(result.families.business, []);
     assert.ok(result.readiness.blockers.some((blocker) => /hypothesis/i.test(blocker)));
   });
+});
+
+test("legacy handoff without an explicit bundle and proposal never reports ready", () => {
+  const result = view("adopted", "accepted");
+  assert.equal(result.readiness.status, "blocked");
+  assert.ok(result.readiness.blockers.some((blocker) => /explicit.*bundle|proposal.*required/i.test(blocker)));
+});
+
+test("requires measured Content variant/outcome evidence matching the packet experiment lineage", () => {
+  const packetValue = packet("adopted", "accepted");
+  const bundle = bundleFor(packetValue);
+  const learningView = buildCommentLearningView({
+    commentObservations: packetValue.commentObservations,
+    funnelEvents: packetValue.funnelEvents,
+    businessOutcomes: packetValue.businessOutcomes,
+    muxinDecision: "adopted",
+  });
+
+  const missing = buildVentureHandoffView({ packet: packetValue, learningView, learningBundle: bundle, proposalId: "proposal-1" });
+  assert.equal(missing.readiness.status, "blocked");
+  assert.ok(missing.readiness.blockers.some((blocker) => /measured.*evidence/i.test(blocker)));
+
+  const mismatched = buildVentureHandoffView({
+    packet: packetValue,
+    learningView,
+    learningBundle: bundle,
+    proposalId: "proposal-1",
+    measuredEvidence: {
+      sourceId: "source-1", variantId: "variant-other", experimentId: "experiment-1", measured: true, sampleSize: 3,
+      evidenceRefs: ["metric:1"], outcomeRefs: ["outcome:1"], provenance: "provider measurement",
+      contentItemRefs: ["content:1"], caveats: ["fixture"],
+    },
+  });
+  assert.equal(mismatched.readiness.status, "blocked");
+  assert.ok(mismatched.readiness.blockers.some((blocker) => /lineage|variant/i.test(blocker)));
 });

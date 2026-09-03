@@ -52,6 +52,20 @@ export interface VentureHandoffView {
   readonly sideEffects: "none";
 }
 
+/** Immutable, evidence-linked proof that this Content variant produced measured outcomes. */
+export interface MeasuredContentEvidence {
+  readonly sourceId: string;
+  readonly variantId: string;
+  readonly experimentId: string;
+  readonly measured: true;
+  readonly sampleSize: number;
+  readonly evidenceRefs: readonly string[];
+  readonly outcomeRefs: readonly string[];
+  readonly contentItemRefs: readonly string[];
+  readonly provenance: string;
+  readonly caveats: readonly string[];
+}
+
 function completeLineage(value: unknown): value is BlueprintLineage {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const lineage = value as Record<string, unknown>;
@@ -64,6 +78,21 @@ function sameLineage(left: unknown, right: unknown): boolean {
     && left.sourceId === right.sourceId
     && left.variantId === right.variantId
     && left.experimentId === right.experimentId;
+}
+
+export function measuredContentEvidenceBlockers(value: MeasuredContentEvidence | null | undefined, lineage: BlueprintLineage): string[] {
+  if (value === null || value === undefined) return ["measured Content variant/outcome evidence is missing"];
+  const blockers: string[] = [];
+  if (value.measured !== true) blockers.push("measured Content variant/outcome evidence is not measured");
+  if (value.sourceId !== lineage.sourceId || value.variantId !== lineage.variantId || value.experimentId !== lineage.experimentId) {
+    blockers.push("measured Content evidence lineage does not match blueprint");
+  }
+  if (!Number.isInteger(value.sampleSize) || value.sampleSize < 1) blockers.push("measured Content evidence sample size is invalid");
+  if (!Array.isArray(value.evidenceRefs) || value.evidenceRefs.length === 0) blockers.push("measured Content evidence refs are missing");
+  if (!Array.isArray(value.outcomeRefs) || value.outcomeRefs.length === 0) blockers.push("measured Content outcome refs are missing");
+  if (!Array.isArray(value.contentItemRefs) || value.contentItemRefs.length === 0) blockers.push("measured Content item refs are missing");
+  if (typeof value.provenance !== "string" || value.provenance.trim() === "") blockers.push("measured Content evidence provenance is missing");
+  return blockers;
 }
 
 function withFamily(
@@ -100,15 +129,17 @@ export function buildVentureHandoffView(input: {
   /** Optional for legacy callers; supplying it requires an explicit proposalId. */
   readonly learningBundle?: LearningBundle | null;
   readonly proposalId?: string | null;
+  readonly measuredEvidence?: MeasuredContentEvidence | null;
 }): VentureHandoffView {
   const { packet, learningView } = input;
   const proposal = packet.ventureInputProposal;
   const blockers = [...packet.handoff.blockers, ...learningView.readiness.blockers];
+  blockers.push(...measuredContentEvidenceBlockers(input.measuredEvidence, packet.lineage));
   const comment = withFamily(packet.commentObservations, learningView, "comment", blockers);
   const funnel = withFamily(packet.funnelEvents, learningView, "funnel", blockers);
   const business = withFamily(packet.businessOutcomes, learningView, "business", blockers);
   const all = [...comment, ...funnel, ...business];
-  const explicitBundlePath = input.learningBundle !== undefined || input.proposalId !== undefined;
+  const explicitBundlePath = true;
   let selectedProposal: VentureHandoffProposalMetadata | null = null;
 
   if (!sameLineage(packet.blueprint.lineage, packet.lineage)) {
@@ -133,8 +164,8 @@ export function buildVentureHandoffView(input: {
   if (proposal.muxinDecision !== "adopted") {
     blockers.push(proposal.muxinDecision === "pending" ? "Muxin decision is pending" : "Muxin declined the proposal");
   }
-  if (proposal.ventureGate !== "ready" && proposal.ventureGate !== "accepted") {
-    blockers.push(`Venture gate is ${proposal.ventureGate}`);
+  if (proposal.ventureGate !== "accepted") {
+    blockers.push(`Venture gate is ${proposal.ventureGate}; accepted is required`);
   }
   if (learningView.muxinDecision !== proposal.muxinDecision) blockers.push("Muxin decision does not match the packet");
   for (const hypothesis of all) {

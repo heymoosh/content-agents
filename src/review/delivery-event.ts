@@ -147,7 +147,8 @@ export function normalizeProviderStatus(provider: DeliveryProvider, value: unkno
   const providerObjectId = pick("providerObjectId", "id", "postId", "draftId", "jobId");
   const providerAccountId = pick("providerAccountId", "accountId", "profileId", "channelId");
   const canonicalUrl = pick("canonicalUrl", "url", "postUrl", "permalink");
-  const plannedFor = pick("plannedFor", "scheduledFor", "whenIso", "publishAt");
+  // `scheduledAt` is the Postiz adapter's field: reconciliation reads it to follow provider-side reschedules.
+  const plannedFor = pick("plannedFor", "scheduledFor", "whenIso", "publishAt", "scheduledAt");
   const providerCreatedAt = pick("providerCreatedAt", "createdAt", "created_at");
   const providerUpdatedAt = pick("providerUpdatedAt", "updatedAt", "updated_at");
   const providerPublishedAt = pick("providerPublishedAt", "publishedAt", "published_at", "postedAt");

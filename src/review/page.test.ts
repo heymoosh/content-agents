@@ -20,6 +20,20 @@ import {
   type MetricReadView, type ChannelTreatmentView, type TreatmentView, type FitBasisView,
 } from "./page.js";
 
+test("Signals and Venture handoff cards expose complete escaped metadata and stay body-free", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  for (const label of ["Scope:", "Sample:", "plan digest", "interpretation", "Caveats:", "Qualification:", "Evidence:", "Lineage:", "Venture:", "Phase:"]) {
+    assert.ok(script.includes(label), `handoff metadata must render ${label}`);
+  }
+  assert.ok(script.includes("esc(scope)"), "scope must be escaped");
+  assert.ok(script.includes("esc(provenance.planDigest"), "plan digest must be escaped");
+  assert.ok(script.includes("esc(caveats"), "caveats must be escaped");
+  assert.ok(script.includes("signalsHandoffMetaHtml(p, perf, interpretation)"), "Signals cards use the shared metadata renderer");
+  assert.ok(script.includes("signalsHandoffMetaHtml(p, null, null)"), "Venture cards use the shared metadata renderer");
+  assert.ok(!html.includes("must never render"), "handoff metadata must not render body text");
+});
+
 test("Charles pages separate work needing review from approved and historical drafts", () => {
   const posts = [
     { id: "p", status: "pending" }, { id: "r", status: "revise" },
@@ -29,6 +43,20 @@ test("Charles pages separate work needing review from approved and historical dr
   assert.deepEqual(charlesPostsForPage(posts, "approved").map((post) => post.id), ["a"]);
   assert.deepEqual(charlesPostsForPage(posts, "all").map((post) => post.id), ["p", "r", "a", "d"]);
   assert.deepEqual(charlesPostsForPage(posts, "input"), []);
+});
+
+test("Charles review names the producing engine and labels legacy drafts honestly", () => {
+  const script = emittedScripts().join("\n");
+  assert.match(script, /Drafted with.*engineLabel\(post\.engine\)/);
+  assert.match(script, /Engine not recorded \(legacy draft\)/);
+  assert.match(script, /p\.engine \? "Drafted with "\+engineLabel\(p\.engine\)/);
+});
+
+test("Charles review shows history-store failures instead of a false empty-history state", () => {
+  const script = emittedScripts().join("\n");
+  assert.match(script, /post\.historyWarning/);
+  assert.match(script, /role="status"/);
+  assert.match(script, /Review history starts when you save a revision note/);
 });
 
 test("fictionEditableSpans keeps exact chapter bytes for surgical in-app edits", () => {
@@ -454,7 +482,10 @@ function venturePathIsCalled(script: string, route: string): boolean {
 }
 
 test("every artifact-lifecycle route has a CardAction id, and every id has a route", () => {
-  const lifecycle = VENTURE_WRITE_PATHS.map((p) => /^\/api\/venture\/:slug\/artifacts\/:id\/([a-z-]+)$/.exec(p)?.[1]).filter(Boolean);
+  const lifecycle = [...VENTURE_WRITE_PATHS,
+    "/api/venture/:slug/artifacts/:id/deliver",
+    "/api/venture/:slug/artifacts/:id/retry-delivery",
+  ].map((p) => /^\/api\/venture\/:slug\/artifacts\/:id\/([a-z-]+)$/.exec(p)?.[1]).filter(Boolean);
   assert.deepEqual([...lifecycle].sort(), [...CARD_ACTION_IDS].sort(), "the action id union and the artifact routes must be the same set");
 });
 
@@ -479,6 +510,7 @@ const VENTURE_PATHS = [...VENTURE_READ_PATHS, ...VENTURE_WRITE_PATHS, ...INTAKE_
 const DECLARED_JOB_REGEX_PATHS = [
   "/api/jobs/:id/stop", "/api/jobs/:id/log", "/api/jobs/:id/answer", "/api/jobs/:id/retry",
   "/api/venture/:slug/analyze", "/api/venture/:slug/run-step",
+  "/api/venture/:slug/artifacts/:id/deliver", "/api/venture/:slug/artifacts/:id/retry-delivery",
 ];
 
 /** `/^\/api\/venture\/[^/]+\/intake\/\d+\/draft$/` → `/api/venture/:slug/intake/:n/draft`. */
@@ -984,7 +1016,10 @@ test("Content separates request-grouped draft approval from publishing status", 
   assert.ok(html.includes('id="publishedMain"'));
   assert.ok(html.includes("<h2>Publishing status</h2>"));
   assert.ok(html.includes("Select all"));
-  assert.ok(html.includes("Approve selected for publishing"));
+  assert.ok(html.includes("Approve selected and attempt scheduling"));
+  assert.ok(html.includes("Each approval immediately attempts scheduling when that destination has a provider"));
+  assert.ok(html.includes("Approve and attempt scheduling"));
+  assert.ok(html.includes("A scheduling problem does not erase your approval"));
   assert.ok(html.includes("Open Focus Mode"));
   assert.ok(html.includes("Typefully"));
   assert.ok(html.includes("PostPeer"));
@@ -993,6 +1028,36 @@ test("Content separates request-grouped draft approval from publishing status", 
   assert.ok(!html.includes("Postiz is not connected"));
   assert.ok(!html.includes("Show drafts for every piece"));
   assert.ok(!html.includes("show published / discarded"));
+});
+
+type ApprovalResultView = (kind: string, result: Record<string, any>) => {
+  status: string; message: string; scheduledWhen?: string; manualComment?: string;
+};
+
+function approvalResultMirror(): ApprovalResultView {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── begin the Content approval-result mirror ──");
+  const end = script.indexOf("// ── end of the Content approval-result mirror ──");
+  assert.ok(start > -1 && end > start, "the approval-result interpreter must reach the browser");
+  return new Function(script.slice(start, end) + "\nreturn approvalResultView;")() as ApprovalResultView;
+}
+
+test("Content approval outcomes preserve the provider/manual truth boundary", () => {
+  const view = approvalResultMirror();
+  assert.deepEqual(view("text", { scheduled: { when: "Sep 2 at 9:00 AM", ref: "provider-1" } }), {
+    status: "published", scheduledWhen: "Sep 2 at 9:00 AM", manualComment: "",
+    message: "Scheduled · Sep 2 at 9:00 AM",
+  });
+  assert.deepEqual(view("text", { scheduleError: "provider timed out" }), {
+    status: "approve", message: "Approved, scheduling needs attention: provider timed out",
+  });
+  const manual = view("text", { scheduled: { autoPublishes: false, readyToPaste: "ready-to-paste/x-1.txt" } });
+  assert.deepEqual(manual, { status: "approve", message: "Approved · ready-to-paste handoff created" });
+  assert.doesNotMatch(manual.message, /provider accepted|scheduled|uploaded/i);
+  assert.deepEqual(view("video", { scheduled: { autoPublishes: false, when: "now", manualComment: "finish in Studio" } }), {
+    status: "published", scheduledWhen: "now", manualComment: "finish in Studio",
+    message: "Uploaded (still PRIVATE: flip it manually in YouTube Studio) · now",
+  });
 });
 
 test("Fiction launch action creates a validated Content handoff and opens configuration", () => {
@@ -1060,11 +1125,28 @@ test("Signals decisions persist through the API instead of browser-session Sets"
   assert.ok(!html.includes("Declined this session"));
 });
 
-test("GPT-OSS is selectable for read-only Signals analysis but not file-writing strategy runs", () => {
+test("Signals Venture inputs stay in the Signals surface and keep the Venture gate separate", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(html.includes("VENTURE INPUTS"));
+  assert.ok(html.includes("Request more evidence"));
+  assert.ok(script.includes("ventureHandoffs"));
+  assert.ok(script.includes('/api/signals/venture-handoff/'));
+  assert.ok(script.includes("Venture remains separately gated"));
+  assert.ok(!script.includes('button.dataset.id)+"/accept'));
+  const signalsAction = script.slice(script.indexOf('"/signals-input/'), script.indexOf('"/signals-input/') + 700);
+  assert.ok(signalsAction.includes("outcome: signalsInput.dataset.signalsInputAction"));
+  assert.ok(signalsAction.includes("reason"));
+  for (const forbidden of ["rulesVersion", "contentDecisionRef", "ventureGateRef", "decisionRef", "measured"]) {
+    assert.ok(!signalsAction.includes(forbidden), "Venture authority field must not be client-supplied: "+forbidden);
+  }
+});
+
+test("GPT-OSS is paused in both analysis and file-writing product choices", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const analysis = html.slice(html.indexOf('id="signalsAnalysisEngine"') - 120, html.indexOf('id="signalsAnalysisEngine"') + 500);
   const strategy = html.slice(html.indexOf('id="strategyEngine"') - 120, html.indexOf('id="strategyEngine"') + 500);
-  assert.ok(analysis.includes('value="ollama-gpt-oss"'));
+  assert.ok(!analysis.includes('value="ollama-gpt-oss"'));
   assert.ok(!strategy.includes('value="ollama-gpt-oss"'));
   assert.ok(html.includes('$("#signalsAnalysisEngine").value'));
   assert.ok(html.includes('$("#strategyEngine").value'));
@@ -1174,8 +1256,9 @@ import type { OutreachLeadView } from "./page.js";
 
 const lead = (over: Partial<OutreachLeadView> = {}): OutreachLeadView => ({ dir: "outreach/leads/client-acme", ...over });
 
-test("outreachSegment: four values, because content-example leads are real rows on the desk", () => {
+test("outreachSegment: five values, because content-example leads are real rows on the desk", () => {
   assert.equal(outreachSegment(lead({ kind: "platform" })), "platform");
+  assert.equal(outreachSegment(lead({ kind: "peer" })), "peer");
   assert.equal(outreachSegment(lead({ kind: "client", source: "jsa" })), "org-role");
   assert.equal(outreachSegment(lead({ kind: "client", source: "scout" })), "org-mission");
   assert.equal(outreachSegment(lead({ kind: "content-example" })), "content-example");
@@ -1187,20 +1270,22 @@ test("outreachSegment: nothing writes fm.segment today, so the kind/source read 
   assert.equal(outreachSegment(lead({ segment: "", kind: "platform" })), "platform");
 });
 
-test("groupLeadsBySegment: four groups in the design's order, empty ones dropped", () => {
+test("groupLeadsBySegment: five groups in the design's order, empty ones dropped", () => {
   const leads = [
     lead({ dir: "a", kind: "content-example" }),
     lead({ dir: "b", kind: "client", source: "jsa" }),
     lead({ dir: "c", kind: "platform" }),
     lead({ dir: "d", kind: "client", source: "scout" }),
     lead({ dir: "e", kind: "platform" }),
+    lead({ dir: "f", kind: "peer" }),
   ];
   const groups = groupLeadsBySegment(leads);
   assert.deepEqual(groups.map((g) => g.name), [
-    "PLATFORMS", "ORGANIZATIONS · MISSION FIT", "ORGANIZATIONS · OPEN ROLES", "EXAMPLES",
+    "PLATFORMS", "PEERS", "ORGANIZATIONS · MISSION FIT", "ORGANIZATIONS · OPEN ROLES", "EXAMPLES",
   ]);
   assert.deepEqual(groups[0].leads.map((l) => l.dir), ["c", "e"]);
-  assert.deepEqual(groups[3].leads.map((l) => l.dir), ["a"]);
+  assert.deepEqual(groups[1].leads.map((l) => l.dir), ["f"]);
+  assert.deepEqual(groups[4].leads.map((l) => l.dir), ["a"]);
   assert.equal(groupLeadsBySegment([lead({ kind: "platform" })]).length, 1, "empty groups do not render");
   assert.equal(groupLeadsBySegment([]).length, 0);
 });
@@ -1209,14 +1294,15 @@ test("groupLeadsBySegment: an Example lead is never dropped on the floor", () =>
   const groups = groupLeadsBySegment([lead({ dir: "x", kind: "content-example" })]);
   assert.equal(groups.length, 1);
   assert.equal(groups[0].key, "content-example");
-  assert.equal(groups[0].note, OUTREACH_SEGMENTS[3].note, "the Example group keeps the line this page already shipped");
+  const exampleSegment = OUTREACH_SEGMENTS.find((s) => s.key === "content-example");
+  assert.equal(groups[0].note, exampleSegment?.note, "the Example group keeps the line this page already shipped");
 });
 
 test("groupLeadsBySegment: every lead handed in lands in exactly one group", () => {
   const leads = [
     lead({ dir: "a", kind: "platform" }), lead({ dir: "b", kind: "client", source: "jsa" }),
     lead({ dir: "c", kind: "client" }), lead({ dir: "d", kind: "content-example" }),
-    lead({ dir: "e", kind: undefined }),
+    lead({ dir: "e", kind: undefined }), lead({ dir: "f", kind: "peer" }),
   ];
   const seen = groupLeadsBySegment(leads).flatMap((g) => g.leads.map((l) => l.dir));
   assert.equal(seen.length, leads.length);
@@ -1230,8 +1316,9 @@ test("lastPitchedLabel: a real tracker timestamp, or the plain truth that there 
   assert.equal(lastPitchedLabel("   "), "never pitched");
 });
 
-test("threadSegLabel: the design's three labels, plus the fourth the repo actually needs", () => {
+test("threadSegLabel: the design's three labels, plus the peer and example labels the repo actually needs", () => {
   assert.equal(threadSegLabel("platform"), "PLATFORM · SELECTED");
+  assert.equal(threadSegLabel("peer"), "PEER · SELECTED");
   assert.equal(threadSegLabel("org-mission"), "MISSION FIT · SELECTED");
   assert.equal(threadSegLabel("org-role"), "OPEN ROLE · SELECTED");
   assert.equal(threadSegLabel("content-example"), "EXAMPLE · SELECTED");
@@ -1666,6 +1753,8 @@ test("every route that enqueues a job arms the poll", () => {
   }
   assert.equal(enqueuesJob("/api/status"), false, "a status write queues nothing");
   assert.equal(enqueuesJob("/api/outreach/mark-sent"), false);
+  assert.equal(enqueuesJob("/api/venture/demo/artifacts/note-1/deliver"), true);
+  assert.equal(enqueuesJob("/api/venture/demo/artifacts/note-1/retry-delivery"), true);
 });
 
 // The Fiction room shipped its three buttons without adding their routes to the arming list, so
@@ -1983,6 +2072,7 @@ test("a stopped job holds its room strip only for the linger, then the strip goe
 test("Stop is offered on queued and running work only, never on anything already settled", () => {
   assert.equal(jobStopOffered(job({ status: "queued" })), true);
   assert.equal(jobStopOffered(job({ status: "running" })), true);
+  assert.equal(jobStopOffered(job({ status: "running", kind: "venture-delivery" })), false, "a delivery closure cannot truthfully be stopped mid-side-effect");
   for (const status of ["done", "failed", "stopped"]) {
     assert.equal(jobStopOffered(job({ status })), false, status + " has already settled; the route would no-op");
   }
@@ -2023,7 +2113,7 @@ test("client mirror: the stopped branch ships in the browser script, on both job
   assert.ok(script.includes('if(j.status==="stopped") return steps.map((t,i)=>({text:t,state: i<step?"done":"pending"}));'));
   // settled, the Stop predicate, and the sweep set that matches jobIsSweepable in jobs.ts
   assert.ok(script.includes('function jobSettled(j){ return j.status==="done" || j.status==="stopped" || (j.status==="blocked" && !!j.answer); }'));
-  assert.ok(script.includes('function jobStopOffered(j){ return j.status==="queued" || j.status==="running"; }'));
+  assert.ok(script.includes('function jobStopOffered(j){ return j.kind!=="venture-delivery" && (j.status==="queued" || j.status==="running"); }'));
   assert.ok(script.includes('JOBS.some(j=>j.status==="done"||j.status==="failed"||j.status==="stopped")'));
   assert.ok(script.includes('forSlug.every(j=>j.status==="done"||j.status==="failed"||j.status==="stopped")'));
 });
@@ -2109,6 +2199,7 @@ function captureMirror(): { classifyCapture: CaptureFn; captureVerdict: VerdictF
 
 // [text, expected room]. The precedence cases are the point: each one matches more than one rule.
 const CAPTURE_ROOM_VECTORS: [string, string][] = [
+  ["Charles should reply to this absurd claim", "Charles"], // explicit persona beats Outreach's "reply to"
   ["follow up with Jamie R. about the pitch", "Outreach"],
   ["met Dana at the meetup, she runs the fund", "Outreach"],
   ["reply to https://someplace.com", "Outreach"],       // a keyword beats the bare-URL branch
@@ -2117,6 +2208,8 @@ const CAPTURE_ROOM_VECTORS: [string, string][] = [
   ["chapter 4 needs a colder open", "Fiction"],
   ["elias finally says it out loud", "Fiction"],
   ["a scene where the offer lands badly", "Fiction"],    // rule 2 beats Venture's "offer"
+  ["Charles should panic about this result", "Charles"],
+  ["a Featherbottom note about the offer", "Charles"],   // explicit persona beats Venture's "offer"
   ["what should the price be", "Venture"],
   ["survey answers are coming in faster than I thought", "Venture"],
   ["a thought about how atomization actually scales", "Content"],
@@ -2187,14 +2280,18 @@ test("classifyCapture mirror: the browser copy answers identically on every vect
 
 test("durable capture verdict: every routed capture names the room it chose, and its browser mirror agrees", () => {
   const mirror = captureMirror().captureVerdict;
-  for (const room of ["Content", "Fiction", "Outreach", "Venture"] as const) {
+  for (const room of ["Content", "Fiction", "Outreach", "Venture", "Charles"] as const) {
     const v = captureHandoffVerdict(room);
     assert.ok(v.line.includes(room), "the verdict must name the room it picked: " + room);
+    assert.deepEqual(captureVerdict(room), v, "the exported verdict must match the durable handoff verdict: " + room);
     assert.deepEqual(mirror(room), v, "the browser copy of captureVerdict must match: " + room);
   }
-  for (const room of ["Content", "Fiction", "Outreach", "Venture"] as const) {
+  for (const room of ["Content", "Fiction", "Outreach", "Venture", "Charles"] as const) {
     assert.equal(captureHandoffVerdict(room).actionLabel, "Start on it");
   }
+  assert.throws(() => mirror("Signals"), /Unsupported capture room: Signals/);
+  assert.throws(() => captureVerdict("Signals" as "Content"), /Unsupported capture room: Signals/);
+  assert.throws(() => captureHandoffVerdict("Signals" as "Content"), /Unsupported capture room: Signals/);
 });
 
 test("Studio capture: the rendered durable-handoff verdict makes no stale routing promise", () => {
@@ -2204,6 +2301,7 @@ test("Studio capture: the rendered durable-handoff verdict makes no stale routin
     "I read this as Fiction. Start on it puts these beats in Write next for you to review before drafting.",
     "I read this as Outreach. Start on it opens the lead chooser; you still choose the person before any draft.",
     "I read this as Venture. Start on it opens the current human-gated venture step. It does not run or approve it.",
+    "I read this as Charles. Start on it places the exact idea in Charles Input for you to review before drafting.",
   ]) assert.ok(script.includes(JSON.stringify(line)), line);
   for (const stale of [
     "I can put it in the composer as your beats",
@@ -2308,7 +2406,15 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(start > -1 && end > start, "the capture client section must be identifiable");
   const section = script.slice(start, end);
   const paths = [...new Set([...section.matchAll(/\/api\/[a-z0-9/-]+/g)].map((m) => m[0]))].sort();
-  assert.deepEqual(paths, ["/api/captures", "/api/captures/start"]);
+  assert.deepEqual(paths, ["/api/captures", "/api/captures/classify", "/api/captures/start"]);
+  const routeRead = section.slice(section.indexOf("async function routeCapture"), section.indexOf('// "Versions for Content"'));
+  assert.ok(routeRead.includes('post("/api/captures/classify"'), "the room read asks the server-side model route");
+  assert.ok(routeRead.includes("showCaptureVerdict(room, note)"), "the verdict shows the model's reason or names the keyword guess");
+  assert.ok(!routeRead.includes("/api/captures/start") && !routeRead.includes('post("/api/captures",'), "the room read creates nothing");
+  assert.ok(routeRead.includes("if(gen!==ROUTE_GEN) return;"), "a superseded read never shows its verdict");
+  assert.ok(routeRead.includes("r.error"), "a server failure is named, not hidden behind a bare keyword guess");
+  const takeBody = section.slice(section.indexOf("async function takeCaptureTo"), section.indexOf("let SERVER_CAPTURES"));
+  assert.ok(takeBody.includes("if(t!==ROUTED_TEXT)"), "a verdict is bound to the exact text it was read from");
   assert.ok(section.includes('SERVER_CAPTURES'));
   assert.ok(!section.includes('content-studio.capture-handoff.v1'), "the retired browser-local capture store must not remain a second authority");
   assert.ok(section.includes('CAPTURE WAITING HERE'));
@@ -2317,9 +2423,17 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(section.includes('post("/api/captures/start"'), "Content starts the advisor-only action");
   const advanceBody = section.slice(section.indexOf("async function advanceCaptureSafely"), section.indexOf("async function takeCaptureTo"));
   assert.ok(advanceBody.includes('setRoom("content")'), "Content opens the owning room before the advisor-only action");
-  assert.ok(section.includes('beats.value=text'), "Fiction prepares beats without auto-drafting");
+  assert.ok(section.includes('idea.value=text'), "Fiction prepares the inbox idea without auto-classifying");
+  assert.ok(section.includes('ficPage="inbox"'), "Fiction opens its safe front door");
   assert.ok(section.includes('setOutreachSub("leads")'), "Outreach opens the required lead chooser");
+  assert.ok(section.includes('charlesPage="input"'), "Charles opens its safe Input page");
+  assert.ok(section.includes("renderCharlesPages()"), "Charles renders the existing Input page helper");
+  assert.ok(section.includes("await loadCharles()"), "Charles waits for its room read before copying into Input");
+  assert.ok(section.includes('input.value=text'), "Charles copies the exact capture without drafting it");
+  assert.ok(section.includes("Charles Input already has an unsaved idea"), "Charles refuses to overwrite a different unsaved idea");
   assert.ok(section.includes('$("#ventureRunStepBtn")?.focus()'), "Venture opens its current human-gated step");
+  assert.ok(section.includes('throw new Error("Unsupported capture room: "+room)'), "unknown rooms fail closed instead of falling through to Venture");
+  assert.ok(!section.includes('$("#charlesDraftBtn").click()'));
   assert.ok(!section.includes('$("#ficDraftBtn").click()'));
   assert.ok(!section.includes('$("#ventureRunStepBtn").click()'));
   for (const id of ["contentCaptureHandoff", "fictionCaptureHandoff", "outreachCaptureHandoff", "ventureCaptureHandoff", "signalsCaptureHandoff", "charlesCaptureHandoff"]) {
@@ -2335,13 +2449,14 @@ test("Studio capture: top-level Start on it advances every classified build to i
 test("Studio capture copy: no em dashes and every classified build names its safe next gate", () => {
   const strings = [
     CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING, LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE,
-    ...(["Content", "Fiction", "Outreach", "Venture"] as const).map((r) => captureHandoffVerdict(r).line),
+    ...(["Content", "Fiction", "Outreach", "Venture", "Charles"] as const).map((r) => captureHandoffVerdict(r).line),
   ];
   for (const s of strings) assert.ok(!s.includes("—"), "em dash in capture copy: " + s);
   assert.match(captureHandoffVerdict("Content").line, /advisor round/);
   assert.match(captureHandoffVerdict("Fiction").line, /review before drafting/);
   assert.match(captureHandoffVerdict("Outreach").line, /choose the person/);
   assert.match(captureHandoffVerdict("Venture").line, /does not run or approve/);
+  assert.match(captureHandoffVerdict("Charles").line, /review before drafting/);
 });
 
 test("Studio keeps obsolete director attribution out of the visible capture workflow", () => {
@@ -2406,6 +2521,23 @@ test("Outreach directed drafts and revisions expose one engine picker and send i
   assert.ok(script.includes('engine:engine || "codex"'), "Outreach defaults to ChatGPT when no selector is available");
 });
 
+test("Outreach request builders execute identically in the emitted browser script", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── begin Outreach request mirror ──");
+  const end = script.indexOf("// ── end Outreach request mirror ──");
+  assert.ok(start > -1 && end > start, "the executable Outreach request mirror must reach the browser");
+  const browser = new Function(script.slice(start, end) + "\nreturn {outreachDraftRequest,outreachMessageReviseRequest};")() as {
+    outreachDraftRequest: typeof outreachDraftRequest;
+    outreachMessageReviseRequest: typeof outreachMessageReviseRequest;
+  };
+  const draftArgs = ["outreach/leads/acme", "keep it warm", "Rae", "grok"] as const;
+  const reviseArgs = ["outreach/leads/acme", "messages/message-01.md", "shorter", "codex"] as const;
+  assert.deepEqual(browser.outreachDraftRequest(...draftArgs), outreachDraftRequest(...draftArgs));
+  assert.deepEqual(browser.outreachMessageReviseRequest(...reviseArgs), outreachMessageReviseRequest(...reviseArgs));
+  assert.deepEqual(browser.outreachDraftRequest("outreach/leads/acme", "hello"), outreachDraftRequest("outreach/leads/acme", "hello"));
+  assert.throws(() => browser.outreachDraftRequest("outreach/leads/acme", "hello", undefined, "claude"), /Outreach engine/);
+});
+
 test("Notes picker sends the selected engine", () => {
   assert.deepEqual(notesPickRequest([1, 3], "grok"), { indices: [1, 3], engine: "grok" });
   assert.deepEqual(notesPickRequest([2]), { indices: [2], engine: "claude" });
@@ -2439,6 +2571,15 @@ test("Fiction drafting and second passes expose a local engine selector and send
   assert.ok(script.includes('const engine = draftBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";'));
   assert.ok(script.includes('const engine = passBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";'));
   assert.ok(script.includes('refreshEngineControls($("#fictionMain"));'));
+});
+
+test("GPT-OSS is paused in product choices and Fiction exposes durable engine provenance", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(!html.includes('<option value="ollama-gpt-oss">'), "a locally installed model must not reopen a paused product choice");
+  assert.ok(script.includes("drafted with "));
+  assert.ok(script.includes("revised with "));
+  assert.ok(script.includes('rep.engine?" with "+engineLabel(rep.engine)'));
 });
 
 test("Studio polish keeps engine choices, capture submits, and room loads understandable", () => {
@@ -2636,8 +2777,12 @@ test("familyGate: only attention and conversation may feed a suppression call", 
 
 test("the Signals screen calls both new reads and renders no prototype fixture number", () => {
   const script = emittedScripts().join("\n");
+  assert.ok(script.includes('fetch("/api/signals"+"?brand="'), "the strategy, decision, and experiment read must use the selected brand");
   assert.ok(script.includes('fetch("/api/signals/outcomes"+"?brand="'), "the brand-scoped outcome families must be fetched");
   assert.ok(script.includes('fetch("/api/research/report"+"?brand="'), "the brand-scoped research read must be fetched");
+  assert.ok(script.includes('function signalsBrand(){'), "the page must have one canonical selected-brand read");
+  assert.ok(script.includes('brand:signalsBrand()'), "Signals writes must carry the selected brand for server-side lineage checks");
+  assert.ok(!script.includes("Briefs, recommendations, and experiments are not yet brand-scoped"), "the completed brand boundary must not retain the old partial-scope warning");
   assert.match(script, /Legacy rows excluded from this brand view/);
   // The prototype's Signals numbers and thresholds have no source in this repo (port rules, Rule 2).
   for (const n of ["4,180", "trending up", "home base", "still testing"]) {
@@ -2833,7 +2978,7 @@ test("Content configuration exposes independent treatments, media, platforms, an
   }
   for (const option of [
     "CTA", "Viral rewrite", "Platform-specific framing", "Shorter version", "Thread",
-    "Counterpoint", "Summary", "Hook variants", "Static quote card", "Animated quote card",
+    "Counterpoint", "Summary", "Hook variants", "Belief shift", "Static quote card", "Animated quote card",
     "Image carousel", "Short-video script", "Video transcript / caption package",
   ]) assert.ok(script.includes(option), `configuration option missing: ${option}`);
   for (const kind of ["treatment", "media", "platform"]) {
@@ -2845,8 +2990,11 @@ test("Content configuration exposes independent treatments, media, platforms, an
   assert.ok(script.includes('engineSelectHtml("contentTreatmentEngine")'), "AI treatments need a nearby model selector");
   assert.ok(script.includes('id="contentControlEnabled"'), "the untreated control must be explicit and disable-able");
   assert.ok(script.includes("Untreated control"));
-  assert.ok(script.includes("Why these platforms and media?"), "recommendations need a source-specific explanation on request");
+  assert.ok(script.includes("Why these recommendations?"), "recommendations need a source-specific explanation on request");
   assert.ok(script.includes("source-fit"), "saved recommendation evidence must preserve source-fit provenance");
+  assert.ok(script.includes("mechanismRecommendations"), "reviewed mechanism evidence must reach preselection and the saved request");
+  assert.ok(script.includes("source:x.source"), "saved mechanism evidence must retain its reviewed dossier provenance");
+  assert.ok(script.includes('"&lens="+encodeURIComponent(CW.approvedLens)'), "mechanism matching must use the selected server-read cut, not the whole source");
   assert.ok(!script.includes("CHOOSE CUTS TO FORMAT"), "Cuts must not remain the primary configuration concept");
   assert.ok(!script.includes("CHANNELS · READ, NOT CHOSEN HERE"), "the routing diagnostic must not remain the selector");
   assert.ok(html.includes('id="contentConfigSave"') || script.includes('id="contentConfigSave"'),
@@ -3315,7 +3463,7 @@ test("Fiction keeps input visible and separates draft review from canon links", 
   assert.ok(html.includes("Review history"));
   assert.ok(html.includes('span,replacement'), "the passage editor must submit the exact displayed span");
   assert.ok(html.includes("historyWarning"), "a history-store failure must not masquerade as a failed primary action");
-  assert.ok(html.includes('ficPage = "write"'));
+  assert.ok(html.includes('ficPage = "inbox"'));
   assert.ok(!html.includes('aria-label="Fiction stages"'));
   const loadStart = html.indexOf("async function loadFiction(){");
   const loadEnd = html.indexOf("async function loadFictionPromotion(){", loadStart);
@@ -3363,6 +3511,23 @@ test("Content step navigation opens approval directly without a duplicate landin
   assert.ok(script.includes('if(n === 3){ CW.pane = "review"'));
   assert.ok(!html.includes("Open Approve Drafts"));
   assert.ok(!html.includes("Back to configuration</button></div></div>"));
+});
+
+test("Content global review and publishing steps do not require a selected source", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes("if(n === 2 && !CW.slug) return;"));
+  assert.ok(!script.includes("if(n > 1 && !CW.slug) return;"));
+});
+
+test("Content configuration displays server-owned cross-room authority", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("APPROVED CROSS-ROOM SOURCE"));
+  assert.ok(html.includes("Content preserves this owning-room authority. Configuration cannot replace it."));
+  for (const label of ["Locked passage:", "Canon:", "Provenance:", "Persona source:", "Approved artifact:", "Claim authority:"]) {
+    assert.ok(html.includes(label), `cross-room context must include ${label}`);
+  }
+  assert.ok(html.includes('fetch("/api/content/request?slug="+encodeURIComponent(slug))'));
+  assert.ok(html.includes('if(contentRequestOrigin(cwSession())!=="human-inference") cwLoadTreatment();'));
 });
 
 test("Approve Drafts puts a searchable request filter before the other filters", () => {
@@ -3452,4 +3617,34 @@ test("Signals experiments expose collecting or ready evidence and keep interpret
   assert.match(html, /This never selects a winner/);
   assert.match(html, /displayLabel\(analysisStatus\)/);
   assert.match(html, /displayLabel\(interpretation\.confidence\)/);
+  assert.match(html, /experimentCanProposeVenture\(perf, interpretation\)/);
+  assert.match(html, /interpretation\.recommendation!=="reject"/);
+  assert.match(html, /family==="audience"\|\|family==="business"/);
+  assert.match(html, /refs\.treatment.*startsWith\("outcome:"\)/s);
+  assert.match(html, /refs\.control.*startsWith\("outcome:"\)/s);
+});
+
+test("Venture Signals inputs stop offering decision buttons after the durable Venture decision projects back", () => {
+  const script = emittedScripts().join("\n");
+  assert.match(script, /p\.ventureDecision\?'DECIDED IN VENTURE':'ADOPTED IN SIGNALS'/);
+  assert.match(script, /p\.ventureDecision\?'':'<div class="vacts">/);
+  assert.match(script, /outcome: signalsInput\.dataset\.signalsInputAction, reason/);
+  for (const forged of ["rulesVersion", "contentDecisionRef", "ventureGateRef", "decisionRef", "measured"]) {
+    assert.doesNotMatch(script.slice(script.indexOf("const signalsInput ="), script.indexOf("const card =", script.indexOf("const signalsInput ="))), new RegExp(forged));
+  }
+});
+
+test("Venture learning loop reads evaluations and keeps decisions and experiments human-gated", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('encodeURIComponent(requestedSlug)+"/learning-evaluations'), "Venture load reads learning evaluations");
+  assert.ok(script.includes('"/learning/"+source') && script.includes('"/evaluate"'), "learning sources have evaluate routes");
+  for (const field of ["evidenceTier", "claimCeiling", "recommendation", "target", "rationale", "proposedChange", "caveats", "status"]) {
+    assert.ok(script.includes(field), `learning cards render ${field}`);
+  }
+  assert.match(script, /Evaluate learning/);
+  assert.match(script, /signals-input-"\+p\.id/);
+  assert.match(script, /request-more-evidence/);
+  assert.match(script, /does not mutate Venture automatically|normal Experiment approval queue/);
+  assert.match(script, /minimumSample|availablePublishingUnits/);
+  assert.match(script, /Never auto-apply|never.*winner|never selects a winner/i);
 });

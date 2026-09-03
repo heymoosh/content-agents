@@ -39,7 +39,6 @@ export const NOT_COVERED: { feature: string; route: string; engine: string; why:
   { feature: "Draft a Charles post", route: "POST /api/charles/draft", engine: "claude -p (subscription)", why: "time+nondeterm" },
   { feature: "Ask the strategy brief a question", route: "POST /api/strategy/ask|refresh-brief", engine: "claude -p (subscription)", why: "time+nondeterm" },
   { feature: "Generate insights from the data", route: "POST /api/strategy/insights|ask-insights", engine: "Codex CLI on the ChatGPT subscription, claude-cli fallback", why: "time+nondeterm" },
-  { feature: "Draft an outreach message / revise a locked one", route: "POST /api/outreach/draft|message/revise", engine: "claude -p (subscription)", why: "time+nondeterm", pr: "#351" },
   { feature: "Scout for new leads or companies", route: "POST /api/outreach/scout", engine: "local process, logs costUsd: 0", why: "time+nondeterm", pr: "#378" },
   { feature: "Stamp captured_at on newly captured evidence", route: "inside the scout / research-capture run", engine: "local process", why: "time+nondeterm", pr: "#383" },
   { feature: "Browse and spread Substack Notes", route: "GET /api/notes", engine: "live Substack fetch, free", why: "live" },

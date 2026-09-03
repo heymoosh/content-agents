@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { openDb } from "../db/db.js";
+import { parseStrategyMeasurementContext, type StrategyMeasurementContext } from "./measurement-context.js";
 import { loadConfig, type RoutingConfig } from "./route.js";
 import { loadStrategyConfig, type StrategyConfig } from "./platform-fit.js";
 import {
@@ -113,12 +114,13 @@ export function combineReport(
 
 // I/O wrapper. injectedDb, when given, is shared across all three loaders and left open for the
 // caller to close (same contract as cadence-fit.ts / frame-fit.ts / cta-fit.ts's own loadRows).
-export function buildReport(injectedDb?: ReturnType<typeof openDb>, now = Date.now()): LeverEffectivenessReport {
+export function buildReport(injectedDb?: ReturnType<typeof openDb>, now = Date.now(), context?: StrategyMeasurementContext): LeverEffectivenessReport {
+  if (!context) throw new Error("strategy measurement requires explicit brand context");
   const cfg = loadConfig();
   const strategyCfg = loadStrategyConfig();
-  const cadenceRows = loadCadenceRows(injectedDb);
-  const frameRows = loadFrameRows(injectedDb);
-  const ctaRows = loadCtaRows(injectedDb);
+  const cadenceRows = loadCadenceRows(injectedDb, context);
+  const frameRows = loadFrameRows(injectedDb, context);
+  const ctaRows = loadCtaRows(injectedDb, context);
   return combineReport(cadenceRows, frameRows, ctaRows, cfg, strategyCfg, now);
 }
 
@@ -275,7 +277,7 @@ export function formatReport(report: LeverEffectivenessReport, cfg: RoutingConfi
 
 function main() {
   const cfg = loadConfig();
-  const report = buildReport();
+  const report = buildReport(undefined, Date.now(), parseStrategyMeasurementContext());
   console.log(formatReport(report, cfg));
 }
 

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Outreach Phase 5 discovery review</title>
+  <style>
+    :root{color-scheme:light;--ink:#1c1917;--paper:#f5f0e7;--panel:#fffdf8;--line:#d8cdbd;--accent:#26594d;--muted:#665e54;--good:#e8f2ed;--warn:#fff3d6}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,sans-serif}main{width:min(1080px,calc(100% - 32px));margin:36px auto 72px}header,.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}h1{font:700 clamp(32px,5vw,54px)/1.05 Georgia,serif;margin:0 0 12px}h2{margin-top:34px}.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:12px;font-weight:800;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}.good{background:var(--good)}.warn{background:var(--warn)}dl{display:grid;grid-template-columns:135px 1fr;gap:8px 14px}dt{font-weight:800}dd{margin:0;color:var(--muted)}code,pre{font:13px/1.55 ui-monospace,monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#22201d;color:#faf4ea;padding:18px;border-radius:10px}.flow{font-size:18px;font-weight:700;color:var(--accent)}li+li{margin-top:8px}.note{border-left:5px solid var(--accent);padding-left:14px}</style>
+</head>
+<body><main>
+  <header>
+    <p class="eyebrow">Human Inference · Outreach Phase 5 review</p>
+    <h1>Discovery that compounds instead of repeating itself</h1>
+    <p>This review shows the judgment changes before any live Scout run. Nothing here contacts a lead, drafts a pitch, schedules content, or publishes anything.</p>
+  </header>
+
+  <h2>What changes in a run</h2>
+  <p class="flow">Normal input → rotated lens → bounded web discovery → deterministic gates → existing Outreach review queue</p>
+  <div class="grid">
+    <article class="card warn"><p class="eyebrow">Before</p><h3>Broad theme search</h3><p>Scout received a theme, the full fit rubric, and a list of existing names. This could drift back toward generic category searches and repeat familiar candidates.</p></article>
+    <article class="card good"><p class="eyebrow">Now</p><h3>One declared search lens</h3><p>Each run selects one belief, one community dialect, one modality, and a small anchor subset. The next run advances the persisted lens instead of silently rerunning the same search.</p></article>
+  </div>
+
+  <h2>Representative first-run lens from current config</h2>
+  <div class="card"><dl>
+    <dt>Belief</dt><dd>Automating an unexamined process entrenches its flaws</dd>
+    <dt>Dialect</dt><dd>“Paving the cowpath”</dd>
+    <dt>Modality</dt><dd>Episode-level podcast discovery</dd>
+    <dt>Anchor subset</dt><dd>Audrey Tang, Collective Intelligence Project, Ankur Gupta</dd>
+    <dt>Graph instruction</dt><dd>Expand one to two public hops through co-appearances, collaboration and citation, public recommendations, and alumni networks.</dd>
+  </dl></div>
+
+  <h2>How the search prompt is sharper</h2>
+  <div class="grid">
+    <article class="card"><h3>Platform discovery</h3><p>Generate fresh queries from the active belief, dialect, and modality. Use trusted anchors as graph entry points, not candidates to repeat. Verify fit with a direct quote and separately search for counter-evidence.</p></article>
+    <article class="card"><h3>Client discovery</h3><p>Start with reflective founders or executives whose public words show openness to changing direction. Establish a named person’s worldview fit first. Research the company only after that person qualifies.</p></article>
+    <article class="card"><h3>Learning from decisions</h3><p>Passed leads and their required reasons become negative examples. Pursue and pass rates are shown to the next run. If the frontier is cold, unchanged methodology blocks another search; changing the fit profile or worldview map permits one recalibrated run.</p></article>
+  </div>
+
+  <h2>Current calibration read</h2>
+  <div class="card"><dl>
+    <dt>Clients</dt><dd>8 pursued across 10 decided leads: 80%. This is above the intended band, so discovery can cautiously broaden the frontier.</dd>
+    <dt>Platforms</dt><dd>No pursue or pass decisions yet. The system says the sample is too thin and does not manufacture a calibration.</dd>
+  </dl></div>
+
+  <h2>Deterministic gates after model output</h2>
+  <div class="card"><ul>
+    <li><strong>Permanent frontier:</strong> Every existing lead is excluded regardless of whether it was pursued or passed. Legal suffixes, punctuation, leading “The,” and URL/domain variants canonicalize to the same identity.</li>
+    <li><strong>Mid-tail policy:</strong> Podcast and newsletter audiences at or above configured caps are downgraded. Client companies at configured late funding stages are excluded.</li>
+    <li><strong>Evidence gate:</strong> Client candidates require a named person’s substantive quote from a valid source before any lead is written. A missing disconfirmation pass deterministically downgrades the result.</li>
+    <li><strong>Cost guard:</strong> The configured five-candidate cap applies to the whole run and model output is sliced before either write loop. Rate limits receive at most two exponential-backoff retries.</li>
+    <li><strong>Run ledger:</strong> Completed and failed runs append to <code>data/outreach/run-log.jsonl</code> with lens, calibration, duration, searches, evidence, retries, and mid-tail outcomes.</li>
+  </ul></div>
+
+  <h2>Weekly Strategy output</h2>
+  <p class="note">The new command is read-only. It folds Outreach into the normal Strategy brief without creating a separate workflow or urgency score.</p>
+  <pre>## Outreach and follow-ups
+
+BORROWED-AUDIENCE TARGET LIST (3)
+  The School for Moral Ambition [fit: partial]
+  Diary of a CEO [fit: weak]
+  UN ITU AI for Good Neural Network [fit: weak]
+
+| bucket    | total | due | overdue | responded |
+| client    | 9     | 0   | 7       | 0         |
+| platform  | 0     | 0   | 0       | 0         |
+| inbound   | 0     | 0   | 0       | 0         |
+| jobsearch | 0     | 0   | 0       | 0         |
+
+Job-search data: JSA_DB_PATH is not set.</pre>
+
+  <h2>Decision boundary</h2>
+  <div class="card good"><p>This is a judgment-affecting discovery change. The PR will remain a draft until you approve this search behavior. Approval does not approve any candidate Scout later finds. Each discovered lead still enters the existing Outreach review queue for a separate pursue or pass decision.</p></div>
+</main></body></html>

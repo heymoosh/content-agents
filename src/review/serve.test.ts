@@ -28,6 +28,7 @@ import {
   computeFreshness,
   parseBriefDate,
   extractSection,
+  latestBriefPath,
   type SchedulerDeps,
   appendLeadContact,
   ventureAnalysisPrompt,
@@ -36,24 +37,45 @@ import {
   requestAnalysisEngine,
   requestInteractiveAnalysisEngine,
   recordOutreachInitialSend,
+  recordOutreachGmailSend,
+  sendLockedOutreachEmail,
+  reconcileLockedOutreachEmail,
   reviewRequestHandler,
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
 import { approveConfiguredMediaStage } from "./configured-media-runtime.js";
 
-test("engine availability requires the exact GPT-OSS model, not merely an Ollama binary", () => {
+test("strategy brief lookup is brand-scoped and leaves top-level legacy briefs unassigned", () => {
+  const root = mkdtempSync(join(tmpdir(), "strategy-brand-briefs-"));
+  try {
+    mkdirSync(join(root, "human-inference"), { recursive: true });
+    mkdirSync(join(root, "charles"), { recursive: true });
+    writeFileSync(join(root, "2026-08-31-strategy-brief.md"), "legacy global");
+    writeFileSync(join(root, "human-inference", "2026-08-30-strategy-brief.md"), "hi");
+    writeFileSync(join(root, "charles", "2026-08-29-strategy-brief.md"), "charles");
+
+    assert.equal(latestBriefPath("human-inference", root), join(root, "human-inference", "2026-08-30-strategy-brief.md"));
+    assert.equal(latestBriefPath("charles", root), join(root, "charles", "2026-08-29-strategy-brief.md"));
+    assert.equal(latestBriefPath("fiction", root), null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("GPT-OSS stays paused even when Ollama reports the exact model", () => {
   const missing = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\nllama3.2:latest\n" : "");
   assert.equal(missing.find((e) => e.id === "ollama-gpt-oss")?.installed, false);
   const ready = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\ngpt-oss:20b\n" : "");
-  assert.equal(ready.find((e) => e.id === "ollama-gpt-oss")?.installed, true);
+  assert.equal(ready.find((e) => e.id === "ollama-gpt-oss")?.installed, false);
+  assert.match(ready.find((e) => e.id === "ollama-gpt-oss")?.note ?? "", /paused/i);
 });
 
-test("GPT-OSS is accepted only by read-only analysis routes", () => {
-  assert.equal(requestAnalysisEngine("ollama-gpt-oss"), "ollama-gpt-oss");
-  assert.throws(() => requestEngine("ollama-gpt-oss"), /read-only|agentic|file/i);
+test("GPT-OSS is refused by every product route while paused", () => {
+  assert.throws(() => requestAnalysisEngine("ollama-gpt-oss"), /paused/i);
+  assert.throws(() => requestEngine("ollama-gpt-oss"), /paused/i);
   assert.equal(requestEngine("codex"), "codex");
-  assert.throws(() => requestInteractiveAnalysisEngine("ollama-gpt-oss"), /self-contained|follow-up/i);
+  assert.throws(() => requestInteractiveAnalysisEngine("ollama-gpt-oss"), /paused/i);
 });
 
 test("manual initial outreach sends use the folder slug and contacted event metadata", () => {
@@ -76,6 +98,84 @@ test("manual initial outreach sends use the folder slug and contacted event meta
   }, (() => ({}) as never)), /lock/i);
 });
 
+test("Gmail sends require a locked email and record confirmed provider delivery", async () => {
+  const detail = {
+    kind: "client" as const,
+    latestMessage: { file: "messages/message-01.md", channel: "email", status: "locked", recipient: "Jane Doe", body: "Hello" },
+    contacts: [],
+  };
+  let request: unknown;
+  let recorded: unknown;
+  const result = await sendLockedOutreachEmail(
+    "outreach/leads/client-example",
+    detail,
+    { to: "jane@example.com", subject: "A quick note" },
+    async (value) => { request = value; return { provider: "gmail", account: "muxin.li.pro@gmail.com", providerMessageId: "gmail-1" }; },
+    (bucket, lead, opts) => {
+      recorded = { bucket, lead, opts };
+      return { ts: "2026-09-01T00:00:00.000Z", bucket, lead, event: "contacted", ...opts } as never;
+    },
+  );
+  assert.deepEqual(request, { to: "jane@example.com", subject: "A quick note", body: "Hello", messageId: "client-example:messages/message-01.md" });
+  assert.equal(result.event?.event, "contacted");
+  assert.deepEqual(recorded, { bucket: "client", lead: "client-example", opts: { person: "Jane Doe", channel: "email", message: "messages/message-01.md", note: "Delivered by Gmail (gmail-1)" } });
+  await assert.rejects(() => sendLockedOutreachEmail("outreach/leads/client-example", { ...detail, latestMessage: { ...detail.latestMessage, status: "draft" } }, { to: "jane@example.com", subject: "Hi" }, async () => ({ status: "already_delivered" })), /lock/i);
+});
+
+test("uncertain Gmail delivery never advances the follow-up clock", async () => {
+  let recorded = false;
+  const result = await sendLockedOutreachEmail(
+    "outreach/leads/platform-example",
+    { kind: "platform", latestMessage: { file: "messages/message-01.md", channel: "email", status: "locked", recipient: "", body: "Hello" }, contacts: [] },
+    { to: "jane@example.com", subject: "Hi" },
+    async () => ({ status: "uncertain" }),
+    (() => { recorded = true; return {} as never; }),
+  );
+  assert.equal(result.event, null);
+  assert.equal(recorded, false);
+});
+
+test("reconciled Gmail delivery advances the follow-up clock only after a Sent-mail match", async () => {
+  let recorded = false;
+  const detail = { kind: "client" as const, latestMessage: { file: "messages/message-01.md", channel: "email", status: "locked", recipient: "Jane", body: "Hello" }, contacts: [] };
+  const uncertain = await reconcileLockedOutreachEmail("outreach/leads/client-example", detail, { to: "jane@example.com", subject: "Hi" }, async () => ({ status: "uncertain" }), (() => { recorded = true; return {} as never; }));
+  assert.equal(uncertain.event, null);
+  assert.equal(recorded, false);
+  const confirmed = await reconcileLockedOutreachEmail("outreach/leads/client-example", detail, { to: "jane@example.com", subject: "Hi" }, async () => ({ provider: "gmail", account: "muxin.li.pro@gmail.com", providerMessageId: "found-1" }), (() => { recorded = true; return { event: "contacted" } as never; }));
+  assert.equal(confirmed.event?.event, "contacted");
+  assert.equal(recorded, true);
+});
+
+test("Outreach Gmail browser path requires confirmation and preserves the manual fallback", () => {
+  const server = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const page = readFileSync(new URL("./page.ts", import.meta.url), "utf8");
+  assert.ok(server.includes('url.pathname === "/api/outreach/send-gmail"'));
+  assert.match(server, /b\.confirm !== true/);
+  assert.match(server, /reconcileLockedOutreachEmail/);
+  assert.match(page, /window\.confirm\("Send this locked message now/);
+  assert.match(page, /\/api\/outreach\/send-gmail/);
+  assert.match(page, /I sent this by hand/);
+});
+
+test("Outreach Gmail HTTP route rejects a request without explicit confirmation before dispatch", async () => {
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/outreach/send-gmail`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dir: "outreach/leads/client-example", to: "person@example.com", subject: "Hello" }),
+    });
+    const body = await response.json() as { ok?: boolean; error?: string };
+    assert.equal(response.status, 400);
+    assert.equal(body.ok, false);
+    assert.match(body.error ?? "", /confirmation/i);
+  } finally {
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test("fiction promotion handoff requires an approved promotional final", () => {
   const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
   assert.ok(source.includes('url.pathname === "/api/fiction/handoff"'));
@@ -85,6 +185,48 @@ test("fiction promotion handoff requires an approved promotional final", () => {
   assert.match(source, /sourceKind: "fiction-promotion"/);
   assert.match(source, /promotion\.state !== "Approved"/);
   assert.match(source, /text: promotion\.body/);
+});
+
+test("Fiction idea inbox exposes classifier, review, approval, and rejection boundaries", () => {
+  const source = readFileSync(new URL("./serve-fiction.ts", import.meta.url), "utf8");
+  for (const route of ["/api/fiction/inbox", "/api/fiction/inbox/approve", "/api/fiction/inbox/reject"]) {
+    assert.ok(source.includes(`url.pathname === "${route}"`), `missing ${route}`);
+  }
+  assert.match(source, /classifyIdea\(rawText, engine\)/);
+  assert.match(source, /createCleanupProposal/);
+  assert.match(source, /approveIdea/);
+  assert.match(source, /queueChapter:/);
+  assert.match(source, /rejectIdea/);
+});
+
+test("Fiction idea inbox exposes an explicit clarification-turn action", () => {
+  const routeSource = readFileSync(new URL("./serve-fiction.ts", import.meta.url), "utf8");
+  const pageSource = readFileSync(new URL("./page.ts", import.meta.url), "utf8");
+  assert.ok(routeSource.includes('url.pathname === "/api/fiction/inbox/clarify"'));
+  assert.match(routeSource, /appendClarificationTurn/);
+  assert.match(routeSource, /buildIdeaContext/);
+  assert.match(pageSource, /ficClarify/);
+  assert.match(pageSource, /\/api\/fiction\/inbox\/clarify/);
+});
+
+test("Fiction Studio exposes an explicit draft-PR and review-comment bridge", () => {
+  const source = readFileSync(new URL("./serve-fiction.ts", import.meta.url), "utf8");
+  for (const route of ["/api/fiction/pr/create", "/api/fiction/pr/revise"]) {
+    assert.ok(source.includes(`url.pathname === "${route}"`), `missing ${route}`);
+  }
+  assert.match(source, /createStoryDraftPr/);
+  assert.match(source, /listStoryReviewComments/);
+  assert.match(source, /processChapterReviewComments/);
+  assert.match(source, /reviseSpanWithEngine\(span, instruction, engine, repoRoot\)/);
+  assert.match(source, /validateStoryChapter/);
+});
+
+test("Fiction page makes the PR bridge an explicit Studio action", () => {
+  const source = readFileSync(new URL("./page.ts", import.meta.url), "utf8");
+  assert.match(source, /id="ficPrCreate"/);
+  assert.match(source, /id="ficPrRevise"/);
+  assert.match(source, /\/api\/fiction\/pr\/create/);
+  assert.match(source, /\/api\/fiction\/pr\/revise/);
 });
 
 test("Charles promotion has an approved request-only handoff route", () => {

@@ -4,6 +4,7 @@
 // back to fetchGenericArticle, a Readability-based extractor for plain article HTML.
 
 import { fetchGenericArticle } from "./fetch-generic.js";
+import { decodeHtmlEntities } from "../util/html-entities.js";
 
 export interface FetchedPost {
   title: string;
@@ -13,17 +14,17 @@ export interface FetchedPost {
 }
 
 function htmlToText(html: string): string {
-  return html
+  const stripped = html
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/(p|h[1-6]|li|blockquote|div)>/gi, "\n\n")
     .replace(/<li[^>]*>/gi, "- ")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&nbsp;/g, " ")
+    .replace(/<[^>]+>/g, "");
+  // Substack's feed writes smart punctuation and accents as numeric references, which the old
+  // six-entity chain here left encoded in source.md — the file every derivative quotes verbatim.
+  return decodeHtmlEntities(stripped)
+    // A non-breaking space is correct after decoding but invisible and easy to paste wrong, so
+    // ingest keeps writing an ordinary space the way it always has.
+    .replace(/\u00a0/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -58,7 +59,7 @@ async function fetchFromFeed(url: string): Promise<FetchedPost> {
 
   const html = tag(item, "content:encoded") ?? tag(item, "description") ?? "";
   return {
-    title: tag(item, "title") ?? "untitled",
+    title: decodeHtmlEntities(tag(item, "title") ?? "untitled"),
     url: tag(item, "link") ?? url,
     publishedAt: tag(item, "pubDate") ? new Date(tag(item, "pubDate")!).toISOString() : null,
     text: htmlToText(html),

@@ -18,10 +18,10 @@ const DEFAULT_TIMEOUT_MS = 240_000;
 // spawn (not execFile) so stdin can be CLOSED up front: codex exec treats an open piped stdin as
 // input to wait on/append, and under Node's default piped stdio it exits silently with no work
 // done — the same stdin gotcha runCommandSpawn documents for `claude -p` in src/review/jobs.ts.
-function runCodex(args: string[], timeoutMs: number): Promise<{ code: number | null; killed: boolean; stdout: string; stderr: string }> {
+function runCodex(args: string[], timeoutMs: number, cwd: string = repoRoot): Promise<{ code: number | null; killed: boolean; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn("codex", args, {
-      cwd: repoRoot,
+      cwd,
       timeout: timeoutMs,
       killSignal: "SIGTERM",
       stdio: ["ignore", "pipe", "pipe"],
@@ -71,7 +71,7 @@ export function classifyCodexAvailability(output: string): string | null {
 
 export const provider: AnalystProvider = {
   name: "gpt-codex",
-  async analyze({ prompt, timeoutMs }) {
+  async analyze({ prompt, timeoutMs, cwd }) {
     const outFile = join(tmpdir(), `codex-analyst-${randomUUID()}.md`);
     let stdout = "";
     let stderr = "";
@@ -80,6 +80,7 @@ export const provider: AnalystProvider = {
       const r = await runCodex(
         ["exec", "--sandbox", "read-only", "--skip-git-repo-check", "-o", outFile, prompt],
         timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        cwd,
       );
       stdout = r.stdout;
       stderr = r.stderr;

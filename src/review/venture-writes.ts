@@ -43,6 +43,9 @@ import { ventureDir } from "../venture/paths.js";
 import { clearIntakeDrafts } from "./intake-draft.js";
 import { commitIntake } from "./intake-commit.js";
 import { existsSync } from "node:fs";
+import { readSignalsVentureProposals } from "./signals-venture-handoff-store.js";
+import { acceptSignalsInput, type SignalsInputHandoff } from "../venture/signals-input.js";
+import { createVentureInputPointer } from "../grow/venture-input.js";
 
 export interface VentureWriteResult {
   status: number;
@@ -57,7 +60,9 @@ const SAFE_SLUG = /^[a-z0-9][\w-]*$/;
 // digits (p1-essay-01, checkpoint-1, transformation-01).
 const SAFE_ID = /^[a-z0-9][\w-]*$/;
 
-type Handler = (slug: string, params: string[], body: Record<string, unknown>) => Record<string, unknown>;
+type Handler = (slug: string, params: string[], body: Record<string, unknown>, options: VentureWriteOptions) => Record<string, unknown>;
+
+export interface VentureWriteOptions { signalsHandoffsPath?: string }
 
 interface Route {
   method: "POST";
@@ -340,6 +345,67 @@ const ROUTES: Route[] = [
     },
   },
 
+  // Venture owns the second decision. Signals' adopted proposal is read-only input here. The
+  // proposal store supplies all measured evidence, sample, provenance, content refs, caveats, and
+  // qualification fields. The route accepts only the Muxin outcome/reason; all authority refs are
+  // derived below, never trusted from the client.
+  {
+    method: "POST",
+    pattern: /^\/api\/venture\/([^/]+)\/signals-input\/([^/]+)\/decision$/,
+    handler: (slug, [proposalId], body, options) => {
+      const unknownFields = Object.keys(body).filter((key) => key !== "outcome" && key !== "reason");
+      if (unknownFields.length) throw new Error(`unknown field(s): ${unknownFields.join(", ")}; only outcome and reason are accepted`);
+      const proposal = readSignalsVentureProposals(options.signalsHandoffsPath).find((p) => p.id === proposalId);
+      if (!proposal) throw new Error(`unknown Signals Venture proposal ${proposalId}`);
+      if (proposal.ventureSlug !== slug) throw new Error(`Signals proposal ${proposalId} belongs to venture ${proposal.ventureSlug}, not ${slug}`);
+      if (proposal.status !== "adopted") throw new Error(`Signals proposal ${proposalId} is not adopted`);
+      const strRequired = (key: string): string => {
+        const value = body[key];
+        if (typeof value !== "string" || !value.trim()) throw new Error(`${key} is required`);
+        return value.trim();
+      };
+      if (proposal.evidenceStatus !== "measured") throw new Error("Signals proposal does not contain measured evidence");
+      if (proposal.qualification !== "qualified") throw new Error("Signals proposal is not qualified for Venture");
+      if (!proposal.decidedAt) throw new Error("Signals adoption timestamp is missing");
+      const outcome = strRequired("outcome");
+      if (outcome !== "accept" && outcome !== "reject" && outcome !== "request-more-evidence") throw new Error("outcome is invalid");
+      const reason = strRequired("reason");
+      const actionAt = now();
+      const rules = loadRules();
+      const sourceRecordRefs = [proposal.id];
+      const evidenceRefs = [...proposal.evidenceRefs];
+      const contentItemRefs = [...proposal.contentItemRefs];
+      const inputKind = `signals-${proposal.inputKind}`;
+      const decisionRef = `${slug}/signals-input/${proposal.id}/decision/${outcome}`;
+      const gateRef = `${slug}/signals-input/${proposal.id}/gate`;
+      const contentDecisionRef = `signals-adoption:${proposal.id}:${proposal.digest}:${proposal.decidedAt}`;
+      const pointer = createVentureInputPointer({
+        id: proposal.id, ventureId: slug, phase: proposal.phase, inputKind, sourceRecordRefs, evidenceRefs,
+        contentItemRefs, scope: proposal.scope, sampleSize: proposal.sampleSize.treatment + proposal.sampleSize.control,
+        provenance: `plan:${proposal.provenance.planDigest};interpretation:${proposal.provenance.interpretationId}`,
+        caveats: [...proposal.caveats],
+        contentHumanDecision: { status: "approved", decidedBy: "muxin", decisionRef: contentDecisionRef, decidedAt: proposal.decidedAt },
+        ventureGate: { status: "open", gateRef },
+        ventureDecision: { outcome, factRef: decisionRef, independent: true, evidenceRefs, decidedAt: actionAt },
+        status: outcome === "accept" ? "ready" : outcome === "reject" ? "rejected" : "needs-more-evidence",
+        lineage: { owner: "content", pointerId: proposal.id, ventureId: slug, phase: proposal.phase, inputKind, sourceRecordRefs, evidenceRefs, contentItemRefs },
+      });
+      const handoff: SignalsInputHandoff = {
+        pointer_id: pointer.id, venture_id: pointer.ventureId, phase: pointer.phase, rules_version: rules.rules_version,
+        input_kind: pointer.inputKind, factual_summary: proposal.factualSummary, source_record_refs: [...pointer.sourceRecordRefs], evidence_refs: [...pointer.evidenceRefs],
+        content_item_refs: [...pointer.contentItemRefs], scope: pointer.scope, sample_size: pointer.sampleSize,
+        sample_size_by_arm: { treatment: proposal.sampleSize.treatment, control: proposal.sampleSize.control },
+        provenance: pointer.provenance, caveats: [...pointer.caveats],
+        lineage: { source_id: proposal.sourceId, variant_id: proposal.variantId, experiment_id: proposal.experimentId },
+        content_decision: { status: "approved", decided_by: "muxin", decision_ref: pointer.contentHumanDecision!.decisionRef! },
+        venture_gate_ref: pointer.ventureGate.gateRef, qualification: proposal.qualification, evidence_status: proposal.evidenceStatus,
+        evidence_tier: proposal.evidenceTier ?? proposal.inputKind, claim_ceiling: proposal.claimCeiling,
+      };
+      const result = acceptSignalsInput(slug, handoff, { outcome, decided_by: "muxin", decision_ref: decisionRef, reason }, actionAt);
+      return { acceptance: result };
+    },
+  },
+
   // --- intake scratch buffer -------------------------------------------------------------------
   //
   // Built in intake-draft.ts and never routed; its own comment says the room will call it right
@@ -380,7 +446,7 @@ function requireArtifact(slug: string, artifactId: string): VentureArtifact {
  * Dispatch one venture write. Returns null when the request is not one, so serve.ts falls through
  * to its own routes and its 404 exactly as before.
  */
-export function handleVentureWrite(method: string, pathname: string, body: Record<string, unknown>): VentureWriteResult | null {
+export function handleVentureWrite(method: string, pathname: string, body: Record<string, unknown>, options: VentureWriteOptions = {}): VentureWriteResult | null {
   if (method !== "POST" || !pathname.startsWith("/api/venture/")) return null;
 
   for (const route of ROUTES) {
@@ -396,7 +462,7 @@ export function handleVentureWrite(method: string, pathname: string, body: Recor
     }
 
     try {
-      return { status: 200, body: { ok: true, ...route.handler(slug, params, body) } };
+      return { status: 200, body: { ok: true, ...route.handler(slug, params, body, options) } };
     } catch (e) {
       // Verbatim. Every one of these messages was written to tell Muxin what to bring instead;
       // rewording it here would throw away the only useful half of the refusal.
@@ -420,6 +486,7 @@ export const VENTURE_WRITE_PATHS = [
   "/api/venture/:slug/checkpoint/:id/clear",
   "/api/venture/:slug/pace",
   "/api/venture/:slug/responses",
+  "/api/venture/:slug/signals-input/:id/decision",
   "/api/venture/:slug/intake/drafts/clear",
   "/api/venture/:slug/intake/commit",
 ];

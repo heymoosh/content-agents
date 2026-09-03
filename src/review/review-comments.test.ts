@@ -2,10 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import {
   appendReviewComment, appendReviewCommentSafe, charlesReviewSubject, fictionReviewSubject, listReviewComments,
+  listReviewCommentsSafe, listReviewCommentsWithHealth, REVIEW_COMMENTS_PATH,
 } from "./review-comments.js";
+test("review comments keep the legacy location shape, but never the real store under the test runner", () => {
+  // Unconfigured roots resolve to ~/.content-agents/<name> in production; under node:test the
+  // data-root guard swaps in a throwaway directory so the gate cannot write into Muxin's store.
+  assert.ok(REVIEW_COMMENTS_PATH.endsWith(join("", "review-comments.jsonl")), REVIEW_COMMENTS_PATH);
+  assert.ok(!REVIEW_COMMENTS_PATH.startsWith(join(homedir(), ".content-agents")), REVIEW_COMMENTS_PATH);
+});
 
 test("review subjects are stable and reject invalid resource identities", () => {
   assert.equal(fictionReviewSubject("the-least-of-us", 3), "the-least-of-us:chapter-3");
@@ -74,5 +81,17 @@ test("safe history writes report a warning without turning a completed primary a
     );
     assert.equal(result.comment, null);
     assert.match(result.warning ?? "", /history/i);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("safe history reads distinguish a healthy empty file from an unavailable store", () => {
+  const root = mkdtempSync(join(tmpdir(), "review-comments-"));
+  try {
+    const missing = join(root, "missing.jsonl");
+    assert.deepEqual(listReviewCommentsWithHealth("charles", "draft-1", missing), { comments: [] });
+    const unavailable = listReviewCommentsWithHealth("charles", "draft-1", root);
+    assert.deepEqual(unavailable.comments, []);
+    assert.match(unavailable.warning ?? "", /Review history is unavailable/);
+    assert.deepEqual(listReviewCommentsSafe("charles", "draft-1", root), [], "legacy callers retain the safe empty-array contract");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

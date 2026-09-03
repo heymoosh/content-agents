@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { changedWorktreePaths, E2E_PHASE3_SLUG, E2E_WRITE_SLUG, EXPENSIVE_ROUTES, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
+import { changedWorktreePaths, E2E_PHASE3_SLUG, E2E_WRITE_SLUG, EXPENSIVE_REQUESTS, EXPENSIVE_ROUTES, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
 import { NOT_COVERED } from "./pass-d-notcovered.js";
 
 test("live content generation fails closed outside the disposable injected-engine browser pass", () => {
@@ -16,6 +16,9 @@ test("deterministic Fiction passage saves are browser-testable without allowing 
   assert.ok(!EXPENSIVE_ROUTES.includes("/api/fiction/fix"));
   assert.ok(EXPENSIVE_ROUTES.includes("/api/fiction/draft"));
   assert.ok(EXPENSIVE_ROUTES.includes("/api/fiction/repass"));
+  assert.ok(EXPENSIVE_REQUESTS.includes("POST /api/fiction/inbox"));
+  assert.ok(EXPENSIVE_REQUESTS.includes("POST /api/fiction/inbox/clarify"));
+  assert.ok(!EXPENSIVE_REQUESTS.includes("GET /api/fiction/inbox" as never));
 });
 
 test("Playwright cache resolution stays on the real home when E2E HOME is disposable", () => {

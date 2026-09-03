@@ -7,6 +7,8 @@ import { buildContentRequest } from "./content-request.js";
 import { approveExperimentPlan, buildExperimentPlan } from "../grow/experiment-content-handoff.js";
 import { signalsExperimentRecommendation } from "../grow/experiment-test-fixtures.js";
 import { markExperimentContentHandoff, readExperimentPlans, recordExperimentPlan, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
+import { recordVentureExperimentPlan } from "./signals-experiment-plan-store.js";
+import { ventureExperimentPlanDigest } from "./venture-experiment-handoff.js";
 import * as planStoreSubject from "./signals-experiment-plan-store.js";
 
 const roots: string[] = [];
@@ -26,6 +28,25 @@ function proposal(id: string, confidence: "low" | "medium" | "high" = "high") {
 }
 
 describe("Signals experiment plan store", () => {
+  test("binds a plan to the Content origin brand and leaves Studio legacy plans unassigned", async () => {
+    const root = await mkdtemp(join(tmpdir(), "signals-experiment-brand-")); roots.push(root); const path = join(root, "plans.jsonl");
+    const plan = proposal("brand-bound");
+    assert.equal(plan.brandId, "human-inference");
+    recordExperimentPlan(plan, path);
+    const legacy = structuredClone(plan) as any;
+    legacy.recommendation.id = "studio-legacy";
+    legacy.contentRequest.id = "studio-legacy";
+    legacy.contentRequest.origin = "studio";
+    delete legacy.brandId;
+    recordExperimentPlan(legacy, path);
+    const rows = readExperimentPlans(path);
+    assert.equal(rows.find((row) => row.contentRequestId === "brand-bound")?.brandId, "human-inference");
+    assert.equal(rows.find((row) => row.contentRequestId === "studio-legacy")?.brandId, null);
+    const decision = approveExperimentPlan(plan, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" });
+    reviewExperimentPlan(plan.recommendation.id, decision, path);
+    markExperimentContentHandoff(plan.recommendation.id, { experimentId: plan.recommendation.id, generatedIds: ["x"], copyApproval: "pending-in-content" }, path);
+    assert.deepEqual((planStoreSubject as any).readExperimentPlansForPerformance(path).map((item: any) => item.recommendation.id), [plan.recommendation.id]);
+  });
   test("persists concurrent plans and returns high confidence first without source or draft bodies", async () => {
     const root = await mkdtemp(join(tmpdir(), "signals-experiment-store-")); roots.push(root); const path = join(root, "plans.jsonl");
     recordExperimentPlan(proposal("medium", "medium"), path);
@@ -87,4 +108,16 @@ describe("Signals experiment plan store", () => {
     assert.match(rows.find((row) => row.contentRequestId === "insufficient")!.priorityReason, /declared publishing capacity is insufficient/i);
     assert.match(rows.find((row) => row.contentRequestId === "legacy")!.priorityReason, /legacy plan has no declared publishing capacity/i);
   });
+});
+
+test("a Venture-origin plan remains in the normal Experiment ledger with its learning context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "venture-plan-context-")); roots.push(root);
+  const path = join(root, "plans.jsonl");
+  const plan = proposal("venture-origin", "high");
+  const ventureContext = { ventureId: "quiet-ops", phase: 2, inputRef: "response:r1", evaluationId: "eval-1", evidenceTier: "survey" as const, claimCeiling: "stated-need" as const, evidenceRefs: ["response:r1"], caveats: ["One response."] };
+  const envelope = { kind: "venture_experiment_plan" as const, version: "venture-experiment-handoff-v1" as const, plan, ventureContext, planApproval: "pending-muxin" as const, copyApproval: "pending-in-content" as const };
+  recordVentureExperimentPlan({ ...envelope, digest: ventureExperimentPlanDigest(envelope) }, path);
+  const row = readExperimentPlans(path)[0]!;
+  assert.equal(row.experimentId, "signals:venture-origin");
+  assert.deepEqual(row.ventureContext, ventureContext);
 });

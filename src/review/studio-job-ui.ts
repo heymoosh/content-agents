@@ -46,7 +46,7 @@ export function jobRoom(kind: string): JobRoom {
   // precisely so it lands here instead of under Content with the Formatter.
   if (kind === "scout" || kind === "draft-follow-up" || kind === "outreach-revise") return "Outreach";
   if (kind === "pull" || kind === "strategy" || kind === "insights" || kind === "ask-insights" || kind === "brief-revise") return "Signals";
-  if (kind === "venture-analysis" || kind === "venture-step") return "Venture";
+  if (kind === "venture-analysis" || kind === "venture-step" || kind === "venture-delivery") return "Venture";
   if (kind === "charles-draft") return "Charles";
   if (kind === "fiction-draft" || kind === "fiction-continuity" || kind === "fiction-promo") return "Fiction";
   // url/file/text/notes/continue/video/develop/develop-reply/revise/duplicate — the production crew
@@ -222,7 +222,7 @@ export function jobSettled(job: JobView): boolean {
 // blocked job is settled too, and stopping it would throw away a question she has not answered
 // yet, which is a decision nobody has made. Queued and running work only.
 export function jobStopOffered(job: JobView): boolean {
-  return job.status === "queued" || job.status === "running";
+  return job.kind !== "venture-delivery" && (job.status === "queued" || job.status === "running");
 }
 
 // Whether the job poll should fire this beat. Queued or running work obviously needs it, but so
@@ -251,7 +251,8 @@ export const JOB_ENQUEUE_ROUTES: readonly string[] = [
   "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check", "/api/fiction/promotion/draft", "/api/fiction/promotion/revise", "/api/venture/:slug/analyze", "/api/venture/:slug/run-step",
 ];
 export function enqueuesJob(path: string): boolean {
-  return JOB_ENQUEUE_ROUTES.includes(path) || /^\/api\/venture\/[^/]+\/analyze$/.test(path);
+  return JOB_ENQUEUE_ROUTES.includes(path) || /^\/api\/venture\/[^/]+\/(analyze|run-step)$/.test(path) ||
+    /^\/api\/venture\/[^/]+\/artifacts\/[^/]+\/(deliver|retry-delivery)$/.test(path);
 }
 
 // `roomOf` is injectable only so the Fiction-failure rule below can be exercised against a made-up
