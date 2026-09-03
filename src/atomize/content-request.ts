@@ -23,28 +23,47 @@ export function originForBrand(brand: BrandId): "human-inference" | "charles" | 
   return brand;
 }
 
+/**
+ * The folder's own slug. Not a namespaced id: the Content room's save and generate paths both
+ * refuse a request whose id is not the slug (`serve.ts` on POST /api/content/request,
+ * `jobs.ts` in `generateConfiguredContent`), so a prefixed id would make the folder impossible to
+ * configure — a worse bug than the invisibility this file fixes.
+ */
 export function atomizeRequestId(folder: string): string {
-  return `atomize:${basename(folder)}`;
+  return basename(folder);
+}
+
+/** Every derivatives directory a run writes into: the default one, plus one per approved cut. */
+function derivativeDirs(folder: string): string[] {
+  const dirs = [join(folder, "derivatives")];
+  const cuts = join(folder, "cuts");
+  if (existsSync(cuts)) {
+    for (const lens of readdirSync(cuts, { withFileTypes: true })) {
+      if (lens.isDirectory()) dirs.push(join(cuts, lens.name, "derivatives"));
+    }
+  }
+  return dirs.filter((dir) => existsSync(dir));
 }
 
 /**
- * Union of every `source_lines` reference the run's derivatives cite. Line numbers and `N-M`
- * ranges are the only two forms the request schema accepts, so anything else is dropped rather
- * than reshaped — a provenance record must not invent a reference.
+ * Union of every `source_lines` reference the run's derivatives cite, across the default
+ * derivatives directory and every `cuts/<lens>/derivatives/`. Line numbers and `N-M` ranges are
+ * the only two forms the request schema accepts, so anything else is dropped rather than
+ * reshaped — a provenance record must not invent a reference.
  */
 export function collectSourceLines(folder: string): (number | string)[] {
-  const dir = join(folder, "derivatives");
-  if (!existsSync(dir)) return [];
   const numbers = new Set<number>();
   const ranges = new Set<string>();
-  for (const name of readdirSync(dir).sort()) {
-    if (!name.endsWith(".md")) continue;
-    const { fm } = splitFrontmatter(readFileSync(join(dir, name), "utf8"));
-    const refs = fm.source_lines;
-    if (!Array.isArray(refs)) continue;
-    for (const ref of refs) {
-      if (typeof ref === "number" && Number.isInteger(ref) && ref > 0) numbers.add(ref);
-      else if (typeof ref === "string" && /^\d+-\d+$/.test(ref.trim())) ranges.add(ref.trim());
+  for (const dir of derivativeDirs(folder)) {
+    for (const name of readdirSync(dir).sort()) {
+      if (!name.endsWith(".md")) continue;
+      const { fm } = splitFrontmatter(readFileSync(join(dir, name), "utf8"));
+      const refs = fm.source_lines;
+      if (!Array.isArray(refs)) continue;
+      for (const ref of refs) {
+        if (typeof ref === "number" && Number.isInteger(ref) && ref > 0) numbers.add(ref);
+        else if (typeof ref === "string" && /^\d+-\d+$/.test(ref.trim())) ranges.add(ref.trim());
+      }
     }
   }
   return [...[...numbers].sort((a, b) => a - b), ...[...ranges].sort()];
@@ -116,15 +135,17 @@ function carriesStudioConfiguration(request: ContentRequestLike): boolean {
 type ContentRequestLike = Awaited<ReturnType<typeof readContentRequest>>;
 
 /**
- * Idempotent: a bare request this writer owns is refreshed. One written by any other path, and
- * one this writer wrote that Muxin has since configured in Studio, are left exactly as they are.
- * A re-run of `/atomize` never clobbers a decision she made.
+ * Idempotent: a bare request this writer owns is refreshed. Anything else is left exactly as it
+ * is, so a re-run of `/atomize` never clobbers a decision Muxin made. The id cannot make that
+ * call — every request for a folder is keyed on the slug — so ownership is judged on two things
+ * a bare atomize request never has: an origin from another path (`studio`, `venture`), or any
+ * Studio configuration saved onto it.
  */
 export async function writeAtomizeContentRequest(folder: string, brand: BrandId): Promise<WriteAtomizeRequestResult> {
   const input = buildAtomizeRequestInput(folder, brand);
   if (existsSync(join(folder, "content-request.json"))) {
     const existing = await readContentRequest(folder).catch(() => null);
-    if (!existing || existing.id !== input.id) {
+    if (!existing || existing.origin !== input.origin) {
       return { written: false, reason: "foreign-request-kept", id: existing?.id ?? "(unreadable)" };
     }
     if (carriesStudioConfiguration(existing)) {
@@ -147,8 +168,11 @@ async function main(): Promise<void> {
   const brandIndex = args.indexOf("--brand");
   if (brandIndex === -1 || !args[brandIndex + 1]) usage();
   const brand = requireBrandId(args[brandIndex + 1]);
-  const folder = args.filter((arg, index) => index !== brandIndex && index !== brandIndex + 1 && !arg.startsWith("--"))[0];
-  if (!folder) usage();
+  // Exactly one folder and no other flag. Silently taking the first of two folders would write a
+  // request for a piece the caller did not name.
+  const rest = args.filter((_, index) => index !== brandIndex && index !== brandIndex + 1);
+  if (rest.some((arg) => arg.startsWith("--")) || rest.length !== 1) usage();
+  const folder = rest[0];
   if (!existsSync(folder)) throw new Error(`content folder not found: ${folder}`);
 
   const result = await writeAtomizeContentRequest(folder, brand);

@@ -33,19 +33,22 @@ whose reference file now names steps 2–8.5).
 | R1.4 truthful origin so delivery policy resolves | test *"records the brand's own origin so delivery policy still resolves it"* (`human-inference` / `charles` / `fiction`, matching `brandForOrigin`) |
 | R1.5 idempotent, never clobbers Studio work | tests *"re-running refreshes its own request instead of duplicating it"*, *"never clobbers a request written by the Content room"*, *"never clobbers Studio configuration saved onto its own request"* |
 | R1.6 the real folder becomes visible | live run, below |
-| R1.7 bookkeeping only, changes nothing a run generates | no derivative, score, routing decision or `source_lines` value is read or written by this path |
-| R1.8 deterministic coverage + green gate | 11 new tests; full `npm run check` green |
+| R1.7 bookkeeping only, changes nothing a run generates | this path writes no derivative, score or routing decision, and derives zero variants. It *reads* `source_lines` (that is what the provenance record is built from) but never writes one back |
+| R1.8 deterministic coverage + green gate | 13 new tests; full `npm run check` green at 4,053 |
 
-**R1.5 detail.** A Content-room save keeps this writer's id (`mergeContentConfiguration` preserves
-`existing.id`), so the id alone cannot distinguish a bare `/atomize` request from one Muxin has
-since configured. The writer therefore also refuses to overwrite when the stored request carries
-an `approved-cut` provenance, any selected platform/media/treatment, or an enabled control.
+**R1.5 detail.** Every request for a folder is keyed on the folder's slug (see the audit round
+below), so the id cannot distinguish a bare `/atomize` request from one Muxin configured. The
+writer keeps the stored file untouched when its `origin` is not the one this run would write
+(`studio`, `venture`), or when it carries an `approved-cut` provenance, any selected
+platform/media/treatment, or an enabled control. It is *not* protected against a concurrent
+Studio save landing between the check and the write; this is a single-user local tool and that
+race is out of scope here.
 
 **R1.6, the acceptance test, run against the real folder.**
 
 ```
 $ npm run content-request -- content/2026-09-02-the-world-s-broken-what-do-we-do --brand human-inference
-written atomize:2026-09-02-the-world-s-broken-what-do-we-do — … is now visible in the Content room's approve step
+written 2026-09-02-the-world-s-broken-what-do-we-do — … is now visible in the Content room's approve step
 
 $ (listPieces() + page.ts's own filter, run against the real content root)
 total pieces: 26 | visible in approve step: 1
@@ -215,3 +218,26 @@ content request and 1 for the treatment brand guard.
 | Finding 6a (`image-carousel` unreachable) | Fix is in `fetch-substack.ts` and would move every `source_lines` number |
 | Finding 3c (`from /cycle` origin stamp) | `QUEUE_ORIGINS` is parsed by fixed column position in three scripts |
 | Muxin-only decisions | #420 accept/revert, the Postiz approval of a drafted row, the Scout `--theme` sentence, open questions (a)-(d), review of #420-#423 |
+
+
+## Cross-family audit round (2026-09-02)
+
+Two independent audits ran against the requirements above and the full diff: `codex exec`
+(GPT, read-only sandbox) and `grok -p`. Both returned **VERDICT: FIX**. Everything below was
+fixed and the gate re-run at 4,053 tests / 484 suites / 0 failures, typecheck clean.
+
+| Finding | Who | Fix |
+|---|---|---|
+| **Request id `atomize:<slug>` makes the folder impossible to configure.** `POST /api/content/request` refuses `request.id !== slug` (`serve.ts:1480`) and so does `generateConfiguredContent` (`jobs.ts:772`), while the GUI posts `id: s.slug`. This traded the invisibility bug for a worse one. | codex | Id is now the folder slug. Ownership is judged on `origin` plus the Studio-configuration check instead, with a test asserting `stored.id === basename(folder)`. |
+| **`--continue` never reached step 8.5**, so the Content room's own "Format for platforms" path still produced invisible drafts — the exact bug this lane exists to fix. | both | `continue-mode.md` and the three `SKILL.md` step-range references now say 2–8.5, with a note on why it matters for that path. |
+| **Cut-mode provenance silently dropped**: the collector scanned only `derivatives/`, not `cuts/<lens>/derivatives/`. | both | Scans every cut's derivatives too; new test. |
+| **No-pillar folders regressed to 400.** `readTreatment` only needs a brand when `pillars.length > 0`, but the handler demanded one first, so an un-routed folder that used to return 200 stopped doing so. | both | The handler passes `measurement` only when a brand resolves and lets `readTreatment` refuse when it actually needs one. The GUI now sends `&brand=` from `signalsBrand()`, so a measured read is bound to the brand Muxin has selected. |
+| **Unreadable request laundered into "no request"** by `.catch(() => null)` in the treatment handler. | codex | Only a *missing* file is tolerated; an unreadable one surfaces as the integrity error it is. |
+| **CLI silently took the first of two folders** and ignored unknown flags. | both | Rejects anything but exactly one folder and the `--brand` pair. |
+| `docs/content-room-alignment-plan.md` still asserted `/atomize` never writes a request; `docs/skills.md` still described `/cycle` as including review and publish. | both | Both corrected. |
+
+**Recorded, not fixed.** The CLI trusts its `--brand` rather than cross-checking `source.md`
+(it is the caller's declaration, and `/atomize` is already brand-scoped). `requiredMedia` can
+add `image-carousel` even when `distribution.media` omits it (`source-distribution.ts:64-66`) —
+this is finding 6a, already recorded above and out of lane B's scope. `revise-mode.md` does not
+call step 8.5; a revise run acts on a folder that already has a request.

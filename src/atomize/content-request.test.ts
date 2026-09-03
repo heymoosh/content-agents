@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { buildAtomizeRequestInput, collectSourceLines, writeAtomizeContentRequest } from "./content-request.js";
 import { readContentRequest, writeContentRequest } from "../review/content-request-store.js";
 
@@ -87,6 +87,19 @@ test("writes a request that round-trips through the store's own validation", asy
   // The two fields the Content room's approve filter actually gates on.
   assert.ok(stored.id);
   assert.ok(stored.originalInput);
+  // POST /api/content/request and generateConfiguredContent both refuse `request.id !== slug`,
+  // so a namespaced id would make the folder impossible to configure.
+  assert.equal(stored.id, basename(folder));
+});
+
+test("collects source_lines from every cut's derivatives, not only the default ones", () => {
+  const folder = folderWithRun({ sourceLines: "[4]" });
+  mkdirSync(join(folder, "cuts", "short", "derivatives"), { recursive: true });
+  writeFileSync(
+    join(folder, "cuts", "short", "derivatives", "bluesky-1.md"),
+    '---\nplatform: bluesky\nsource_lines: [21, "30-33"]\n---\nBody.\n'
+  );
+  assert.deepEqual(collectSourceLines(folder), [4, 21, "30-33"]);
 });
 
 test("re-running refreshes its own request instead of duplicating it", async () => {
@@ -102,7 +115,7 @@ test("re-running refreshes its own request instead of duplicating it", async () 
 test("never clobbers a request written by the Content room", async () => {
   const folder = folderWithRun();
   await writeContentRequest(folder, {
-    id: "studio-request-1",
+    id: basename(folder),
     origin: "studio",
     descriptor: "Configured in Studio",
     originalInput: "A verbatim thought.",
@@ -130,6 +143,7 @@ test("never clobbers Studio configuration saved onto its own request", async () 
   for (const configuration of configurations) {
     const folder = folderWithRun();
     const id = (await writeAtomizeContentRequest(folder, "human-inference")).id;
+    assert.equal(id, basename(folder));
     await writeContentRequest(folder, {
       id,
       origin: "human-inference",

@@ -1445,13 +1445,15 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           mechanismBody = (await readAuthoritativeApprovedCut(folder, lens)).body;
         }
         // Measured fit reads one brand's analytics. The piece's own request names its origin, so
-        // prefer that; a folder without one must say which brand explicitly. No default: an
-        // unbound read is exactly what `loadData` refuses.
+        // prefer that; otherwise take the brand the caller asked for. No default: an unbound read
+        // is exactly what `loadData` refuses. A folder with no pillar never reaches `loadData`, so
+        // it is still answered here rather than refused for a brand it does not need.
+        // A missing request is ordinary; an unreadable one is an integrity failure and must not be
+        // laundered into "no request".
         const requested = url.searchParams.get("brand");
-        const stored = await readContentRequest(folder).catch(() => null);
+        const stored = existsSync(join(folder, "content-request.json")) ? await readContentRequest(folder) : null;
         const brandId = brandForOrigin(stored?.origin) ?? (requested ? requestBrand(requested) : null);
-        if (!brandId) throw new Error("brand must be one of human-inference, charles, fiction");
-        json(res, 200, readTreatment(slug, { folder, mechanismBody, measurement: { brandId } }));
+        json(res, 200, readTreatment(slug, { folder, mechanismBody, ...(brandId ? { measurement: { brandId } } : {}) }));
       } catch (e) {
         json(res, 400, { error: String((e as Error)?.message ?? e) });
       }
