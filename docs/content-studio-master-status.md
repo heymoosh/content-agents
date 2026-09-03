@@ -1,6 +1,92 @@
 # Content Studio master status
 
-**Last reconciled:** 2026-09-02
+## START HERE — next session (written 2026-09-03)
+
+**Repo to work in:** `/Users/Muxin/Documents/GitHub/content-agents`, branch `main`.
+**This doc:** `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
+The `content-agents-worktrees/content-studio-master-status-recovery` worktree is merged and
+disposable — do not continue in it.
+
+**Read only this section to start.** Everything below it is history and reference; open a named
+section only when this one cites it.
+
+### Standing authorization (settles the old "nothing is approved to build" gate)
+
+Muxin owns *what* gets built, and she has already said it: **work through this document.** She does
+not pick starting items, sequence lanes, or approve mechanics — that is the agent's job. Earlier
+revisions of this doc froze `src/review/jobs.ts` "until she picks a starting item"; that freeze is
+**lifted**. The order below is not a preference, it is forced by the code (see "Room-model
+execution order"), so there was never anything for her to choose.
+
+What still needs her, and the only thing that does: **CLAUDE.md rule 7.** A change to
+content-generation LOGIC ships as a *draft* PR carrying an old-versus-new content sample, and waits
+for her. Everything else self-vet merges after a green local `npm run check`.
+
+### Do this next, in this order
+
+1. **Rebase the four held PRs onto `main`** — #421 (Fiction idea inbox), #422 (Outreach discovery),
+   #423 (Charles persona edit), #433 (per-brand Strategy). All four conflict with `main` today, so
+   none of them can even be *judged* until they rebase. Rebasing does not merge them; the rule 7
+   hold stands. While rebasing #433, write its PR body — it is empty, and part of its diff
+   (`loadData`'s `context?: StrategyMeasurementContext` parameter) is already identical on `main`,
+   so its real delta is far smaller than its 77-file diff suggests.
+2. **Then build lane A, strictly serial, in `src/review/jobs.ts`:** P1 (delete
+   `CONFIGURED_PLATFORM_LIMITS`, read `config/platforms.yaml`) → P2 (editor registry, un-fuse the
+   editor from provenance) → item 1 (Venture through the normal editor) → item 2 (Fiction and
+   Charles treated variants). Each one is content-generation LOGIC: **draft PR, old-versus-new
+   sample, hold.** Line references: "Room-model execution order" below.
+3. **Item 4 (Studio Start for the other rooms) stays blocked** until #421 and #423 land — they
+   already carry the per-room inbox code it needs. Do not rebuild it on `main`.
+4. **Lane C (item 5's port sequence) queues behind lane A** — same file, same region.
+
+### Ground rules that bite immediately
+
+- Run the gate `npm run check` **unsandboxed**; under the sandbox it reports ~196 phantom failures.
+  Green as of 2026-09-02 at **4,053 tests / 484 suites / 0 failures**.
+- A fresh worktree has no `node_modules` and no `.env`: run `npm run worktree:setup` first.
+- Studio: `npm run review` serves `http://localhost:4600` and dies with the terminal.
+- Hosted CI is `on: workflow_dispatch` only. The sole automatic PR check is `gitleaks`, a secret
+  scan that runs no test. **Dependabot PRs are therefore ungated** — run `npm ci && npm run check`
+  locally before merging any dependabot major. #430 landed red exactly this way.
+- Before landing any long-lived integration branch, run
+  `git merge-base --is-ancestor <held-branch> <integration-branch>` against every held PR head.
+  PR #420 auto-merged without review because a recovery branch silently contained its commits.
+- `bash scripts/repo-hygiene.sh --rescue` from the repo root is the standing state check. It
+  snapshots uncommitted work to `refs/wip/` without touching any working tree, index, or branch.
+
+### Two audits, one lesson
+
+Lane B was audited twice, cross-family (codex and grok). Codex caught a **blocker that grok and my
+own review both missed**: the new content-request writer keyed requests as `atomize:<slug>`, and
+both `serve.ts:1480` and `jobs.ts:772` refuse a request whose `id !== slug`, so every folder it
+touched would have become impossible to configure in the Content room — strictly worse than the
+invisibility it was fixing. **One auditor would have shipped it.** Run two, from different
+families, on anything that writes files other code reads.
+
+### Open, recorded, not scheduled
+
+- **PR #420 merged without Muxin's review** (a rule 7 breach; mechanism traced further down). Her
+  call: accept it (it is covered by the green gate) or revert. Nothing publishes either way — rule 2
+  still gates that through `review-queue.md`.
+- **Finding 6a:** `image-carousel` can never be auto-recommended for a Substack-ingested essay —
+  the rule needs three markdown headings and `htmlToText` emits none. The fix lives in
+  `fetch-substack.ts` and would shift every `source_lines` number, so it is recorded, not built.
+- **Finding 3c:** the `"from /cycle"` provenance stamp outlives the `/cycle` steps retired in 3a.
+- `revise-mode.md` does not call `/atomize` step 8.5; the content-request CLI trusts `--brand`
+  without cross-checking `source.md`; the check-then-write path is not concurrency-safe (a
+  single-user local tool, deliberately out of scope). All in
+  `docs/evidence-lane-b-2026-09-02.md`.
+
+### Branch hygiene state (2026-09-03)
+
+`repo-hygiene.sh --rescue` reports **no uncommitted work and no untracked paths** anywhere. Twenty
+local `agent/*`, `docs/*`, `feat/*` and `fix/*` branches remain unpushed and unmerged (tips
+2026-08-24 through 2026-08-31); they are local-only work, not residue, and were left alone. Run the
+script to list them.
+
+---
+
+**Last reconciled:** 2026-09-03 (START HERE section); body below reconciled 2026-09-02
 **Repository baseline:** merged `origin/main` commit `10e678e` (PR #419), plus local recovery-branch
 commits through `444b4d9` (`fix: isolate Fiction model drafting`) and the integrated Phase 4
 cross-system learning, per-brand partition, Outreach Phase 5, Fiction P2, and Charles persona-edit patches on the current recovery
@@ -182,8 +268,9 @@ what has been verified, and what remains.
   it is there: Venture bypasses the editor inside Content, Fiction and Charles are blocked from any
   treated variant, `/cycle` drafts into a place Content cannot review, Studio Start does server
   work for one room only, and most of the "make it for social" machinery lives in `/atomize` where
-  the Content room cannot reach it. **Nothing is approved to build.** No `src/review/jobs.ts` edit
-  should be made until she picks a starting item.
+  the Content room cannot reach it. **Superseded 2026-09-03:** the freeze on `src/review/jobs.ts`
+  is lifted — see "Standing authorization" at the top of this doc. Build in the code-forced order
+  and hold each PR under rule 7; she does not pick a starting item.
 - **Studio front-door room router (2026-09-02):** the capture router was a keyword match (7 of 16
   drafted probes landed in the right room). `POST /api/captures/classify` now asks the subscription
   analyst route (GPT via codex, Claude fallback, no tools, empty working directory) for the room
@@ -592,7 +679,9 @@ Content generation before it appears as pending work in Content. A generic claim
 
 The work recorded in decision 10. All six gaps are agreed; there is no preference order among them,
 so this is the order the code forces. Full inventory with file and line references:
-`docs/content-room-alignment-plan.md`. **Nothing below is approved to build yet.**
+`docs/content-room-alignment-plan.md`. **Approved to build (2026-09-03)** — see "Standing
+authorization" at the top of this doc. Rule 7 still holds each lane A and lane C PR as a draft
+carrying an old-versus-new sample.
 
 **Two prerequisites, both cheap, both blocking.**
 
