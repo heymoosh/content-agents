@@ -78,11 +78,64 @@ what has been verified, and what remains.
 ## Current handoff — 2026-09-02
 
 - **Continue in:** `/Users/Muxin/Documents/GitHub/content-agents-worktrees/content-studio-master-status-recovery`
-  on branch `recovery/content-studio-master-status`. The branch is local-only, has no upstream, and
-  has not been pushed; open no PR without Muxin's word. Start Studio with `npm run review` from the
+  on branch `recovery/content-studio-master-status`. The branch is pushed to
+  `origin/recovery/content-studio-master-status` with an upstream set, so nothing on it is
+  local-only any more. It has **not** landed on `main` and has no PR; open no PR without Muxin's
+  word. Start Studio with `npm run review` from the
   worktree after exporting the main-checkout `.env` (the worktree has none); it serves
   `http://localhost:4600` and dies with the terminal. Run the gate `npm run check` unsandboxed.
   The 2026-09-02 evening slices below are the latest work (see git log for hashes).
+- **Blocked on Muxin, carried into the next session (2026-09-02, night).** Each of these was
+  attempted and denied by the Claude Code permission classifier, not by a code problem. Run them
+  from the repo root; prefixing with `!` in the Claude Code prompt runs them in-session.
+  1. **Land the branch on `main`.** Approved but undone. `git push origin HEAD:main` and
+     `gh pr create` were both denied. The branch is 4 behind `main` (dependabot commits landed
+     after it forked) but `git merge-tree` reports the merge clean, so a rebase is not required.
+     Do not rebase inside the sandbox: it must rewrite `.claude/skills/*`, which is on the sandbox
+     deny list, and a half-finished rebase left 170 modified and 103 deleted files in this worktree
+     earlier tonight.
+  2. **Delete the 15th contained branch.** `agent/pattern-local-evidence-inventory` is provably
+     contained in `main` but is what the main checkout is sitting on, so it cannot be deleted until
+     that checkout moves: `git -C ~/Documents/GitHub/content-agents checkout main && git branch -D
+     agent/pattern-local-evidence-inventory`.
+  3. **Delete two proven-stale untracked paths** (`rm -rf` was denied; both are captured in
+     `refs/wip/` first, so they are recoverable):
+     `~/Documents/GitHub/content-agents/docs/content-studio-program/staging/reviewed-evidence-staging-20260826/`
+     — a strict predecessor of the committed `reviewed-evidence-staging-claude-20260826/` sibling
+     (same 70 evidence rows, one field fewer, written a day earlier), and
+     `~/Documents/GitHub/content-agents/.claude/worktrees/content-studio-ui-recovery/venture/e2e-phase3/`
+     plus `.../venture/e2e-probe-venture/` — end-to-end test residue in the real data root.
+  4. **Decide three modified files in the `content-studio-ui-recovery` worktree**, all of which
+     look like the same e2e residue: a backlog card that says outright "Filed by the end-to-end
+     suite to prove the write lands", a `review-queue.md` status flipped `discard` to `hold`, and a
+     `data/outreach/tracker.jsonl` row marking `client-aaron-hill` contacted by email on
+     2026-08-29. The tracker row is the one worth a human look — if that outreach really happened
+     it should be kept, and if it was the e2e suite writing into the real data root it should go.
+- **Repo state cleanup (2026-09-02, night):** the branch was pushed to origin (66 commits that had
+  existed only on this disk), and `npm run check` passed unsandboxed at **4040 tests / 484 suites /
+  0 failures** as the merge proof. Branch hygiene: every local branch was tested for containment
+  with `git merge-tree --write-tree origin/main <branch>` compared against `origin/main^{tree}` —
+  the only test that answers "would merging this change main at all", and the only one that catches
+  a squash-merge. **14 provably contained branches were deleted**; none was an open-PR head and all
+  are reflog-recoverable. An earlier count in this session's conversation ("24 safe, 15
+  conflicting") was wrong: that loop captured `head`'s exit code instead of git's through a pipe,
+  so the conflict half was never measured. `scripts/repo-hygiene.sh` (copied unmodified from
+  `voter-choice`, pure git, no baked-in paths) is now committed here and is the standing check —
+  run `bash scripts/repo-hygiene.sh --rescue` from the repo root, which snapshots every worktree's
+  uncommitted work to `refs/wip/<worktree>` without touching any working tree, index, or branch.
+  It found a **third worktree** nobody was tracking,
+  `/Users/Muxin/Documents/GitHub/content-agents/.claude/worktrees/content-studio-ui-recovery`
+  (on `agent/studio-functionality`), whose entire dirty state is end-to-end test residue written
+  into the real data root — the defect `4e611cc` fixed, from a run predating it.
+- **Open PR state (2026-09-02):** five draft PRs and two dependabot PRs. Four of the drafts (#423
+  Charles persona, #422 Outreach discovery, #421 Fiction inbox, #420 Venture handoff) are correctly
+  held under rule 7 — each is a content-generation LOGIC change, each names an old-vs-new review
+  packet under `docs/reviews/*.html`, and each is waiting on Muxin's eyes and nothing else. **#433
+  (per-brand Strategy) has an empty PR body** — it touches brief synthesis, which is on rule 7's
+  hold list, so it needs a body, a review packet, and an old-vs-new sample before it can be judged.
+  Only #423 conflicts with `main`. On merge method: Muxin's "commit depth is version history"
+  position argues for `--merge` or `--rebase` over the `--squash` habit, which would collapse the
+  67 commits she said cost nothing.
 - **Room-model architecture review (2026-09-02, evening):** Muxin stated the intended job of each
   room and asked what it would take to match it. Recorded as decision 10 under "Recorded product
   decisions"; the traced gap inventory with file and line references is
