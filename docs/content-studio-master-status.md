@@ -27,17 +27,43 @@ for her. Everything else self-vet merges after a green local `npm run check`.
 **The PR queue is empty. Every open PR was resolved on 2026-09-03 — start by building, not by
 triage.** What happened is under "PR hygiene" below; you do not need it to begin.
 
-1. **Build lane A, strictly serial, in `src/review/jobs.ts`:** P1 (delete
-   `CONFIGURED_PLATFORM_LIMITS`, read `config/platforms.yaml`) → P2 (editor registry, un-fuse the
-   editor from provenance) → item 1 (Venture through the normal editor) → item 2 (Fiction and
-   Charles treated variants). Each one is content-generation LOGIC: **draft PR, old-versus-new
-   sample, hold.** Line references: "Room-model execution order" below.
-2. **Item 4 (Studio Start for the other rooms) is UNBLOCKED as of 2026-09-03** — the per-room inbox
-   code it waited on is already on `main` (`src/fiction/idea-inbox.ts`, `src/review/serve-fiction.ts`,
-   `src/review/serve-charles.ts`). It was blocked only by draft PRs #421/#423, which turned out to
-   contain older copies of that same code and are now closed. Item 4 is lane B, touches different
-   files from lane A, and **can be built in parallel with step 1**. Build on `main`; do not resurrect
-   those branches.
+**Session of 2026-09-03 (evening) already shipped the first two pieces — start at P2.**
+
+- **P1 is DONE, held as draft PR #442** (`lane-a/p1-platform-limits-single-source`). It deletes
+  `CONFIGURED_PLATFORM_LIMITS` and resolves platform character limits from `config/platforms.yaml`
+  via a memoized `configuredPlatformLimit()`. It is a **pure identity refactor** — for every
+  platform reachable as a `variant.platform`, config `max_chars` equals the retired table value (or
+  both absent); `quote-card` is a media type, never a platform, so its 180-char config limit cannot
+  introduce a new gate. The PR body carries the full old-vs-new limits table (delta: none). Held
+  under rule 7 for Muxin's one-glance review; a regression test pins the values. **P2 branches on
+  top of #442, not on `main`.**
+- **Item 4 (Fiction leg) is DONE and MERGED — PR #443** (`d682d77`). Studio Start
+  (`POST /api/captures/start`) now takes an optional `room` (default `"Content"`, backwards
+  compatible) and, for `room: "Fiction"`, lands the capture as a **durable inbox idea** via the
+  existing `createIdea()` — `needs-review`, **no model job runs**. The client Fiction branch calls
+  Start instead of prefilling `#ficIdea`. Verified by an isolated HTTP integration test
+  (`CONTENT_AGENTS_HOME` sandboxed so it never touches the real fiction inbox) that also asserts no
+  job is enqueued and the idea stays unclassified, plus two cross-family audits (grok SHIP; codex
+  FIX on test strength, applied). Not logic → self-vet merged.
+  - **Correction to the plan's premise:** a routed capture is **not** lost on reload.
+    `takeCaptureTo` already saves it via `POST /api/captures` before advancing, so every capture
+    persists in `studio-captures.json` tagged with its room. The real gap was **promotion into the
+    room's own item type**, which item 4 now closes for Fiction.
+  - **Charles, Venture, Outreach remain a product question for Muxin.** None has a durable
+    lightweight room-item store to reuse: Charles's only create is a draft-*generation* job,
+    Venture's is the heavy `commitIntake`, Outreach's `intakeManual` needs a name/URL and has no
+    endpoint. Start **fails closed** for them (clear error). Inventing "a Charles input" / "a
+    Venture note" / "an Outreach capture" store would be a product-shape guess (HOLD, rule 7 /
+    CLAUDE.md). **Muxin: say what each of those should become and Start can create it.**
+
+Remaining, in order:
+
+1. **Build the rest of lane A, strictly serial, in `src/review/jobs.ts`, on top of #442:** P2
+   (editor registry, un-fuse the editor from provenance) → item 1 (Venture through the normal
+   editor) → item 2 (Fiction and Charles treated variants). Each is content-generation LOGIC:
+   **draft PR, old-versus-new sample, hold.** Line references: "Room-model execution order" below.
+2. **Lane B is otherwise clear** (item 4 Fiction done; item 6, 3a, the content-request fix done).
+   The only open lane-B work is the three deferred Start rooms above, which need Muxin's decision.
 3. **Lane C (item 5's port sequence) queues behind lane A** — same file, same region.
 
 ### Ground rules that bite immediately
@@ -145,7 +171,8 @@ same file:
 
 ---
 
-**Last reconciled:** 2026-09-03 (START HERE section); body below reconciled 2026-09-02
+**Last reconciled:** 2026-09-03 evening (START HERE + Room-model order: P1 done as held PR #442,
+item 4 Fiction leg merged as PR #443); body below reconciled 2026-09-02
 **Repository baseline:** merged `origin/main` commit `10e678e` (PR #419), plus local recovery-branch
 commits through `444b4d9` (`fix: isolate Fiction model drafting`) and the integrated Phase 4
 cross-system learning, per-brand partition, Outreach Phase 5, Fiction P2, and Charles persona-edit patches on the current recovery
@@ -753,11 +780,12 @@ carrying an old-versus-new sample.
 
 **Two prerequisites, both cheap, both blocking.**
 
-- **P1 — one source of truth for platform limits.** `src/review/jobs.ts:438-440` hardcodes
-  `CONFIGURED_PLATFORM_LIMITS`; `config/platforms.yaml` holds `max_chars` as configuration and is
-  what `src/atomize/validate.ts` already reads. Settle on the config file and delete the table.
-  This must land **before** item 1, because item 1 wires Venture into the limit check and would
-  otherwise entrench the wrong source of truth in a second place.
+- **P1 — one source of truth for platform limits. DONE (2026-09-03), held as draft PR #442.**
+  `src/review/jobs.ts` no longer hardcodes `CONFIGURED_PLATFORM_LIMITS`; a memoized
+  `configuredPlatformLimit()` reads `config/platforms.yaml` `max_chars`, the same source
+  `src/atomize/validate.ts` uses. Pure identity refactor (delta: none — see PR body's limits table);
+  a regression test pins every value. It landed **before** item 1, as required, so item 1 wires
+  Venture into the config-backed limit check rather than the retired table. **P2 branches on #442.**
 - **P2 — the editor registry, and un-fusing the editor from provenance.** Replace the single
   `configuredColdFeedEditorPrompt` (`jobs.ts:443-461`) with a registry of named editors, one per
   source kind, each a complete independent instruction set carrying its own voice rubric and its
@@ -802,12 +830,16 @@ carrying an old-versus-new sample.
   from the piece's own request origin, then an explicit `?brand=`, and 400s naming the missing
   brand if neither exists. No Human Inference default.
   Evidence: `docs/evidence-lane-b-2026-09-02.md`.
-- **Item 4 is UNBLOCKED (2026-09-03).** It was recorded a day earlier as blocked on Muxin's
-  decision about draft PRs #421/#423, which carried the durable per-room inboxes it needs. Those
-  PRs turned out to hold *older copies* of code already on `main`: `src/fiction/idea-inbox.ts`,
-  `src/review/serve-fiction.ts` and `src/review/serve-charles.ts` are all there today, in a newer
-  form. Both PRs are closed. **Build item 4 on `main`, in lane B, in parallel with lane A** — it
-  touches different files. Do not resurrect those branches.
+- **Item 4 — Fiction leg DONE and MERGED (2026-09-03), PR #443 (`d682d77`).** Studio Start
+  (`POST /api/captures/start`) takes an optional `room` (default `"Content"`), and for Fiction lands
+  the capture as a durable inbox idea via `createIdea()` — `needs-review`, no model job, client no
+  longer prefills `#ficIdea`. Charles, Venture and Outreach still have no durable lightweight
+  room-item store to reuse (Charles's only create is a draft-generation job; Venture's is heavy
+  `commitIntake`; Outreach's `intakeManual` needs a name/URL and has no endpoint), so Start fails
+  closed for them — **defining what a Charles input / Venture note / Outreach capture should become
+  is an open product question for Muxin** (see "Do this next"). Correction to the original premise:
+  a routed capture is not lost on reload — `takeCaptureTo` persists it via `POST /api/captures`
+  before advancing; the real gap was promotion into the room's own item type.
 - **Item 5 is its own sequence:** the platform routing gate first (it decides which variants get
   made at all), then `validate`, then the remaining seven capabilities, which are largely
   independent of one another once those two land.
@@ -817,7 +849,7 @@ carrying an old-versus-new sample.
 | Lane | Work | Touches | Notes |
 |---|---|---|---|
 | A | P1, P2, item 1, item 2 | `src/review/jobs.ts` | Strictly serial within itself: one file, one region. |
-| B | Item 4 (Studio Start for the other rooms). Item 6, 3a and the `/atomize` content-request fix are all DONE. | `serve.ts`, `page.ts`, skills, verification | No overlap with lane A at all. **Item 4 is the only thing left in this lane and is unblocked as of 2026-09-03** — build it in parallel with lane A. |
+| B | Item 4 Fiction leg DONE (PR #443). Item 6, 3a and the `/atomize` content-request fix are all DONE. | `serve.ts`, `page.ts`, skills, verification | No overlap with lane A at all. **Only remaining lane-B work is item 4's Charles/Venture/Outreach Start legs, blocked on Muxin naming what each room's captured item should be.** |
 | C | Item 5's port sequence | `jobs.ts` generation path | **Collides with lane A on the same file.** Queue C behind A, or split the generation module before starting either. |
 
 **One small independent fix worth doing early — DONE (2026-09-02, evening).** `/atomize` wrote no
