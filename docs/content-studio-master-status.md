@@ -111,8 +111,8 @@ what has been verified, and what remains.
   `.claude/skills/strategy/SKILL.md`, and — caught by the audit below, and the ones that actually
   matter — `.claude/skills/atomize/SKILL.md` step 3.5, `.claude/skills/develop/SKILL.md`, and this
   repo's `CLAUDE.md` pipeline table. Drafting then ran on the same folder and produced 15
-  derivatives (11 text, 3 quote-card captions, 1 card line), each with `source_lines`, and 15
-  `pending` rows; `npm run validate` on the real output returned `ok: 15 derivative(s) within
+  derivatives (11 text, 3 quote-card captions, 1 card line), each with `source_lines`, and 14
+  `pending` rows (the card's own quote line carries no row); `npm run validate` on the real output returned `ok: 15 derivative(s) within
   platform limits`, so the routing gate held on live drafting, not just in tests. The Claude CLI
   hit a session limit mid-attempt and the leg was re-run on the codex CLI — same subscription
   route, $0 either way.
@@ -127,7 +127,11 @@ what has been verified, and what remains.
   is proven live but its decisions reflect a thin snapshot, not Muxin's history; source triage ran
   but had nothing to narrow (`frame-native`, no beat-2, no case); no scoped brief existed so no
   directives applied and no community derivative was drafted; no image or video was rendered
-  (no-spend constraint), so the quote-card rows point at a PNG that does not exist yet; and
+  (no-spend constraint), so the quote-card rows point at a PNG that does not exist yet; the run
+  went through the `/atomize` skill rather than the Content room's `POST /api/content/generate`,
+  so the blind cold-feed editor, the treated/control pairing, the mechanical voice gate and the
+  source-line boundary check never ran on it, and with no `content-request.json` written the
+  folder is invisible to the Content room's own approval step; and
   nothing was approved, scheduled, or published. Evidence:
   `docs/evidence-base-loop-2026-09-02.md`.
 - **Postiz batch drain (2026-09-02):** a 429 on create releases the claimed slot, records a

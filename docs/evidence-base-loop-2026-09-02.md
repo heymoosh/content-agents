@@ -19,7 +19,7 @@ material, seven of which are the stale pending rows in the open questions.
 | Front door, prose | `routeCapture(<first ~1,100 chars of source.md>)` | `room: Content`, method `model`, engine `gpt-codex`, reason "This is Muxin's nonfiction reflection on AI, society, power, and collective leverage." First time the router has been read against Muxin's own writing rather than an invented probe. |
 | Routing | `npx tsx src/strategy/route.ts --brand human-inference --pillar civic-tech,human-ai --folder <folder>` | Wrote `routing.md`. **Found a usage defect — see below.** |
 | Source triage | `npm run tag-source` (inside `/atomize`) | `source_class: frame-native`, `source_class_beat2: not_found`, `source_class_case: not_found` stamped on `source.md`. |
-| Drafting | `/atomize --brand human-inference --continue <folder>` | 15 derivatives (11 text across x/linkedin/bluesky/mastodon/threads, 3 quote-card captions, 1 card line), each with `source_lines` frontmatter. 15 `pending` rows in the folder's `review-queue.md`. Nothing rendered, nothing approved. |
+| Drafting | `/atomize --brand human-inference --continue <folder>` | 15 derivatives (11 text across x/linkedin/bluesky/mastodon/threads, 3 quote-card captions, 1 card line), each with `source_lines` frontmatter. 14 `pending` rows in the folder's `review-queue.md` (the 15th derivative, `quote-card-1.md`, is the card's quote line, which carries no queue row of its own). Nothing rendered, nothing approved. |
 | Validate | `npx tsx src/atomize/validate.ts <folder>` | `ok: 15 derivative(s) within platform limits`. No derivative exists for a `skip` platform, so the routing gate held on real output. |
 
 ## Defect found and fixed: HTML entities survived ingest
@@ -86,6 +86,14 @@ YAML-safe.
 
 ## What this run does NOT prove
 
+- **It did not exercise the Content room's generation path, so the blind cold-feed editor never
+  ran.** `/atomize --continue` writes derivatives straight to disk from the skill. The cold-feed
+  editor lives only in `generateConfiguredContent` (`src/review/jobs.ts:814`), reached through
+  `POST /api/content/generate`. No derivative in this folder carries an `editor_pass:
+  cold-feed-v1` stamp, and the folder has no `content-request.json`, which is also why the
+  Content room's step 3 shows nothing for it (`src/review/page.ts:1616` filters on a request).
+  Treatments, the control/treated variant pairing, the mechanical `config/voice.yaml` gate, and
+  the source-line boundary check are all in that same path and are likewise unexercised here.
 - **The routing decisions are cold-start, not data-driven.** All 20 posts in this worktree's
   `data/analytics.db` have a null `pillar`, so every platform came back `cold-start (no tagged
   data yet), posting broadly to gather signal`. The July folders show what a data-backed decision
