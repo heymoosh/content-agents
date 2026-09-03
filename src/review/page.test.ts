@@ -2423,7 +2423,8 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(section.includes('post("/api/captures/start"'), "Content starts the advisor-only action");
   const advanceBody = section.slice(section.indexOf("async function advanceCaptureSafely"), section.indexOf("async function takeCaptureTo"));
   assert.ok(advanceBody.includes('setRoom("content")'), "Content opens the owning room before the advisor-only action");
-  assert.ok(section.includes('idea.value=text'), "Fiction prepares the inbox idea without auto-classifying");
+  assert.ok(advanceBody.includes('post("/api/captures/start",{room:"Fiction"'), "Fiction Start creates a durable inbox idea on the server, not a lost-on-reload textarea prefill");
+  assert.ok(!advanceBody.includes('idea.value=text'), "Fiction no longer prefills the raw idea textarea; the idea is a durable record");
   assert.ok(section.includes('ficPage="inbox"'), "Fiction opens its safe front door");
   assert.ok(section.includes('setOutreachSub("leads")'), "Outreach opens the required lead chooser");
   assert.ok(section.includes('charlesPage="input"'), "Charles opens its safe Input page");

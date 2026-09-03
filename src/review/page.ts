@@ -6580,11 +6580,11 @@ async function advanceCaptureSafely(room, text){
   }
   await Promise.resolve(setRoom(room.toLowerCase()));
   if(room==="Fiction"){
+    const r=await post("/api/captures/start",{room:"Fiction",text:text});
+    if(!r.ok) throw new Error(r.error||"Could not add this to the Fiction inbox.");
     await loadFiction();
     ficPage="inbox"; renderFiction();
-    const idea=$("#ficIdea"); if(idea&&!idea.value.trim()) idea.value=text;
-    idea?.focus();
-    return "Your idea is in the Fiction inbox. Review it before classification.";
+    return "Your idea is a durable Fiction inbox record now. Open it to classify before approval.";
   }
   if(room==="Outreach"){
     setOutreachSub("leads");
