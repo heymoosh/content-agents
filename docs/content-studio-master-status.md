@@ -125,6 +125,14 @@ families, on anything that writes files other code reads.
   breaches; mechanism traced above and further down). Her call on all five: accept them (they are
   covered by the green 4,053-test gate) or revert. Nothing publishes either way — rule 2 still gates
   that through `review-queue.md`.
+- **P1 audit follow-up — content-request selections are not validated against a vocabulary.**
+  `buildContentRequest()`'s `selections()` (`content-request.ts:154`) accepts any non-empty string
+  for `platforms[]`/`media[]`; the GUI only offers the `CONTENT_CONFIG_OPTIONS` set, but a direct
+  `/api/content/request` caller could pass e.g. `platforms: ["quote-card"]` and make
+  `variant.platform === "quote-card"`. After P1 that now gates the body at config's 180 (stricter
+  than the retired table's no-gate — see PR #442's body). The fix is a shared server-side platform/
+  media vocabulary to validate against; none exists today (`CONTENT_CONFIG_OPTIONS` is client-only),
+  so it is its own small change, not part of P1's table deletion. Recorded, not built.
 - **Item-4 follow-up — a promoted capture still reads as "waiting."** The Content Start path stamps
   a capture's `startedAt`/`jobId` through `startCapture`; item 4's Fiction path uses
   `saveCapture` + `createIdea` and stamps nothing, because `markCaptureStarted` requires a `jobId`
