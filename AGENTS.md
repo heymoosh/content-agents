@@ -27,6 +27,47 @@ use `AGENTS.md` so any agent can discover them consistently.
 - Maturity: when you finish a feature or open a PR (not small fixes), check the next rung in `docs/maturity.md` and propose it if its trigger fires — never auto-apply.
 - Living document: when a correction recurs, add the rule here.
 
+## Keeping the state clean
+
+These bind every agent — Claude, Codex, Grok, or any other — working anywhere in this repository
+or its worktrees. They exist because stale state is what actually confuses a later session, and
+none of it comes from having a long commit log.
+
+**Commit depth costs nothing. Never rewrite history to reduce noise.** Git materializes only the
+tip: check out a branch and the files on disk are the newest version of each file. The commits
+behind them do not co-exist with them, do not get read, and do not dilute anything. A later commit
+to a file fully replaces the earlier one. Squashing or pruning to "clean up" buys nothing and
+destroys the provenance that makes a reversed decision auditable later. Do not offer it, do not do
+it unasked.
+
+What actually rots is the working tree and the prose. Three rules, in the order they bite:
+
+1. **One on-disk copy per artifact.** This is the only real poison: the same filename existing
+   twice with contradictory content, both greppable, either one reachable by a search. Whenever a
+   file appears in two places, ask which one is committed. The uncommitted one is either newer
+   (commit it) or stale (delete it). Never both. A variant that needs to survive belongs on a
+   branch, never as an untracked shadow beside the committed file.
+2. **Nothing valuable stays uncommitted.** Untracked work is the only work git cannot recover — a
+   `git clean` destroys it irrecoverably, and nothing warns you first. Committing early is the
+   protection and it is cheap. `git status --short` showing untracked source files is the smell;
+   commit them, even as work in progress, rather than leaving them stranded. This is the opposite
+   of pruning: the fix is more commits, sooner.
+3. **When a decision reverses, edit the sentence that states it.** A file is overwritten by its
+   successor; a sentence is not. A document that still asserts a retired gate stays wrong until
+   somebody edits that assertion, and appending a correction underneath leaves both claims live and
+   equally readable. Edit the claim in place. Where the superseded fact is still worth keeping,
+   keep it labelled — "retired as of <date>, diagnostic only" — so the record survives and cannot
+   be mistaken for the current rule. `docs/content-studio-master-status.md` and
+   `docs/content-room-alignment-plan.md` are the two documents most likely to need this.
+
+Two consequences for how work is arranged:
+
+- **Leave the primary checkout on `main`.** Do feature work in a branch or worktree. A primary
+  checkout sitting on a feature branch makes "which version is current?" genuinely hard to answer
+  for the next session that opens the repository cold.
+- **A planning document that lives only on an unpushed branch is invisible to anyone reading
+  `main`.** Land decision records promptly, or say plainly which branch holds the current one.
+
 ## Bounded verification contract
 
 For context-heavy or authenticated model workflows, keep proof of behavior separate from adjacent

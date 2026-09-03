@@ -497,6 +497,67 @@ Content generation before it appears as pending work in Content. A generic claim
 | Experiment lifecycle | Signals ranks and proposes content-growth experiments; Muxin approves plans in Signals; Experiment creates tagged work through the canonical Content generator; Content remains the sole copy-review and publishing surface; Signals later interprets grouped outcomes. Venture owns venture-learning experiments and surveys within one venture's hypothesis chain. | **Phase 3 implementation complete, including the 2026-08-31 cross-family audit corrections.** Signals can evaluate a persisted normal Content request against a digest-bound, Muxin-approved Phase 2 dossier through the wired Claude, Grok, or Codex subscription-CLI seam; the production route records either an honest no-experiment result or a ranked body-free plan. The approval view exposes the full science case and explicitly declared capacity. Generic hypotheses and missing or insufficient capacity fail closed, decline rationale is durable, and the retired legacy Grow CLI can no longer put copy into an approved queue state. Approved plans still use canonical Content generation, concurrent experiment identities, and pending-copy review. The measurement loop matches live provider identities to the latest analytics and attributed outcomes, then presents collecting/ready status and a separately reviewed keep/revise/reject interpretation. No path selects a winner or changes routing automatically. | Red-green tests cover production-route wiring with injected runners, canonical dossier replay, body-free prompts, honest abstention, complete approval evidence, generic-hypothesis rejection, capacity deferral, durable decline rationale, legacy pending-copy behavior, canonical generation, exact provider matching, readiness, and separately reviewed interpretation. On 2026-09-01, one fresh authenticated Claude request completed through the live production HTTP proposal route and recorded exactly one body-free, medium-confidence proposed plan; the persisted request and source were unchanged, and no decision, generation, handoff, publication, or provider activity occurred. The request used `curl` against the disposable live server because no browser backend was connected; it was not a browser-operated proof. A cross-family Codex audit found no P0/P1 issue and one P2 human-review caveat: the proposed guardrail duplicated the primary metric and its effect/noise threshold was underspecified, so the proposal has not passed scientific approval. | Exercise the proposal from the Studio browser, have Muxin review the plan's scientific quality, then run the first approved experiment through publication and data collection. Metrics absent from provider exports remain honestly collecting until explicit attributed rows enter `data/outcomes.jsonl`. Multi-pair operational cadence remains bounded by declared Content capacity and human review. |
 | Cross-system learning and Venture handoff | Signals may offer analytics/experiment learning to one named Venture; Venture-native reader responses enter from their existing manually judged intake. Muxin separately reviews every recommendation. | **Phase 4 deterministic implementation complete on the current branch, including the 2026-09-01 audit corrections.** Engagement → attention; qualitative/comments → resonance; surveys → stated-need; directional → directional-comparison; controlled → bounded-comparison; funnel → behavioral-intent; business → observed-demand. Ordinary account-level analytics and redacted comment/reply/DM/email observations are listed from `data/analytics.db` as reviewable Venture learning sources; exact text and respondent hashes never enter the evaluator. Signals remains analytics/pattern prioritization; Venture remains contextual hypothesis authority for lead-generation, product, offer, and strategy. Accepted learning may recommend no-change/change/test without upgrading evidence. Signals-origin adoption creates one internal, non-publishable `signals-input` artifact plus an append-only canon decision; Venture-native surveys/comments/emails/DMs use their existing explicit response-intake judgment instead of a redundant Signals gate. Neither path clears a checkpoint, advances a phase, publishes, selects a winner, changes configuration, or claims demand automatically. Accepted tests flow through the canonical Experiment planner, normal plan approval, canonical Content drafting/review/publishing/measurement, then back to Signals and Venture learning; the normal queue supports multiple experiments. | Deterministic contract, lifecycle, lineage, tier/ceiling, tamper, idempotency, ordinary-engagement intake, redaction, and rules-parity coverage. No operational live proof is claimed until a real reviewed loop is run. | Run one complete reviewed loop with real evidence after operational verification is authorized; preserve deterministic-only status meanwhile. |
 
+## Room-model execution order — start here in a new session
+
+The work recorded in decision 10. All six gaps are agreed; there is no preference order among them,
+so this is the order the code forces. Full inventory with file and line references:
+`docs/content-room-alignment-plan.md`. **Nothing below is approved to build yet.**
+
+**Two prerequisites, both cheap, both blocking.**
+
+- **P1 — one source of truth for platform limits.** `src/review/jobs.ts:438-440` hardcodes
+  `CONFIGURED_PLATFORM_LIMITS`; `config/platforms.yaml` holds `max_chars` as configuration and is
+  what `src/atomize/validate.ts` already reads. Settle on the config file and delete the table.
+  This must land **before** item 1, because item 1 wires Venture into the limit check and would
+  otherwise entrench the wrong source of truth in a second place.
+- **P2 — the editor registry, and un-fusing the editor from provenance.** Replace the single
+  `configuredColdFeedEditorPrompt` (`jobs.ts:443-461`) with a registry of named editors, one per
+  source kind, each a complete independent instruction set carrying its own voice rubric and its
+  own `editor_pass:` stamp (decision 10b2). In the same change, split the `jobs.ts:804` gate
+  `treated.length && authoritative?.sourceLines.length` into its two separate questions:
+  scannability and traceability are different concerns. Items 1 and 2 both need this; building it
+  once first is the difference between one change and the same change made twice incompatibly.
+
+**Then the forced chain.**
+
+- **Item 1, Venture, after P2.** Delete the Venture branch at `jobs.ts:793-803` and let Venture
+  take the same editor pass and limit check as every other origin. It must come after P2: deleting
+  the branch drops Venture through to the `:804` gate, which is false for it
+  (`resolveConfiguredAuthoritative` returns `null` for Venture), so without P2 one bypass is simply
+  replaced by another. Venture keeps its scoped tracing exception (`claim_refs`, not
+  `source_lines`); that exemption is from tracing, not from the editor.
+- **Item 2, Fiction and Charles, after item 1** — only because both rewrite the same region of
+  `jobs.ts`. They are independent in design and serial in merge. Item 2's own new piece, the
+  mechanically checkable restricted treatment kind (every sentence in the treated body must already
+  appear in the approved body), is blocked by nothing and can be written and tested while item 1 is
+  in review. Lifting the block at `jobs.ts:608-610` is the last step, not the first.
+- **Item 3 splits.** `/cycle`'s review and publish steps duplicate what the Content room already
+  owns and can be retired immediately, dependent on nothing (**3a**). Its drafting step cannot be
+  retired until Content can do what `/atomize` does, so **3b depends on the item 5 port** —
+  retiring drafting first would delete the only working path.
+- **Item 5 is its own sequence:** the platform routing gate first (it decides which variants get
+  made at all), then `validate`, then the remaining seven capabilities, which are largely
+  independent of one another once those two land.
+
+**What is genuinely parallel: two lanes, not three.**
+
+| Lane | Work | Touches | Notes |
+|---|---|---|---|
+| A | P1, P2, item 1, item 2 | `src/review/jobs.ts` | Strictly serial within itself: one file, one region. |
+| B | Item 4 (Studio Start for the other rooms), item 6 (media auto-selection live check), 3a, and the `/atomize` content-request fix below | `serve.ts`, `page.ts`, skills, verification | No overlap with lane A at all. Start item 6 first: it is verification with no code, it is cheap, and it may change item 5's scope. |
+| C | Item 5's port sequence | `jobs.ts` generation path | **Collides with lane A on the same file.** Queue C behind A, or split the generation module before starting either. |
+
+**One small independent fix worth doing early.** `/atomize` writes no `content-request.json`, which
+is the entire reason the 14 pending rows in
+`content/2026-09-02-the-world-s-broken-what-do-we-do` are invisible in Content's approve step
+(`page.ts:1616`). Making `/atomize` write one is small, depends on nothing above, and makes
+already-drafted work reviewable now instead of after the item 5 port. It belongs in lane B.
+
+**Rule 7 split.** Lane A and lane C change what future runs generate: content-generation LOGIC,
+each needing a draft PR carrying an old-versus-new content sample, not a self-vet merge. Lane B is
+not logic — routing, verification and bookkeeping — with one exception: **3b** removes a drafting
+path and holds.
+
 ## Prioritized remaining work
 
 ### P0: safety and truthfulness before broader use
