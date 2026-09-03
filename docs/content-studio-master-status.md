@@ -67,9 +67,14 @@ Remaining, in order:
    (editor registry, un-fuse the editor from provenance) → item 1 (Venture through the normal
    editor) → item 2 (Fiction and Charles treated variants). Each is content-generation LOGIC:
    **draft PR, old-versus-new sample, hold.** Line references: "Room-model execution order" below.
-2. **Lane B: the per-room queues (decision 11) are the main open work** — mostly UI + input-routing,
-   self-vet mergeable (the Fiction confirm-before-canon prompt and any Charles suggest-type logic
-   hold). Item 4 Fiction, item 6, 3a, and the content-request fix are done.
+2. **Lane B: the per-room queues (decision 11) are the main open work** — UI + input-routing, all
+   self-vet mergeable (routing/gates/classification don't compose content, so nothing here holds;
+   only story/canon and Charles-persona *composition* holds, and this touches neither). Item 4
+   Fiction, item 6, 3a, and the content-request fix are done. **Build order REVISED to
+   contracts-first (Codex review, 2026-09-03):** slice 1 (shared `roomQueueHtml()` + Fiction queue)
+   is built and green as **PR #448 but HELD as a draft** — the durable capture/state contracts +
+   Fiction confirm gate (slice 1.5) come first, then routing/queues. Full checklist under decision
+   11 below.
 3. **Lane C (item 5's port sequence) queues behind lane A** — same file, same region.
 
 ### Ground rules that bite immediately
@@ -1119,9 +1124,76 @@ are ordinary operations, not gates.
    Studio Start routing today has only Content + Fiction branches (`serve.ts:1420-1444`); the
    Venture and Charles branches and all three bottom-of-home queues are net-new. Rule 7: this is
    UI + input-routing, not content-generation logic (it changes where a capture lands and how a
-   room is browsed, not the words a run produces), so it self-vet merges — except the Fiction
-   confirm-before-canon chat prompt and any Charles "suggest output type from the input" logic are
-   judgment prompts and hold for Muxin's review when their wording is authored.
+   room is browsed, not the words a run produces), so **all of it self-vet merges**. The Fiction
+   confirm-before-canon step is a routing/gate and a Charles "suggest output type" step is
+   classification — neither *composes* content, so by the narrowed rule 7 (only changes to how
+   content is *created* hold) neither holds. What holds is unchanged and out of scope here: the
+   actual composition of story/canon prose (Build 2 fiction-drafting logic) and Charles persona
+   prose (Build 4) — this decision touches neither. **Confirmed by Muxin 2026-09-03** when an
+   adversarial review pushed back: the only thing she wants a held PR on is *actual fiction chapter
+   prose*, where she comments line-by-line on the passage. Nothing in decision 11 — queues,
+   routing, Venture disambiguation, Charles output-type multi-select/fan-out, the Fiction
+   confirm-before-canon gate — is that, so the whole feature self-vet merges.
+
+### Decision 11 build order — REVISED to contracts-first (Codex review, Muxin 2026-09-03)
+
+A cross-family adversarial review (Codex/OpenAI, repo-grounded) of the whole decision-11 plan
+returned **"slicing not sound as-is: build the durable capture/state contracts and the Fiction
+confirm gate first, then the queues."** Muxin chose **contracts-first, hold #448**. So the order is
+now:
+
+- **Slice 1 (built, PR #448, GREEN 4056/4056, HELD as a draft — do not merge yet).** Shared
+  `roomQueueHtml()` + Fiction bottom queue reading `ficInbox` needs-review. Kept open so the helper
+  + wiring are ready to re-target. It is a shortcut into Fiction's *existing* classifier →
+  "Approve for canonical update" path (`idea-inbox.ts` writes canon), i.e. the very path the
+  confirm gate replaces — so it must not ship before the gate exists. (Fix landed in this branch:
+  the client `<script>` is inside a template literal, so a source `\s` is eaten and emits `/s+/g`;
+  regexes in that region need `\\s`. `page.test.ts` enforces even-length backslash runs — run it.)
+- **Slice 1.5 (NEW, do first): the capture/state contracts.** These are the foundation findings
+  3–10 of the review demand. Build and test them before any Charles/Venture queue:
+  1. **Durable capture identity + protocol.** Today a capture id is derived from room+trimmed text
+     (`captures.ts:24-31`) and the client resends only `{room,text}`. Ambiguous Venture captures
+     need a *persisted* `awaiting-venture` record with a stable id, a candidate snapshot, and a
+     version; the `{needsVenture,candidates}` response must carry that id; the answer goes to an
+     **idempotent** endpoint taking `captureId` + selected slug + expected version
+     (compare-and-swap), server-validating the slug. Guards reload, two-tab divergence, retry
+     dupes, venture-deleted-mid-select.
+  2. **Capture schema as an append-only event log + room-owned projections.** `StudioCapture` v1
+     (`captures.ts:7-20`) holds only room/text/timestamps/job — no venture slug, source-item id,
+     lifecycle, Charles selection, or group id. Do NOT just bump `CAPTURE_VERSION` (that silently
+     filters old rows out on `read()`). Treat the store as immutable front-door events; project
+     into Venture-slug records, Fiction records linked to `ideas.json`, and Charles capture groups.
+     Add an explicit migration that preserves legacy rows.
+  3. **Queue lifecycle + count semantics.** Define states (`pending`, `awaiting-answer`,
+     `in-progress`, `partially-complete`, `complete`, `rejected`, `archived`) and specify exactly
+     which count in a collapsed queue summary — otherwise Venture/Charles counts grow forever.
+  4. **Fiction two-store consistency.** Fiction Start writes `studio-captures.json` then separately
+     `createIdea` (`serve.ts:1424-1431`) with no link → orphan on partial failure. Add a capture id
+     to `IdeaRecord` (or make the queue record authoritative) + a reconciliation test. Route tests
+     MUST inject an isolated `CONTENT_AGENTS_HOME` or they write Muxin's real inbox (the idea store
+     ignores `NODE_TEST_CONTEXT`).
+  5. **Charles group model.** The drafting validator requires exactly one new file + one queue row
+     per run (`charles-jobs.ts:110-145`), so one capture can't fan out to essay+post+reply as a
+     group today. Add a durable capture/group id + output type/ordinal per row; decide approval is
+     per-output with group-level partial-complete; multi-select must persist the selection *before*
+     drafting and return per-output status so a retry targets only the missing outputs (today the
+     client POSTs types sequentially, `page.ts:5248-5265`, and a mid-way failure leaves an
+     untracked half-set).
+  6. **Venture name→slug resolver.** `capture-router` picks room only; there is no slug match.
+     Build a deterministic resolver: exact slug/name → auto-resolve; fuzzy/NL mention → return
+     candidates + require confirmation; define no-match and multiple-mention behavior. Never fall
+     back to the client `ventureSlug` as an implicit default.
+  7. **Fiction confirm-before-canon state machine.** Where the confirm/gate state lives, its
+     conversation id, and that navigation alone is not "resume" — each room needs a resume payload
+     (Venture: slug + destination phase; Fiction: conversation id + gate state; Charles: capture
+     group + durable selected formats).
+- **Slice 2 (after 1.5): the Studio Start routing + Charles/Venture queues + re-target #448's
+  Fiction queue at the new confirm flow.** Cross-family audit every store write.
+- **Slice 3:** the Charles combined-review layout (essay scrollable sub-window + stacked drafts,
+  focus mode) and any remaining resume depth.
+
+All of the above is still self-vet per the confirmed rule-7 scope above; "contracts-first" is an
+engineering-soundness reorder, not a review-gate change.
 
 ## Known stale or historical documents
 
