@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, configuredPlatformLimit, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 import { assertCharlesDraftPolicy, captureCharlesDraftState, restoreCharlesDraftState, validateCharlesDraftMutation } from "./charles-jobs.js";
 import * as charlesJobs from "./charles-jobs.js";
@@ -21,6 +21,22 @@ async function waitForJobStatus(
   }
   assert.equal(job.status, status);
 }
+
+test("configuredPlatformLimit resolves from config/platforms.yaml, matching the retired hardcoded table", () => {
+  // P1: the studio generation path's platform character limits now come from the single source of
+  // truth, config/platforms.yaml, instead of a hardcoded CONFIGURED_PLATFORM_LIMITS table. These are
+  // the values that table carried, and must stay byte-identical so P1 is a pure refactor.
+  const retiredTable: Record<string, number> = { x: 280, bluesky: 300, threads: 500, mastodon: 500, community: 1500, linkedin: 3000 };
+  for (const [platform, limit] of Object.entries(retiredTable)) {
+    assert.equal(configuredPlatformLimit(platform), limit, `${platform} limit drifted from config`);
+  }
+  // Every platform selectable in the Content room (page.ts CONTENT_CONFIG_OPTIONS.platform) with no
+  // configured max_chars resolves to undefined — "no character gate" — exactly as the table did by
+  // omission. quote-card carries a config limit but is a media type, never a variant.platform.
+  for (const platform of ["substack", "instagram", "tiktok", "youtube"]) {
+    assert.equal(configuredPlatformLimit(platform), undefined, `${platform} should have no configured character limit`);
+  }
+});
 
 test("runAgentSpawn forwards a selected engine's stdin payload", () => {
   const source = readFileSync(join(process.cwd(), "src/review/jobs.ts"), "utf8");
