@@ -3093,6 +3093,25 @@ function cwStep1Html(){
     '<div class="src" style="margin-top:16px;max-width:520px">An essay from somewhere else comes in through Studio. Paste the link there and pick "Versions for Content".</div>'+
     '</div>';
 }
+// Shared expandable room queue — collapsed by default, showing a pending count in the summary.
+// Rows reuse Content's cw-src three-column layout (tag | title+meta | action); no net-new CSS.
+// Each item: {id,title,meta,tag,tagCls,action}. Rows carry data-rq-id; the caller attaches the
+// click handler that resumes that room's own flow (Fiction inbox, Venture chat, Charles draft).
+function roomQueueHtml(label, items){
+  const list = items||[];
+  const n = list.length;
+  const rows = list.map(it=>
+    '<button type="button" class="cw-src rq-row" data-rq-id="'+esc(it.id)+'">'+
+      '<span class="cw-tag '+(it.tagCls||"untagged")+'">'+esc(it.tag||"")+'</span>'+
+      '<span style="min-width:0"><span class="ttl">'+esc(it.title||"")+'</span>'+
+      '<span class="meta">'+esc(it.meta||"")+'</span></span>'+
+      '<span class="src" style="justify-self:end;white-space:nowrap">'+esc(it.action||"Open")+'</span>'+
+    '</button>').join("");
+  const body = n
+    ? '<div style="margin-top:12px">'+rows+'</div>'
+    : '<div class="src" style="margin-top:12px">Nothing waiting here yet. Send a thought from Studio Start and it lands in this queue.</div>';
+  return '<details class="lead-details" style="margin-top:30px;padding-top:16px;border-top:1px solid #efe7d6"><summary>'+esc(label)+' · '+n+'</summary>'+body+'</details>';
+}
 function cwPickedHtml(s){
   const cls = CW_TAGCLASS[s.tag] || "untagged";
   return '<div class="cw-picked">'+
@@ -4993,7 +5012,7 @@ function renderFiction(){
     const clarifyPanel=canClarify
       ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #efe7d6"><div class="wb-margin-cap">ADD CLARIFICATION</div><textarea id="ficClarify-'+esc(idea.id)+'" rows="3" placeholder="Add the missing context in your own words." style="width:100%;box-sizing:border-box;margin-top:6px"></textarea><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:8px"><select id="ficClarifyTarget-'+esc(idea.id)+'"><option value="">Target only when needed</option>'+inboxTargets+'</select><button type="button" data-inbox-clarify="'+esc(idea.id)+'" class="primary">Continue the conversation</button></div></div>'
       : '';
-    return '<article style="margin-top:14px;border:1px solid #d8cfbb;border-radius:8px;padding:16px 18px;background:#fffdf8">'+
+    return '<article data-idea-id="'+esc(idea.id)+'" style="margin-top:14px;border:1px solid #d8cfbb;border-radius:8px;padding:16px 18px;background:#fffdf8">'+
       '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><span class="wb-label" style="margin:0">'+esc(idea.classification||'clarify')+'</span><span class="pill">'+esc(idea.status||'needs-review')+'</span>'+(idea.targetPath?'<span class="src">→ '+esc(idea.targetPath)+'</span>':'')+'</div>'+
       '<div class="wb-margin-cap" style="margin-top:13px">RAW IDEA · NEVER REWRITTEN</div><div style="white-space:pre-wrap;font:400 16px/1.55 Georgia,serif;margin-top:5px">'+esc(idea.rawText||'')+'</div>'+
       (turns?'<div class="wb-margin-cap" style="margin-top:13px">CLARIFICATION TURNS · AUTHOR SUPPLIED</div>'+turns:'')+
@@ -5034,7 +5053,15 @@ function renderFiction(){
   const promotionPage=intake+promoDraftPanel+(ficPromoDraft&&ficPromoDraft.state==='Approved'?finalPanel:'');
   const reviewPage=head+(hasScene?anchor+failCard+scene:'<div class="empty">No draft yet. Add your direction in Write next, then draft a first pass.</div>')+
     '<div class="src" style="max-width:680px;margin-top:24px;padding-top:16px;border-top:1px solid #efe7d6">Direct line edits and final acceptance happen in the story PR. Use the revision note here to ask for another focused pass; the canonical chapter is never silently overwritten.</div>';
-  $("#fictionMain").innerHTML = stageNav+(ficPage==="inbox"?inboxPage:ficPage==="write"?head+composer+failCard:ficPage==="review"?reviewPage:ficPage==="canon"?canonPanel:promotionPage);
+  const ficQueue=(ficInbox||[]).filter(i=>i.status==="needs-review").map(i=>({
+    id:i.id,
+    title:(i.rawText||"").replace(/\s+/g," ").trim().slice(0,90)||"(untitled idea)",
+    meta:(i.classification||"clarify")+" · "+(i.proposal?"cleanup ready to review":"needs a destination first"),
+    tag:"IDEA", tagCls:"yours",
+    action:i.proposal?"Review":"Open"
+  }));
+  const ficQueueHtml=roomQueueHtml("Fiction queue",ficQueue);
+  $("#fictionMain").innerHTML = stageNav+(ficPage==="inbox"?inboxPage:ficPage==="write"?head+composer+failCard:ficPage==="review"?reviewPage:ficPage==="canon"?canonPanel:promotionPage)+ficQueueHtml;
 
   const rows = [].concat(rep?rep.conflicts||[]:[], rep?rep.holds||[]:[]);
   const checks = rows.length
@@ -5067,6 +5094,13 @@ function renderFiction(){
     ficPage=button.dataset.fictionPage;
     if(ficPage==="promotion") await loadFictionPromotion();
     renderFiction();
+  }));
+  document.querySelectorAll("#fictionMain .rq-row").forEach(button=>button.addEventListener("click",()=>{
+    const id=button.dataset.rqId;
+    ficPage="inbox";
+    renderFiction();
+    const card=document.querySelector('#fictionMain [data-idea-id="'+id+'"]');
+    if(card) card.scrollIntoView({behavior:"smooth",block:"center"});
   }));
   $("#ficIdeaSubmit")?.addEventListener("click",async ()=>{
     const raw=$("#ficIdea").value; if(!raw){flash("Add the idea first");return;}
