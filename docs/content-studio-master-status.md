@@ -52,6 +52,14 @@ section only when this one cites it.
 > **Repo gotchas:** run `npm run check` UNSANDBOXED (sandbox = phantom failures + EPERM); client JS
 > lives in a `<script>` template literal so regex backslashes MUST be doubled (`\\s`), enforced by
 > `page.test.ts`; Fiction route tests MUST set `CONTENT_AGENTS_HOME` or they write the real inbox.
+>
+> **Handoff hygiene (2026-09-04):** working tree clean; local `main` == `origin/main`. The
+> notes-spread cron's 2026-09-04 ledger rows were committed as a `chore` (`1565045`, runtime state,
+> not logic). `scripts/repo-hygiene.sh --rescue` still lists 5 stale local-only agent branches from
+> 2026-08-24→27 (`agent/cs2-jobs-outreach-charles-extract`, `agent/cs2-page-room-pure-helpers`,
+> `agent/cs2-serve-walled-room-routes`, `agent/cs3-studio-durable-handoff`,
+> `agent/cs6-parallel-safe-ui-completion`) — prior-session work, unclassified, left untouched; verify
+> against merged history before deleting or resuming any of them.
 
 ### Standing authorization (settles the old "nothing is approved to build" gate)
 
