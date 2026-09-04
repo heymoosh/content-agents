@@ -47,8 +47,20 @@ export function pendingCount(items: ReadonlyArray<Pick<RoomQueueItem, "state">>)
 export interface ContentQueuePayload { readonly kind: "content"; readonly jobId: string | null }
 /** Slice 1.5c: `ideaId` links the projection to the room's `ideas.json` record. `null` = not yet promoted. */
 export interface FictionQueuePayload { readonly kind: "fiction"; readonly series: string | null; readonly ideaId: string | null }
-/** Slice 1.5b adds the awaiting-venture candidate snapshot + answer version (compare-and-swap). */
-export interface VentureQueuePayload { readonly kind: "venture"; readonly slug: string | null }
+/** One venture Muxin can be asked to pick: its directory slug and a display name (venture-resolver.ts). */
+export interface VentureCandidate { readonly slug: string; readonly name: string }
+/**
+ * Slice 1.5b. `slug` is null while the capture is `awaiting-answer`; `candidates` is the snapshot
+ * the question was asked over (empty once answered or never ambiguous); `answerVersion` is the
+ * compare-and-swap token for the answer protocol (venture-queue.ts). Both new fields are optional
+ * so slice-1.5a rows (slug only) still load: a missing `answerVersion` reads as 0.
+ */
+export interface VentureQueuePayload {
+  readonly kind: "venture";
+  readonly slug: string | null;
+  readonly candidates?: readonly VentureCandidate[];
+  readonly answerVersion?: number;
+}
 /** Slice 1.5d adds the selected output types + per-output status under one durable group id. */
 export interface CharlesQueuePayload { readonly kind: "charles"; readonly groupId: string | null }
 /** Rooms with no projection of their own yet (Outreach, Signals). */
@@ -150,12 +162,26 @@ export function projectCapture<P extends RoomQueuePayload>(
 export function updateQueueItem<P extends RoomQueuePayload>(
   captureId: string, patch: { state?: QueueState; payload?: Partial<P> }, path: string = ROOM_QUEUE_PATH,
 ): RoomQueueItem<P> {
-  if (patch.state !== undefined && !(QUEUE_STATES as readonly string[]).includes(patch.state)) throw new Error(`unknown queue state: ${String(patch.state)}`);
+  return mutateQueueItem<P>(captureId, () => patch, path);
+}
+
+export interface QueueItemPatch<P extends RoomQueuePayload> { state?: QueueState; payload?: Partial<P> }
+
+/**
+ * The same write as `updateQueueItem`, but the patch is decided from the CURRENT row under the
+ * store lock, so a read-check-write (compare-and-swap) cannot interleave with another writer.
+ * `decide` may throw to refuse the write; the lock is released and the error propagates unchanged.
+ */
+export function mutateQueueItem<P extends RoomQueuePayload>(
+  captureId: string, decide: (current: RoomQueueItem<P>) => QueueItemPatch<P>, path: string = ROOM_QUEUE_PATH,
+): RoomQueueItem<P> {
   return withFileLock(`${path}.lock`, () => {
     const rows = read(path);
     const index = rows.findIndex((item) => item.captureId === captureId);
     if (index < 0) throw new Error("no such queue item");
     const current = rows[index]! as RoomQueueItem<P>;
+    const patch = decide(current);
+    if (patch.state !== undefined && !(QUEUE_STATES as readonly string[]).includes(patch.state)) throw new Error(`unknown queue state: ${String(patch.state)}`);
     const payload = patch.payload ? { ...current.payload, ...patch.payload } as P : current.payload;
     if (patch.payload?.kind !== undefined && patch.payload.kind !== current.payload.kind) throw new Error("queue payload kind is fixed per room");
     const state = patch.state ?? current.state;
