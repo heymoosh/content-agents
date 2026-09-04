@@ -651,6 +651,28 @@ test("client <script> output: the two regexes that shipped broken now emit corre
   assert.ok(!script.includes("/^https?:///i"), "emitted /^https?:///i turns the rest of the line into a comment");
 });
 
+// Slice 2a: a canonical update on a Studio-captured idea is routed through the durable confirm
+// gate instead of the one-click approve; chapter drafts and capture-less ideas keep the direct
+// path. The gate's BEHAVIOR (confirm appends once, cancel writes nothing, a stale id is a 409) is
+// proven in fiction-gate.test.ts against the real routes; this test only guards the client wiring
+// so the branch can't silently drop out. It asserts the guard's shape and its ORDER relative to the
+// open call, not source punctuation.
+test("client <script>: Fiction canon approval routes captured non-chapter ideas through the confirm gate", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
+  const handler = script.slice(script.indexOf('"#fictionMain [data-inbox-approve]"'));
+  const guard = handler.search(/if\s*\(\s*idea\s*&&\s*idea\.captureId\s*&&\s*idea\.classification\s*!==\s*'chapter'\s*\)/);
+  const open = handler.indexOf('"/api/fiction/gate/open"');
+  const approve = handler.indexOf('"/api/fiction/inbox/approve"');
+  assert.ok(guard >= 0, "the approve handler branches on captureId AND non-chapter");
+  assert.ok(open > guard, "the gate is opened inside that branch, after the guard");
+  assert.ok(approve > open, "the one-click approve is the fall-through after the gate branch");
+  assert.ok(/gate\/open"\s*,\s*\{\s*captureId\s*:\s*idea\.captureId/.test(handler), "open sends the idea's captureId");
+  assert.ok(script.includes('data-inbox-gate-confirm="') && script.includes('data-inbox-gate-cancel="'), "the card renders Confirm and Cancel while a gate is open");
+  assert.ok(script.includes('"/api/fiction/gate/confirm"') && script.includes('"/api/fiction/gate/cancel"'), "both resolution endpoints are wired");
+  assert.ok(/gate\/cancel"[^\n]*captureId\s*:\s*gate\.captureId[^\n]*gateId\s*:\s*gate\.gateId/.test(handler), "confirm/cancel send the open gate's captureId and gateId");
+});
+
 // ── job UI surfaces (v5 §5) ──────────────────────────────────────────────────────────────────────
 // The three surfaces (Studio working panel, room progress strip, Studio team rail) all read
 // /api/jobs. These cover the pure mirrors; the inline client copies are kept in sync by hand.

@@ -3093,6 +3093,25 @@ function cwStep1Html(){
     '<div class="src" style="margin-top:16px;max-width:520px">An essay from somewhere else comes in through Studio. Paste the link there and pick "Versions for Content".</div>'+
     '</div>';
 }
+// Shared expandable room queue — collapsed by default, showing a pending count in the summary.
+// Rows reuse Content's cw-src three-column layout (tag | title+meta | action); no net-new CSS.
+// Each item: {id,title,meta,tag,tagCls,action}. Rows carry data-rq-id; the caller attaches the
+// click handler that resumes that room's own flow (Fiction inbox, Venture chat, Charles draft).
+function roomQueueHtml(label, items){
+  const list = items||[];
+  const n = list.length;
+  const rows = list.map(it=>
+    '<button type="button" class="cw-src rq-row" data-rq-id="'+esc(it.id)+'">'+
+      '<span class="cw-tag '+(it.tagCls||"untagged")+'">'+esc(it.tag||"")+'</span>'+
+      '<span style="min-width:0"><span class="ttl">'+esc(it.title||"")+'</span>'+
+      '<span class="meta">'+esc(it.meta||"")+'</span></span>'+
+      '<span class="src" style="justify-self:end;white-space:nowrap">'+esc(it.action||"Open")+'</span>'+
+    '</button>').join("");
+  const body = n
+    ? '<div style="margin-top:12px">'+rows+'</div>'
+    : '<div class="src" style="margin-top:12px">Nothing waiting here yet. Send a thought from Studio Start and it lands in this queue.</div>';
+  return '<details class="lead-details" style="margin-top:30px;padding-top:16px;border-top:1px solid #efe7d6"><summary>'+esc(label)+' · '+n+'</summary>'+body+'</details>';
+}
 function cwPickedHtml(s){
   const cls = CW_TAGCLASS[s.tag] || "untagged";
   return '<div class="cw-picked">'+
@@ -3385,6 +3404,10 @@ let ficPromoDraft = null;
 let ficPromoBusy = false;
 let ficPromoError = "";
 let ficInbox = [];
+// The open confirm-before-canon gate for one inbox card (slice 2a): {ideaId, captureId, gateId,
+// target} while Muxin is being asked, null otherwise. Server-side it is durable (fiction-queue.ts);
+// here it only decides which card shows Confirm / Cancel instead of Approve.
+let ficGate = null;
 let ficPrNumber = "";
 let ficPrError = "";
 // ── Venture room ────────────────────────────────────────────────────────────────────────────────
@@ -4993,13 +5016,17 @@ function renderFiction(){
     const clarifyPanel=canClarify
       ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #efe7d6"><div class="wb-margin-cap">ADD CLARIFICATION</div><textarea id="ficClarify-'+esc(idea.id)+'" rows="3" placeholder="Add the missing context in your own words." style="width:100%;box-sizing:border-box;margin-top:6px"></textarea><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:8px"><select id="ficClarifyTarget-'+esc(idea.id)+'"><option value="">Target only when needed</option>'+inboxTargets+'</select><button type="button" data-inbox-clarify="'+esc(idea.id)+'" class="primary">Continue the conversation</button></div></div>'
       : '';
-    return '<article style="margin-top:14px;border:1px solid #d8cfbb;border-radius:8px;padding:16px 18px;background:#fffdf8">'+
+    return '<article data-idea-id="'+esc(idea.id)+'" style="margin-top:14px;border:1px solid #d8cfbb;border-radius:8px;padding:16px 18px;background:#fffdf8">'+
       '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><span class="wb-label" style="margin:0">'+esc(idea.classification||'clarify')+'</span><span class="pill">'+esc(idea.status||'needs-review')+'</span>'+(idea.targetPath?'<span class="src">→ '+esc(idea.targetPath)+'</span>':'')+'</div>'+
       '<div class="wb-margin-cap" style="margin-top:13px">RAW IDEA · NEVER REWRITTEN</div><div style="white-space:pre-wrap;font:400 16px/1.55 Georgia,serif;margin-top:5px">'+esc(idea.rawText||'')+'</div>'+
       (turns?'<div class="wb-margin-cap" style="margin-top:13px">CLARIFICATION TURNS · AUTHOR SUPPLIED</div>'+turns:'')+
       (proposal?'<div class="wb-margin-cap" style="margin-top:14px">CLEANUP PROPOSAL · REVIEW BEFORE CANON</div><div style="white-space:pre-wrap;font:400 16px/1.55 Georgia,serif;margin-top:5px">'+esc(proposal.cleanedText||'')+'</div><div class="src" style="margin-top:8px">Provenance: '+esc(proposal.provenance.engine)+' · '+esc(proposal.provenance.targetPath||'default target')+'</div>' : '<div class="src" style="margin-top:10px">The classifier abstained. Clarify the destination before a cleanup proposal can be made.</div>')+
       clarifyPanel+
-      (proposal&&idea.status==='needs-review'?'<div class="actions" style="margin-top:13px"><button class="primary" data-inbox-approve="'+esc(idea.id)+'">Approve for '+(idea.classification==='chapter'?'chapter drafting':'canonical update')+'</button><button data-inbox-reject="'+esc(idea.id)+'">Reject</button></div>':'')+
+      (proposal&&idea.status==='needs-review'
+        ? (ficGate&&ficGate.ideaId===idea.id
+          ? '<div style="margin-top:13px;padding-top:12px;border-top:1px solid #efe7d6"><div class="wb-margin-cap">CONFIRM BEFORE CANON</div><div class="src" style="margin-top:6px">This writes to '+esc(ficGate.target)+'. Nothing is written until you confirm.</div><div class="actions" style="margin-top:9px"><button class="primary" data-inbox-gate-confirm="'+esc(idea.id)+'">Confirm</button><button data-inbox-gate-cancel="'+esc(idea.id)+'">Cancel</button></div></div>'
+          : '<div class="actions" style="margin-top:13px"><button class="primary" data-inbox-approve="'+esc(idea.id)+'">Approve for '+(idea.classification==='chapter'?'chapter drafting':'canonical update')+'</button><button data-inbox-reject="'+esc(idea.id)+'">Reject</button></div>')
+        : '')+
       '</article>';
   }).join('');
   const inboxPage='<div class="wb-label" style="margin-top:28px">FICTION INBOX · ONE SAFE FRONT DOOR</div><div style="font:400 27px/1.35 Georgia,serif;margin:2px 0 9px">Where does this belong?</div><p class="src" style="max-width:650px">Your raw idea is stored byte-for-byte outside git. The selected engine classifies it, then proposes a cleanup for your review. Approval is the only action that can update a selected world, plot, or character document. Chapter ideas go to the existing draft flow.</p><div style="max-width:650px;border:1px solid #d8cfbb;border-radius:8px;padding:18px;background:#fffdf8"><textarea id="ficIdea" rows="5" placeholder="Drop in a world, character, plot, chapter, or imagery idea." style="width:100%;box-sizing:border-box;font:400 17px/1.6 Georgia,serif"></textarea><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px"><select id="ficIdeaTarget"><option value="">Choose a target when needed</option>'+inboxTargets+'</select>'+engineSelectHtml("ficIdeaEngine")+'<button class="primary" id="ficIdeaSubmit">Classify and prepare review</button></div></div><div style="max-width:700px;margin-top:23px">'+(inboxCards||'<div class="empty">No ideas in this inbox yet.</div>')+'</div>';
@@ -5034,7 +5061,15 @@ function renderFiction(){
   const promotionPage=intake+promoDraftPanel+(ficPromoDraft&&ficPromoDraft.state==='Approved'?finalPanel:'');
   const reviewPage=head+(hasScene?anchor+failCard+scene:'<div class="empty">No draft yet. Add your direction in Write next, then draft a first pass.</div>')+
     '<div class="src" style="max-width:680px;margin-top:24px;padding-top:16px;border-top:1px solid #efe7d6">Direct line edits and final acceptance happen in the story PR. Use the revision note here to ask for another focused pass; the canonical chapter is never silently overwritten.</div>';
-  $("#fictionMain").innerHTML = stageNav+(ficPage==="inbox"?inboxPage:ficPage==="write"?head+composer+failCard:ficPage==="review"?reviewPage:ficPage==="canon"?canonPanel:promotionPage);
+  const ficQueue=(ficInbox||[]).filter(i=>i.status==="needs-review").map(i=>({
+    id:i.id,
+    title:(i.rawText||"").replace(/\\s+/g," ").trim().slice(0,90)||"(untitled idea)",
+    meta:(i.classification||"clarify")+" · "+(i.proposal?"cleanup ready to review":"needs a destination first"),
+    tag:"IDEA", tagCls:"yours",
+    action:i.proposal?"Review":"Open"
+  }));
+  const ficQueueHtml=roomQueueHtml("Fiction queue",ficQueue);
+  $("#fictionMain").innerHTML = stageNav+(ficPage==="inbox"?inboxPage:ficPage==="write"?head+composer+failCard:ficPage==="review"?reviewPage:ficPage==="canon"?canonPanel:promotionPage)+ficQueueHtml;
 
   const rows = [].concat(rep?rep.conflicts||[]:[], rep?rep.holds||[]:[]);
   const checks = rows.length
@@ -5068,13 +5103,47 @@ function renderFiction(){
     if(ficPage==="promotion") await loadFictionPromotion();
     renderFiction();
   }));
+  document.querySelectorAll("#fictionMain .rq-row").forEach(button=>button.addEventListener("click",()=>{
+    const id=button.dataset.rqId;
+    ficPage="inbox";
+    renderFiction();
+    const card=document.querySelector('#fictionMain [data-idea-id="'+id+'"]');
+    if(card) card.scrollIntoView({behavior:"smooth",block:"center"});
+  }));
   $("#ficIdeaSubmit")?.addEventListener("click",async ()=>{
     const raw=$("#ficIdea").value; if(!raw){flash("Add the idea first");return;}
     const button=$("#ficIdeaSubmit"); button.disabled=true; button.textContent="Preparing…";
     const result=await post("/api/fiction/inbox",{series:ficSeries,rawText:raw,targetPath:$("#ficIdeaTarget")?.value||undefined,engine:$("#ficIdeaEngine")?.value||"claude"});
     if(result.ok){flash(result.needsClarification?"I need a clearer destination":result.needsTarget?"Choose the character document":"Review proposal ready");await loadFiction();}else{button.disabled=false;button.textContent="Classify and prepare review";flash(result.error||"Could not classify idea");}
   });
-  document.querySelectorAll("#fictionMain [data-inbox-approve]").forEach(button=>button.addEventListener("click",async ()=>{const result=await post("/api/fiction/inbox/approve",{series:ficSeries,id:button.dataset.inboxApprove});if(result.ok){flash("Approved through the Fiction workflow");await loadFiction();}else flash(result.error||"Could not approve idea");}));
+  document.querySelectorAll("#fictionMain [data-inbox-approve]").forEach(button=>button.addEventListener("click",async ()=>{
+    const id=button.dataset.inboxApprove;
+    const idea=(ficInbox||[]).find(i=>i.id===id);
+    // A canonical update on a Studio-captured idea goes through the durable confirm gate
+    // (slice 1.5c). Chapter drafts never write canon, and ideas without a captureId never had a
+    // capture to gate on, so both keep the one-click approve.
+    if(idea&&idea.captureId&&idea.classification!=='chapter'){
+      button.disabled=true;
+      const result=await post("/api/fiction/gate/open",{captureId:idea.captureId});
+      if(result.ok&&result.gate){ficGate={ideaId:id,captureId:idea.captureId,gateId:result.gate.gateId,target:result.gate.target};renderFiction();}
+      else {ficGate=null;flash(result.error||"Could not open the confirmation");await loadFiction();}
+      return;
+    }
+    const result=await post("/api/fiction/inbox/approve",{series:ficSeries,id});
+    if(result.ok){flash("Approved through the Fiction workflow");await loadFiction();}else flash(result.error||"Could not approve idea");
+  }));
+  document.querySelectorAll("#fictionMain [data-inbox-gate-confirm],#fictionMain [data-inbox-gate-cancel]").forEach(button=>button.addEventListener("click",async ()=>{
+    const isConfirm=button.hasAttribute("data-inbox-gate-confirm");
+    const gate=ficGate; if(!gate){await loadFiction();return;}
+    button.disabled=true;
+    const result=await post(isConfirm?"/api/fiction/gate/confirm":"/api/fiction/gate/cancel",{captureId:gate.captureId,gateId:gate.gateId});
+    // Any outcome clears the local gate and reloads: a 409 (stale or superseded) or 400 must not
+    // leave the card stuck on Confirm; the server keeps the durable state either way.
+    ficGate=null;
+    if(result.ok) flash(isConfirm?"Confirmed into canon":"Cancelled; canonical documents were untouched");
+    else flash(result.error||(isConfirm?"Could not confirm":"Could not cancel"));
+    await loadFiction();
+  }));
   document.querySelectorAll("#fictionMain [data-inbox-reject]").forEach(button=>button.addEventListener("click",async ()=>{const result=await post("/api/fiction/inbox/reject",{series:ficSeries,id:button.dataset.inboxReject});if(result.ok){flash("Rejected; canonical documents were untouched");await loadFiction();}else flash(result.error||"Could not reject idea");}));
   document.querySelectorAll("#fictionMain [data-inbox-clarify]").forEach(button=>button.addEventListener("click",async ()=>{
     const id=button.dataset.inboxClarify; const followUp=$("#ficClarify-"+id)?.value||"";
