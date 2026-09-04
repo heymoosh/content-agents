@@ -85,8 +85,37 @@ export interface VentureQueuePayload {
   readonly candidates?: readonly VentureCandidate[];
   readonly answerVersion?: number;
 }
-/** Slice 1.5d adds the selected output types + per-output status under one durable group id. */
-export interface CharlesQueuePayload { readonly kind: "charles"; readonly groupId: string | null }
+/** The text modes one Charles capture can fan out to (memes are out of scope on purpose, see charles-jobs.ts). */
+export const CHARLES_OUTPUT_TYPES = ["oneliner", "essay", "reply"] as const;
+export type CharlesOutputType = (typeof CHARLES_OUTPUT_TYPES)[number];
+/**
+ * One output's own lifecycle: `pending` = selected, not yet drafted (a retry drafts exactly these);
+ * `drafting` = reserved by one run under the store lock, so no second run (or process) drafts it
+ * again; `drafted` = its file + review-queue.md row exist and await Muxin; `approved` / `rejected`
+ * mirror her review-queue decision and are terminal for the group rollup (charles-queue.ts).
+ */
+export const CHARLES_OUTPUT_STATES = ["pending", "drafting", "drafted", "approved", "rejected"] as const;
+export type CharlesOutputState = (typeof CHARLES_OUTPUT_STATES)[number];
+export interface CharlesGroupOutput {
+  readonly type: CharlesOutputType;
+  /** Stable position in the order Muxin selected; never renumbered once persisted. */
+  readonly ordinal: number;
+  readonly status: CharlesOutputState;
+  /** The review-queue.md row id and charles/-relative draft path, once drafted. */
+  readonly postId: string | null;
+  readonly file: string | null;
+  readonly updatedAt: string;
+}
+/**
+ * Slice 1.5d: one capture is one durable GROUP. `groupId` is derived from the capture id, so a
+ * retry converges on the same group; `outputs` holds the selection (one entry per output type, no
+ * duplicates) with per-output status. Optional so 1.5a rows (groupId only, possibly null) still load.
+ */
+export interface CharlesQueuePayload {
+  readonly kind: "charles";
+  readonly groupId: string | null;
+  readonly outputs?: readonly CharlesGroupOutput[];
+}
 /** Rooms with no projection of their own yet (Outreach, Signals). */
 export interface GenericQueuePayload { readonly kind: "generic" }
 export type RoomQueuePayload = ContentQueuePayload | FictionQueuePayload | VentureQueuePayload | CharlesQueuePayload | GenericQueuePayload;

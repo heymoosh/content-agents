@@ -215,6 +215,37 @@ test("Charles draft mutation requires one pending mode-specific row and no other
   }
 });
 
+test("Charles group mutation accepts one file + one pending row per selected output and still rejects orphans and duplicate types", () => {
+  const root = mkdtempSync(join(tmpdir(), "charles-group-transaction-test-"));
+  mkdirSync(join(root, "posts", "essays"), { recursive: true });
+  mkdirSync(join(root, "posts", "one-liners"), { recursive: true });
+  const header = "| id | type | file | status | notes |\n";
+  writeFileSync(join(root, "review-queue.md"), header);
+  const snapshot = captureCharlesDraftState(root);
+  const { validateCharlesGroupMutation } = charlesJobs;
+  try {
+    writeFileSync(join(root, "posts", "essays", "one.md"), "---\ntype: essay\n---\n\nClean prose.\n");
+    writeFileSync(join(root, "posts", "one-liners", "two.md"), "---\ntype: one-liner\n---\n\nQuite.\n");
+    writeFileSync(join(root, "review-queue.md"), header + "| one | essay | posts/essays/one.md | pending | generated |\n| two | one-liner | posts/one-liners/two.md | pending | generated |\n");
+    const accepted = validateCharlesGroupMutation(snapshot, ["essay", "oneliner"], root);
+    assert.deepEqual(accepted.map((output) => [output.mode, output.id, output.post.file]), [["essay", "one", "posts/essays/one.md"], ["oneliner", "two", "posts/one-liners/two.md"]]);
+    // The single-mode check is the group check over one mode: two outputs for one selection still fail.
+    assert.throws(() => validateCharlesDraftMutation(snapshot, "essay", root), /exactly one/i);
+    assert.throws(() => validateCharlesGroupMutation(snapshot, ["essay", "essay"], root), /same output type twice/i);
+
+    // A row whose type points at the other mode's file: no output matches one-to-one.
+    writeFileSync(join(root, "review-queue.md"), header + "| one | essay | posts/one-liners/two.md | pending | generated |\n| two | one-liner | posts/essays/one.md | pending | generated |\n");
+    assert.throws(() => validateCharlesGroupMutation(snapshot, ["essay", "oneliner"], root), /match its requested mode and new file/i);
+    // An orphan row: two rows for one file, or a file with no row.
+    writeFileSync(join(root, "review-queue.md"), header + "| one | essay | posts/essays/one.md | pending | generated |\n| three | essay | posts/essays/one.md | pending | generated |\n");
+    assert.throws(() => validateCharlesGroupMutation(snapshot, ["essay", "oneliner"], root), /exactly one essay row|one-liner row/i);
+    writeFileSync(join(root, "review-queue.md"), header + "| one | essay | posts/essays/one.md | pending | generated |\n");
+    assert.throws(() => validateCharlesGroupMutation(snapshot, ["essay", "oneliner"], root), /exactly one queue row per selected output/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("Charles managed staging always removes its workspace when the task throws", async () => {
   let stagedRoot = "";
   await assert.rejects(

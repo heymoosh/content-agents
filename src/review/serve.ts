@@ -118,6 +118,7 @@ import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
 import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
 import { projectFictionCapture, syncFictionQueue } from "./fiction-queue.js";
 import { pendingCount, projectCaptureEvents, readQueueItem, roomQueueItems } from "./room-queue.js";
+import { syncCharlesQueue } from "./charles-queue.js";
 import { answerVentureCapture, answerVersionOf, projectVentureCapture } from "./venture-queue.js";
 import { resolveVentureMention, ventureCandidates } from "./venture-resolver.js";
 import { listVentures } from "../venture/paths.js";
@@ -1408,6 +1409,11 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           json(res, 200, { ok: true, room, ...syncFictionQueue({ series: listFictionSeries().map((s) => s.slug) }) });
           return;
         }
+        // Charles groups mirror each drafted output's review-queue.md decision and roll up (slice 1.5d).
+        if (room === "Charles") {
+          json(res, 200, { ok: true, room, ...syncCharlesQueue() });
+          return;
+        }
         projectCaptureEvents(listCaptures().filter((capture) => capture.room === room));
         const items = roomQueueItems(room).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         json(res, 200, { ok: true, room, items, pending: pendingCount(items) });
@@ -1452,9 +1458,10 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     // Fiction capture lands as a durable inbox idea (needs-review state), so it survives a reload as
     // a real room item instead of text prefilled into a field. `room` defaults to Content so existing
     // callers are unchanged. A Venture capture lands in the Venture queue against one venture, or as
-    // a durable open question when the venture is ambiguous (slice 1.5b). Charles and Outreach have
-    // no durable lightweight room-item store yet (see docs/content-studio-master-status.md); those
-    // rooms still only persist the capture.
+    // a durable open question when the venture is ambiguous (slice 1.5b). A Charles capture becomes a
+    // durable group through POST /api/charles/group (slice 1.5d), which needs the selected formats,
+    // so Start does not create one; Outreach has no durable lightweight room-item store yet (see
+    // docs/content-studio-master-status.md). Those rooms still only persist the capture here.
     if (req.method === "POST" && url.pathname === "/api/captures/start") {
       const b = await readBody(req);
       const room = String(b.room ?? "Content") as CaptureRoom;
