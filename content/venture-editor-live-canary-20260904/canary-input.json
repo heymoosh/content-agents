@@ -1,0 +1,70 @@
+{
+  "kind": "content_request",
+  "version": "content-request-v1",
+  "id": "venture-editor-live-canary-20260904",
+  "origin": "venture",
+  "descriptor": "Representative Venture editor canary",
+  "originalInput": "Before adding another tool, make one repeated decision easier to see. That is the smaller first step.",
+  "ventureId": "venture-editor-canary",
+  "ventureSource": {
+    "artifactId": "venture-editor-canary-source",
+    "phase": 1,
+    "artifactKind": "text-post-note",
+    "messageId": "venture-editor-canary-source",
+    "bodyPath": "evidence/venture-editor-canary-source.md",
+    "claimRefs": [
+      {
+        "claim": "Before adding another tool, make one repeated decision easier to see. That is the smaller first step.",
+        "ref": "canary:representative-input"
+      }
+    ],
+    "approval": {
+      "editorialStatus": "approved",
+      "provenance": "muxin-editorial-approval"
+    }
+  },
+  "sourceProvenance": null,
+  "sourceContext": null,
+  "experiment": null,
+  "selections": {
+    "treatments": [
+      "shorter"
+    ],
+    "media": [],
+    "platforms": [
+      "bluesky"
+    ]
+  },
+  "recommendations": {
+    "treatments": [],
+    "media": [],
+    "platforms": []
+  },
+  "control": {
+    "enabled": true
+  },
+  "variants": [
+    {
+      "identity": {
+        "id": "control-Ymx1ZXNreQ-bm9uZQ",
+        "requestId": "venture-editor-live-canary-20260904",
+        "kind": "control"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-Ymx1ZXNreQ-bm9uZQ-c2hvcnRlcg",
+        "requestId": "venture-editor-live-canary-20260904",
+        "kind": "treated"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": [
+        "shorter"
+      ]
+    }
+  ]
+}

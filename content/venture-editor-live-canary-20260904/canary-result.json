@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2026-09-04T16:49:00.578Z",
+  "engine": "codex",
+  "engineExecution": "live",
+  "ids": [
+    "control-Ymx1ZXNreQ-bm9uZQ",
+    "treated-Ymx1ZXNreQ-bm9uZQ-c2hvcnRlcg"
+  ],
+  "jobId": "job-1788540517324-1",
+  "jobLog": "canary-model-output.log",
+  "publication": "none; all generated rows remain pending review"
+}

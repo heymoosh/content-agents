@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildContentRequest } from "./content-request.js";
-import { CONTENT_EDITORS, assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredColdFeedEditorPrompt, configuredContentPrompt, configuredDerivativeText, configuredEditor, configuredEditorFrontmatter, configuredEditorKind, configuredExperimentFrontmatter, configuredQueueNote, configuredSourceCtaLabel, configuredSourceSupportsCta, configuredSourceSegments, parseConfiguredEditorBodies, parseConfiguredVariantBodies, parseVentureConfiguredBodies, planConfiguredEditing, preflightConfiguredGeneration, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
+import { repoRoot } from "../db/db.js";
+import { CONTENT_EDITORS, assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredColdFeedEditorPrompt, configuredContentPrompt, configuredDerivativeText, configuredEditor, configuredEditorFrontmatter, configuredEditorKind, configuredExperimentFrontmatter, configuredQueueNote, configuredSourceCtaLabel, configuredSourceSupportsCta, configuredSourceSegments, generateConfiguredContent, parseConfiguredEditorBodies, parseConfiguredVariantBodies, parseVentureConfiguredBodies, planConfiguredEditing, preflightConfiguredGeneration, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
 
 const request = buildContentRequest({
   id: "request-1", origin: "studio", descriptor: "A useful idea", originalInput: "The exact source.",
@@ -358,6 +359,45 @@ test("Venture treated variants use a dedicated engine-body contract with claim a
     /voice check/i,
   );
   assert.throws(() => parseVentureConfiguredBodies(JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: engineBody, source_lines: [1] }))), ventureTreated), /malformed/);
+});
+
+test("configured generation dispatches Venture through its editor and stamps the real derivative", async () => {
+  const slug = `test-venture-editor-${process.pid}-${Date.now()}`;
+  const folder = join(repoRoot, "content", slug);
+  const marker = join(repoRoot, ".e2e-configured-engine-token");
+  const priorToken = process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
+  const priorRoot = process.env.E2E_REPO_ROOT;
+  const priorMarker = existsSync(marker) ? readFileSync(marker, "utf8") : null;
+  const token = `test-${slug}`;
+  const venture = buildContentRequest({
+    id: slug, origin: "venture", ventureId: "v1", descriptor: "approved probe",
+    originalInput: "Careful operators need a smaller first step.", treatments: ["shorter"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
+    ventureSource: {
+      artifactId: "p1", phase: 1, artifactKind: "text-post-note", messageId: "m1", bodyPath: "phase-1/p1.md",
+      claimRefs: [{ claim: "Careful operators need a smaller first step.", ref: "intake:q4" }],
+      approval: { editorialStatus: "approved", provenance: "muxin-editorial-approval" },
+    },
+  });
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, "review-queue.md"), "# Review queue — Venture editor test\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n");
+  writeFileSync(marker, token, { mode: 0o600 });
+  process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = token;
+  process.env.E2E_REPO_ROOT = repoRoot;
+  try {
+    const result = await generateConfiguredContent(slug, venture);
+    const treatedVariant = venture.variants.find((variant) => variant.identity.kind === "treated")!;
+    const derivative = readFileSync(join(folder, "derivatives", `${treatedVariant.identity.id}.md`), "utf8");
+    assert.equal(result.engineExecution, "disposable-injected", "the hermetic drafting/editor seam prevents a real model call");
+    assert.match(derivative, /^editor_pass:\s*venture-social-v1$/m, "the selected Venture editor records its own pass stamp");
+    assert.match(derivative, /Approved Venture premise, composed for bluesky as variant 1\./, "the editor receives and preserves the Venture drafting result");
+    assert.doesNotMatch(derivative, /^source_lines:/m, "Venture remains untraced rather than fabricating essay provenance");
+    assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), new RegExp(`\\| ${treatedVariant.identity.id} \\|[^\\n]+\\| pending \\|`));
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+    if (priorMarker === null) rmSync(marker, { force: true }); else writeFileSync(marker, priorMarker, { mode: 0o600 });
+    if (priorToken === undefined) delete process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN; else process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = priorToken;
+    if (priorRoot === undefined) delete process.env.E2E_REPO_ROOT; else process.env.E2E_REPO_ROOT = priorRoot;
+  }
 });
 
 test("authoritative resolution fails closed on missing or forged source/cut provenance", () => {
