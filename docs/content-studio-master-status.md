@@ -15,12 +15,12 @@ checklist), so no separate spec doc exists for it yet.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff #3) — P2 built + HELD (draft #455); item 1 implementation is held for real-output evidence
-> Decision 11's per-room-queue ladder (slices 1.5/2/3) is done and merged. Lane A has resumed: the two
-> prerequisites are complete — **P1 done (PR #442)** and **P2 built and HELD as draft PR #455** — so the
-> next lane-A build is **item 1 (Venture through the normal editor)**. Its implementation is now
-> present in an isolated checkout but is not eligible to commit yet; start by closing its evidence
-> checklist below, not by rebuilding it.
+> ### ▶ NEXT ACTION (2026-09-04 handoff #4) — P2 + Venture item 1 are held as draft PRs #455 and #456
+> Decision 11's per-room-queue ladder (slices 1.5/2/3) is done and merged. Lane A's first two pieces are
+> now stacked and held: **P1 done (PR #442)**, **P2 draft #455**, and **item 1 draft #456**. Both draft
+> PRs change content-generation behavior and require Muxin's explicit review decision; do not infer a
+> merge approval from the test/audit results. After #455 is cleared and item 1 is reviewed, continue with
+> **item 2 (Fiction/Charles)** from the P2 editor registry rather than rebuilding either completed slice.
 >
 > 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — BUILT, HELD as
 >    draft PR #455** (branch `feat/p2-editor-registry`, `97614a7`). `CONTENT_EDITORS` registry keyed by
@@ -44,9 +44,9 @@ section only when this one cites it.
 >      then `gh pr ready 455 && gh pr merge 455 --squash`, or (b) if item 1 is picked up first, stack it
 >      on `feat/p2-editor-registry` (see item 1 sequencing note). Do not merge #455 on inference alone.**
 >    - **Audit → acceptance checklist the next builders MUST close:**
->      - **Item 1 (Venture):** delete the `origin === "venture"` bypass (`jobs.ts:915`) so venture falls
->        through to `editing.scannable` and uses the `venture-social-v1` editor already in the registry;
->        acceptance = a venture treated piece (no source_lines) emits `editor_pass: venture-social-v1`.
+>      - **Item 1 (Venture): CLOSED in draft #456.** The dedicated Venture drafting branch now falls
+>        through to `editing.scannable`; a treated Venture piece with no `source_lines` emits
+>        `editor_pass: venture-social-v1` in a deterministic integration test and a preserved live canary.
 >      - **Item 2 (Fiction/Charles):** when lifting the `jobs.ts:726` treated-policy block, **Charles must
 >        NOT run through `muxinVoiceFindings()`** (rule-5 exemption) — add a per-editor `check` hook on
 >        `ContentEditor`; acceptance = Charles output validated against `persona.yaml`, not voice.yaml.
@@ -79,40 +79,32 @@ section only when this one cites it.
 >    (missing/NaN last via `POSITIVE_INFINITY`, tie-break `postId`); a duplicate empty group row
 >    can't shadow a later real one. `npm run check` unsandboxed green (484 suites / 4107 tests);
 >    four-round cross-family codex/GPT audit ended PASS. Presentation-only, self-vet merged.
-> 4. **Lane-A item 1 (Venture through the normal editor) — IMPLEMENTED, NOT COMMITTED (2026-09-04).**
->    The isolated stacked checkout is `/private/tmp/content-agents-venture-editor` on
->    `feat/venture-editor` from `feat/p2-editor-registry` (`97614a7`). It moves normal editor dispatch
->    after the Venture draft branch, so treated Venture output selects the registry's Venture editor and
->    stamps `editor_pass: venture-social-v1`; the guarded disposable editor-output seam makes that
->    dispatch deterministic in tests. `node --import tsx --test src/review/content-generation.test.ts`
->    passed **18/18**, `npm run check` passed, and `git diff --check` passed. Pass D browser E2E was
->    attempted twice but timed out at the pre-existing Studio Capture selector
->    `#captureVerdict:not([hidden]) .cap-go` before this scenario ran.
+> 4. **Lane-A item 1 (Venture through the normal editor) — BUILT, HELD as draft PR #456 (2026-09-04).**
+>    The isolated stacked checkout `/private/tmp/content-agents-venture-editor` has branch
+>    `feat/venture-editor`, commits `3b7b701` + `d7153de`, and targets `feat/p2-editor-registry`.
+>    Venture's dedicated treated-draft path now runs the selected registry editor afterwards, including
+>    guarded disposable drafting; treated output is stamped `editor_pass: venture-social-v1`. The focused
+>    `generateConfiguredContent` suite passed **18/18**, unsandboxed `npm run check` passed, and
+>    `git diff --check` passed. The single authenticated Codex canary is preserved in
+>    `content/venture-editor-live-canary-20260904/`: it records the representative input, actual
+>    pre-editor draft, edited result, live engine execution, no `source_lines`, and two pending-only rows.
+>    Its review-facing old/new sample is `docs/evidence-venture-editor-2026-09-04.md`.
 >
->    **Cross-family audit (Grok 4.6, corrected high-effort retry): FIX — delivery evidence only.**
->    It found the dispatch implementation sound; the blockers are that this content-generation change
->    has neither a preserved real (non-disposable) Venture before/after pair nor its required held draft
->    PR. Do not commit or mark item 1 complete until this checklist is closed:
->    - Run one isolated, authenticated Venture treated-content canary and preserve the input, unedited
->      draft, and Venture-editor result. The edited result must show `editor_pass: venture-social-v1`;
->      the disposable fixture is not evidence. Do not publish it.
->    - Re-run the focused `generateConfiguredContent` test and `npm run check`; then create a **held
->      draft PR** carrying the sample. Do not merge it or P2 #455 without Muxin's explicit clearance.
->    - Confirm Venture selects `editing.editor`, executes it for every scannable treated variant (including
->      disposable-injected drafting), and emits `venture-social-v1`; retain cold-feed's `cold-feed-v1`
->      assertion too. Search for every remaining `engineExecution !== "disposable-injected"`-style
->      editor skip before committing.
->    - The fixture must return `null` without `disposableConfiguredEngineAuthorized()`; keep the focused
->      test assertion for preserved Venture body, no fabricated `source_lines`, and a pending review row.
->    - Once the Capture selector defect is fixed, rerun Pass D and verify its GUI Venture case records
->      `venture-social-v1`. The existing timeout is recorded as pre-existing, not a reason to broaden
->      this slice now.
->    - Optional hardening recorded by audit: eventually move the marker/token fixture out of the live
->      repo root so a killed or parallel test cannot leave harness state behind.
+>    **Audit closure:** the prior Grok 4.6 high-effort audit's delivery-only FIX is closed. Its packet-only
+>    Grok bridge failed on this Mac's sandbox profile, so an independent **Claude Opus** audit received the
+>    slice requirements, diff, evidence, and test results only; it returned **PASS, no introduced blockers**.
+>    Pass D browser E2E remains pre-existing: its two bounded attempts timed out at Studio Capture selector
+>    `#captureVerdict:not([hidden]) .cap-go` before the Venture case, so do not retry it in this slice.
+>
+>    **Future-builder acceptance checklist (P2, not a merge blocker):** add a direct unauthorized-case test
+>    for `disposableConfiguredEditorOutput()`, make a regression guard for any future
+>    `engineExecution !== "disposable-injected"` editor skip, record exact canary command/timestamp when
+>    changing this evidence protocol, and after the Capture selector defect is repaired run Pass D once to
+>    confirm the GUI Venture case records `venture-social-v1`.
 >
 >    Then item 2 (Fiction/Charles), then lane-C (item 5 port). Decision 11's queue ladder is complete;
->    no decision-11 slice remains. **Sequencing note:** item 1 depends on P2. If Muxin has not cleared
->    #455, continue stacked on `feat/p2-editor-registry`; do not rebuild P2's registry.
+>    no decision-11 slice remains. **Sequencing note:** item 1 depends on P2 and remains stacked on it;
+>    do not rebuild P2's registry while either draft awaits Muxin's decision.
 >
 > **Rule 7 (settled):** decision-11's routing, queues, gates, and fan-out self-vet merge on green;
 > lane-A changes to *how content is generated* remain held in a draft PR with a real old-versus-new
