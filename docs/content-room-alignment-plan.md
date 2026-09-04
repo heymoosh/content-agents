@@ -1,5 +1,11 @@
 # Aligning the code with the room model
 
+> **Design/reference only — status and decisions live in**
+> [`docs/content-studio-master-status.md`](content-studio-master-status.md). **Do not use this
+> document's historical “approved”, “done”, PR, or sequencing prose as current status.** The next
+> build is master-plan handoff #8: Lane-C item 5a, the platform-routing-gate port. Read §5 and
+> §Dependencies and running order here only after reading that handoff.
+
 Written 2026-09-02 after tracing what the Studio, Content, Fiction, Charles and Venture rooms
 actually do. Muxin's stated model:
 
@@ -10,7 +16,8 @@ actually do. Muxin's stated model:
 > review, approval, publish. That is why the editor belongs on Content: Content is where social
 > creation and distribution happen.
 
-Nothing here is approved to build. This is the inventory and a proposed order.
+This is the inventory and design rationale. The master status document determines authorization,
+current completion, and execution order.
 
 ## What already matches the model
 

@@ -1,27 +1,40 @@
 # Content Studio master status
 
-## START HERE — next session (written 2026-09-04)
+## START HERE — next session (updated 2026-09-04)
 
 **Repo to work in:** `/Users/Muxin/Documents/GitHub/content-agents`, branch `main`.
 **This doc:** `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
 The `content-agents-worktrees/content-studio-master-status-recovery` worktree is merged and
 disposable — do not continue in it.
 
-**This doc is the single source of truth for status + decisions.** Any detailed design spec
-lives in its own doc that redirects here at its top; this doc always tracks the full progress.
-Decision 11's spec is inline below (Recorded product decisions → decision 11 + the slice
-checklist), so no separate spec doc exists for it yet.
+**This doc is the single source of truth for status + decisions.** Use
+`docs/content-room-alignment-plan.md` only as the detailed design/reference specification for
+room-model item 5; its top block redirects back here. Update this file whenever a slice lands,
+is deferred, or its verification/audit decision changes.
 
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff #7) — build Lane-C item 5 after this branch lands
-> Decision 11's per-room-queue ladder (slices 1.5/2/3) is done and merged. Lane A's first two pieces are
-> now landed: **P1 done (PR #442)**, **P2 merged #455 (`df02f09`)**, and **item 1 merged #456
-> (`608f335`)**. Muxin retired the former content-generation PR-review hold on 2026-09-04; all
-> implementation PRs merge after their recorded verification and audit. **Lane-A item 2
-> (Fiction/Charles) is complete on `feat/fiction-charles-editors` and ready to merge.** Continue
-> with Lane-C item 5 after it lands.
+> ### ▶ NEXT ACTION (2026-09-04 handoff #8) — Lane-C item 5a: port the platform-routing gate
+> Work from `main` in a fresh feature worktree. Lane A is fully merged: **P1 #442**, **P2 #455
+> (`df02f09`)**, **item 1 #456 (`608f335`)**, and **item 2 #457 (`e53c6d3`)**. Decision 11's
+> per-room queues (slices 1.5/2/3) are also complete. There are no open PRs.
+>
+> **Build exactly item 5a first:** bring the `/atomize` platform-routing `include`/`skip`,
+> cold-start, and exploration-probe decision into the configured Content generation path, so it
+> determines which variants are generated. Do not combine it with the subsequent `validate` port
+> or the seven remaining item-5 capabilities. Read the design constraints in
+> `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order, then inspect only
+> the cited route/generation code. Acceptance: a deterministic integration test proves skipped
+> platforms generate no variants while included/cold-start/exploration cases retain their intended
+> variants; existing request/provenance/review-pending invariants remain unchanged; focused tests
+> and final `npm run check` pass; complete a cross-family audit before the one bounded live canary.
+>
+> Use the bounded verification contract in `CLAUDE.md`: early Claude architecture review if its
+> quota is available (it was quota-blocked this session), red/green + fake-model E2E, audit before
+> canary, P0/P1 fixes only, then one isolated authenticated canary and final `npm run check`.
+> The audit packet must contain only this slice's requirements, diff, and test log. Record P2
+> findings as the next-builder checklist in this master doc or a linked evidence file.
 >
 > 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — DONE, merged as
 >    PR #455 (`df02f09`).** `CONTENT_EDITORS` registry keyed by
@@ -102,8 +115,8 @@ section only when this one cites it.
 >    changing this evidence protocol, and after the Capture selector defect is repaired run Pass D once to
 >    confirm the GUI Venture case records `venture-social-v1`.
 >
->    Then item 2 (Fiction/Charles), then lane-C (item 5 port). Decision 11's queue ladder is complete;
->    no decision-11 slice remains. P2 and item 1 are both now on `main`.
+>    Item 2 (Fiction/Charles) subsequently merged as #457 (`e53c6d3`). Lane C item 5a is now next.
+>    Decision 11's queue ladder is complete; no decision-11 slice remains.
 >
 > **Rule 7 (settled):** all slices merge after their scoped local verification and required audit pass.
 > Content-generation logic retains its stronger test, canary, and cross-family audit requirements; it no
@@ -113,11 +126,10 @@ section only when this one cites it.
 > lives in a `<script>` template literal so regex backslashes MUST be doubled (`\\s`), enforced by
 > `page.test.ts`; Fiction route tests MUST set `CONTENT_AGENTS_HOME` or they write the real inbox.
 >
-> **Handoff hygiene (2026-09-04, re-run at handoff #2):** `bash scripts/repo-hygiene.sh --rescue` run
-> from the repo root — **clean: no uncommitted work, no prunable/merged branches, nothing to rescue,
-> no untracked twins.** Working tree clean; local `main` will == `origin/main` after this doc commit.
-> P2's branch `feat/p2-editor-registry` (`97614a7`) is pushed and open as draft #455 — not a local-only
-> twin. `scripts/repo-hygiene.sh --rescue` still lists the same 5 stale local-only agent branches from
+> **Handoff hygiene (2026-09-04, re-run at handoff #8):** run `bash scripts/repo-hygiene.sh --rescue`
+> from the repo root after recording this update. Commit every real status/evidence change and never
+> leave an untracked twin beside a committed artifact. `scripts/repo-hygiene.sh --rescue` previously
+> listed the same 5 stale local-only agent branches from
 > 2026-08-24→27 (`agent/cs2-jobs-outreach-charles-extract`, `agent/cs2-page-room-pure-helpers`,
 > `agent/cs2-serve-walled-room-routes`, `agent/cs3-studio-durable-handoff`,
 > `agent/cs6-parallel-safe-ui-completion`) — prior-session work, unclassified, left untouched; verify
@@ -175,12 +187,15 @@ that day; what happened is under "PR hygiene" below, and you do not need it to b
 
 Remaining, in order:
 
-1. **Lane-A item 2 is complete on `feat/fiction-charles-editors`:** Fiction and Charles treated
-   variants dispatch through their selected editors with origin-specific checks and stamps. It passed
-   focused/full verification, a Grok 4.6 audit, and one bounded live canary; merge it, then advance.
+1. **Lane-A item 2 is DONE and MERGED — PR #457 (`e53c6d3`, 2026-09-04):** Fiction and Charles
+   treated variants dispatch through their selected editors with origin-specific checks and stamps.
+   It passed focused/full verification, a Grok 4.6 audit, and one bounded live canary. Evidence and
+   future hardening checklist: `docs/evidence-fiction-charles-editor-2026-09-04.md`.
 2. **Lane B: Decision 11's per-room queues are complete.** Item 4 Fiction, item 6, 3a, and the
    content-request fix are done, as are the contracts-first 1.5 slices and all queues.
-3. **Lane C (item 5's port sequence) is next** — same file, same region.
+3. **Lane C, item 5a (platform-routing gate port), is next** — same `jobs.ts` generation region.
+   Its detailed design is `docs/content-room-alignment-plan.md` §5; follow the narrowly scoped
+   handoff above rather than re-reading this history.
 
 ### Ground rules that bite immediately
 
@@ -907,18 +922,18 @@ Content generation before it appears as pending work in Content. A generic claim
 The work recorded in decision 10. All six gaps are agreed; there is no preference order among them,
 so this is the order the code forces. Full inventory with file and line references:
 `docs/content-room-alignment-plan.md`. **Approved to build (2026-09-03)** — see "Standing
-authorization" at the top of this doc. Rule 7 still holds each lane A and lane C PR as a draft
-carrying an old-versus-new sample.
+authorization" at the top of this doc. Rule 7 requires recorded local verification and any
+required cross-family audit; the former separate draft/PR-review hold was retired on 2026-09-04.
 
 **Two prerequisites, both cheap, both blocking.**
 
-- **P1 — one source of truth for platform limits. DONE (2026-09-03), held as draft PR #442.**
+- **P1 — one source of truth for platform limits. DONE and merged (2026-09-03), PR #442.**
   `src/review/jobs.ts` no longer hardcodes `CONFIGURED_PLATFORM_LIMITS`; a memoized
   `configuredPlatformLimit()` reads `config/platforms.yaml` `max_chars`, the same source
   `src/atomize/validate.ts` uses. Pure identity refactor (delta: none — see PR body's limits table);
   a regression test pins every value. It landed **before** item 1, as required, so item 1 wires
-  Venture into the config-backed limit check rather than the retired table. **P2 branches on #442.**
-- **P2 — the editor registry, and un-fusing the editor from provenance.** Replace the single
+  Venture into the config-backed limit check rather than the retired table. **P2 branched on #442.**
+- **P2 — the editor registry, and un-fusing the editor from provenance — DONE and merged, PR #455.** It replaced the single
   `configuredColdFeedEditorPrompt` (`jobs.ts:443-461`) with a registry of named editors, one per
   source kind, each a complete independent instruction set carrying its own voice rubric and its
   own `editor_pass:` stamp (decision 10b2). In the same change, split the `jobs.ts:804` gate
@@ -928,17 +943,16 @@ carrying an old-versus-new sample.
 
 **Then the forced chain.**
 
-- **Item 1, Venture, after P2.** Delete the Venture branch at `jobs.ts:793-803` and let Venture
-  take the same editor pass and limit check as every other origin. It must come after P2: deleting
+- **Item 1, Venture, after P2 — DONE and merged, PR #456.** The Venture branch at `jobs.ts:793-803` was deleted and Venture now takes the
+  same editor pass and limit check as every other origin. It had to come after P2: deleting
   the branch drops Venture through to the `:804` gate, which is false for it
   (`resolveConfiguredAuthoritative` returns `null` for Venture), so without P2 one bypass is simply
   replaced by another. Venture keeps its scoped tracing exception (`claim_refs`, not
   `source_lines`); that exemption is from tracing, not from the editor.
-- **Item 2, Fiction and Charles, after item 1** — only because both rewrite the same region of
-  `jobs.ts`. They are independent in design and serial in merge. Item 2's own new piece, the
-  mechanically checkable restricted treatment kind (every sentence in the treated body must already
-  appear in the approved body), is blocked by nothing and can be written and tested while item 1 is
-  in review. Lifting the block at `jobs.ts:608-610` is the last step, not the first.
+- **Item 2, Fiction and Charles, after item 1 — DONE and merged, PR #457.** Both rewrote the same
+  `jobs.ts` region, so they were serial in merge. Treated variants now select their origin-specific
+  editor/stamp; Charles's check is independent of `muxinVoiceFindings()`. The evidence file records
+  the bounded live canary and the P2 hardening checklist.
 - **Item 3 splits. 3a is DONE (2026-09-02, evening).** `/cycle`'s review and publish steps
   duplicated what the Content room already owns and were retired: steps 4 and 5 are gone from
   `.claude/skills/cycle/SKILL.md`, the wrap-up now points at the Content room, a "Retired steps"
@@ -962,14 +976,13 @@ carrying an old-versus-new sample.
   from the piece's own request origin, then an explicit `?brand=`, and 400s naming the missing
   brand if neither exists. No Human Inference default.
   Evidence: `docs/evidence-lane-b-2026-09-02.md`.
-- **Item 4 — Fiction leg DONE and MERGED (2026-09-03), PR #443 (`d682d77`).** Studio Start
+- **Item 4 — all Decision 11 room queues DONE and merged; Fiction leg was PR #443 (`d682d77`).** Studio Start
   (`POST /api/captures/start`) takes an optional `room` (default `"Content"`), and for Fiction lands
   the capture as a durable inbox idea via `createIdea()` — `needs-review`, no model job, client no
-  longer prefills `#ficIdea`. Charles, Venture and Outreach still have no durable lightweight
-  room-item store to reuse (Charles's only create is a draft-generation job; Venture's is heavy
-  `commitIntake`; Outreach's `intakeManual` needs a name/URL and has no endpoint), so Start fails
-  closed for them — **defining what a Charles input / Venture note / Outreach capture should become
-  is an open product question for Muxin** (see "Do this next"). Correction to the original premise:
+  longer prefills `#ficIdea`. **Historical premise, superseded by Decision 11:** Charles, Venture,
+  and Outreach initially had no lightweight item store. Decision 11 subsequently defined and
+  implemented their durable per-room queues, so this is no longer an open product question.
+  Correction to the original premise:
   a routed capture is not lost on reload — `takeCaptureTo` persists it via `POST /api/captures`
   before advancing; the real gap was promotion into the room's own item type.
 - **Item 5 is its own sequence:** the platform routing gate first (it decides which variants get
@@ -981,7 +994,7 @@ carrying an old-versus-new sample.
 | Lane | Work | Touches | Notes |
 |---|---|---|---|
 | A | P1, P2, item 1, item 2 | `src/review/jobs.ts` | Strictly serial within itself: one file, one region. |
-| B | Item 4 Fiction leg DONE (PR #443). Item 6, 3a and the `/atomize` content-request fix are all DONE. | `serve.ts`, `page.ts`, skills, verification | No overlap with lane A at all. **Only remaining lane-B work is item 4's Charles/Venture/Outreach Start legs, blocked on Muxin naming what each room's captured item should be.** |
+| B | Decision 11 per-room queues, item 4, item 6, 3a, and the `/atomize` content-request fix are all DONE. | `serve.ts`, `page.ts`, skills, verification | No remaining Lane-B work. |
 | C | Item 5's port sequence | `jobs.ts` generation path | **Collides with lane A on the same file.** Queue C behind A, or split the generation module before starting either. |
 
 **One small independent fix worth doing early — DONE (2026-09-02, evening).** `/atomize` wrote no
