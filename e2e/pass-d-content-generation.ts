@@ -220,7 +220,7 @@ async function main(): Promise<void> {
     const treatedStandalone = generated.some((body) => /variant_kind:\s*["']?treated/.test(body)
       && body.includes("Fixture standalone point 1.") && !body.includes("invented"));
     const editorStamped = generated.some((body) => /variant_kind:\s*["']?treated/.test(body)
-      && !/^editor_pass:/m.test(body));
+      && /^editor_pass:\s*cold-feed-v1$/m.test(body));
     const essayCta = generated.every((body) => /^cta:\s*source$/m.test(body) && /^cta_label:\s*["']Read the full essay:["']$/m.test(body))
       && stored.sourceProvenance?.canonicalUrl === "https://humaninference.substack.com/p/e2e-authoritative-source";
     const pending = (payload.ids ?? []).every((id) => new RegExp(`\\| ${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\|[^\\n]+\\| pending \\|`).test(queue));
@@ -269,11 +269,12 @@ async function main(): Promise<void> {
     const ventureBodies = (venturePayload.ids ?? []).map((id) => readFileSync(join(ventureFolder, "derivatives", `${id}.md`), "utf8"));
     const ventureQueue = readFileSync(join(ventureFolder, "review-queue.md"), "utf8");
     const ventureComposed = ventureBodies.some((body) => /variant_kind:\s*["']?treated/.test(body) && body.includes("Approved Venture premise, composed for"));
+    const ventureEditorStamped = ventureBodies.some((body) => /variant_kind:\s*["']?treated/.test(body) && /^editor_pass:\s*venture-social-v1$/m.test(body));
     const venturePending = (venturePayload.ids ?? []).every((id) => new RegExp(`\\| ${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\|[^\\n]+\\| pending \\|`).test(ventureQueue));
     record({
       feature: "Approved Venture authority composes treated pending Content through the real GUI",
-      status: ventureResponse.ok() && venturePayload.ok === true && venturePayload.engineExecution === "disposable-injected" && ventureComposed && venturePending ? "pass" : "fail",
-      detail: `HTTP ${ventureResponse.status()}; injected=${venturePayload.engineExecution}; outputs=${ventureBodies.length}; composed=${ventureComposed}; pending=${venturePending}; blocked calls=${session.blockedCalls.join(", ") || "none"}${venturePayload.error ? `; error=${venturePayload.error}` : ""}`,
+      status: ventureResponse.ok() && venturePayload.ok === true && venturePayload.engineExecution === "disposable-injected" && ventureComposed && ventureEditorStamped && venturePending ? "pass" : "fail",
+      detail: `HTTP ${ventureResponse.status()}; injected=${venturePayload.engineExecution}; outputs=${ventureBodies.length}; composed=${ventureComposed}; venture-social-v1=${ventureEditorStamped}; pending=${venturePending}; blocked calls=${session.blockedCalls.join(", ") || "none"}${venturePayload.error ? `; error=${venturePayload.error}` : ""}`,
     });
 
     const fictionResult = await page.evaluate(async (slug) => {

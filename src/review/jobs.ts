@@ -676,6 +676,24 @@ export function disposableVentureEngineOutput(request: ContentRequest, variants:
   })));
 }
 
+/**
+ * Deterministic stand-in for the configured editor's JSON-only response. It deliberately accepts
+ * the selected editor, rather than deriving an origin again, so the disposable browser pass
+ * exercises the same editor dispatch and records the same stamp as a live Venture run.
+ */
+export function disposableConfiguredEditorOutput(
+  editor: ContentEditor,
+  variants: readonly ContentVariant[],
+  bodies: ReadonlyMap<string, { body: string; sourceLines: (number | string)[] }>,
+): string | null {
+  if (!disposableConfiguredEngineAuthorized()) return null;
+  return JSON.stringify(variants.map((variant) => ({
+    id: variant.identity.id,
+    recommendation: `Fixture ${editor.kind} social edit preserves the approved draft.`,
+    body: bodies.get(variant.identity.id)?.body ?? "",
+  })));
+}
+
 export function ventureConfiguredContentPrompt(request: ContentRequest, variants: readonly ContentVariant[]): string {
   const source = request.ventureSource;
   if (!source) throw new Error("configured Venture treatment requires approved Venture source provenance");
@@ -942,16 +960,22 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
       } else {
         bodies = new Map(treated.map((variant) => [variant.identity.id, { body: authoritative?.body ?? request.originalInput, sourceLines: [] }]));
       }
-      // The injected engine stands in for the whole live run, editor included, so the harness
-      // stays deterministic; a live run always gets its origin's editor.
-      if (engineExecution !== "disposable-injected") {
-        const editor = editing.editor!;
+    }
+    if (editing.scannable) {
+      const editor = editing.editor!;
+      // The disposable editor response is as tightly gated as the disposable drafting response.
+      // It lets the browser test cover dispatch and stamp emission without allowing a real model
+      // or a generic test fixture to impersonate an editor in an ordinary checkout.
+      const injected = disposableConfiguredEditorOutput(editor, treated, bodies);
+      if (injected !== null) {
+        bodies = parseConfiguredEditorBodies(injected, treated, bodies);
+      } else {
         const editorResult = await runClaudeSpawn(job, editor.prompt(treated, bodies), { timeoutMs: ATOMIZE_TIMEOUT_MS, tools: "" });
         const editorFailure = decodeSpawnFailure(editorResult, job.id, { timeoutVerb: `${editor.kind} social editing`, timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`, exitVerb: `${editor.kind} social editing` });
         if (editorFailure) throw new Error(editorFailure.replace(/Claude/g, engineName(job)));
         bodies = parseConfiguredEditorBodies(editorResult.stdout, treated, bodies);
-        editorStamp = editor.stamp;
       }
+      editorStamp = editor.stamp;
     }
     mkdirSync(join(folder, "derivatives"), { recursive: true });
     mkdirSync(join(folder, "media-stages"), { recursive: true });
