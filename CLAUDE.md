@@ -108,32 +108,11 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    temporary exception for Kling video generation while local Wan 2.2 is evaluated; every paid
    call remains opt-in and logged to `data/cost-log.csv`. Attended Codex image generation is a
    reviewed-file workflow, not a callable repository API. New builds inherit this.
-7. **PR merge: prove routine changes locally; hold only for changes to content-generation LOGIC,
-   never for generated content itself.** The conductor merges a clean, locally verified PR
-   immediately after self-vet; routine hosted CI is manual/advisory. The ONLY reason to hold
-   a PR open for Muxin's explicit review is a change to the *code/prompts that decide what content
-   says* — `src/atomize/` extraction or spin logic, quote-card copy/image-prompt generation logic,
-   video script/storyboard drafting logic, `src/strategy/` brief-synthesis logic, Build 2 fiction
-   chapter-drafting logic, Build 3 Venture phase logic and gate predicates (`src/venture/**`), its
-   runtime rubric input (`venture/rules.yaml`), and its skill prompts (`.claude/skills/venture/**`),
-   Build 4 Charles's persona/voice config (`charles/config/persona.yaml`) and its skill prompts
-   (`.claude/skills/charles/**`). That is judgment-affecting and needs her eyes every time. Everything
-   else merges after the local check, full stop — including: the generated content itself committed to
-   git (derivatives, quote-card text, drafted chapters), review-queue/publish-log/ledger state,
-   backlog bookkeeping, docs, scripts, infra, config. Committing already-generated or
-   already-decided content to git is not "publishing" (rule 2 still gates actual publish via
-   `review-queue.md`) and is not a logic change, so it never needs a held PR. If in doubt whether a
-   diff is "logic" or "content," ask: does this diff change what future runs will generate, or is
-   it just this run's output/state? Only the former holds.
-   - **Conductor mechanics for a held content-generation-logic PR.** Open it as a **draft PR**,
-     never auto-merge, and put an **old-vs-new content sample side by side** in the PR
-     description (run the changed logic on a real or representative input before/after so Muxin
-     can see the actual output delta, not just the diff). This applies to every content-generation
-     LOGIC change with no exceptions — there is no self-vet carve-out for these, even when the
-     diff also touches a UI surface (e.g. review-GUI tooling bundled with a logic change still
-     holds on the logic half). The narrower self-vet exception for review-GUI/tooling-only PRs
-     (no logic change) still stands — see the diagnostic above: only "is it a logic change"
-     decides, UI-surface-or-not is irrelevant to that decision.
+7. **PR merge: prove changes locally, then merge.** A clean change may merge after its scoped
+   verification and any required cross-family audit pass; routine hosted CI is manual/advisory.
+   Content-generation logic still receives the same stronger test, canary, and audit gates, but it
+   does not require a separate PR-review hold. Committing generated or already-decided content is
+   not "publishing" — rule 2 remains the sole gate for publishing through `review-queue.md`.
 
 ## Pipeline map
 

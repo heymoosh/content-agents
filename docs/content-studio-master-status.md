@@ -15,15 +15,14 @@ checklist), so no separate spec doc exists for it yet.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff #4) — P2 + Venture item 1 are held as draft PRs #455 and #456
+> ### ▶ NEXT ACTION (2026-09-04 handoff #5) — merge P2 #455, then Venture item 1 #456
 > Decision 11's per-room-queue ladder (slices 1.5/2/3) is done and merged. Lane A's first two pieces are
-> now stacked and held: **P1 done (PR #442)**, **P2 draft #455**, and **item 1 draft #456**. Both draft
-> PRs change content-generation behavior and require Muxin's explicit review decision; do not infer a
-> merge approval from the test/audit results. After #455 is cleared and item 1 is reviewed, continue with
-> **item 2 (Fiction/Charles)** from the P2 editor registry rather than rebuilding either completed slice.
+> now stacked: **P1 done (PR #442)**, **P2 draft #455**, and **item 1 draft #456**. Muxin retired the
+> former content-generation PR-review hold on 2026-09-04: merge each after its recorded verification and
+> audit. After #455 and #456 land, continue with **item 2 (Fiction/Charles)** from the P2 editor registry.
 >
-> 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — BUILT, HELD as
->    draft PR #455** (branch `feat/p2-editor-registry`, `97614a7`). `CONTENT_EDITORS` registry keyed by
+> 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — BUILT, ready to
+>    merge as PR #455** (branch `feat/p2-editor-registry`, `97614a7`). `CONTENT_EDITORS` registry keyed by
 >    `request.origin` (studio/fiction/charles/venture, each its own prompt + voice rubric + `editor_pass`
 >    stamp); the fused `treated && sourceLines` gate split into a pure `planConfiguredEditing()` returning
 >    `{traceable, scannable, editor}`. Studio prompt moved in **byte-identical** (independently diffed vs
@@ -32,17 +31,12 @@ section only when this one cites it.
 >    just builder). Cross-family **Codex** audit returned FIX, but all three findings are seams P2
 >    deliberately leaves for the *unbuilt* items 1/2 (venture branch still bypasses by design; Fiction/
 >    Charles editors unreachable behind `assertConfiguredTreatmentPolicy`; no editor-dispatch integration
->    test seam yet) — re-scoped PASS. **HELD under rule 7** because P2's one behavior change is real:
+>    test seam yet) — re-scoped PASS. The former rule-7 hold was **retired 2026-09-04**; P2's one behavior
+>    change is real:
 >    a treated piece with **no `source_lines`** now gets an editor pass where before it got none.
 >    Sample: `docs/evidence-p2-editor-registry-2026-09-04.md`.
->    - **⚠ Muxin's word on this (2026-09-04):** "I don't really see a 'before editor vs after editor'
->      example to review here. I did review the editor previously and it works the way I want it to."
->      i.e. the deterministic prompt-in/out evidence file is NOT a real content before/after, and she is
->      already satisfied with the editor itself. She did **not** explicitly say "merge #455." Her comment
->      is about the editor generally; P2's held delta is the narrower gate-split (no-source treated now
->      gets an editor pass). **Next agent: either (a) confirm with Muxin that this clears #455 to merge,
->      then `gh pr ready 455 && gh pr merge 455 --squash`, or (b) if item 1 is picked up first, stack it
->      on `feat/p2-editor-registry` (see item 1 sequencing note). Do not merge #455 on inference alone.**
+>    - Muxin's prior editor-feedback record remains diagnostic only. The retired hold no longer blocks
+>      merging #455; its verification and audit evidence are sufficient.
 >    - **Audit → acceptance checklist the next builders MUST close:**
 >      - **Item 1 (Venture): CLOSED in draft #456.** The dedicated Venture drafting branch now falls
 >        through to `editing.scannable`; a treated Venture piece with no `source_lines` emits
@@ -79,7 +73,7 @@ section only when this one cites it.
 >    (missing/NaN last via `POSITIVE_INFINITY`, tie-break `postId`); a duplicate empty group row
 >    can't shadow a later real one. `npm run check` unsandboxed green (484 suites / 4107 tests);
 >    four-round cross-family codex/GPT audit ended PASS. Presentation-only, self-vet merged.
-> 4. **Lane-A item 1 (Venture through the normal editor) — BUILT, HELD as draft PR #456 (2026-09-04).**
+> 4. **Lane-A item 1 (Venture through the normal editor) — BUILT, ready to merge as PR #456 (2026-09-04).**
 >    The isolated stacked checkout `/private/tmp/content-agents-venture-editor` has branch
 >    `feat/venture-editor`, commits `3b7b701` + `d7153de`, and targets `feat/p2-editor-registry`.
 >    Venture's dedicated treated-draft path now runs the selected registry editor afterwards, including
@@ -104,11 +98,11 @@ section only when this one cites it.
 >
 >    Then item 2 (Fiction/Charles), then lane-C (item 5 port). Decision 11's queue ladder is complete;
 >    no decision-11 slice remains. **Sequencing note:** item 1 depends on P2 and remains stacked on it;
->    do not rebuild P2's registry while either draft awaits Muxin's decision.
+>    merge #455 first, then retarget #456 to `main` before merging.
 >
-> **Rule 7 (settled):** decision-11's routing, queues, gates, and fan-out self-vet merge on green;
-> lane-A changes to *how content is generated* remain held in a draft PR with a real old-versus-new
-> sample. Actual fiction chapter prose additionally needs line-comment review in that PR.
+> **Rule 7 (settled):** all slices merge after their scoped local verification and required audit pass.
+> Content-generation logic retains its stronger test, canary, and cross-family audit requirements; it no
+> longer waits for separate PR review. Human approval before publishing remains unchanged.
 >
 > **Repo gotchas:** run `npm run check` UNSANDBOXED (sandbox = phantom failures + EPERM); client JS
 > lives in a `<script>` template literal so regex backslashes MUST be doubled (`\\s`), enforced by
@@ -132,9 +126,8 @@ revisions of this doc froze `src/review/jobs.ts` "until she picks a starting ite
 **lifted**. The order below is not a preference, it is forced by the code (see "Room-model
 execution order"), so there was never anything for her to choose.
 
-What still needs her, and the only thing that does: **CLAUDE.md rule 7.** A change to
-content-generation LOGIC ships as a *draft* PR carrying an old-versus-new content sample, and waits
-for her. Everything else self-vet merges after a green local `npm run check`.
+No PR-specific review hold remains. Content-generation logic retains its stronger verification and
+cross-family audit requirements; publishing still requires Muxin's normal content approval.
 
 ### Do this next, in this order
 
@@ -1003,10 +996,9 @@ pending rows after. The request records identity, the verbatim source body and `
 provenance, and selects no platform/media/treatment (zero derived variants) — Studio configured and
 generated none of it. Evidence: `docs/evidence-lane-b-2026-09-02.md`.
 
-**Rule 7 split.** Lane A and lane C change what future runs generate: content-generation LOGIC,
-each needing a draft PR carrying an old-versus-new content sample, not a self-vet merge. Lane B is
-not logic — routing, verification and bookkeeping — with one exception: **3b** removes a drafting
-path and holds.
+**Verification split.** Lane A and lane C change what future runs generate and therefore require
+their stronger tests, canary evidence, and cross-family audit. Lane B is routing, verification, and
+bookkeeping, with one exception: **3b** removes a drafting path and receives the stronger verification.
 
 ## Prioritized remaining work
 
