@@ -681,6 +681,51 @@ test("client <script>: the Venture queue reads room=Venture, filters to the acti
   assert.ok(/"\/api\/room-queue\/venture-answer"\s*,\s*\{[^\n]*captureId[^\n]*slug[^\n]*expectedVersion/.test(rowClick), "an answer sends captureId, slug and the compare-and-swap version");
 });
 
+// Slice 2c: the Charles bottom-of-home queue and the group run. Order/shape assertions on the
+// emitted script: the loader reads room=Charles behind a guarded parse; the queue rows are built
+// from the group payload and appended AFTER the main render through the shared helper; the composer
+// posts ONE group run with the checked formats as `types` (no per-mode fan-out) behind the
+// at-least-one-format guard. The group's own behavior (reserve, draft, retry) is charles-queue's.
+test("client <script>: Charles reads its queue with a guarded parse, appends it after the main render, and drafts as one group run", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
+
+  const load = script.slice(script.indexOf("async function loadCharles("), script.indexOf("function renderCharles("));
+  assert.ok(load.includes('"/api/room-queue?room=Charles"'), "loadCharles reads the Charles room's queue projection");
+  assert.ok(/queueResponse\.json\(\)\.catch\(\(\)\s*=>\s*null\)/.test(load), "a malformed queue body degrades to null instead of throwing out of loadCharles");
+  assert.ok(/CHARLES_QUEUE\s*=\s*queueData\s*&&\s*queueData\.ok\s*&&\s*Array\.isArray\(queueData\.items\)\s*\?\s*queueData\.items\s*:\s*\[\]/.test(load), "the read lands in CHARLES_QUEUE, falling back to [] on a null or malformed read");
+
+  const render = script.slice(script.indexOf("function renderCharles("), script.indexOf("async function onCharlesAction("));
+  const mainRender = render.indexOf('$("#charlesMain").innerHTML =');
+  const queueCall = render.indexOf("renderCharlesQueue();", mainRender);
+  const queueFn = render.indexOf("function renderCharlesQueue(");
+  assert.ok(mainRender >= 0 && queueCall > mainRender, "the queue is appended after the main render, never in place of it");
+  const queueBody = render.slice(queueFn);
+  const filter = queueBody.search(/CHARLES_QUEUE[^\n]*\.filter\([^\n]*payload\.kind==="charles"/);
+  const join = queueBody.indexOf("SERVER_CAPTURES.find(c=>c.id===it.captureId)");
+  const outputs = queueBody.indexOf("it.payload.outputs");
+  const append = queueBody.search(/\$\("#charlesMain"\)\.insertAdjacentHTML\("beforeend",\s*roomQueueHtml\("Charles queue"/);
+  assert.ok(queueFn >= 0 && filter >= 0 && join > filter && outputs > join && append > outputs, "rows are filtered to Charles groups, titled from the capture text, carry per-output states, then go through the shared helper");
+  const rowClick = queueBody.slice(queueBody.indexOf('"#charlesMain .rq-row"'));
+  // The guard token is pinned literally and bound to its branch: `if(drafted)` (an inserted `!`
+  // breaks the match) must open the block that assigns charlesId and returns, and only after that
+  // block does the composer fall-through focus the input. Textual order alone would survive an
+  // inverted condition; this does not.
+  assert.ok(rowClick.includes("if(drafted){"), "the drafted branch is guarded by the literal `if(drafted)`");
+  assert.ok(!/if\s*\(\s*!\s*drafted\s*\)/.test(rowClick), "the guard is not its inverse");
+  assert.ok(/if\(drafted\)\{[^]*?charlesId\s*=\s*drafted\.postId[^]*?return;[^]*?\}[^]*?\$\("#charlesInput"\)\?\.focus\(\)/.test(rowClick), "the drafted branch sets charlesId and returns before the composer fall-through focuses the input");
+  assert.ok(!/\$\("#charlesInput"\)\?\.focus\(\)[^]*?charlesId\s*=\s*drafted\.postId/.test(rowClick), "the composer fall-through never precedes the drafted branch");
+
+  const draft = script.slice(script.indexOf("async function draftCharles("), script.indexOf("function renderCharlesReplySource("));
+  const guard = draft.search(/if\s*\(\s*!modes\.length\s*\)\s*\{\s*flash\("Choose at least one format"\)\s*;\s*return;\s*\}/);
+  const group = draft.search(/post\("\/api\/charles\/group"\s*,\s*\{\s*text\s*:\s*input\s*,\s*types\s*:\s*modes\s*,\s*engine\b/);
+  assert.ok(guard >= 0, "the at-least-one-format guard is still there");
+  assert.ok(group > guard, "one group run is posted after the guard, carrying the checked formats as types");
+  assert.ok(!draft.includes('"/api/charles/draft"'), "the composer no longer fans out per mode");
+  assert.ok(!/for\s*\(\s*const mode of modes\s*\)/.test(draft), "no per-mode loop survives");
+  assert.ok(draft.indexOf("loadCharles()") > group, "the room reloads after the group run so the new group shows in the queue");
+});
+
 // Slice 2a: a canonical update on a Studio-captured idea is routed through the durable confirm
 // gate instead of the one-click approve; chapter drafts and capture-less ideas keep the direct
 // path. The gate's BEHAVIOR (confirm appends once, cancel writes nothing, a stale id is a 409) is
@@ -1224,8 +1269,10 @@ test("Charles composer reveals a separate quoted-post field only when Reply is s
     "Reply remains part of the multi-output composer");
   assert.ok(html.includes("function renderCharlesReplySource()"),
     "format changes must control the conditional reply field");
-  assert.ok(html.includes('mode==="reply" ? replySource+(input ? "\\nRequested angle: "+input : "") : input'),
-    "the Reply job receives both the quoted post and the optional common thought");
+  // Since slice 2c the join (source first, then "Requested angle: <thought>") happens server-side in
+  // charles-queue.ts charlesDraftInput; the client's job is to send the quoted post as replySource.
+  assert.ok(/"\/api\/charles\/group"\s*,\s*\{[^\n]*replySource\s*:\s*modes\.includes\("reply"\)\s*\?\s*replySource/.test(html),
+    "the Reply output receives the quoted post as replySource on the group run");
 });
 
 test("Venture uses one workspace select, one labeled creation action, and four staged views", () => {
@@ -1804,7 +1851,7 @@ test("every route that enqueues a job arms the poll", () => {
     "/api/atomize", "/api/notes/pick", "/api/revise", "/api/duplicate", "/api/video/generate",
     "/api/strategy/refresh-brief", "/api/strategy/insights",
     "/api/strategy/ask-insights", "/api/strategy/pull", "/api/outreach/scout", "/api/outreach/draft",
-    "/api/outreach/message/revise", "/api/charles/draft", "/api/followups/draft-follow-up",
+    "/api/outreach/message/revise", "/api/charles/draft", "/api/charles/group", "/api/followups/draft-follow-up",
     "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check",
   ]) {
     assert.equal(enqueuesJob(route), true, route + " queues a job, so it must arm the poll");

@@ -5352,20 +5352,22 @@ async function draftCharles(){
   const btn = $("#charlesDraftBtn");
   btn.disabled = true; btn.textContent = "Queueing checked formats…";
   const engine=$("#charlesEngine").value;
-  const results=[];
-  for(const mode of modes) results.push({mode,result:await post("/api/charles/draft", {
-    mode, input:mode==="reply" ? replySource+(input ? "\\nRequested angle: "+input : "") : input, engine,
-  })});
+  // One durable group per capture (slice 2c): the server persists the selection first, then drafts
+  // each output through the same per-mode path; a reply gets its source prepended server-side
+  // (charles-queue.ts charlesDraftInput), so the client sends the pieces, not the joined string.
+  const result=await post("/api/charles/group", {text:input, types:modes, engine, replySource:modes.includes("reply")?replySource:undefined});
   btn.disabled = false; btn.textContent = "Draft";
-  const ok=results.filter(x=>x.result.ok), failed=results.filter(x=>!x.result.ok);
+  if(!result.ok){ flash(result.error||"Could not draft the selected formats"); return; }
+  const results=result.results||[];
+  const ok=results.filter(x=>x.outcome==="drafted"), failed=results.filter(x=>x.outcome==="failed");
   if(ok.length){
     $("#charlesInput").value = "";
     $("#charlesReplyInput").value = "";
-    charlesId = ok[ok.length-1].result.id;
+    charlesId = ok[ok.length-1].id;
     charlesPage = "needs-review";
-    flash("Queued "+ok.map(x=>typeLabel(x.mode)).join(", ")+" with "+engineLabel(engine)+(failed.length?"; failed: "+failed.map(x=>typeLabel(x.mode)).join(", "):""));
-    if(currentTab==="charles") loadCharles();
-  } else flash(failed.map(x=>typeLabel(x.mode)+": "+(x.result.error||"failed")).join("; "));
+    flash("Queued "+ok.map(x=>typeLabel(x.type)).join(", ")+" with "+engineLabel(engine)+(failed.length?"; failed: "+failed.map(x=>typeLabel(x.type)).join(", "):""));
+  } else flash(failed.length?failed.map(x=>typeLabel(x.type)+": "+(x.error||"failed")).join("; "):"Nothing new to draft; the group already holds those formats");
+  if(currentTab==="charles") loadCharles();
 }
 function renderCharlesReplySource(){
   $("#charlesReplySource").hidden = ![...document.querySelectorAll(".charles-format:checked")].some(x=>x.value==="reply");
@@ -5434,6 +5436,9 @@ $("#charlesPersonaProposeBtn").addEventListener("click",async()=>{
 // Content room, against Charles's simpler 5-column table (see charles/CLAUDE.md). Nothing here
 // posts anything — approving just flips the status cell; Muxin pastes it to Substack herself.
 let CHARLES_POSTS = [];
+// The Charles room's queue projection (GET /api/room-queue?room=Charles, slice 2c): one durable
+// group per capture with per-output states.
+let CHARLES_QUEUE = [];
 let charlesId = null;
 let charlesPage = "input";
 function renderCharlesPages(){
@@ -5456,11 +5461,15 @@ function typeLabel(t){ return t==="one-liner" ? "One-liner" : t==="essay" ? "Ess
 async function loadCharles(){
   loadCharlesBrief();
   loadCharlesPersona();
-  const r = await fetch("/api/charles");
+  const [r, queueResponse] = await Promise.all([fetch("/api/charles"), fetch("/api/room-queue?room=Charles").catch(()=>null)]);
   CHARLES_POSTS = (await r.json()).posts || [];
+  // The queue degrades on its own: a bad body must not take the room down with it.
+  const queueData = queueResponse&&queueResponse.ok ? await queueResponse.json().catch(()=>null) : null;
+  CHARLES_QUEUE = queueData&&queueData.ok&&Array.isArray(queueData.items) ? queueData.items : [];
   if(!CHARLES_POSTS.length){
     $("#charlesMain").innerHTML = '<div class="empty">Nothing drafted yet. Pick a mode above and hit Draft.</div>';
     $("#charlesDraftList").innerHTML = "";
+    renderCharlesQueue();
     renderCharlesPages(); return;
   }
   if(!charlesId || !CHARLES_POSTS.some(p=>p.id===charlesId)) charlesId = CHARLES_POSTS[0].id;
@@ -5472,7 +5481,7 @@ function renderCharles(){
   const post = visible.find(p=>p.id===charlesId) || visible[0];
   if(!post){
     $("#charlesMain").innerHTML='<div class="empty">Nothing in this view.</div>';
-    $("#charlesDraftList").innerHTML=""; return;
+    $("#charlesDraftList").innerHTML=""; renderCharlesQueue(); return;
   }
   charlesId=post.id;
   const engineProvenance=post.engine ? "Drafted with "+engineLabel(post.engine) : "Engine not recorded (legacy draft)";
@@ -5508,6 +5517,38 @@ function renderCharles(){
     '</div>').join("");
   document.querySelectorAll("#charlesDraftList .lead-chip").forEach(c=>c.addEventListener("click",()=>{ charlesId=c.dataset.id; renderCharles(); }));
   $("#charlesMain").querySelectorAll("[data-act]").forEach(b=>b.addEventListener("click", (e)=>onCharlesAction(e.target.dataset.act, post)));
+  renderCharlesQueue();
+}
+// Bottom-of-home queue (slice 2c): one row per captured thought (its durable group), titled by the
+// capture's own text (SERVER_CAPTURES) with the per-output states from the group payload. A row
+// click resumes Charles's native flow: it opens the group's first drafted output in the review
+// pages, or, for a group with nothing drafted yet, returns to the composer.
+function renderCharlesQueue(){
+  const rows=(CHARLES_QUEUE||[]).filter(it=>it.payload&&it.payload.kind==="charles").map(it=>{
+    const capture=SERVER_CAPTURES.find(c=>c.id===it.captureId);
+    const outputs=it.payload.outputs||[];
+    const done=outputs.filter(o=>o.status==="drafted"||o.status==="approved"||o.status==="rejected").length;
+    return {
+      id:it.captureId,
+      title:((capture&&capture.text)||"").replace(/\\s+/g," ").trim().slice(0,90)||"(captured thought)",
+      meta:it.state+" · "+done+" of "+outputs.length+" drafted"+(outputs.length?" · "+outputs.map(o=>typeLabel(o.type)+" "+o.status).join(", "):""),
+      tag:"GROUP", tagCls:"yours",
+      action:done?"Open":"Compose"
+    };
+  });
+  $("#charlesMain").insertAdjacentHTML("beforeend", roomQueueHtml("Charles queue", rows));
+  document.querySelectorAll("#charlesMain .rq-row").forEach(button=>button.addEventListener("click",()=>{
+    const item=(CHARLES_QUEUE||[]).find(it=>it.captureId===button.dataset.rqId);
+    const drafted=item&&(item.payload.outputs||[]).find(o=>o.postId&&CHARLES_POSTS.some(p=>p.id===o.postId));
+    if(drafted){
+      charlesId=drafted.postId; charlesPage="all";
+      renderCharles(); renderCharlesPages();
+      $("#charlesMain").scrollIntoView({behavior:"smooth",block:"start"});
+      return;
+    }
+    charlesPage="input"; renderCharlesPages();
+    $("#charlesInput")?.focus();
+  }));
 }
 async function onCharlesAction(act, item){
   if (act === "approve" || act === "discard"){
@@ -6255,7 +6296,7 @@ function jobsPollDue(jobs, now, armedUntil){
   if(jobs.some(j=>j.status==="queued"||j.status==="running")) return true;
   return jobs.some(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS + JOBS_POLL_MS);
 }
-const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/content/generate","/api/content/media/render","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check","/api/fiction/promotion/draft","/api/fiction/promotion/revise"];
+const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/content/generate","/api/content/media/render","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/charles/group","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check","/api/fiction/promotion/draft","/api/fiction/promotion/revise"];
 function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path) || /^\\/api\\/venture\\/[^/]+\\/(analyze|run-step)$/.test(path) || /^\\/api\\/venture\\/[^/]+\\/artifacts\\/[^/]+\\/(deliver|retry-delivery)$/.test(path); }
 function jobRoom(kind){
   if(kind==="scout"||kind==="draft-follow-up"||kind==="outreach-revise") return "Outreach";
