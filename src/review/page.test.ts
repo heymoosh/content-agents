@@ -16,7 +16,7 @@ import {
   groupDigits, metricLine, sampleNote, familyGate, fitLine, floorNote, reuseLine, readsFromCells,
   intakeProgressLine, intakeUnanswered, intakeSaveLine, intakeSlugError,
   ventureMultiPickIds, followupDraftRequest, outreachDraftRequest, outreachMessageReviseRequest, notesPickRequest,
-  charlesPostsForPage,
+  charlesPostsForPage, charlesReviewGroups, charlesGroupHtml, charlesOutputOrder, charlesResumeOutput,
   type MetricReadView, type ChannelTreatmentView, type TreatmentView, type FitBasisView,
 } from "./page.js";
 
@@ -43,6 +43,136 @@ test("Charles pages separate work needing review from approved and historical dr
   assert.deepEqual(charlesPostsForPage(posts, "approved").map((post) => post.id), ["a"]);
   assert.deepEqual(charlesPostsForPage(posts, "all").map((post) => post.id), ["p", "r", "a", "d"]);
   assert.deepEqual(charlesPostsForPage(posts, "input"), []);
+});
+
+// Slice 3: the combined review layout. Grouping keys off the durable group id each queue item
+// carries (never text); outputs order by ORDINAL (missing last, postId tie-break), not input order;
+// the essay leads in a bounded scroll window with a focus-mode trigger; the shorter outputs stack
+// below it as siblings; legacy rows with no group still render. The client copies of the grouping,
+// ordering and resume helpers are extracted from the emitted <script> and EXECUTED against the same
+// inputs so server and client cannot drift silently.
+const slice3Posts = [
+  { id: "one-1", type: "one-liner", status: "pending", body: "quip" },
+  { id: "essay-1", type: "essay", status: "approve", body: "long essay" },
+  { id: "reply-1", type: "reply", status: "revise", body: "riposte" },
+  { id: "legacy-1", type: "one-liner", status: "pending", body: "old quip" },
+];
+// Ordinals deliberately OUT of array order: reply first (0), essay (1), oneliner last (2).
+const slice3Items = [{
+  captureId: "cap-1", state: "partially-complete", payload: { kind: "charles", groupId: "group-abc", outputs: [
+    { type: "oneliner", ordinal: 2, status: "drafted", postId: "one-1" },
+    { type: "essay", ordinal: 1, status: "approved", postId: "essay-1" },
+    { type: "reply", ordinal: 0, status: "drafted", postId: "reply-1" },
+  ] },
+}];
+const slice3Title = (id: string) => (id === "cap-1" ? "  the   captured thought " : "");
+
+function clientCharlesHelpers(): { charlesReviewGroups: typeof charlesReviewGroups; charlesResumeOutput: typeof charlesResumeOutput; charlesOutputOrder: typeof charlesOutputOrder } {
+  const page = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = page.slice(page.indexOf("<script>"), page.lastIndexOf("</script>"));
+  const pages = script.slice(script.indexOf("function charlesPostsForPage("), script.indexOf("function charlesVisiblePosts("));
+  const grouping = script.slice(script.indexOf("function charlesOutputOrder("), script.indexOf("function charlesGroupHtml("));
+  assert.ok(pages && grouping, "the client helpers are present in the emitted script");
+  return new Function(pages + grouping + "; return { charlesReviewGroups, charlesResumeOutput, charlesOutputOrder };")();
+}
+
+test("Charles combined review groups outputs by durable group id: essay first, others stacked below by ordinal", () => {
+  for (const [side, api] of [["server", { charlesReviewGroups, charlesResumeOutput, charlesOutputOrder }], ["client", clientCharlesHelpers()]] as const) {
+    const groups = api.charlesReviewGroups(slice3Posts, slice3Items, "needs-review", slice3Title);
+    assert.equal(groups.length, 2, side + ": one durable group plus one legacy pseudo-group; nothing dropped");
+    const [group, legacy] = groups;
+    assert.equal(group.groupId, "group-abc", side);
+    assert.equal(group.title, "the captured thought", side);
+    assert.deepEqual(group.outputs.map((p) => p.id), ["essay-1", "reply-1", "one-1"], side + ": essay first, then the shorter outputs by ORDINAL (reply 0 before oneliner 2), not input order");
+    assert.deepEqual(group.others.map((p) => p.id), ["reply-1", "one-1"], side);
+    assert.equal(group.summary, "partially-complete · 3 of 3 drafted · 1 approved · 1 outside this page", side + ": partial-complete state reads off the group");
+    assert.equal(legacy.groupId, null, side);
+    assert.equal(legacy.key, "post:legacy-1", side);
+    assert.deepEqual(legacy.outputs.map((p) => p.id), ["legacy-1"], side);
+    assert.equal(api.charlesReviewGroups(slice3Posts, slice3Items, "input", slice3Title).length, 0, side + ": the input page shows nothing");
+    // The page argument drives visibility, not any global page state.
+    const approvedOnly = api.charlesReviewGroups(slice3Posts, slice3Items, "approved", slice3Title);
+    assert.deepEqual(approvedOnly.map((g) => g.key), ["group-abc"], side + ": the approved page shows the group (its essay is approved) and no legacy pending row");
+    assert.equal(approvedOnly[0].summary, "partially-complete · 3 of 3 drafted · 1 approved · 2 outside this page", side);
+    // A duplicate item for the same group renders once.
+    assert.equal(api.charlesReviewGroups(slice3Posts, [...slice3Items, ...slice3Items], "all", slice3Title).filter((g) => g.groupId === "group-abc").length, 1, side + ": a repeated groupId is drawn once");
+
+    // Ordering is deterministic under missing or duplicate ordinals: missing sorts last, ties break on postId.
+    // The finite MAX_SAFE_INTEGER entry carries the LARGEST postId ("zz"): it must still sort before
+    // every missing/NaN entry (small postIds "a"/"y"), which only holds when the missing sentinel is
+    // Infinity. Under a MAX_SAFE_INTEGER sentinel they would tie and "zz" would fall to the end.
+    const messy = [{ ordinal: undefined, postId: "a" }, { ordinal: 1, postId: "d" }, { ordinal: 1, postId: "c" }, { ordinal: Number.NaN, postId: "y" }, { ordinal: 0, postId: null }, { ordinal: Number.MAX_SAFE_INTEGER, postId: "zz" }];
+    assert.deepEqual([...messy].sort(api.charlesOutputOrder).map((o) => o.postId), [null, "c", "d", "zz", "a", "y"], side + ": ordinal, then postId; a finite MAX_SAFE_INTEGER ordinal sorts before every missing/NaN one");
+    assert.deepEqual([...messy].reverse().sort(api.charlesOutputOrder).map((o) => o.postId), [null, "c", "d", "zz", "a", "y"], side + ": input order does not leak into the result");
+
+    // Resume picks the LOWEST-ordinal drafted output whose post is loaded, not the first array entry.
+    const loaded = new Set(slice3Posts.map((p) => p.id));
+    assert.equal(api.charlesResumeOutput(slice3Items[0].payload.outputs, loaded)?.postId, "reply-1", side + ": resume opens reply (ordinal 0), not the array-first oneliner");
+    assert.equal(api.charlesResumeOutput(slice3Items[0].payload.outputs, new Set(["one-1"]))?.postId, "one-1", side + ": an unloaded lower-ordinal post is skipped");
+    assert.equal(api.charlesResumeOutput([{ type: "essay", ordinal: 0, status: "pending", postId: null }], loaded), null, side + ": nothing drafted yet resumes to the composer");
+  }
+});
+
+// A corrupted store can carry two rows for one groupId (room-queue.ts guarantees one per captureId,
+// not per file). The group is claimed only by the first row that actually yields drafted outputs,
+// so an EMPTY duplicate ahead of the real row must not shadow it.
+test("Charles combined review: an empty duplicate row for a group does not drop a later row's drafted outputs", () => {
+  const emptyFirst = [
+    { captureId: "cap-1", state: "pending", payload: { kind: "charles", groupId: "group-abc", outputs: [{ type: "essay", ordinal: 0, status: "pending", postId: null }] } },
+    ...slice3Items,
+  ];
+  for (const [side, api] of [["server", { charlesReviewGroups }], ["client", clientCharlesHelpers()]] as const) {
+    const shadowed = api.charlesReviewGroups(slice3Posts, emptyFirst, "all", slice3Title).filter((g) => g.groupId === "group-abc");
+    assert.equal(shadowed.length, 1, side + ": one section for the duplicated group");
+    assert.deepEqual(shadowed[0].outputs.map((p) => p.id), ["essay-1", "reply-1", "one-1"], side + ": the later row's drafted outputs render instead of falling through");
+    // And the real row first, empty duplicate second, still renders exactly once.
+    const realFirst = api.charlesReviewGroups(slice3Posts, [...slice3Items, emptyFirst[0]], "all", slice3Title).filter((g) => g.groupId === "group-abc");
+    assert.equal(realFirst.length, 1, side + ": a trailing duplicate is skipped");
+    assert.deepEqual(realFirst[0].outputs.map((p) => p.id), ["essay-1", "reply-1", "one-1"], side);
+  }
+});
+
+test("Charles group container: essay in a bounded scroll window with a focus trigger, shorter outputs stacked below", () => {
+  const [group] = charlesReviewGroups(slice3Posts, slice3Items, "needs-review", slice3Title);
+  const frag = (id: string) => ({ id, head: `<h4>${id}</h4>`, body: `body of ${id}`, actions: `<div class="actions" data-for="${id}"></div>` });
+  const html = charlesGroupHtml(group, frag(group.essay!.id), group.others.map((p) => frag(p.id)));
+  assert.equal(html.match(/<section class="charles-group"/g)?.length, 1, "one group container");
+  assert.ok(html.includes('data-group-id="group-abc"'), "the container carries the durable group id");
+  const essayAt = html.indexOf('<article class="charles-output charles-output-essay" data-charles-output="essay-1">');
+  const windowAt = html.indexOf('<div class="charles-essay-window charles-body">body of essay-1</div>');
+  const focusAt = html.indexOf('<button type="button" class="charles-focus" data-act="focus">');
+  const stackAt = html.indexOf('<div class="charles-group-stack">');
+  const replyAt = html.indexOf('data-charles-output="reply-1"');
+  const oneAt = html.indexOf('data-charles-output="one-1"');
+  assert.ok(essayAt >= 0 && windowAt > essayAt && focusAt > windowAt, "the essay renders in the bounded scroll window with a focus-mode trigger");
+  assert.ok(stackAt > focusAt && replyAt > stackAt && oneAt > replyAt, "the two shorter outputs stack below the essay in ordinal order (reply, then oneliner)");
+  assert.equal(html.match(/<article class="charles-output/g)?.length, 3, "three outputs, no more");
+  assert.equal(html.match(/charles-essay-window/g)?.length, 1, "only the essay gets the scroll window");
+  assert.ok(html.indexOf('data-for="essay-1"') > focusAt && html.indexOf('data-for="essay-1"') < stackAt, "the essay keeps its own per-output actions");
+
+  const noEssay = charlesGroupHtml({ key: "k", groupId: "g", title: "t", summary: "s" }, null, [frag("one-1")]);
+  assert.ok(!noEssay.includes("charles-essay-window") && !noEssay.includes("charles-focus"), "no empty essay window without an essay");
+  assert.ok(noEssay.includes('<div class="charles-group-stack">'), "the outputs still stack");
+  const single = charlesGroupHtml({ key: "k", groupId: "g", title: "t", summary: "s" }, frag("essay-1"), []);
+  assert.ok(single.includes("charles-essay-window") && !single.includes("charles-group-stack"), "a lone essay renders without an empty stack");
+
+  // The client render is wired the same way: the CSS bounds the essay window, the review pages group
+  // off the queue's durable groups, every output action resolves its own article, focus mode reuses
+  // the shared dialog over the existing save path, and resume selects by lowest ordinal then scrolls
+  // to that output's element.
+  const page = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.match(page, /\.charles-essay-window \{ max-height:\d+px; overflow-y:auto; \}/);
+  const script = page.slice(page.indexOf("<script>"), page.lastIndexOf("</script>"));
+  const render = script.slice(script.indexOf("function renderCharles("), script.indexOf("async function onCharlesAction("));
+  assert.ok(/charlesReviewGroups\(CHARLES_POSTS,\s*CHARLES_QUEUE\|\|\[\],\s*charlesPage/.test(render), "the review pages group off the queue's durable groups");
+  assert.ok(render.includes('".charles-output [data-act]"') && render.includes('closest(".charles-output")'), "each action resolves its own output");
+  const queue = render.slice(render.indexOf("function renderCharlesQueue("));
+  assert.ok(queue.startsWith("function renderCharlesQueue("), "renderCharlesQueue is in the Charles render block");
+  assert.ok(/const drafted=item \? charlesResumeOutput\(item\.payload\.outputs\|\|\[\],/.test(queue), "resume selects the lowest-ordinal drafted output through the shared helper");
+  assert.ok(/\(\$\("#charlesMain \.charles-output\.on"\)\|\|\$\("#charlesMain"\)\)\.scrollIntoView/.test(queue), "resume scrolls to the selected output element itself");
+  const focus = render.slice(render.indexOf("function openCharlesFocus("));
+  assert.ok(focus.includes('"/api/charles/doc"'), "focus mode saves through the existing per-output edit path");
+  assert.ok(focus.includes('$("#reviewFocus").hidden=false'), "focus mode reuses the shared review dialog");
 });
 
 test("Charles review names the producing engine and labels legacy drafts honestly", () => {
