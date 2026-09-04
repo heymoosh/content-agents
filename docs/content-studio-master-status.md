@@ -15,7 +15,7 @@ checklist), so no separate spec doc exists for it yet.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff) — decision-11 queues DONE; lane-A P2 built + HELD (draft #455); item 1 next
+> ### ▶ NEXT ACTION (2026-09-04 handoff #2) — P2 built + HELD (draft #455); Muxin says editor already reviewed; item 1 next
 > Decision 11's per-room-queue ladder (slices 1.5/2/3) is done and merged. Lane A has resumed: the two
 > prerequisites are complete — **P1 done (PR #442)** and **P2 built and HELD as draft PR #455** — so the
 > next lane-A build is **item 1 (Venture through the normal editor)**. Start here:
@@ -33,6 +33,14 @@ section only when this one cites it.
 >    test seam yet) — re-scoped PASS. **HELD under rule 7** because P2's one behavior change is real:
 >    a treated piece with **no `source_lines`** now gets an editor pass where before it got none.
 >    Sample: `docs/evidence-p2-editor-registry-2026-09-04.md`.
+>    - **⚠ Muxin's word on this (2026-09-04):** "I don't really see a 'before editor vs after editor'
+>      example to review here. I did review the editor previously and it works the way I want it to."
+>      i.e. the deterministic prompt-in/out evidence file is NOT a real content before/after, and she is
+>      already satisfied with the editor itself. She did **not** explicitly say "merge #455." Her comment
+>      is about the editor generally; P2's held delta is the narrower gate-split (no-source treated now
+>      gets an editor pass). **Next agent: either (a) confirm with Muxin that this clears #455 to merge,
+>      then `gh pr ready 455 && gh pr merge 455 --squash`, or (b) if item 1 is picked up first, stack it
+>      on `feat/p2-editor-registry` (see item 1 sequencing note). Do not merge #455 on inference alone.**
 >    - **Audit → acceptance checklist the next builders MUST close:**
 >      - **Item 1 (Venture):** delete the `origin === "venture"` bypass (`jobs.ts:915`) so venture falls
 >        through to `editing.scannable` and uses the `venture-social-v1` editor already in the registry;
@@ -84,9 +92,11 @@ section only when this one cites it.
 > lives in a `<script>` template literal so regex backslashes MUST be doubled (`\\s`), enforced by
 > `page.test.ts`; Fiction route tests MUST set `CONTENT_AGENTS_HOME` or they write the real inbox.
 >
-> **Handoff hygiene (2026-09-04):** working tree clean; local `main` == `origin/main`. The
-> notes-spread cron's 2026-09-04 ledger rows were committed as a `chore` (`1565045`, runtime state,
-> not logic). `scripts/repo-hygiene.sh --rescue` still lists 5 stale local-only agent branches from
+> **Handoff hygiene (2026-09-04, re-run at handoff #2):** `bash scripts/repo-hygiene.sh --rescue` run
+> from the repo root — **clean: no uncommitted work, no prunable/merged branches, nothing to rescue,
+> no untracked twins.** Working tree clean; local `main` will == `origin/main` after this doc commit.
+> P2's branch `feat/p2-editor-registry` (`97614a7`) is pushed and open as draft #455 — not a local-only
+> twin. `scripts/repo-hygiene.sh --rescue` still lists the same 5 stale local-only agent branches from
 > 2026-08-24→27 (`agent/cs2-jobs-outreach-charles-extract`, `agent/cs2-page-room-pure-helpers`,
 > `agent/cs2-serve-walled-room-routes`, `agent/cs3-studio-durable-handoff`,
 > `agent/cs6-parallel-safe-ui-completion`) — prior-session work, unclassified, left untouched; verify
