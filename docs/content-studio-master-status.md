@@ -10,23 +10,24 @@ disposable — do not continue in it.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff) — slice 1.5 DONE; build slice 2
-> Slice 1.5 (the decision-11 durable contracts) is built, green, cross-family-audited, and merged.
-> Start here:
+> ### ▶ NEXT ACTION (2026-09-04 handoff) — slices 1.5 + 2 DONE; build slice 3
+> Slices 1.5 (durable contracts) and 2 (per-room queues) are built, green, cross-family-audited, and
+> merged. Start here:
 > 1. **~~Build slice 1.5~~ — DONE.** Branch `feat/capture-contracts-slice15`, four commits
 >    (fd3268f 1.5a capture event-log + room projections; 7ca0d5f 1.5b Venture resolver + CAS answer
 >    protocol; e07b0e1 1.5c Fiction two-store link + confirm-before-canon gate; 59289ec 1.5d Charles
 >    durable output group + double-draft-safe run). Every sub-slice passed `npm run check`
 >    (4100/4100) + a cross-family codex/GPT audit before commit. Self-vet merged (rule 7 untouched —
 >    contracts/gates/classification, no prose). Checklist mapping under decision 11 below.
-> 2. **Build slice 2 — Studio Start routing + Charles/Venture queues** and **re-target PR #448's
->    Fiction queue at the new confirm gate** (slice 1.5c's `openCanonGate`/`confirmCanonGate`
->    replaces the old canon-approve shortcut), then un-draft/rebase #448 for merge.
-> 3. **Then slice 3** (Charles combined-review layout).
->
-> **Held, do NOT merge yet:** PR #448 (`feat/room-queue-slice1-fiction`) — green (4056/4056) but a
-> draft; it shortcuts into Fiction's *old* canon-approve path that slice 1.5's gate replaces. Rebase
-> and re-open only after the gate lands.
+> 2. **~~Build slice 2 — Studio Start routing + Charles/Venture queues~~ — DONE.** Three sub-slices,
+>    each `npm run check` unsandboxed green + cross-family codex audit, self-vet merged:
+>    **2a #448 (`2e467a7`)** re-targeted Fiction's canon-approve one-click at slice 1.5c's
+>    confirm-before-canon gate (captured non-chapter ideas only; chapters + legacy ideas keep the
+>    direct path) + the Fiction bottom queue; **2b #452 (`1487a0b`)** the Venture bottom queue
+>    (active-slug filter + open "which venture?" rows, CAS answer picker); **2c #453 (`fbd355c`)**
+>    the Charles bottom queue + switching the composer from N per-mode `/api/charles/draft` calls to
+>    one durable `/api/charles/group` run. All client-only over the 1.5 contracts; no prose logic.
+> 3. **Next = slice 3** (Charles combined-review layout).
 >
 > **Rule 7 (settled):** only actual fiction *chapter prose* (line-commented in a PR) ever holds. The
 > whole decision-11 feature — routing, queues, gates, fan-out — self-vet merges on green.
@@ -1222,10 +1223,12 @@ now:
      conversation id, and that navigation alone is not "resume" — each room needs a resume payload
      (Venture: slug + destination phase; Fiction: conversation id + gate state; Charles: capture
      group + durable selected formats).
-- **Slice 2 (after 1.5): the Studio Start routing + Charles/Venture queues + re-target #448's
-  Fiction queue at the new confirm flow.** Cross-family audit every store write.
-- **Slice 3:** the Charles combined-review layout (essay scrollable sub-window + stacked drafts,
-  focus mode) and any remaining resume depth.
+- **Slice 2 — DONE (2026-09-04):** the Charles/Venture per-room queues + re-target #448's Fiction
+  queue at the new confirm flow, all client-only over the 1.5 contracts. 2a #448 (`2e467a7`) Fiction
+  gate re-target + queue; 2b #452 (`1487a0b`) Venture queue + CAS answer picker; 2c #453 (`fbd355c`)
+  Charles queue + single `/api/charles/group` run. Each cross-family codex-audited before merge.
+- **Slice 3 (next):** the Charles combined-review layout (essay scrollable sub-window + stacked
+  drafts, focus mode) and any remaining resume depth.
 
 All of the above is still self-vet per the confirmed rule-7 scope above; "contracts-first" is an
 engineering-soundness reorder, not a review-gate change.
