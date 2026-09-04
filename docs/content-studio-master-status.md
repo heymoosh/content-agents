@@ -15,10 +15,36 @@ checklist), so no separate spec doc exists for it yet.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff) — slices 1.5 + 2 + 3 DONE; decision 11 per-room-queue slices complete
-> Slices 1.5 (durable contracts), 2 (per-room queues), and 3 (Charles combined-review layout) are all
-> built, green, cross-family-audited, and merged. Decision 11's per-room-queue slice ladder is done.
-> Start here:
+> ### ▶ NEXT ACTION (2026-09-04 handoff) — decision-11 queues DONE; lane-A P2 built + HELD (draft #455); item 1 next
+> Decision 11's per-room-queue ladder (slices 1.5/2/3) is done and merged. Lane A has resumed: the two
+> prerequisites are complete — **P1 done (PR #442)** and **P2 built and HELD as draft PR #455** — so the
+> next lane-A build is **item 1 (Venture through the normal editor)**. Start here:
+>
+> 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — BUILT, HELD as
+>    draft PR #455** (branch `feat/p2-editor-registry`, `97614a7`). `CONTENT_EDITORS` registry keyed by
+>    `request.origin` (studio/fiction/charles/venture, each its own prompt + voice rubric + `editor_pass`
+>    stamp); the fused `treated && sourceLines` gate split into a pure `planConfiguredEditing()` returning
+>    `{traceable, scannable, editor}`. Studio prompt moved in **byte-identical** (independently diffed vs
+>    `main` + literal-pin test); studio stamp stays `cold-feed-v1` so `src/grow/experiment-slice.ts` is
+>    untouched. `npm run check` unsandboxed **484 suites / 4111 tests / 0 fail** (coordinator-verified, not
+>    just builder). Cross-family **Codex** audit returned FIX, but all three findings are seams P2
+>    deliberately leaves for the *unbuilt* items 1/2 (venture branch still bypasses by design; Fiction/
+>    Charles editors unreachable behind `assertConfiguredTreatmentPolicy`; no editor-dispatch integration
+>    test seam yet) — re-scoped PASS. **HELD under rule 7** because P2's one behavior change is real:
+>    a treated piece with **no `source_lines`** now gets an editor pass where before it got none.
+>    Sample: `docs/evidence-p2-editor-registry-2026-09-04.md`.
+>    - **Audit → acceptance checklist the next builders MUST close:**
+>      - **Item 1 (Venture):** delete the `origin === "venture"` bypass (`jobs.ts:915`) so venture falls
+>        through to `editing.scannable` and uses the `venture-social-v1` editor already in the registry;
+>        acceptance = a venture treated piece (no source_lines) emits `editor_pass: venture-social-v1`.
+>      - **Item 2 (Fiction/Charles):** when lifting the `jobs.ts:726` treated-policy block, **Charles must
+>        NOT run through `muxinVoiceFindings()`** (rule-5 exemption) — add a per-editor `check` hook on
+>        `ContentEditor`; acceptance = Charles output validated against `persona.yaml`, not voice.yaml.
+>      - **Both:** add a deterministic editor-dispatch test seam (injectable editor output) + an integration
+>        test through `generateConfiguredContent` proving editor selection + stamp emission per newly-reachable
+>        origin (closes Codex finding 3; the untraced path has no disposable stand-in today).
+>
+> Prior slices, for the record:
 > 1. **~~Build slice 1.5~~ — DONE.** Branch `feat/capture-contracts-slice15`, four commits
 >    (fd3268f 1.5a capture event-log + room projections; 7ca0d5f 1.5b Venture resolver + CAS answer
 >    protocol; e07b0e1 1.5c Fiction two-store link + confirm-before-canon gate; 59289ec 1.5d Charles
@@ -43,8 +69,13 @@ section only when this one cites it.
 >    (missing/NaN last via `POSITIVE_INFINITY`, tie-break `postId`); a duplicate empty group row
 >    can't shadow a later real one. `npm run check` unsandboxed green (484 suites / 4107 tests);
 >    four-round cross-family codex/GPT audit ended PASS. Presentation-only, self-vet merged.
-> 4. **Next = the broader lane backlog** (decision 11's queue ladder is complete). Resume lane-A
->    editor depth and the lane-C port work from their own sections below — no decision-11 slice remains.
+> 4. **Next = lane-A item 1 (Venture through the normal editor)**, on top of P2's held branch #455
+>    (or `main` once #455 merges) — it is content-gen LOGIC, so **draft PR + old-vs-new sample + HOLD**,
+>    and it must close the item-1 acceptance line in the P2 checklist above. Then item 2 (Fiction/
+>    Charles), then lane-C (item 5 port). Decision 11's queue ladder is complete; no decision-11 slice
+>    remains. Line references: "Room-model execution order" below.
+>    **Sequencing note:** item 1 depends on P2. If Muxin has not yet cleared #455, either branch item 1
+>    off `feat/p2-editor-registry` (stacked) or wait for the merge — do not rebuild P2's registry.
 >
 > **Rule 7 (settled):** only actual fiction *chapter prose* (line-commented in a PR) ever holds. The
 > whole decision-11 feature — routing, queues, gates, fan-out — self-vet merges on green.
