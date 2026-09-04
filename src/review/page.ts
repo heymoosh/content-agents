@@ -3404,6 +3404,10 @@ let ficPromoDraft = null;
 let ficPromoBusy = false;
 let ficPromoError = "";
 let ficInbox = [];
+// The open confirm-before-canon gate for one inbox card (slice 2a): {ideaId, captureId, gateId,
+// target} while Muxin is being asked, null otherwise. Server-side it is durable (fiction-queue.ts);
+// here it only decides which card shows Confirm / Cancel instead of Approve.
+let ficGate = null;
 let ficPrNumber = "";
 let ficPrError = "";
 // ── Venture room ────────────────────────────────────────────────────────────────────────────────
@@ -5018,7 +5022,11 @@ function renderFiction(){
       (turns?'<div class="wb-margin-cap" style="margin-top:13px">CLARIFICATION TURNS · AUTHOR SUPPLIED</div>'+turns:'')+
       (proposal?'<div class="wb-margin-cap" style="margin-top:14px">CLEANUP PROPOSAL · REVIEW BEFORE CANON</div><div style="white-space:pre-wrap;font:400 16px/1.55 Georgia,serif;margin-top:5px">'+esc(proposal.cleanedText||'')+'</div><div class="src" style="margin-top:8px">Provenance: '+esc(proposal.provenance.engine)+' · '+esc(proposal.provenance.targetPath||'default target')+'</div>' : '<div class="src" style="margin-top:10px">The classifier abstained. Clarify the destination before a cleanup proposal can be made.</div>')+
       clarifyPanel+
-      (proposal&&idea.status==='needs-review'?'<div class="actions" style="margin-top:13px"><button class="primary" data-inbox-approve="'+esc(idea.id)+'">Approve for '+(idea.classification==='chapter'?'chapter drafting':'canonical update')+'</button><button data-inbox-reject="'+esc(idea.id)+'">Reject</button></div>':'')+
+      (proposal&&idea.status==='needs-review'
+        ? (ficGate&&ficGate.ideaId===idea.id
+          ? '<div style="margin-top:13px;padding-top:12px;border-top:1px solid #efe7d6"><div class="wb-margin-cap">CONFIRM BEFORE CANON</div><div class="src" style="margin-top:6px">This writes to '+esc(ficGate.target)+'. Nothing is written until you confirm.</div><div class="actions" style="margin-top:9px"><button class="primary" data-inbox-gate-confirm="'+esc(idea.id)+'">Confirm</button><button data-inbox-gate-cancel="'+esc(idea.id)+'">Cancel</button></div></div>'
+          : '<div class="actions" style="margin-top:13px"><button class="primary" data-inbox-approve="'+esc(idea.id)+'">Approve for '+(idea.classification==='chapter'?'chapter drafting':'canonical update')+'</button><button data-inbox-reject="'+esc(idea.id)+'">Reject</button></div>')
+        : '')+
       '</article>';
   }).join('');
   const inboxPage='<div class="wb-label" style="margin-top:28px">FICTION INBOX · ONE SAFE FRONT DOOR</div><div style="font:400 27px/1.35 Georgia,serif;margin:2px 0 9px">Where does this belong?</div><p class="src" style="max-width:650px">Your raw idea is stored byte-for-byte outside git. The selected engine classifies it, then proposes a cleanup for your review. Approval is the only action that can update a selected world, plot, or character document. Chapter ideas go to the existing draft flow.</p><div style="max-width:650px;border:1px solid #d8cfbb;border-radius:8px;padding:18px;background:#fffdf8"><textarea id="ficIdea" rows="5" placeholder="Drop in a world, character, plot, chapter, or imagery idea." style="width:100%;box-sizing:border-box;font:400 17px/1.6 Georgia,serif"></textarea><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px"><select id="ficIdeaTarget"><option value="">Choose a target when needed</option>'+inboxTargets+'</select>'+engineSelectHtml("ficIdeaEngine")+'<button class="primary" id="ficIdeaSubmit">Classify and prepare review</button></div></div><div style="max-width:700px;margin-top:23px">'+(inboxCards||'<div class="empty">No ideas in this inbox yet.</div>')+'</div>';
@@ -5108,7 +5116,34 @@ function renderFiction(){
     const result=await post("/api/fiction/inbox",{series:ficSeries,rawText:raw,targetPath:$("#ficIdeaTarget")?.value||undefined,engine:$("#ficIdeaEngine")?.value||"claude"});
     if(result.ok){flash(result.needsClarification?"I need a clearer destination":result.needsTarget?"Choose the character document":"Review proposal ready");await loadFiction();}else{button.disabled=false;button.textContent="Classify and prepare review";flash(result.error||"Could not classify idea");}
   });
-  document.querySelectorAll("#fictionMain [data-inbox-approve]").forEach(button=>button.addEventListener("click",async ()=>{const result=await post("/api/fiction/inbox/approve",{series:ficSeries,id:button.dataset.inboxApprove});if(result.ok){flash("Approved through the Fiction workflow");await loadFiction();}else flash(result.error||"Could not approve idea");}));
+  document.querySelectorAll("#fictionMain [data-inbox-approve]").forEach(button=>button.addEventListener("click",async ()=>{
+    const id=button.dataset.inboxApprove;
+    const idea=(ficInbox||[]).find(i=>i.id===id);
+    // A canonical update on a Studio-captured idea goes through the durable confirm gate
+    // (slice 1.5c). Chapter drafts never write canon, and ideas without a captureId never had a
+    // capture to gate on, so both keep the one-click approve.
+    if(idea&&idea.captureId&&idea.classification!=='chapter'){
+      button.disabled=true;
+      const result=await post("/api/fiction/gate/open",{captureId:idea.captureId});
+      if(result.ok&&result.gate){ficGate={ideaId:id,captureId:idea.captureId,gateId:result.gate.gateId,target:result.gate.target};renderFiction();}
+      else {ficGate=null;flash(result.error||"Could not open the confirmation");await loadFiction();}
+      return;
+    }
+    const result=await post("/api/fiction/inbox/approve",{series:ficSeries,id});
+    if(result.ok){flash("Approved through the Fiction workflow");await loadFiction();}else flash(result.error||"Could not approve idea");
+  }));
+  document.querySelectorAll("#fictionMain [data-inbox-gate-confirm],#fictionMain [data-inbox-gate-cancel]").forEach(button=>button.addEventListener("click",async ()=>{
+    const isConfirm=button.hasAttribute("data-inbox-gate-confirm");
+    const gate=ficGate; if(!gate){await loadFiction();return;}
+    button.disabled=true;
+    const result=await post(isConfirm?"/api/fiction/gate/confirm":"/api/fiction/gate/cancel",{captureId:gate.captureId,gateId:gate.gateId});
+    // Any outcome clears the local gate and reloads: a 409 (stale or superseded) or 400 must not
+    // leave the card stuck on Confirm; the server keeps the durable state either way.
+    ficGate=null;
+    if(result.ok) flash(isConfirm?"Confirmed into canon":"Cancelled; canonical documents were untouched");
+    else flash(result.error||(isConfirm?"Could not confirm":"Could not cancel"));
+    await loadFiction();
+  }));
   document.querySelectorAll("#fictionMain [data-inbox-reject]").forEach(button=>button.addEventListener("click",async ()=>{const result=await post("/api/fiction/inbox/reject",{series:ficSeries,id:button.dataset.inboxReject});if(result.ok){flash("Rejected; canonical documents were untouched");await loadFiction();}else flash(result.error||"Could not reject idea");}));
   document.querySelectorAll("#fictionMain [data-inbox-clarify]").forEach(button=>button.addEventListener("click",async ()=>{
     const id=button.dataset.inboxClarify; const followUp=$("#ficClarify-"+id)?.value||"";

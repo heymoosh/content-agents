@@ -313,3 +313,37 @@ test("gate routes: open asks durably, confirm off main refuses and keeps the gat
   assert.equal(unknown.code, 400);
   assert.match(String(unknown.body.error), /no such capture/);
 }));
+
+// Slice 2a: the desk's Cancel button and its stale-gate path, through the same routes the client
+// calls. open -> cancel must leave the bible byte-identical and the idea still needs-review; a
+// confirm carrying a gate id that is not the open one is a 409 that writes nothing.
+test("gate routes: open then cancel writes no canon and keeps the idea reviewable; a foreign gate id cannot confirm", () => withIsolatedHome(async (home) => {
+  const stories = storiesRoot("series-a");
+  const capture = saveCapture("Fiction", `A harbor that keeps no ledger. ${Date.now()}`);
+  const idea = worldIdea(home, stories, capture.text, capture.id);
+  projectFictionCapture(capture, idea);
+  const onMain = async () => "main";
+  const bible = join(stories, "series-a", "bible.md");
+  const before = readFileSync(bible, "utf8");
+
+  const opened = await call("/api/fiction/gate/open", { captureId: capture.id }, onMain);
+  assert.equal(opened.code, 200, String(opened.body.error ?? ""));
+  const gate = opened.body.gate as { gateId: string; target: string };
+  assert.equal(gate.target, "bible.md", "the card shows the doc the confirm would write");
+
+  const foreign = await call("/api/fiction/gate/confirm", { captureId: capture.id, gateId: "gate-not-this-one" }, onMain);
+  assert.equal(foreign.code, 409);
+  assert.equal(readFileSync(bible, "utf8"), before, "a foreign gate id appends nothing");
+  assert.equal(readIdea("series-a", idea.id, home)?.status, "needs-review");
+
+  const cancelled = await call("/api/fiction/gate/cancel", { captureId: capture.id, gateId: gate.gateId }, onMain);
+  assert.equal(cancelled.code, 200, String(cancelled.body.error ?? ""));
+  assert.equal((cancelled.body.gate as { state: string }).state, "cancelled");
+  assert.equal((cancelled.body.item as { state: string }).state, "pending", "the card goes back to Approve, not to done");
+  assert.equal(readFileSync(bible, "utf8"), before, "cancel writes no canon");
+  assert.equal(readIdea("series-a", idea.id, home)?.status, "needs-review", "the proposal is still Muxin's to approve");
+
+  const stale = await call("/api/fiction/gate/confirm", { captureId: capture.id, gateId: gate.gateId }, onMain);
+  assert.equal(stale.code, 409, "confirming the cancelled gate is refused, not silently promoted");
+  assert.equal(readFileSync(bible, "utf8"), before);
+}));
