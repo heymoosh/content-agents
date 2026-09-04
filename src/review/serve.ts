@@ -116,6 +116,12 @@ import { loadFictionPromotionDraft } from "./fiction-promotion-draft.js";
 import { createApprovedCharlesHandoff } from "./charles-content-handoff-store.js";
 import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
 import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
+import { projectFictionCapture, syncFictionQueue } from "./fiction-queue.js";
+import { pendingCount, projectCaptureEvents, readQueueItem, roomQueueItems } from "./room-queue.js";
+import { syncCharlesQueue } from "./charles-queue.js";
+import { answerVentureCapture, answerVersionOf, projectVentureCapture } from "./venture-queue.js";
+import { resolveVentureMention, ventureCandidates } from "./venture-resolver.js";
+import { listVentures } from "../venture/paths.js";
 import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
 import { saveCutBody, addCutComment } from "./rows.js";
 import { brandForOrigin, isBrandId, type BrandId } from "../identity/brand.js";
@@ -1390,6 +1396,42 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       json(res, 200, { ok: true, captures: listCaptures() });
       return;
     }
+    // One room's queue projection (decision 11, slice 1.5a). Read-side reconcile: legacy capture
+    // events are projected on first read, Fiction items mirror their idea's status. `pending` is
+    // the collapsed-summary count — only still-needs-attention states (room-queue.ts).
+    if (req.method === "GET" && url.pathname === "/api/room-queue") {
+      const room = String(url.searchParams.get("room") ?? "") as CaptureRoom;
+      if (!["Content", "Fiction", "Outreach", "Venture", "Signals", "Charles"].includes(room)) {
+        json(res, 400, { ok: false, error: "capture room is invalid" }); return;
+      }
+      try {
+        if (room === "Fiction") {
+          json(res, 200, { ok: true, room, ...syncFictionQueue({ series: listFictionSeries().map((s) => s.slug) }) });
+          return;
+        }
+        // Charles groups mirror each drafted output's review-queue.md decision and roll up (slice 1.5d).
+        if (room === "Charles") {
+          json(res, 200, { ok: true, room, ...syncCharlesQueue() });
+          return;
+        }
+        projectCaptureEvents(listCaptures().filter((capture) => capture.room === room));
+        const items = roomQueueItems(room).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        json(res, 200, { ok: true, room, items, pending: pendingCount(items) });
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    // Muxin's answer to an awaiting-venture capture (decision 11, slice 1.5b). Compare-and-swap on
+    // `answerVersion`: a stale version is a 409 and writes nothing; the same answer replayed is a
+    // no-op 200; a slug not on disk right now is a 400 (venture-queue.ts).
+    if (req.method === "POST" && url.pathname === "/api/room-queue/venture-answer") {
+      const b = await readBody(req);
+      const expectedVersion = typeof b.expectedVersion === "number" ? b.expectedVersion : Number.NaN;
+      const result = answerVentureCapture({ captureId: String(b.captureId ?? ""), slug: String(b.slug ?? ""), expectedVersion }, listVentures());
+      if (result.status === 200) json(res, 200, { ok: true, item: result.item, replayed: result.replayed });
+      else if (result.status === 409) json(res, 409, { ok: false, error: result.error, item: result.item });
+      else json(res, result.status, { ok: false, error: result.error });
+      return;
+    }
     // The front door's room read: a subscription-route model judgment with the keyword sniff as
     // fallback (src/review/capture-router.ts). Pure read: it creates and queues nothing; the desk
     // still shows the verdict with "Wrong room?" buttons and waits for Start on it.
@@ -1415,8 +1457,11 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     // it can create source/cuts, but has no approval, scheduling, or publishing capability. A routed
     // Fiction capture lands as a durable inbox idea (needs-review state), so it survives a reload as
     // a real room item instead of text prefilled into a field. `room` defaults to Content so existing
-    // callers are unchanged. Charles, Venture and Outreach have no durable lightweight room-item store
-    // yet (see docs/content-studio-master-status.md); those rooms still only persist the capture.
+    // callers are unchanged. A Venture capture lands in the Venture queue against one venture, or as
+    // a durable open question when the venture is ambiguous (slice 1.5b). A Charles capture becomes a
+    // durable group through POST /api/charles/group (slice 1.5d), which needs the selected formats,
+    // so Start does not create one; Outreach has no durable lightweight room-item store yet (see
+    // docs/content-studio-master-status.md). Those rooms still only persist the capture here.
     if (req.method === "POST" && url.pathname === "/api/captures/start") {
       const b = await readBody(req);
       const room = String(b.room ?? "Content") as CaptureRoom;
@@ -1427,8 +1472,32 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           const series = listFictionSeries();
           if (series.length !== 1) throw new Error(series.length === 0 ? "no fiction series exists yet" : "more than one fiction series exists; open the Fiction room to choose one");
           const capture = saveCapture("Fiction", String(b.text ?? ""));
-          const idea = createIdea(series[0]!.slug, capture.text);
-          json(res, 200, { ok: true, capture, idea, room: "Fiction", replayed: false });
+          // The idea records the capture id it was Started from, so a crash before the queue
+          // projection below still leaves the two stores reconcilable by id (fiction-queue.ts).
+          const idea = createIdea(series[0]!.slug, capture.text, { captureId: capture.id });
+          // The raw capture event stays as-is; the idea link and lifecycle live in the room queue.
+          const queueItem = projectFictionCapture(capture, idea);
+          json(res, 200, { ok: true, capture, idea, queueItem, room: "Fiction", replayed: false });
+          return;
+        }
+        if (room === "Venture") {
+          // No model runs and no venture step starts: the capture is persisted and projected into the
+          // Venture queue against ONE venture. The mention is `b.venture` when the desk sends one,
+          // else the capture text itself; the resolver never trusts a bare client slug. When it
+          // cannot pick one venture the question is durable (awaiting-answer + candidate snapshot)
+          // and the desk answers it through POST /api/room-queue/venture-answer.
+          const text = String(b.text ?? "");
+          const ventures = ventureCandidates();
+          if (ventures.length === 0) throw new Error("no venture exists yet; create one in the Venture room first");
+          const mention = typeof b.venture === "string" && b.venture.trim() ? b.venture : text;
+          const capture = saveCapture("Venture", text);
+          const replayed = readQueueItem(capture.id) !== null;
+          const queueItem = projectVentureCapture(capture, resolveVentureMention(mention, ventures), ventures);
+          const needsVenture = queueItem.state === "awaiting-answer";
+          json(res, 200, {
+            ok: true, capture, queueItem, room: "Venture", replayed, needsVenture, captureId: capture.id,
+            ...(needsVenture ? { candidates: queueItem.payload.candidates ?? [], answerVersion: answerVersionOf(queueItem) } : {}),
+          });
           return;
         }
         if (room !== "Content") throw new Error(`Studio Start does not create a room item for ${room} yet`);

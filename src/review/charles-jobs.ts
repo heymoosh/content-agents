@@ -106,6 +106,23 @@ export function validateCharlesDraftMutation(
   mode: CharlesDraftMode,
   root: string,
 ): { id: string; post: CharlesPost } {
+  const [only] = validateCharlesGroupMutation(before, [mode], root);
+  return { id: only!.id, post: only!.post };
+}
+
+/**
+ * The group form of the check above (slice 1.5d): one run may produce several outputs under one
+ * group, but the invariant per output is unchanged. Exactly one new draft file in its mode's
+ * directory and exactly one appended pending row pointing at it, per selected mode; no output type
+ * twice; no row without a file and no file without a row; nothing else in the tree touched.
+ */
+export function validateCharlesGroupMutation(
+  before: CharlesDraftState,
+  modes: readonly CharlesDraftMode[],
+  root: string,
+): Array<{ mode: CharlesDraftMode; id: string; post: CharlesPost }> {
+  if (!modes.length) throw new Error("Charles draft must select at least one output");
+  if (new Set(modes).size !== modes.length) throw new Error("Charles group must not select the same output type twice");
   const after = captureCharlesDraftState(root);
   const queueRel = "review-queue.md";
   const queueBefore = before.files.get(queueRel)?.toString("utf8") ?? "";
@@ -116,36 +133,44 @@ export function validateCharlesDraftMutation(
     const next = after.files.get(rel);
     return next !== undefined && !before.files.get(rel)!.equals(next);
   });
-  const expectedDir = `posts/${CHARLES_DIR_BY_MODE[mode]}`;
+  const expectedDirs = new Set(modes.map((mode) => `posts/${CHARLES_DIR_BY_MODE[mode]}`));
   const addedDirs = [...after.dirs].filter((rel) => !before.dirs.has(rel));
   const removedDirs = [...before.dirs].filter((rel) => !after.dirs.has(rel));
-  if (removedDirs.length || addedDirs.some((rel) => rel !== expectedDir)) {
+  if (removedDirs.length || addedDirs.some((rel) => !expectedDirs.has(rel))) {
     throw new Error("Charles draft must not add or remove any unexpected directory");
   }
   for (const [rel, priorMode] of before.modes) {
     if (after.modes.get(rel) !== priorMode) throw new Error(`Charles draft changed a file mode or permission: ${rel}`);
   }
   if (removed.length || modified.some((rel) => rel !== queueRel) || modified.filter((rel) => rel === queueRel).length !== 1) {
-    throw new Error("Charles draft must change only review-queue.md and one new draft file");
+    throw new Error("Charles draft must change only review-queue.md and its new draft files");
   }
-  if (added.length !== 1) throw new Error("Charles draft must create exactly one new draft file");
-  const expectedType: Record<CharlesDraftMode, string> = { oneliner: "one-liner", essay: "essay", reply: "reply" };
-  if (!new RegExp(`^posts/${CHARLES_DIR_BY_MODE[mode]}/[a-z0-9][a-z0-9-]*\\.md$`).test(added[0])) {
-    throw new Error(`Charles ${mode} draft must use its mode-specific posts directory`);
-  }
+  if (added.length !== modes.length) throw new Error("Charles draft must create exactly one new draft file per selected output");
   const prefix = queueBefore.endsWith("\n") ? queueBefore : queueBefore + "\n";
-  if (!queueAfter.startsWith(prefix)) throw new Error("Charles draft must append one queue row without rewriting existing queue bytes");
+  if (!queueAfter.startsWith(prefix)) throw new Error("Charles draft must append its queue rows without rewriting existing queue bytes");
   const appended = queueAfter.slice(prefix.length).trimEnd();
-  if (!appended || appended.includes("\n")) throw new Error("Charles draft must append exactly one queue row");
+  if (!appended || appended.split("\n").length !== modes.length) throw new Error("Charles draft must append exactly one queue row per selected output");
   const beforeIds = new Set(queueRows(queueBefore).map((row) => row.id));
   const newRows = queueRows(queueAfter).filter((row) => !beforeIds.has(row.id));
-  if (newRows.length !== 1) throw new Error("Charles draft must append exactly one new queue id");
-  const row = newRows[0];
-  if (row.status !== "pending") throw new Error("Charles draft queue status must be pending");
-  if (row.type !== expectedType[mode] || row.file !== added[0]) throw new Error("Charles draft row must match its requested mode and new file");
-  const authored = after.files.get(added[0])!.toString("utf8") + "\n" + appended;
+  if (newRows.length !== modes.length) throw new Error("Charles draft must append exactly one new queue id per selected output");
+  const expectedType: Record<CharlesDraftMode, string> = { oneliner: "one-liner", essay: "essay", reply: "reply" };
+  const outputs = modes.map((mode) => {
+    const files = added.filter((rel) => new RegExp(`^posts/${CHARLES_DIR_BY_MODE[mode]}/[a-z0-9][a-z0-9-]*\\.md$`).test(rel));
+    if (files.length !== 1) throw new Error(`Charles ${mode} draft must use its mode-specific posts directory`);
+    const rows = newRows.filter((row) => row.type === expectedType[mode]);
+    if (rows.length !== 1) throw new Error(`Charles draft must append exactly one ${expectedType[mode]} row`);
+    const row = rows[0]!;
+    if (row.status !== "pending") throw new Error("Charles draft queue status must be pending");
+    if (row.file !== files[0]) throw new Error("Charles draft row must match its requested mode and new file");
+    return { mode, file: files[0]!, row };
+  });
+  // Every added file is claimed by exactly one row and vice versa: no orphans in either direction.
+  if (new Set(outputs.map((output) => output.file)).size !== added.length || new Set(outputs.map((output) => output.row.id)).size !== newRows.length) {
+    throw new Error("Charles draft rows and draft files must match one to one");
+  }
+  const authored = added.map((rel) => after.files.get(rel)!.toString("utf8")).join("\n") + "\n" + appended;
   assertCharlesDraftPolicy(authored);
-  return { id: row.id, post: readCharlesPost(row.id, root) };
+  return outputs.map((output) => ({ mode: output.mode, id: output.row.id, post: readCharlesPost(output.row.id, root) }));
 }
 
 export async function withCharlesDraftStage<T>(task: (stage: { root: string; charlesRoot: string }) => Promise<T>): Promise<T> {

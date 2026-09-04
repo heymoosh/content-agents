@@ -56,6 +56,13 @@ export interface IdeaRecord {
   updatedAt: string;
   storageRoot?: string;
   storiesRoot?: string;
+  /**
+   * The Studio capture event this idea was Started from (captures.ts id), the durable link between
+   * the two stores (decision 11, slice 1.5c). Optional: ideas from the Fiction room's own inbox and
+   * every record written before the field existed have none, and the room queue falls back to a
+   * unique raw-text match for those.
+   */
+  captureId?: string;
 }
 
 export interface IdeaOptions {
@@ -64,6 +71,7 @@ export interface IdeaOptions {
   classification?: IdeaClassification;
   targetPath?: string;
   engine?: Engine;
+  captureId?: string;
 }
 
 const defaultHome = () => process.env.CONTENT_AGENTS_HOME?.trim() || join(homedir(), ".content-agents");
@@ -140,15 +148,23 @@ export function createIdea(series: string, rawText: string, options: IdeaOptions
   const storageRoot = resolve(options.storageRoot ?? defaultHome());
   const storiesRoot = resolve(options.storiesRoot ?? join(repoRoot, "stories"));
   const id = ideaId(series, rawText);
+  const captureId = options.captureId?.trim() || undefined;
   return mutate(series, storageRoot, (records) => {
-    const existing = records.find((record) => record.id === id && record.rawText === rawText);
-    if (existing) return existing;
+    const index = records.findIndex((record) => record.id === id && record.rawText === rawText);
+    if (index >= 0) {
+      const existing = records[index]!;
+      // A replayed Start (crash retry, second tab) over a record that predates the link: backfill
+      // the capture id, never overwrite one already recorded.
+      if (captureId && existing.captureId === undefined) records[index] = { ...existing, captureId, updatedAt: new Date().toISOString() };
+      return records[index]!;
+    }
     const now = new Date().toISOString();
     const classification = options.classification ?? "clarify";
     const record: IdeaRecord = {
       id, series, rawText, classification,
       targetPath: targetForClassification(classification, options.targetPath), status: "needs-review", proposal: null,
       engine: options.engine ?? "claude", clarificationTurns: [], createdAt: now, updatedAt: now, storageRoot, storiesRoot,
+      ...(captureId ? { captureId } : {}),
     };
     records.push(record);
     return record;
@@ -275,8 +291,19 @@ export function approveIdea(proposal: CleanupProposal, options: ApprovalOptions 
         throw new Error("target document is not writable through the Fiction inbox");
       }
       const existing = readFileSync(resolved.abs, "utf8");
-      const body = `${existing.replace(/\n*$/, "\n\n")}${proposal.cleanedText.replace(/\n*$/, "\n")}`;
-      writeFileSync(resolved.abs, body);
+      // The canon doc and the idea store are two files: a crash after this append but before the
+      // status below persists leaves the text in canon and the idea still needs-review. A retry
+      // must not append it twice, so a doc already ending in this exact text only gets the status
+      // persisted. The match is anchored to a line boundary (an append always lands after "\n\n"),
+      // so a doc whose last line merely ends in the same words still gets its append; an
+      // identical block earlier in the doc is unrelated.
+      const tail = proposal.cleanedText.replace(/\n*$/, "");
+      const docTrimmed = existing.replace(/\n*$/, "");
+      const alreadyAppended = docTrimmed === tail || docTrimmed.endsWith(`\n${tail}`);
+      if (!alreadyAppended) {
+        const body = `${existing.replace(/\n*$/, "\n\n")}${proposal.cleanedText.replace(/\n*$/, "\n")}`;
+        writeFileSync(resolved.abs, body);
+      }
     }
     const updated = { ...proposal, status: "approved" as const, storageRoot, storiesRoot };
     records[index] = { ...records[index], proposal: updated, status: "approved", updatedAt: new Date().toISOString() };

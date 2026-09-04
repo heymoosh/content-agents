@@ -26,6 +26,8 @@ import {
   createStoryDraftPr, defaultRun, listStoryReviewComments, processChapterReviewComments,
   replyToStoryReviewComment, reviseSpanWithEngine, validateStoryChapter, verifyStoryReviewPr,
 } from "../fiction/review-pr.js";
+import { cancelCanonGate, canonGateDigest, confirmCanonGate, openCanonGate, type FictionGateResult } from "./fiction-queue.js";
+import { readQueueItem, type FictionQueuePayload, type RoomQueueItem } from "./room-queue.js";
 
 type FictionRouteContext = {
   req: IncomingMessage;
@@ -159,6 +161,44 @@ export async function handleFictionRoute({
         queueChapter: (slug, raw, engine) => { queued = addFictionDraftJob(slug, raw, engine).job; },
       });
       json(res, 200, { ok: true, idea: record, job: queued ? publicJob(queued) : null });
+    } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+    return true;
+  }
+  // Confirm-before-canon gate over a Studio-queued idea (decision 11, slice 1.5c, fiction-queue.ts).
+  // `open` asks the durable question, `confirm` is the only path that writes canon from here (the
+  // same approveIdea + main-branch authorization the approve route above uses), `cancel` withdraws
+  // it. All three are idempotent; a reload reads the same gate off GET /api/room-queue?room=Fiction.
+  if (req.method === "POST" && (url.pathname === "/api/fiction/gate/open" || url.pathname === "/api/fiction/gate/confirm" || url.pathname === "/api/fiction/gate/cancel")) {
+    const b = await readBody(req);
+    const captureId = String(b.captureId ?? "");
+    const gateId = String(b.gateId ?? "");
+    const reply = (result: FictionGateResult) => {
+      if (result.status === 200) json(res, 200, { ok: true, item: result.item, gate: result.gate, resume: result.resume, replayed: result.replayed });
+      else if (result.status === 409) json(res, 409, { ok: false, error: result.error, item: result.item });
+      else json(res, result.status, { ok: false, error: result.error });
+    };
+    const linkedIdea = () => {
+      const item = readQueueItem(captureId) as RoomQueueItem<FictionQueuePayload> | null;
+      if (!item || item.payload.kind !== "fiction") throw new Error("no such capture in the Fiction queue");
+      if (!item.payload.series || !item.payload.ideaId) throw new Error("this capture is not linked to an idea yet");
+      const idea = readIdea(item.payload.series, item.payload.ideaId);
+      if (!idea) throw new Error("the linked idea no longer exists");
+      return idea;
+    };
+    try {
+      if (url.pathname === "/api/fiction/gate/open") { reply(openCanonGate(captureId, linkedIdea())); return true; }
+      if (url.pathname === "/api/fiction/gate/cancel") { reply(cancelCanonGate({ captureId, gateId })); return true; }
+      const onMain = await currentBranch() === "main";
+      reply(confirmCanonGate({ captureId, gateId }, (gate) => {
+        const idea = linkedIdea();
+        // The promotion already landed (a crash after approveIdea, before the gate row was
+        // written): recording the confirmation is all that is left, nothing is appended twice.
+        if (idea.status === "approved") return idea;
+        if (!idea.proposal) throw new Error("no reviewable cleanup proposal");
+        if (canonGateDigest(idea.proposal) !== gate.digest) throw new Error("the proposal changed since this confirmation was opened; ask again");
+        if (!onMain) throw new Error("switch to main before confirming an idea into a canonical Fiction document");
+        return approveIdea(idea.proposal, { canonicalWriteAuthorized: true });
+      }));
     } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
     return true;
   }

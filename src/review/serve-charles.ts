@@ -9,6 +9,9 @@ import {
   approveCharlesPersonaProposal, proposeCharlesPersonaEdit, readCharlesPersona,
   rejectCharlesPersonaProposal,
 } from "./charles-persona.js";
+import { saveCapture } from "./captures.js";
+import { isCharlesOutputType, runCharlesGroup, type CharlesDrafter } from "./charles-queue.js";
+import { pendingCount, type CharlesOutputType } from "./room-queue.js";
 
 type CharlesRouteContext = {
   req: IncomingMessage;
@@ -20,6 +23,10 @@ type CharlesRouteContext = {
   charlesRoot?: string;
   personaProposalsPath?: string;
   reviewCommentsPath?: string;
+  /** Slice 1.5d group run: injectable stores + drafter so a test never spawns a model or touches charles/. */
+  capturesPath?: string;
+  queuePath?: string;
+  draftCharles?: CharlesDrafter;
 };
 
 function assertOnly(body: Record<string, unknown>, allowed: readonly string[]): void {
@@ -28,7 +35,7 @@ function assertOnly(body: Record<string, unknown>, allowed: readonly string[]): 
 }
 
 // Charles room routes preserve the review-only contract: no endpoint here posts a draft.
-export async function handleCharlesRoute({ req, res, url, readBody, json, requestEngine, charlesRoot, personaProposalsPath, reviewCommentsPath }: CharlesRouteContext): Promise<boolean> {
+export async function handleCharlesRoute({ req, res, url, readBody, json, requestEngine, charlesRoot, personaProposalsPath, reviewCommentsPath, capturesPath, queuePath, draftCharles }: CharlesRouteContext): Promise<boolean> {
   // Charles room (Build 4): charles/review-queue.md + the drafts it points at. Same review
   // contract as everywhere else — approve/revise/discard just flips a status cell here, nothing
   // posts (see charles/CLAUDE.md).
@@ -110,6 +117,35 @@ export async function handleCharlesRoute({ req, res, url, readBody, json, reques
     try {
       saveCharlesPost(String(b.id ?? ""), String(b.body ?? ""));
       json(res, 200, { ok: true });
+    } catch (e) {
+      json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+    }
+    return true;
+  }
+  // One capture, several outputs, one durable group (decision 11, slice 1.5d, charles-queue.ts).
+  // The selection is persisted with every output `pending` BEFORE any draft runs; each output then
+  // drafts through the same per-mode path as /api/charles/draft. A failed output stays `pending`
+  // and the same request again drafts only what is still missing. The group is read back off
+  // GET /api/room-queue?room=Charles. No client caller yet (the desk still posts per mode).
+  if (req.method === "POST" && url.pathname === "/api/charles/group") {
+    const b = await readBody(req);
+    try {
+      const rawTypes = Array.isArray(b.types) ? b.types : [];
+      const types: CharlesOutputType[] = [];
+      for (const type of rawTypes) {
+        if (!isCharlesOutputType(type)) throw new Error(`"${String(type)}" isn't a format this can draft. Try oneliner, essay, or reply`);
+        types.push(type);
+      }
+      if (!types.length) throw new Error("choose at least one format");
+      const capture = saveCapture("Charles", String(b.text ?? ""), capturesPath);
+      const run = await runCharlesGroup({
+        capture, types, engine: requestEngine(b.engine), path: queuePath,
+        replySource: b.replySource === undefined ? undefined : String(b.replySource),
+        draft: draftCharles ?? ((mode, input, engine) => enqueueCharlesDraft(mode, input, engine)),
+      });
+      json(res, 200, {
+        ok: true, captureId: capture.id, groupId: run.item.payload.groupId, item: run.item, results: run.results, pending: pendingCount([run.item]),
+      });
     } catch (e) {
       json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
     }
