@@ -1,11 +1,16 @@
 # Content Studio master status
 
-## START HERE — next session (written 2026-09-03)
+## START HERE — next session (written 2026-09-04)
 
 **Repo to work in:** `/Users/Muxin/Documents/GitHub/content-agents`, branch `main`.
 **This doc:** `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
 The `content-agents-worktrees/content-studio-master-status-recovery` worktree is merged and
 disposable — do not continue in it.
+
+**This doc is the single source of truth for status + decisions.** Any detailed design spec
+lives in its own doc that redirects here at its top; this doc always tracks the full progress.
+Decision 11's spec is inline below (Recorded product decisions → decision 11 + the slice
+checklist), so no separate spec doc exists for it yet.
 
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
