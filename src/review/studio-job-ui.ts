@@ -247,7 +247,7 @@ export const JOB_ENQUEUE_ROUTES: readonly string[] = [
   "/api/strategy/ask", "/api/strategy/refresh-brief", "/api/strategy/insights",
   "/api/strategy/ask-insights", "/api/strategy/pull",
   "/api/outreach/scout", "/api/outreach/draft", "/api/outreach/message/revise",
-  "/api/charles/draft", "/api/followups/draft-follow-up",
+  "/api/charles/draft", "/api/charles/group", "/api/followups/draft-follow-up",
   "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check", "/api/fiction/promotion/draft", "/api/fiction/promotion/revise", "/api/venture/:slug/analyze", "/api/venture/:slug/run-step",
 ];
 export function enqueuesJob(path: string): boolean {
