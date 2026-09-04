@@ -304,6 +304,16 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .review-focus-editor { width:100%; min-height:260px; box-sizing:border-box; margin-top:16px; padding:16px;
     font:400 18px/1.65 Georgia,"Times New Roman",serif; color:var(--ink); background:#fff;
     border:1px solid #d8cfbb; border-left:3px solid var(--blue); border-radius:0 8px 8px 0; resize:vertical; }
+  /* Charles combined review (decision 11, slice 3): one container per durable capture group; the
+     essay sits in a bounded scroll window so it never fills the pane, the shorter outputs stack below. */
+  .charles-group { border:1px solid #e0d6c0; border-radius:10px; padding:16px 18px 18px; margin-bottom:22px; background:#fff; }
+  .charles-group-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .charles-output { padding:12px 0 6px; border-top:1px solid #efe7d6; }
+  .charles-output.on { box-shadow:inset 3px 0 0 var(--blue); padding-left:12px; }
+  .charles-output.offpage { opacity:.62; }
+  .charles-body { font:400 16px/1.75 Georgia,serif; border:1px dashed #e0d6c0; border-radius:8px; padding:20px 22px; background:#fcfbf7; white-space:pre-wrap; }
+  .charles-essay-window { max-height:320px; overflow-y:auto; }
+  .charles-group-stack { display:flex; flex-direction:column; }
   .room-pages { display:flex; align-items:baseline; gap:24px; flex-wrap:wrap; padding-bottom:14px; margin-bottom:22px; border-bottom:1px solid #dfd4bb; }
   .room-pages button { border:0; border-bottom:1.5px solid transparent; border-radius:0; background:none; color:#9b907b; padding:0 0 5px; font:inherit; cursor:pointer; }
   .room-pages button.on { color:var(--ink); border-bottom-color:var(--ink); font-weight:600; }
@@ -5446,12 +5456,14 @@ function renderCharlesPages(){
   $("#charlesDraftPane").hidden=charlesPage==="input";
   document.querySelectorAll("[data-charles-page]").forEach(button=>button.classList.toggle("on",button.dataset.charlesPage===charlesPage));
 }
-function charlesVisiblePosts(){
-  if(charlesPage==="needs-review") return CHARLES_POSTS.filter(post=>post.status==="pending"||post.status==="revise");
-  if(charlesPage==="approved") return CHARLES_POSTS.filter(post=>post.status==="approve");
-  if(charlesPage==="all") return CHARLES_POSTS;
+// Mirror of page-charles.ts charlesPostsForPage (pinned by node:test); takes its inputs, no globals.
+function charlesPostsForPage(posts, page){
+  if(page==="needs-review") return posts.filter(post=>post.status==="pending"||post.status==="revise");
+  if(page==="approved") return posts.filter(post=>post.status==="approve");
+  if(page==="all") return posts;
   return [];
 }
+function charlesVisiblePosts(){ return charlesPostsForPage(CHARLES_POSTS, charlesPage); }
 document.querySelectorAll("[data-charles-page]").forEach(button=>button.addEventListener("click",()=>{
   charlesPage=button.dataset.charlesPage;
   const visible=charlesVisiblePosts(); if(visible.length&&!visible.some(post=>post.id===charlesId)) charlesId=visible[0].id;
@@ -5476,38 +5488,121 @@ async function loadCharles(){
   renderCharles();
   renderCharlesPages();
 }
-function renderCharles(){
-  const visible = charlesVisiblePosts();
-  const post = visible.find(p=>p.id===charlesId) || visible[0];
-  if(!post){
-    $("#charlesMain").innerHTML='<div class="empty">Nothing in this view.</div>';
-    $("#charlesDraftList").innerHTML=""; renderCharlesQueue(); return;
+// Combined review (decision 11, slice 3). Client mirrors of page-charles.ts charlesReviewGroups /
+// charlesGroupHtml, which node:test pins; keep the two in step. Grouping keys off the DURABLE group
+// id on each queue item (charles-queue.ts), never off titles or text.
+// Deterministic output order (mirror of page-charles.ts charlesOutputOrder): by ordinal, a missing
+// or non-finite ordinal LAST (Infinity), then by postId (empty last) so duplicate or absent ordinals stay stable.
+function charlesOutputOrder(a, b){
+  const oa=Number.isFinite(a.ordinal) ? a.ordinal : Number.POSITIVE_INFINITY;
+  const ob=Number.isFinite(b.ordinal) ? b.ordinal : Number.POSITIVE_INFINITY;
+  if(oa!==ob) return oa-ob;
+  const pa=a.postId||"", pb=b.postId||"";
+  if(pa===pb) return 0;
+  if(!pa) return 1;
+  if(!pb) return -1;
+  return pa<pb ? -1 : 1;
+}
+// Resume target (mirror of page-charles.ts charlesResumeOutput): the LOWEST-ordinal drafted output
+// whose post is loaded, or null when the group has nothing drafted yet.
+function charlesResumeOutput(outputs, postIds){
+  return [...outputs].sort(charlesOutputOrder).find(output=>Boolean(output.postId)&&postIds.has(output.postId))||null;
+}
+// Grouping works ONLY off its arguments (posts, items, page), same as the server copy, so the two
+// cannot disagree under a different page state. One item per groupId is room-queue.ts's guarantee
+// (one item per captureId, groupId derived from it); the first row with drafted outputs wins, a repeat is skipped.
+function charlesReviewGroups(posts, items, page, titleFor){
+  const visibleIds=new Set(charlesPostsForPage(posts, page).map(post=>post.id));
+  const byId=new Map(posts.map(post=>[post.id,post]));
+  const claimed=new Set();
+  const seenGroups=new Set();
+  const groups=[];
+  for(const item of items){
+    if(!item.payload||item.payload.kind!=="charles"||!item.payload.groupId||seenGroups.has(item.payload.groupId)) continue;
+    const outputs=[...(item.payload.outputs||[])].sort(charlesOutputOrder);
+    const drafted=outputs.map(output=>(output.postId&&!claimed.has(output.postId) ? byId.get(output.postId) : undefined)).filter(Boolean);
+    if(!drafted.length||!drafted.some(post=>visibleIds.has(post.id))) continue;
+    // Claim the group only once a row actually yields outputs (a duplicate empty row must not shadow the real one).
+    seenGroups.add(item.payload.groupId);
+    for(const post of drafted) claimed.add(post.id);
+    const essay=drafted.find(post=>post.type==="essay")||null;
+    const others=drafted.filter(post=>post!==essay);
+    const approved=drafted.filter(post=>post.status==="approve").length;
+    const offPage=drafted.filter(post=>!visibleIds.has(post.id)).length;
+    const title=((titleFor ? titleFor(item.captureId) : "")||"").replace(/\\s+/g," ").trim().slice(0,90)||"(captured thought)";
+    const parts=[item.state||"pending", drafted.length+" of "+outputs.length+" drafted"];
+    if(approved) parts.push(approved+" approved");
+    if(offPage) parts.push(offPage+" outside this page");
+    groups.push({ key:item.payload.groupId, groupId:item.payload.groupId, captureId:item.captureId, title, summary:parts.join(" · "), essay, others, outputs: essay ? [essay,...others] : others });
   }
-  charlesId=post.id;
+  for(const post of posts){
+    if(claimed.has(post.id)||!visibleIds.has(post.id)) continue;
+    groups.push({ key:"post:"+post.id, groupId:null, captureId:null, title:post.id, summary:"legacy draft · no capture group", essay: post.type==="essay" ? post : null, others: post.type==="essay" ? [] : [post], outputs:[post] });
+  }
+  return groups;
+}
+function charlesGroupHtml(group, essay, others){
+  const output=(o,isEssay)=>
+    '<article class="charles-output'+(isEssay?" charles-output-essay":"")+'" data-charles-output="'+esc(o.id)+'">'+o.head+
+      (isEssay
+        ? '<div class="charles-essay-window charles-body">'+o.body+'</div><div class="actions" style="margin-top:8px"><button type="button" class="charles-focus" data-act="focus">Open in focus mode</button></div>'
+        : '<div class="charles-body">'+o.body+'</div>')+
+      o.actions+'</article>';
+  return '<section class="charles-group" data-group-key="'+esc(group.key)+'"'+(group.groupId?' data-group-id="'+esc(group.groupId)+'"':"")+'>'+
+    '<header class="charles-group-head"><span class="wb-label">'+(group.groupId?"GROUP":"DRAFT")+' · '+esc(group.title)+'</span><span class="src">'+esc(group.summary)+'</span></header>'+
+    (essay ? output(essay,true) : "")+
+    (others.length ? '<div class="charles-group-stack">'+others.map(o=>output(o,false)).join("")+'</div>' : "")+
+    '</section>';
+}
+// One output's fragments for the group skeleton: header, escaped body, and its own per-output
+// actions (approve / revise / discard / edit / note), each wired by data-act inside its article.
+function charlesOutputHtml(post, onPage){
   const engineProvenance=post.engine ? "Drafted with "+engineLabel(post.engine) : "Engine not recorded (legacy draft)";
   const reviewHistory=post.historyWarning
     ? '<div class="aierr" role="status" style="margin-top:14px">'+esc(post.historyWarning)+'</div>'
     : (post.comments||[]).length
-    ? '<details class="lead-details" open style="margin-top:18px"><summary>Review history · '+post.comments.length+'</summary>'+post.comments.map(item=>'<div class="src" style="margin-top:9px"><strong>'+esc(String(item.createdAt||"").slice(0,16).replace("T"," "))+'</strong><br>'+esc(item.body)+'</div>').join("")+'</details>'
+    ? '<details class="lead-details" style="margin-top:14px"><summary>Review history · '+post.comments.length+'</summary>'+post.comments.map(item=>'<div class="src" style="margin-top:9px"><strong>'+esc(String(item.createdAt||"").slice(0,16).replace("T"," "))+'</strong><br>'+esc(item.body)+'</div>').join("")+'</details>'
     : '<div class="src" style="margin-top:14px">Review history starts when you save a revision note.</div>';
-  $("#charlesMain").innerHTML =
-    '<div class="wb-label">Charles Lord Featherbottom · '+esc(typeLabel(post.type))+'</div>'+
-    '<div style="display:flex;align-items:center;gap:10px;margin:2px 0 14px;">'+
+  return {
+    id: post.id,
+    head: '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;">'+
+      '<span class="wb-label">'+esc(typeLabel(post.type))+' · '+esc(post.id)+'</span>'+
       '<span class="pill '+pillClass(post.status)+'">'+esc(statusLabel(post.status))+'</span>'+
       '<span class="src">'+esc(engineProvenance)+'</span>'+
       (post.notes ? '<span class="src">'+esc(post.notes)+'</span>' : "")+
-    '</div>'+
-    '<div id="charlesBody" style="font:400 16px/1.75 Georgia,serif;border:1px dashed #e0d6c0;border-radius:8px;padding:20px 22px;background:#fcfbf7;white-space:pre-wrap;max-height:460px;overflow:auto;">'+esc(post.body)+'</div>'+
-    '<div class="actions" style="margin-top:12px">'+
+      (onPage ? "" : '<span class="src">(outside this page)</span>')+
+    '</div>',
+    body: esc(post.body),
+    actions: '<div class="actions" style="margin-top:12px">'+
       '<button class="approve'+(post.status==="approve"?" on":"")+'" data-act="approve">Approve</button>'+
       '<button class="revise'+(post.status==="revise"?" on":"")+'" data-act="revise">Revise</button>'+
       '<button class="discard'+(post.status==="discard"?" on":"")+'" data-act="discard">Discard</button>'+
       '<span class="spacer"></span>'+
       (post.status==="approve"?'<button class="primary" data-act="content-handoff">Send approved draft to Content</button>':"")+
-      '<button id="charlesEditBtn" data-act="edit">Edit in place</button>'+
+      '<button class="charles-edit-btn" data-act="edit">Edit in place</button>'+
     '</div>'+
-    '<div class="revisebox" id="charlesRevisebox"><input placeholder="what needs changing?" value="" /><button data-act="save-note">Save note</button></div>'+reviewHistory+
+    '<div class="revisebox"><input placeholder="what needs changing?" value="" /><button data-act="save-note">Save note</button></div>'+reviewHistory,
+  };
+}
+function renderCharles(){
+  const visible = charlesVisiblePosts();
+  const groups = charlesReviewGroups(CHARLES_POSTS, CHARLES_QUEUE||[], charlesPage, captureId=>{ const c=SERVER_CAPTURES.find(x=>x.id===captureId); return c ? c.text : ""; });
+  if(!groups.length){
+    $("#charlesMain").innerHTML='<div class="empty">Nothing in this view.</div>';
+    $("#charlesDraftList").innerHTML=""; renderCharlesQueue(); return;
+  }
+  const shown = groups.flatMap(group=>group.outputs);
+  if(!shown.some(p=>p.id===charlesId)) charlesId = (visible[0]||shown[0]).id;
+  const visibleIds=new Set(visible.map(p=>p.id));
+  const frag=post=>charlesOutputHtml(post, visibleIds.has(post.id));
+  $("#charlesMain").innerHTML =
+    '<div class="wb-label">Charles Lord Featherbottom · '+groups.length+(groups.length===1?" group":" groups")+'</div>'+
+    groups.map(group=>charlesGroupHtml(group, group.essay ? frag(group.essay) : null, group.others.map(frag))).join("")+
     '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Approving here does not post anything. An approved output can enter Content with Charles identity and CTA restrictions for optional treatments, media, and routing.</div>';
+  $("#charlesMain").querySelectorAll(".charles-output").forEach(el=>{
+    el.classList.toggle("on", el.dataset.charlesOutput===charlesId);
+    el.classList.toggle("offpage", !visibleIds.has(el.dataset.charlesOutput));
+  });
   $("#charlesDraftList").innerHTML =
     '<div class="wb-margin-cap">DRAFTS · CLICK TO OPEN</div>'+
     visible.map(p=>'<div class="lead-chip'+(p.id===charlesId?" on":"")+'" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px" data-id="'+esc(p.id)+'">'+
@@ -5515,9 +5610,31 @@ function renderCharles(){
       '<span class="src" style="font-size:10px">'+esc(p.engine ? "Drafted with "+engineLabel(p.engine) : "Engine not recorded (legacy draft)")+'</span>'+
       '<span class="pill '+pillClass(p.status)+'" style="font-size:10px">'+esc(statusLabel(p.status))+'</span>'+
     '</div>').join("");
-  document.querySelectorAll("#charlesDraftList .lead-chip").forEach(c=>c.addEventListener("click",()=>{ charlesId=c.dataset.id; renderCharles(); }));
-  $("#charlesMain").querySelectorAll("[data-act]").forEach(b=>b.addEventListener("click", (e)=>onCharlesAction(e.target.dataset.act, post)));
+  document.querySelectorAll("#charlesDraftList .lead-chip").forEach(c=>c.addEventListener("click",()=>{ charlesId=c.dataset.id; renderCharles(); $("#charlesMain .charles-output.on")?.scrollIntoView({behavior:"smooth",block:"start"}); }));
+  // Every action resolves its own output from the enclosing article, so each output in a group
+  // keeps independent approve / revise / discard / edit / note controls.
+  $("#charlesMain").querySelectorAll(".charles-output [data-act]").forEach(b=>b.addEventListener("click", (e)=>{
+    const el=e.currentTarget.closest(".charles-output");
+    const post=CHARLES_POSTS.find(p=>p.id===el.dataset.charlesOutput);
+    if(post) onCharlesAction(e.currentTarget.dataset.act, post, el);
+  }));
   renderCharlesQueue();
+}
+// Focus mode for an essay: the shared review focus dialog (#reviewFocus) over the same per-output
+// save path as "Edit in place" (POST /api/charles/doc). No new save contract.
+function openCharlesFocus(item, returnTo){
+  reviewFocusReturn=returnTo;
+  const body=$("#reviewFocusBody");
+  body.innerHTML='<div class="rowhead"><span class="fmt">'+esc(typeLabel(item.type))+' · '+esc(item.id)+'</span><span class="pill '+pillClass(item.status)+'">'+esc(statusLabel(item.status))+'</span></div>'+
+    '<label class="wb-label" for="reviewFocusEditor" style="display:block;margin-top:18px">EDIT THE ESSAY DIRECTLY</label>'+
+    '<textarea id="reviewFocusEditor" class="review-focus-editor" style="min-height:60vh">'+esc(item.body||"")+'</textarea>'+
+    '<div class="actions"><button type="button" id="reviewFocusSave">Save edit</button><button type="button" class="approve" data-focus-act="approve">Approve</button><button type="button" class="discard" data-focus-act="discard">Discard</button></div>'+
+    '<div class="src">Approving here does not post anything. Muxin pastes approved drafts to Substack herself.</div>';
+  $("#reviewFocusTitle").textContent="Charles · "+typeLabel(item.type);
+  $("#reviewFocus").hidden=false; $("#reviewFocus .focus-dialog").focus();
+  const editor=$("#reviewFocusEditor"); editor.focus();
+  $("#reviewFocusSave").addEventListener("click",async ()=>{ const r=await post("/api/charles/doc",{id:item.id,body:editor.value}); if(r.ok===false){flash(r.error||"Could not save");return;} flash("Saved"); closeReviewFocus(); loadCharles(); });
+  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ closeReviewFocus(); await onCharlesAction(button.dataset.focusAct, item, null); }));
 }
 // Bottom-of-home queue (slice 2c): one row per captured thought (its durable group), titled by the
 // capture's own text (SERVER_CAPTURES) with the per-output states from the group payload. A row
@@ -5539,27 +5656,31 @@ function renderCharlesQueue(){
   $("#charlesMain").insertAdjacentHTML("beforeend", roomQueueHtml("Charles queue", rows));
   document.querySelectorAll("#charlesMain .rq-row").forEach(button=>button.addEventListener("click",()=>{
     const item=(CHARLES_QUEUE||[]).find(it=>it.captureId===button.dataset.rqId);
-    const drafted=item&&(item.payload.outputs||[]).find(o=>o.postId&&CHARLES_POSTS.some(p=>p.id===o.postId));
+    // Resume opens the group's LOWEST-ordinal drafted output (not the first array entry), then
+    // scrolls to that output's own element: a reply beneath a long essay window must land on screen.
+    const drafted=item ? charlesResumeOutput(item.payload.outputs||[], new Set(CHARLES_POSTS.map(p=>p.id))) : null;
     if(drafted){
       charlesId=drafted.postId; charlesPage="all";
       renderCharles(); renderCharlesPages();
-      $("#charlesMain").scrollIntoView({behavior:"smooth",block:"start"});
+      ($("#charlesMain .charles-output.on")||$("#charlesMain")).scrollIntoView({behavior:"smooth",block:"start"});
       return;
     }
     charlesPage="input"; renderCharlesPages();
     $("#charlesInput")?.focus();
   }));
 }
-async function onCharlesAction(act, item){
-  if (act === "approve" || act === "discard"){
+async function onCharlesAction(act, item, el){
+  if (act === "focus"){
+    openCharlesFocus(item, el ? el.querySelector(".charles-focus") : null);
+  } else if (act === "approve" || act === "discard"){
     const r = await post("/api/charles/status", {id:item.id, status:act});
     if (r.ok===false){ flash(r.error||"Failed"); return; }
     flash(act==="approve" ? "Approved: paste it to Substack when ready" : "Discarded");
     loadCharles();
   } else if (act === "revise"){
-    $("#charlesRevisebox").classList.toggle("show");
+    if(el) el.querySelector(".revisebox").classList.toggle("show");
   } else if (act === "save-note"){
-    const noteInput = $("#charlesRevisebox input");
+    const noteInput = el.querySelector(".revisebox input");
     const note = noteInput.value;
     const operationId=noteInput.dataset.operationId||(noteInput.dataset.operationId=(globalThis.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now()+"-"+Math.random())));
     const r = await post("/api/charles/status", {id:item.id, status:"revise", notes:note, operationId});
@@ -5567,8 +5688,8 @@ async function onCharlesAction(act, item){
     flash(r.historyWarning||"Marked revise");
     loadCharles();
   } else if (act === "edit"){
-    const bodyEl = $("#charlesBody");
-    const btn = $("#charlesEditBtn");
+    const bodyEl = el.querySelector(".charles-body");
+    const btn = el.querySelector(".charles-edit-btn");
     if(btn.dataset.mode==="save"){
       const ta = bodyEl.querySelector("textarea");
       const r = await post("/api/charles/doc", {id:item.id, body: ta?ta.value:""});
