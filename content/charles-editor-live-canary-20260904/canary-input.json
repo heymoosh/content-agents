@@ -1,0 +1,62 @@
+{
+  "kind": "content_request",
+  "version": "content-request-v1",
+  "id": "charles-editor-live-canary-20260904",
+  "origin": "charles",
+  "descriptor": "Representative live editor canary",
+  "originalInput": "The board is quite calm, dear reader. Quite calm.",
+  "ventureId": null,
+  "ventureSource": null,
+  "sourceProvenance": null,
+  "sourceContext": {
+    "kind": "charles-approved-post",
+    "authoritativeBody": "The board is quite calm, dear reader. Quite calm.",
+    "personaRef": "charles/config/persona.yaml",
+    "identity": "charles-lord-featherbottom",
+    "restrictions": [
+      "no new leak claims"
+    ]
+  },
+  "experiment": null,
+  "selections": {
+    "treatments": [
+      "shorter"
+    ],
+    "media": [],
+    "platforms": [
+      "bluesky"
+    ]
+  },
+  "recommendations": {
+    "treatments": [],
+    "media": [],
+    "platforms": []
+  },
+  "control": {
+    "enabled": true
+  },
+  "variants": [
+    {
+      "identity": {
+        "id": "control-Ymx1ZXNreQ-bm9uZQ",
+        "requestId": "charles-editor-live-canary-20260904",
+        "kind": "control"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-Ymx1ZXNreQ-bm9uZQ-c2hvcnRlcg",
+        "requestId": "charles-editor-live-canary-20260904",
+        "kind": "treated"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": [
+        "shorter"
+      ]
+    }
+  ]
+}
