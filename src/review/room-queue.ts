@@ -45,8 +45,32 @@ export function pendingCount(items: ReadonlyArray<Pick<RoomQueueItem, "state">>)
 // Room payloads. Each room owns its own interface; a slice that builds a room's queue adds fields
 // to that interface only. A consumer switching on `kind` must keep a default branch.
 export interface ContentQueuePayload { readonly kind: "content"; readonly jobId: string | null }
-/** Slice 1.5c: `ideaId` links the projection to the room's `ideas.json` record. `null` = not yet promoted. */
-export interface FictionQueuePayload { readonly kind: "fiction"; readonly series: string | null; readonly ideaId: string | null }
+export const FICTION_GATE_STATES = ["open", "confirmed", "cancelled"] as const;
+export type FictionGateState = (typeof FICTION_GATE_STATES)[number];
+/**
+ * The Fiction confirm-before-canon gate (decision 11, slice 1.5c, build-order item 7). It is
+ * content-addressed: `gateId` hashes the capture id with `digest`, the digest of the exact cleanup
+ * proposal being confirmed, so a reload re-reads the SAME open confirmation and a changed proposal
+ * is a different gate. `target` is the canon doc the confirmed text would be appended to.
+ */
+export interface FictionCanonGate {
+  readonly gateId: string;
+  readonly state: FictionGateState;
+  readonly target: string;
+  readonly digest: string;
+  readonly openedAt: string;
+  readonly resolvedAt: string | null;
+}
+/**
+ * Slice 1.5c: `ideaId` links the projection to the room's `ideas.json` record (`null` = not yet
+ * promoted); `gate` is the open/resolved canon confirmation, optional so 1.5a rows still load.
+ */
+export interface FictionQueuePayload {
+  readonly kind: "fiction";
+  readonly series: string | null;
+  readonly ideaId: string | null;
+  readonly gate?: FictionCanonGate;
+}
 /** One venture Muxin can be asked to pick: its directory slug and a display name (venture-resolver.ts). */
 export interface VentureCandidate { readonly slug: string; readonly name: string }
 /**

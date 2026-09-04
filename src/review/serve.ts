@@ -1465,7 +1465,9 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           const series = listFictionSeries();
           if (series.length !== 1) throw new Error(series.length === 0 ? "no fiction series exists yet" : "more than one fiction series exists; open the Fiction room to choose one");
           const capture = saveCapture("Fiction", String(b.text ?? ""));
-          const idea = createIdea(series[0]!.slug, capture.text);
+          // The idea records the capture id it was Started from, so a crash before the queue
+          // projection below still leaves the two stores reconcilable by id (fiction-queue.ts).
+          const idea = createIdea(series[0]!.slug, capture.text, { captureId: capture.id });
           // The raw capture event stays as-is; the idea link and lifecycle live in the room queue.
           const queueItem = projectFictionCapture(capture, idea);
           json(res, 200, { ok: true, capture, idea, queueItem, room: "Fiction", replayed: false });
