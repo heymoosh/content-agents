@@ -368,14 +368,7 @@ test("wiring guard: every emitted <script> block parses as JavaScript", () => {
 // (/api/content/treatment, /api/signals/outcomes, /api/research/report) are all called by the page
 // now: the Content room's configuration flow reads the first, and Signals reads the other two.
 // Add an entry only for a route whose UI genuinely has not landed yet, and delete it the moment it has.
-const PENDING_UI_ROUTES = new Set<string>([
-  // Room queue projection read (decision 11, slice 1.5a). The client caller is PR #448's Fiction
-  // bottom queue, held until it re-targets from ficInbox onto this route (slice 2).
-  "/api/room-queue",
-  // Venture answer protocol (decision 11, slice 1.5b). The client caller is the Venture room's
-  // "which venture?" picker over a Start response's `needsVenture`, wired in slice 2.
-  "/api/room-queue/venture-answer",
-]);
+const PENDING_UI_ROUTES = new Set<string>([]);
 
 test("wiring guard: every client /api path has a serve.ts route, and every route has a caller", () => {
   const script = emittedScripts().join("\n");
@@ -649,6 +642,43 @@ test("client <script> output: the two regexes that shipped broken now emit corre
     "the evidence-link verdict must still be wired into the <a class=\"ev-src\"> tag",
   );
   assert.ok(!script.includes("/^https?:///i"), "emitted /^https?:///i turns the rest of the line into a comment");
+});
+
+// Slice 2b: the Venture bottom-of-home queue. Asserts the wiring's shape and ORDER inside the
+// emitted script, not punctuation: the room read is Venture's, the rows are filtered to the active
+// venture (an open "which venture?" question belongs to no slug yet, so it stays visible), and a
+// row click resumes this venture's own flow (the answer prompt, or the thread + next step). The
+// answer protocol's behavior (compare-and-swap, 409 on a stale version) is proven server-side in
+// venture-queue tests; here it only has to send captureId, slug and expectedVersion.
+test("client <script>: the Venture queue reads room=Venture, filters to the active venture, and a row resumes the venture flow", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
+  const load = script.slice(script.indexOf("async function loadVenture("), script.indexOf("async function loadVenture(") + 4000);
+  assert.ok(load.includes('"/api/room-queue?room=Venture"'), "loadVenture reads the Venture room's queue projection");
+  // The parse itself is guarded: a 200 with a malformed body rejects inside loadVenture's try and
+  // would otherwise abort the whole thread render, not just the queue.
+  assert.ok(/queueResponse\.json\(\)\.catch\(\(\)\s*=>\s*null\)/.test(load), "a malformed queue body degrades to null instead of throwing out of loadVenture");
+  assert.ok(/VENTURE_QUEUE\s*=\s*queueData\s*&&\s*queueData\.ok\s*&&\s*Array\.isArray\(queueData\.items\)\s*\?\s*queueData\.items\s*:\s*\[\]/.test(load), "the read lands in VENTURE_QUEUE, falling back to [] on a null or malformed read");
+
+  const render = script.slice(script.indexOf("function renderVenture("), script.indexOf("function renderVentureExample("));
+  // The awaiting-answer clause is conjoined with a null-slug check: an open question with a foreign
+  // slug (whatever the server invariant says today) never leaks into another venture's queue.
+  const filter = render.search(/VENTURE_QUEUE[^\n]*\.filter\([^\n]*payload\.slug===ventureSlug\s*\|\|\s*\(\s*it\.state==="awaiting-answer"\s*&&\s*!it\.payload\.slug\s*\)/);
+  const queue = render.indexOf('roomQueueHtml("Venture queue"');
+  assert.ok(filter >= 0, "rows are filtered to the active venture's slug, keeping open which-venture questions");
+  assert.ok(queue > filter, "the shared queue helper renders the filtered rows, not the raw projection");
+  const messages = render.indexOf("t.messages.map(");
+  const append = render.search(/\$\("#ventureThread"\)\.insertAdjacentHTML\("beforeend",\s*roomQueueHtml\("Venture queue"/);
+  assert.ok(messages >= 0 && append > messages, "the queue is appended to the venture thread after the message render, never replacing it");
+
+  const rowClick = render.slice(render.indexOf('"#ventureThread .rq-row"'));
+  assert.ok(rowClick.length > 0, "queue rows get a click handler");
+  const ask = rowClick.indexOf('state==="awaiting-answer"');
+  const askRender = rowClick.indexOf("ventureQueueAsk=id");
+  const resume = rowClick.indexOf('"#ventureRunStepBtn"');
+  assert.ok(ask >= 0 && askRender > ask, "an open which-venture row surfaces its answer prompt");
+  assert.ok(resume > askRender, "any other row returns to the thread and focuses the next draft step");
+  assert.ok(/"\/api\/room-queue\/venture-answer"\s*,\s*\{[^\n]*captureId[^\n]*slug[^\n]*expectedVersion/.test(rowClick), "an answer sends captureId, slug and the compare-and-swap version");
 });
 
 // Slice 2a: a canonical update on a Studio-captured idea is routed through the durable confirm

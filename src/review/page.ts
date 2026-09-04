@@ -3440,6 +3440,10 @@ let VENTURE_LEARNING_SOURCES = [];
 let VENTURE_RESPONSE_EVALUATE_ID = null;
 let VENTURE_SUMMARIES = {};
 let VENTURE_DOCUMENTS = [];
+// The Venture room's queue projection (GET /api/room-queue?room=Venture, slice 2b) and the capture
+// id whose "which venture?" question is open on the desk right now, if any.
+let VENTURE_QUEUE = [];
+let ventureQueueAsk = null;
 let ventureDocument = null;
 let ventureAnalysisPending = false;
 let ventureRunStepPending = false;
@@ -3598,7 +3602,7 @@ async function loadVenture(){
   const requestedSlug = ventureSlug;
   showRoomLoading("ventureThread");
   try {
-    const [r, signalsResponse, learningResponse, sourceResponse] = await Promise.all([fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread"), fetch("/api/signals?brand=human-inference").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-evaluations").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-sources").catch(()=>null)]);
+    const [r, signalsResponse, learningResponse, sourceResponse, queueResponse] = await Promise.all([fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread"), fetch("/api/signals?brand=human-inference").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-evaluations").catch(()=>null), fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/learning-sources").catch(()=>null), fetch("/api/room-queue?room=Venture").catch(()=>null)]);
     if(!r.ok) throw new Error("venture "+r.status);
     const j = await r.json();
     if(requestedSlug !== ventureSlug){ hideRoomLoading("ventureThread"); return; }
@@ -3609,6 +3613,9 @@ async function loadVenture(){
     VENTURE_LEARNING_EVALUATIONS = learning&&Array.isArray(learning.evaluations) ? learning.evaluations : [];
     const sourceData = sourceResponse&&sourceResponse.ok ? await sourceResponse.json() : null;
     VENTURE_LEARNING_SOURCES = sourceData&&Array.isArray(sourceData.sources) ? sourceData.sources : [];
+    // The queue degrades on its own: a bad body must not take the thread down with it.
+    const queueData = queueResponse&&queueResponse.ok ? await queueResponse.json().catch(()=>null) : null;
+    VENTURE_QUEUE = queueData&&queueData.ok&&Array.isArray(queueData.items) ? queueData.items : [];
     VENTURE_SUMMARIES[requestedSlug] = j.thread;
     $("#ventureRunStepBtn").disabled = false;
     renderVenture();
@@ -4229,6 +4236,26 @@ function renderVenture(){
     if(m.kind==="checkpoint") return vCheckpoint(m);
     return "";
   }).join("");
+  // Bottom-of-home queue (slice 2b): this venture's captured thoughts, plus every open "which
+  // venture?" question that has no slug yet (a slugged row is another venture's, whatever its
+  // state). Row text comes from the capture event itself (SERVER_CAPTURES); the queue row only
+  // carries the id and its state.
+  const ventureQueue=(VENTURE_QUEUE||[]).filter(it=>it.payload&&it.payload.kind==="venture"&&(it.payload.slug===ventureSlug||(it.state==="awaiting-answer"&&!it.payload.slug))).map(it=>{
+    const capture=SERVER_CAPTURES.find(c=>c.id===it.captureId);
+    const asking=it.state==="awaiting-answer";
+    return {
+      id:it.captureId,
+      title:((capture&&capture.text)||"").replace(/\\s+/g," ").trim().slice(0,90)||"(captured thought)",
+      meta:asking?"which venture? · "+((it.payload.candidates||[]).length)+" to choose from":it.state+" · "+(it.payload.slug||""),
+      tag:asking?"ASK":"THOUGHT", tagCls:"yours",
+      action:asking?"Answer":"Resume"
+    };
+  });
+  const asking=ventureQueueAsk?(VENTURE_QUEUE||[]).find(it=>it.captureId===ventureQueueAsk&&it.state==="awaiting-answer"):null;
+  const askHtml=asking
+    ? '<div class="vblock" id="ventureQueueAsk"><div class="vmono">WHICH VENTURE IS THIS FOR?</div><div class="vnote" style="margin-top:8px">'+esc(((SERVER_CAPTURES.find(c=>c.id===asking.captureId)||{}).text)||"")+'</div><div class="vacts">'+(asking.payload.candidates||[]).map(c=>'<button type="button" data-venture-answer="'+esc(c.slug)+'" data-venture-answer-capture="'+esc(asking.captureId)+'">'+esc(c.name||c.slug)+'</button>').join("")+'<button type="button" data-venture-answer-dismiss="1">Not now</button></div></div>'
+    : '';
+  $("#ventureThread").insertAdjacentHTML("beforeend", roomQueueHtml("Venture queue", ventureQueue)+askHtml);
   const historyHtml = (t.history||[]).map(g=>'<details class="venture-history" style="margin-top:12px" open><summary class="vmono">EARLIER PHASE '+esc(g.phase)+' · WHAT WAS DRAFTED ('+g.artifacts.length+')</summary>'
     + g.artifacts.map(a=>'<div class="vnote" style="margin-top:9px;padding:10px;border:1px solid var(--line);border-radius:8px">'
       + '<div class="vtitle" style="font-size:14px">'+esc(a.title)+'</div>'
@@ -4252,6 +4279,33 @@ function renderVenture(){
     + t.refs.map(r=>'<div style="margin-top:6px"><div style="font-size:12px;line-height:1.4;color:#5a5346">'+esc(r.name)+'</div>'
       + '<div class="from" style="font:10px/1.5 ui-monospace,monospace;color:#b8ad94">'+esc(r.stamp)+'</div></div>').join("")
     + '</div>';
+  // A queue row resumes this venture's own flow: an open "which venture?" question surfaces its
+  // answer prompt; anything else is already this venture's, so it scrolls back to the thread and
+  // hands focus to the next draft step (the room's native next action).
+  document.querySelectorAll("#ventureThread .rq-row").forEach(button=>button.addEventListener("click",()=>{
+    const id=button.dataset.rqId;
+    const item=(VENTURE_QUEUE||[]).find(it=>it.captureId===id);
+    if(item&&item.state==="awaiting-answer"){
+      ventureQueueAsk=id; renderVenture();
+      $("#ventureQueueAsk")?.scrollIntoView({behavior:"smooth",block:"center"});
+      return;
+    }
+    $("#ventureThread").scrollIntoView({behavior:"smooth",block:"start"});
+    $("#ventureRunStepBtn")?.focus();
+  }));
+  document.querySelectorAll("#ventureThread [data-venture-answer]").forEach(button=>button.addEventListener("click",async ()=>{
+    const captureId=button.dataset.ventureAnswerCapture, slug=button.dataset.ventureAnswer;
+    const item=(VENTURE_QUEUE||[]).find(it=>it.captureId===captureId);
+    button.disabled=true;
+    const r=await post("/api/room-queue/venture-answer",{captureId,slug,expectedVersion:(item&&item.payload&&item.payload.answerVersion)||0});
+    // Any outcome clears the prompt and reloads: a 409 (answered elsewhere) must not leave a stale
+    // question on the desk, and a reload reads the queue's durable state either way.
+    ventureQueueAsk=null;
+    if(r.ok) flash(slug===ventureSlug?"Filed under this venture":"Filed under "+slug);
+    else flash(r.error||"Could not record the answer");
+    loadVenture();
+  }));
+  $("#ventureThread [data-venture-answer-dismiss]")?.addEventListener("click",()=>{ ventureQueueAsk=null; renderVenture(); });
 }
 function renderVentureExample(){
   $("#ventureDay").textContent = "read-only example";
