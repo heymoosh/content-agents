@@ -10,16 +10,18 @@ disposable — do not continue in it.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-03 handoff) — build slice 1.5, the decision-11 contracts
-> Everything else on the board is done or deliberately held. Start here:
-> 1. **Build slice 1.5 — the durable capture/state contracts + Fiction confirm-before-canon gate.**
->    This is the reordered first step (contracts-first, per Codex review + Muxin). The full 7-item
->    checklist is in the "Decision 11 build order — REVISED to contracts-first" subsection under
->    decision 11 below. Start with the capture event-log + room projections + Venture answer
->    protocol. Self-vet mergeable (routing/gates/classification don't compose prose → nothing here
->    holds under rule 7).
-> 2. **Then slice 2** (Studio Start routing + Charles/Venture queues) and **re-target PR #448's
->    Fiction queue at the new confirm gate**, then un-draft/rebase #448 for merge.
+> ### ▶ NEXT ACTION (2026-09-04 handoff) — slice 1.5 DONE; build slice 2
+> Slice 1.5 (the decision-11 durable contracts) is built, green, cross-family-audited, and merged.
+> Start here:
+> 1. **~~Build slice 1.5~~ — DONE.** Branch `feat/capture-contracts-slice15`, four commits
+>    (fd3268f 1.5a capture event-log + room projections; 7ca0d5f 1.5b Venture resolver + CAS answer
+>    protocol; e07b0e1 1.5c Fiction two-store link + confirm-before-canon gate; 59289ec 1.5d Charles
+>    durable output group + double-draft-safe run). Every sub-slice passed `npm run check`
+>    (4100/4100) + a cross-family codex/GPT audit before commit. Self-vet merged (rule 7 untouched —
+>    contracts/gates/classification, no prose). Checklist mapping under decision 11 below.
+> 2. **Build slice 2 — Studio Start routing + Charles/Venture queues** and **re-target PR #448's
+>    Fiction queue at the new confirm gate** (slice 1.5c's `openCanonGate`/`confirmCanonGate`
+>    replaces the old canon-approve shortcut), then un-draft/rebase #448 for merge.
 > 3. **Then slice 3** (Charles combined-review layout).
 >
 > **Held, do NOT merge yet:** PR #448 (`feat/room-queue-slice1-fiction`) — green (4056/4056) but a
@@ -1172,8 +1174,18 @@ now:
   confirm gate replaces — so it must not ship before the gate exists. (Fix landed in this branch:
   the client `<script>` is inside a template literal, so a source `\s` is eaten and emits `/s+/g`;
   regexes in that region need `\\s`. `page.test.ts` enforces even-length backslash runs — run it.)
-- **Slice 1.5 (NEW, do first): the capture/state contracts.** These are the foundation findings
-  3–10 of the review demand. Build and test them before any Charles/Venture queue:
+- **Slice 1.5 — DONE (branch `feat/capture-contracts-slice15`, 4 commits).** The capture/state
+  contracts, foundation findings 3–10. Item→commit map: **1** (durable capture identity + CAS
+  answer) → 1.5b `7ca0d5f` (`venture-resolver.ts`, `venture-queue.ts`); **2** (append-only event
+  log + room projections + legacy migration) → 1.5a `fd3268f` (`captures.ts` front door,
+  `room-queue.ts` projections, `projectCaptureEvents`); **3** (7-state lifecycle + collapsed count =
+  the 4 pending states) → 1.5a `fd3268f` (`QUEUE_STATES`/`PENDING_STATES`/`pendingCount`); **4**
+  (Fiction two-store link + reconciliation) → 1.5c `e07b0e1` (`captureId` on `IdeaRecord`,
+  `syncFictionQueue`); **5** (Charles group model, per-output status, persist-before-draft) → 1.5d
+  `59289ec` (`charles-queue.ts` durable group + double-draft-safe `runCharlesGroup`); **6** (Venture
+  name→slug resolver, never trusts client slug) → 1.5b `7ca0d5f` (`resolveVentureMention`); **7**
+  (Fiction confirm-before-canon state machine + resume payloads) → 1.5c `e07b0e1` (`openCanonGate`/
+  `confirmCanonGate`/`cancelCanonGate`, `fictionResume`). Original spec preserved below:
   1. **Durable capture identity + protocol.** Today a capture id is derived from room+trimmed text
      (`captures.ts:24-31`) and the client resends only `{room,text}`. Ambiguous Venture captures
      need a *persisted* `awaiting-venture` record with a stable id, a candidate snapshot, and a
