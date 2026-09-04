@@ -15,14 +15,15 @@ checklist), so no separate spec doc exists for it yet.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff #5) — merge P2 #455, then Venture item 1 #456
+> ### ▶ NEXT ACTION (2026-09-04 handoff #6) — build item 2 (Fiction/Charles) from the editor registry
 > Decision 11's per-room-queue ladder (slices 1.5/2/3) is done and merged. Lane A's first two pieces are
-> now stacked: **P1 done (PR #442)**, **P2 draft #455**, and **item 1 draft #456**. Muxin retired the
-> former content-generation PR-review hold on 2026-09-04: merge each after its recorded verification and
-> audit. After #455 and #456 land, continue with **item 2 (Fiction/Charles)** from the P2 editor registry.
+> now landed: **P1 done (PR #442)**, **P2 merged #455 (`df02f09`)**, and **item 1 merged #456
+> (`608f335`)**. Muxin retired the former content-generation PR-review hold on 2026-09-04; all
+> implementation PRs merge after their recorded verification and audit. Continue with **item 2
+> (Fiction/Charles)** from the P2 editor registry.
 >
-> 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — BUILT, ready to
->    merge as PR #455** (branch `feat/p2-editor-registry`, `97614a7`). `CONTENT_EDITORS` registry keyed by
+> 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — DONE, merged as
+>    PR #455 (`df02f09`).** `CONTENT_EDITORS` registry keyed by
 >    `request.origin` (studio/fiction/charles/venture, each its own prompt + voice rubric + `editor_pass`
 >    stamp); the fused `treated && sourceLines` gate split into a pure `planConfiguredEditing()` returning
 >    `{traceable, scannable, editor}`. Studio prompt moved in **byte-identical** (independently diffed vs
@@ -73,7 +74,7 @@ section only when this one cites it.
 >    (missing/NaN last via `POSITIVE_INFINITY`, tie-break `postId`); a duplicate empty group row
 >    can't shadow a later real one. `npm run check` unsandboxed green (484 suites / 4107 tests);
 >    four-round cross-family codex/GPT audit ended PASS. Presentation-only, self-vet merged.
-> 4. **Lane-A item 1 (Venture through the normal editor) — BUILT, ready to merge as PR #456 (2026-09-04).**
+> 4. **Lane-A item 1 (Venture through the normal editor) — DONE, merged as PR #456 (`608f335`, 2026-09-04).**
 >    The isolated stacked checkout `/private/tmp/content-agents-venture-editor` has branch
 >    `feat/venture-editor`, commits `3b7b701` + `d7153de`, and targets `feat/p2-editor-registry`.
 >    Venture's dedicated treated-draft path now runs the selected registry editor afterwards, including
@@ -97,8 +98,7 @@ section only when this one cites it.
 >    confirm the GUI Venture case records `venture-social-v1`.
 >
 >    Then item 2 (Fiction/Charles), then lane-C (item 5 port). Decision 11's queue ladder is complete;
->    no decision-11 slice remains. **Sequencing note:** item 1 depends on P2 and remains stacked on it;
->    merge #455 first, then retarget #456 to `main` before merging.
+>    no decision-11 slice remains. P2 and item 1 are both now on `main`.
 >
 > **Rule 7 (settled):** all slices merge after their scoped local verification and required audit pass.
 > Content-generation logic retains its stronger test, canary, and cross-family audit requirements; it no
@@ -170,18 +170,12 @@ that day; what happened is under "PR hygiene" below, and you do not need it to b
 
 Remaining, in order:
 
-1. **Build the rest of lane A, strictly serial, in `src/review/jobs.ts`, on top of `main`:** P2
-   (editor registry, un-fuse the editor from provenance) → item 1 (Venture through the normal
-   editor) → item 2 (Fiction and Charles treated variants). Each is content-generation LOGIC:
-   **draft PR, old-versus-new sample, hold.** Line references: "Room-model execution order" below.
-2. **Lane B: the per-room queues (decision 11) are the main open work** — UI + input-routing, all
-   self-vet mergeable (routing/gates/classification don't compose content, so nothing here holds;
-   only story/canon and Charles-persona *composition* holds, and this touches neither). Item 4
-   Fiction, item 6, 3a, and the content-request fix are done. **Build order REVISED to
-   contracts-first (Codex review, 2026-09-03):** slice 1 (shared `roomQueueHtml()` + Fiction queue)
-   is built and green as **PR #448 but HELD as a draft** — the durable capture/state contracts +
-   Fiction confirm gate (slice 1.5) come first, then routing/queues. Full checklist under decision
-   11 below.
+1. **Build lane-A item 2, in `src/review/jobs.ts`, on top of `main`:** Fiction and Charles treated
+   variants through the selected editor. It is content-generation logic and requires the stronger
+   test, canary, and cross-family audit gate, then merges without a separate PR hold. Line references:
+   "Room-model execution order" below.
+2. **Lane B: Decision 11's per-room queues are complete.** Item 4 Fiction, item 6, 3a, and the
+   content-request fix are done, as are the contracts-first 1.5 slices and all queues.
 3. **Lane C (item 5's port sequence) queues behind lane A** — same file, same region.
 
 ### Ground rules that bite immediately
