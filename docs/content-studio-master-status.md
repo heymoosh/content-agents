@@ -15,9 +15,10 @@ checklist), so no separate spec doc exists for it yet.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff) — slices 1.5 + 2 DONE; build slice 3
-> Slices 1.5 (durable contracts) and 2 (per-room queues) are built, green, cross-family-audited, and
-> merged. Start here:
+> ### ▶ NEXT ACTION (2026-09-04 handoff) — slices 1.5 + 2 + 3 DONE; decision 11 per-room-queue slices complete
+> Slices 1.5 (durable contracts), 2 (per-room queues), and 3 (Charles combined-review layout) are all
+> built, green, cross-family-audited, and merged. Decision 11's per-room-queue slice ladder is done.
+> Start here:
 > 1. **~~Build slice 1.5~~ — DONE.** Branch `feat/capture-contracts-slice15`, four commits
 >    (fd3268f 1.5a capture event-log + room projections; 7ca0d5f 1.5b Venture resolver + CAS answer
 >    protocol; e07b0e1 1.5c Fiction two-store link + confirm-before-canon gate; 59289ec 1.5d Charles
@@ -32,7 +33,18 @@ section only when this one cites it.
 >    (active-slug filter + open "which venture?" rows, CAS answer picker); **2c #453 (`fbd355c`)**
 >    the Charles bottom queue + switching the composer from N per-mode `/api/charles/draft` calls to
 >    one durable `/api/charles/group` run. All client-only over the 1.5 contracts; no prose logic.
-> 3. **Next = slice 3** (Charles combined-review layout).
+> 3. **~~Build slice 3 — Charles combined-review layout~~ — DONE.** PR #454 (`92190d8`), one commit.
+>    Groups Charles review outputs by durable `payload.groupId`: essay leads in a bounded scrollable
+>    sub-window (max-height 320px) with an "Open in focus mode" trigger (saves via existing
+>    `/api/charles/doc`); shorter outputs stack below by ordinal; legacy no-group posts fall back to
+>    per-post pseudo-groups. Server (`page-charles.ts`) + client-script (`page.ts`) share
+>    argument-only grouping/order/resume helpers, pinned by a test that runs BOTH copies. Resume
+>    picks the lowest-ordinal drafted output and scrolls to it; ordinal order is deterministic
+>    (missing/NaN last via `POSITIVE_INFINITY`, tie-break `postId`); a duplicate empty group row
+>    can't shadow a later real one. `npm run check` unsandboxed green (484 suites / 4107 tests);
+>    four-round cross-family codex/GPT audit ended PASS. Presentation-only, self-vet merged.
+> 4. **Next = the broader lane backlog** (decision 11's queue ladder is complete). Resume lane-A
+>    editor depth and the lane-C port work from their own sections below — no decision-11 slice remains.
 >
 > **Rule 7 (settled):** only actual fiction *chapter prose* (line-commented in a PR) ever holds. The
 > whole decision-11 feature — routing, queues, gates, fan-out — self-vet merges on green.
@@ -1232,8 +1244,37 @@ now:
   queue at the new confirm flow, all client-only over the 1.5 contracts. 2a #448 (`2e467a7`) Fiction
   gate re-target + queue; 2b #452 (`1487a0b`) Venture queue + CAS answer picker; 2c #453 (`fbd355c`)
   Charles queue + single `/api/charles/group` run. Each cross-family codex-audited before merge.
-- **Slice 3 (next):** the Charles combined-review layout (essay scrollable sub-window + stacked
-  drafts, focus mode) and any remaining resume depth.
+- **Slice 3 — DONE (2026-09-04, PR #454 `92190d8`):** the Charles combined-review layout — outputs
+  grouped by durable `payload.groupId`, essay in a bounded scrollable sub-window with a focus-mode
+  editor (existing `/api/charles/doc`), shorter outputs stacked by ordinal, legacy posts as per-post
+  pseudo-groups, per-output actions + partial-complete summary. Resume selects the lowest-ordinal
+  drafted output and scrolls to it. Server (`page-charles.ts`) + client-script (`page.ts`) share
+  argument-only grouping/order/resume helpers, pinned by a test running both copies. Deterministic
+  ordinal order (`POSITIVE_INFINITY` sentinel + `postId` tie-break); duplicate empty group row can't
+  shadow a real one. Presentation-only over the 1.5 contracts; four-round cross-family codex audit →
+  PASS; self-vet merged. **This completes decision 11's per-room-queue slice ladder.**
+
+**Acceptance checklist distilled from slice 3's four audit rounds (close these UP FRONT on any
+"client-`<script>` UI over the contracts" slice — each was a real cross-family audit finding here):**
+1. **Mirror parity is argument-only + executed by a test.** The server render and its client-`<script>`
+   copy must both compute from their arguments (no reading a global like `charlesVisiblePosts()`
+   *inside* the grouping helper). Pin it with a test that EXTRACTS the client copy from the emitted
+   `<script>` (`new Function`) and runs it against the same fixtures — string-presence assertions on
+   server HTML do not catch a client that went flat or misordered.
+2. **Comparators must be total.** For missing/NaN/duplicate sort keys use `Number.POSITIVE_INFINITY`
+   as the "missing" sentinel (NOT `MAX_SAFE_INTEGER` — a real value can equal it) plus a stable
+   tie-break (e.g. `postId`). The test fixture must actually **discriminate** the sentinel: the wrong
+   sentinel has to FAIL the assertion (give the finite-max entry a tie-break key that sorts opposite).
+3. **Resume selects the intended element, not the array-first one.** Deep-link/resume must pick the
+   lowest-ordinal drafted output via the shared helper and scroll to THAT `.charles-output`, not the
+   group container (or a reply can land off-screen under a long essay window).
+4. **Dedupe marks "seen" only after a row yields usable outputs.** An empty duplicate row must not
+   shadow a later real one — add the id to the seen-set after the drafted/visible guard, with a test.
+5. **Even-length backslash runs** in the client `<script>` (`\\s`), enforced by `page.test.ts`.
+6. **Run `npm run check` UNSANDBOXED** (sandbox = phantom failures + EPERM).
+7. **"Search for every other use of this symbol."** Replacing singleton DOM ids (`#charlesBody`,
+   `#charlesEditBtn`, `#charlesRevisebox`) with per-output scoped selectors requires updating every
+   reader — grep them all before assuming the swap is complete.
 
 All of the above is still self-vet per the confirmed rule-7 scope above; "contracts-first" is an
 engineering-soundness reorder, not a review-gate change.
