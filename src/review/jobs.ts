@@ -32,6 +32,7 @@ import { acquireJobExecutionLease, readDurableJobs, recoverAbandonedJobs, remove
 import { processAlive, type FileLease } from "../runtime/file-lock.js";
 import { migrateLegacyDataDirectory } from "../runtime/data-root.js";
 import { muxinVoiceFindings } from "../voice/configured.js";
+import { validateCharlesPersonaYaml } from "./charles-persona.js";
 import {
   createFictionJobs,
   fictionDraftPrompt as fictionDraftPromptImpl,
@@ -462,6 +463,30 @@ export interface ContentEditor {
   /** The `editor_pass:` frontmatter value a derivative records when this editor ran. */
   readonly stamp: string;
   readonly prompt: (variants: readonly ContentVariant[], bodies: ReadonlyMap<string, { body: string }>) => string;
+  /** Deterministic post-editor guard for this editor's own voice contract. */
+  readonly check: (body: string) => string[];
+}
+
+function sharedEditorFindings(body: string): string[] {
+  const findings: string[] = [];
+  if (/[—–]/.test(body)) findings.push("contains an em dash or en dash");
+  if (/\[\^[^\]]+\]|^\[\^[^\]]+\]:/m.test(body)) findings.push("contains a markdown footnote marker");
+  if (/:\s+[a-z]/.test(body)) findings.push("starts a word lowercase after a colon");
+  return findings;
+}
+
+/** Fiction's own bounded house-style guard. It deliberately does not apply Muxin's nonfiction rubric. */
+export function fictionEditorFindings(body: string): string[] {
+  const findings = sharedEditorFindings(body);
+  if (/\b(?:in a world where|little did they know)\b/i.test(body)) findings.push("contains a fiction style cliché banned by config/fiction/style.yaml");
+  if (/\bnot .{0,80}\bbut\b/i.test(body)) findings.push("contains the generic-AI 'not X but Y' rhythm banned by config/fiction/style.yaml");
+  return findings;
+}
+
+/** Charles's contract is his schema-validated persona, plus the shared house em-dash prohibition. */
+export function charlesEditorFindings(body: string): string[] {
+  validateCharlesPersonaYaml(readFileSync(join(repoRoot, "charles", "config", "persona.yaml"), "utf8"));
+  return sharedEditorFindings(body);
 }
 
 /** The draft payload every editor receives: finished bodies, platform limits, and any byte-exact constraint. Never a source. */
@@ -542,10 +567,10 @@ export function ventureSocialEditorPrompt(variants: readonly ContentVariant[], b
 }
 
 export const CONTENT_EDITORS: Readonly<Record<ContentEditorKind, ContentEditor>> = {
-  studio: { kind: "studio", stamp: "cold-feed-v1", prompt: configuredColdFeedEditorPrompt },
-  fiction: { kind: "fiction", stamp: "fiction-social-v1", prompt: fictionSocialEditorPrompt },
-  charles: { kind: "charles", stamp: "charles-social-v1", prompt: charlesSocialEditorPrompt },
-  venture: { kind: "venture", stamp: "venture-social-v1", prompt: ventureSocialEditorPrompt },
+  studio: { kind: "studio", stamp: "cold-feed-v1", prompt: configuredColdFeedEditorPrompt, check: muxinVoiceFindings },
+  fiction: { kind: "fiction", stamp: "fiction-social-v1", prompt: fictionSocialEditorPrompt, check: fictionEditorFindings },
+  charles: { kind: "charles", stamp: "charles-social-v1", prompt: charlesSocialEditorPrompt, check: charlesEditorFindings },
+  venture: { kind: "venture", stamp: "venture-social-v1", prompt: ventureSocialEditorPrompt, check: muxinVoiceFindings },
 };
 
 /** Map a request origin to its editor. `studio` and `human-inference` are one room and share the studio editor. */
@@ -579,6 +604,7 @@ export function parseConfiguredEditorBodies(
   output: string,
   variants: readonly ContentVariant[],
   originals: ReadonlyMap<string, { body: string; sourceLines: (number | string)[] }>,
+  editor: ContentEditor,
 ): Map<string, { body: string; sourceLines: (number | string)[] }> {
   const expected = new Set(variants.map((variant) => variant.identity.id));
   let parsed: unknown;
@@ -598,8 +624,8 @@ export function parseConfiguredEditorBodies(
     const variant = variants.find((candidate) => candidate.identity.id === id)!;
     const limit = configuredPlatformLimit(variant.platform);
     if (limit && body.length > limit) throw new Error(`selected editor exceeded the ${variant.platform} character limit`);
-    const voiceFindings = muxinVoiceFindings(body);
-    if (voiceFindings.length) throw new Error(`selected editor returned variant ${id} that failed the voice check: ${voiceFindings.join("; ")}`);
+    const findings = editor.check(body);
+    if (findings.length) throw new Error(`selected ${editor.kind} editor returned variant ${id} that failed its style check: ${findings.join("; ")}`);
     if (variant.treatments.includes("belief-shift") && body !== original.body) {
       throw new Error(`selected editor must preserve belief-shift variant ${id} byte-for-byte`);
     }
@@ -740,9 +766,6 @@ export function parseVentureConfiguredBodies(output: string, variants: readonly 
 export function assertConfiguredTreatmentPolicy(request: ContentRequest, treated: readonly ContentVariant[]): void {
   if (treated.some((variant) => variant.treatments.includes("belief-shift")) && request.origin !== "studio" && request.origin !== "human-inference") {
     throw new Error("belief-shift treatment is available only for an authorized Human Inference approved cut");
-  }
-  if (treated.length && (request.origin === "fiction" || request.origin === "charles")) {
-    throw new Error(`configured ${request.origin} treatments are unavailable: no enforceable restricted transformation exists; request an untreated control only`);
   }
   if (treated.length && request.origin === "venture" && !request.ventureSource) {
     throw new Error("configured Venture treatment requires approved Venture source provenance");
@@ -968,12 +991,13 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
       // or a generic test fixture to impersonate an editor in an ordinary checkout.
       const injected = disposableConfiguredEditorOutput(editor, treated, bodies);
       if (injected !== null) {
-        bodies = parseConfiguredEditorBodies(injected, treated, bodies);
+        engineExecution = "disposable-injected";
+        bodies = parseConfiguredEditorBodies(injected, treated, bodies, editor);
       } else {
         const editorResult = await runClaudeSpawn(job, editor.prompt(treated, bodies), { timeoutMs: ATOMIZE_TIMEOUT_MS, tools: "" });
         const editorFailure = decodeSpawnFailure(editorResult, job.id, { timeoutVerb: `${editor.kind} social editing`, timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`, exitVerb: `${editor.kind} social editing` });
         if (editorFailure) throw new Error(editorFailure.replace(/Claude/g, engineName(job)));
-        bodies = parseConfiguredEditorBodies(editorResult.stdout, treated, bodies);
+        bodies = parseConfiguredEditorBodies(editorResult.stdout, treated, bodies, editor);
       }
       editorStamp = editor.stamp;
     }

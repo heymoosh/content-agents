@@ -81,10 +81,10 @@ test("belief-shift drafting is constrained to a real source-grounded change of m
   const editedExact = JSON.stringify(variants.map((variant) => ({
     id: variant.identity.id, recommendation: "Preserve exact reviewed mechanism copy.", body: beliefShift.originalInput,
   })));
-  assert.equal(parseConfiguredEditorBodies(editedExact, variants, parsed).get(variants[0]!.identity.id)?.body, beliefShift.originalInput);
+  assert.equal(parseConfiguredEditorBodies(editedExact, variants, parsed, CONTENT_EDITORS.studio).get(variants[0]!.identity.id)?.body, beliefShift.originalInput);
   assert.throws(() => parseConfiguredEditorBodies(JSON.stringify(variants.map((variant) => ({
     id: variant.identity.id, recommendation: "Sharpen it.", body: `${beliefShift.originalInput} Extra conclusion.`,
-  }))), variants, parsed), /preserve belief-shift.*byte-for-byte/i);
+  }))), variants, parsed, CONTENT_EDITORS.studio), /preserve belief-shift.*byte-for-byte/i);
 
   mkdirSync(join(folder, "cuts", "belief-audit"), { recursive: true });
   writeFileSync(join(folder, "cuts", "belief-audit", "cut.md"), `---\nsource_lines: [1]\n---\n\n${beliefShift.originalInput}\n`);
@@ -211,13 +211,13 @@ test("cold-feed editor sees no source context and preserves provenance while enf
     recommendation: "Name the concrete topic immediately.",
     body: `AI policy is the subject of this post ${index}.`,
   })));
-  const edited = parseConfiguredEditorBodies(output, treated, originals);
+  const edited = parseConfiguredEditorBodies(output, treated, originals, CONTENT_EDITORS.studio);
   assert.deepEqual(edited.get(treated[0]!.identity.id)?.sourceLines, [2]);
   assert.equal(edited.get(treated[0]!.identity.id)?.body, "AI policy is the subject of this post 0.");
-  assert.throws(() => parseConfiguredEditorBodies(JSON.stringify(treated.map((variant) => ({ id: variant.identity.id, recommendation: "Fix it.", body: "The point: this is unclear." }))), treated, originals), /lowercase after a colon/i);
-  assert.throws(() => parseConfiguredEditorBodies(JSON.stringify(treated.map((variant) => ({ id: variant.identity.id, recommendation: "Fix it.", body: "Same edited post." }))), treated, originals), /duplicate cold-feed body/i);
+  assert.throws(() => parseConfiguredEditorBodies(JSON.stringify(treated.map((variant) => ({ id: variant.identity.id, recommendation: "Fix it.", body: "The point: this is unclear." }))), treated, originals, CONTENT_EDITORS.studio), /lowercase after a colon/i);
+  assert.throws(() => parseConfiguredEditorBodies(JSON.stringify(treated.map((variant) => ({ id: variant.identity.id, recommendation: "Fix it.", body: "Same edited post." }))), treated, originals, CONTENT_EDITORS.studio), /duplicate cold-feed body/i);
   const overLimit = "x".repeat(3001);
-  assert.throws(() => parseConfiguredEditorBodies(JSON.stringify(treated.map((variant, index) => ({ id: variant.identity.id, recommendation: "Fix it.", body: index ? `Distinct ${index}.` : overLimit }))), treated, originals), /character limit/i);
+  assert.throws(() => parseConfiguredEditorBodies(JSON.stringify(treated.map((variant, index) => ({ id: variant.identity.id, recommendation: "Fix it.", body: index ? `Distinct ${index}.` : overLimit }))), treated, originals, CONTENT_EDITORS.studio), /character limit/i);
 });
 
 test("editor registry returns a distinct named editor per source kind, each with its own stamp and voice rubric", () => {
@@ -246,6 +246,9 @@ test("editor registry returns a distinct named editor per source kind, each with
   assert.match(CONTENT_EDITORS.charles.prompt(treated, bodies), /accidental slip/i);
   assert.match(CONTENT_EDITORS.venture.prompt(treated, bodies), /config\/voice\.yaml governs in full/);
   assert.match(CONTENT_EDITORS.venture.prompt(treated, bodies), /Never invent proof/);
+  assert.match(CONTENT_EDITORS.fiction.check("In a world where the door opens.").join("; "), /fiction style cliché/i);
+  assert.deepEqual(CONTENT_EDITORS.charles.check("Here's the thing: We are quite fine."), [], "Charles accepts a persona-valid phrase that Muxin's rubric would reject");
+  assert.match(CONTENT_EDITORS.charles.check("Quite fine — unquestionably.").join("; "), /em dash or en dash/i);
 });
 
 test("the studio editor prompt is byte-identical to the approved pre-registry cold-feed prompt", () => {
@@ -329,8 +332,8 @@ test("Fiction and Charles authoritative approved bodies win over arbitrary origi
   assert.equal(resolvedCharles.body, "Approved Charles post.");
   assert.deepEqual(resolvedCharles.restrictionRefs, ["charles/config/persona.yaml", "charles-lord-featherbottom", "no new leak claims"]);
   assert.match(configuredContentPrompt(charles, charles.variants), /no new leak claims/);
-  assert.throws(() => assertConfiguredTreatmentPolicy(fiction, fiction.variants.filter((v) => v.identity.kind === "treated")), /unavailable.*untreated control/i);
-  assert.throws(() => assertConfiguredTreatmentPolicy(charles, charles.variants.filter((v) => v.identity.kind === "treated")), /unavailable.*untreated control/i);
+  assert.doesNotThrow(() => assertConfiguredTreatmentPolicy(fiction, fiction.variants.filter((v) => v.identity.kind === "treated")));
+  assert.doesNotThrow(() => assertConfiguredTreatmentPolicy(charles, charles.variants.filter((v) => v.identity.kind === "treated")));
   assert.doesNotThrow(() => assertConfiguredTreatmentPolicy(buildContentRequest({ ...fiction, treatments: [] }), []));
 });
 
@@ -394,6 +397,72 @@ test("configured generation dispatches Venture through its editor and stamps the
     assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), new RegExp(`\\| ${treatedVariant.identity.id} \\|[^\\n]+\\| pending \\|`));
   } finally {
     rmSync(folder, { recursive: true, force: true });
+    if (priorMarker === null) rmSync(marker, { force: true }); else writeFileSync(marker, priorMarker, { mode: 0o600 });
+    if (priorToken === undefined) delete process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN; else process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = priorToken;
+    if (priorRoot === undefined) delete process.env.E2E_REPO_ROOT; else process.env.E2E_REPO_ROOT = priorRoot;
+  }
+});
+
+test("configured generation dispatches Fiction and Charles through their own editors, not Muxin's voice guard", async () => {
+  const marker = join(repoRoot, ".e2e-configured-engine-token");
+  const priorToken = process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
+  const priorRoot = process.env.E2E_REPO_ROOT;
+  const priorMarker = existsSync(marker) ? readFileSync(marker, "utf8") : null;
+  const token = `test-fiction-charles-editors-${process.pid}-${Date.now()}`;
+  const cases = [
+    {
+      origin: "fiction" as const,
+      stamp: "fiction-social-v1",
+      body: "A door opened behind Mara.",
+      sourceContext: {
+        kind: "fiction-approved-promotion" as const,
+        authoritativeBody: "A door opened behind Mara.",
+        series: { id: "test-series", title: "Test Series" },
+        chapter: { number: 1, title: "The Door" },
+        sourcePassages: [{ ref: "chapters/chapter-01.md#L1", text: "A door opened behind Mara.", locked: true as const }],
+        restrictions: { canon: ["no new canon"], provenance: ["locked passage only"] },
+      },
+    },
+    {
+      origin: "charles" as const,
+      stamp: "charles-social-v1",
+      body: "Here's the thing: We are quite fine.",
+      sourceContext: {
+        kind: "charles-approved-post" as const,
+        authoritativeBody: "Here's the thing: We are quite fine.",
+        personaRef: "charles/config/persona.yaml" as const,
+        identity: "charles-lord-featherbottom" as const,
+        restrictions: ["no new leak claims"],
+      },
+    },
+  ];
+  writeFileSync(marker, token, { mode: 0o600 });
+  process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = token;
+  process.env.E2E_REPO_ROOT = repoRoot;
+  try {
+    for (const item of cases) {
+      const slug = `test-${item.origin}-editor-${process.pid}-${Date.now()}`;
+      const folder = join(repoRoot, "content", slug);
+      const configured = buildContentRequest({
+        id: slug, origin: item.origin, descriptor: "approved promotion", originalInput: item.body,
+        treatments: ["shorter"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
+        sourceContext: item.sourceContext,
+      });
+      mkdirSync(folder, { recursive: true });
+      writeFileSync(join(folder, "review-queue.md"), "# Review queue — editor dispatch test\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n");
+      try {
+        const result = await generateConfiguredContent(slug, configured);
+        const treatedVariant = configured.variants.find((variant) => variant.identity.kind === "treated")!;
+        const derivative = readFileSync(join(folder, "derivatives", `${treatedVariant.identity.id}.md`), "utf8");
+        assert.equal(result.engineExecution, "disposable-injected", `${item.origin} stays hermetic`);
+        assert.match(derivative, new RegExp(`^editor_pass:\\s*${item.stamp}$`, "m"), `${item.origin} records its selected editor stamp`);
+        assert.match(derivative, new RegExp(item.body.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${item.origin} editor preserves the supplied approved draft`);
+        assert.doesNotMatch(derivative, /^source_lines:/m, `${item.origin} remains untraced rather than fabricating essay provenance`);
+      } finally {
+        rmSync(folder, { recursive: true, force: true });
+      }
+    }
+  } finally {
     if (priorMarker === null) rmSync(marker, { force: true }); else writeFileSync(marker, priorMarker, { mode: 0o600 });
     if (priorToken === undefined) delete process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN; else process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = priorToken;
     if (priorRoot === undefined) delete process.env.E2E_REPO_ROOT; else process.env.E2E_REPO_ROOT = priorRoot;

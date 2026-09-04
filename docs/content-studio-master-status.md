@@ -15,12 +15,13 @@ checklist), so no separate spec doc exists for it yet.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff #6) — build item 2 (Fiction/Charles) from the editor registry
+> ### ▶ NEXT ACTION (2026-09-04 handoff #7) — build Lane-C item 5 after this branch lands
 > Decision 11's per-room-queue ladder (slices 1.5/2/3) is done and merged. Lane A's first two pieces are
 > now landed: **P1 done (PR #442)**, **P2 merged #455 (`df02f09`)**, and **item 1 merged #456
 > (`608f335`)**. Muxin retired the former content-generation PR-review hold on 2026-09-04; all
-> implementation PRs merge after their recorded verification and audit. Continue with **item 2
-> (Fiction/Charles)** from the P2 editor registry.
+> implementation PRs merge after their recorded verification and audit. **Lane-A item 2
+> (Fiction/Charles) is complete on `feat/fiction-charles-editors` and ready to merge.** Continue
+> with Lane-C item 5 after it lands.
 >
 > 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — DONE, merged as
 >    PR #455 (`df02f09`).** `CONTENT_EDITORS` registry keyed by
@@ -48,6 +49,10 @@ section only when this one cites it.
 >      - **Both:** add a deterministic editor-dispatch test seam (injectable editor output) + an integration
 >        test through `generateConfiguredContent` proving editor selection + stamp emission per newly-reachable
 >        origin (closes Codex finding 3; the untraced path has no disposable stand-in today).
+>      - **Item 2 (Fiction/Charles): CLOSED.** Treated variants now reach `fiction-social-v1` and
+>        `charles-social-v1`; the Charles check is independent of `muxinVoiceFindings()`. Focused,
+>        full-suite, cross-family Grok audit, and one bounded authenticated Codex canary all passed.
+>        Evidence and the new P2 acceptance checklist: `docs/evidence-fiction-charles-editor-2026-09-04.md`.
 >
 > Prior slices, for the record:
 > 1. **~~Build slice 1.5~~ — DONE.** Branch `feat/capture-contracts-slice15`, four commits
@@ -170,13 +175,12 @@ that day; what happened is under "PR hygiene" below, and you do not need it to b
 
 Remaining, in order:
 
-1. **Build lane-A item 2, in `src/review/jobs.ts`, on top of `main`:** Fiction and Charles treated
-   variants through the selected editor. It is content-generation logic and requires the stronger
-   test, canary, and cross-family audit gate, then merges without a separate PR hold. Line references:
-   "Room-model execution order" below.
+1. **Lane-A item 2 is complete on `feat/fiction-charles-editors`:** Fiction and Charles treated
+   variants dispatch through their selected editors with origin-specific checks and stamps. It passed
+   focused/full verification, a Grok 4.6 audit, and one bounded live canary; merge it, then advance.
 2. **Lane B: Decision 11's per-room queues are complete.** Item 4 Fiction, item 6, 3a, and the
    content-request fix are done, as are the contracts-first 1.5 slices and all queues.
-3. **Lane C (item 5's port sequence) queues behind lane A** — same file, same region.
+3. **Lane C (item 5's port sequence) is next** — same file, same region.
 
 ### Ground rules that bite immediately
 

@@ -1,0 +1,10 @@
+{
+  "version": "configured-media-stage-v1",
+  "id": "control-Ymx1ZXNreQ-bm9uZQ",
+  "platform": "bluesky",
+  "media": "none",
+  "status": "staged",
+  "stage": "draft-ready",
+  "derivativePath": "derivatives/control-Ymx1ZXNreQ-bm9uZQ.md",
+  "approvalGate": "ordinary review-queue approval"
+}

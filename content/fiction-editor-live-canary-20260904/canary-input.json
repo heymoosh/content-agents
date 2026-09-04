@@ -1,0 +1,80 @@
+{
+  "kind": "content_request",
+  "version": "content-request-v1",
+  "id": "fiction-editor-live-canary-20260904",
+  "origin": "fiction",
+  "descriptor": "Representative live editor canary",
+  "originalInput": "Mara found the sealed door already open.",
+  "ventureId": null,
+  "ventureSource": null,
+  "sourceProvenance": null,
+  "sourceContext": {
+    "kind": "fiction-approved-promotion",
+    "authoritativeBody": "Mara found the sealed door already open.",
+    "series": {
+      "id": "canary-series",
+      "title": "Canary Series"
+    },
+    "chapter": {
+      "number": 1,
+      "title": "The Door"
+    },
+    "sourcePassages": [
+      {
+        "ref": "chapters/chapter-01.md#L1",
+        "text": "Mara found the sealed door already open.",
+        "locked": true
+      }
+    ],
+    "restrictions": {
+      "canon": [
+        "no new canon"
+      ],
+      "provenance": [
+        "locked passage only"
+      ]
+    }
+  },
+  "experiment": null,
+  "selections": {
+    "treatments": [
+      "shorter"
+    ],
+    "media": [],
+    "platforms": [
+      "bluesky"
+    ]
+  },
+  "recommendations": {
+    "treatments": [],
+    "media": [],
+    "platforms": []
+  },
+  "control": {
+    "enabled": true
+  },
+  "variants": [
+    {
+      "identity": {
+        "id": "control-Ymx1ZXNreQ-bm9uZQ",
+        "requestId": "fiction-editor-live-canary-20260904",
+        "kind": "control"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-Ymx1ZXNreQ-bm9uZQ-c2hvcnRlcg",
+        "requestId": "fiction-editor-live-canary-20260904",
+        "kind": "treated"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": [
+        "shorter"
+      ]
+    }
+  ]
+}
