@@ -5,25 +5,28 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight. SLICE-5D (spin) is **ACCEPTED and merged to local `main`**
-  (2026-09-05): Muxin approved the Rule-7 hold as option A (keep 5b's atomic skeleton-gate reject
-  for reflective/fiction-promo sources routed to LinkedIn/X; the "fall back to non-case spin"
-  variant is filed as an optional follow-on, unbuilt, to raise only if reflective pieces get
-  blocked in practice). Fast-forwarded to `b8eea12`; branch `feat/content-spin-5d` deleted.
-- Last accepted packet: `docs/operations/launch-slices/SLICE-5D.md` (Closeout PASS + Muxin approval;
-  gate 4178/484/0). SLICE-5C before it (gate 4173/484/0).
+- Current slice: none in flight. SLICE-5E (pillar tagging) is **ACCEPTED and merged to local `main`**
+  (2026-09-05, `df26d30`): metadata-only surfacing of the routed pillar from `routing.md` onto
+  derivative frontmatter via `readPillar`, deterministic, no recompute — a Rule-7 self-vet merge, no
+  hold. Gate 4181/484/0. Branch deleted. (SLICE-5D spin before it: ACCEPTED `b8eea12`, Muxin's Rule-7
+  option A — keep 5b's atomic skeleton-gate reject for reflective/fiction-promo → LinkedIn/X; the
+  "fall back to non-case spin" alternative is an optional, unbuilt follow-on to raise only if
+  reflective pieces get blocked in practice.)
+- Last accepted packet: `docs/operations/launch-slices/SLICE-5E.md` (Closeout ACCEPTED; gate
+  4181/484/0). SLICE-5D before it (4178/484/0, + Muxin approval); SLICE-5C (4173/484/0).
 - Blocked on: nothing. Pick the next dependency-ready slice below.
-- Next dependency-ready: any one of the five remaining item-5 capabilities (pillar tagging,
-  scoring/soft gate, thread check, quote-card captions, brief directives) — largely independent now
-  that routing (5a), `validate` (5b), source triage (5c), and spin (5d) have landed; item `3a`
+- Next dependency-ready: any one of the four remaining item-5 capabilities (scoring/soft gate,
+  thread check, quote-card captions, brief directives) — largely independent now
+  that routing (5a), `validate` (5b), source triage (5c), spin (5d), and pillar tagging (5e) have
+  landed; item `3a`
   (retire `/cycle`'s review+publish steps) is also independently ready and depends on nothing. The
   5c→spin follow-on is DISCHARGED: 5d un-dormanted the skeleton gate end to end and added the
   gate-rejection test. The case gate stays intentionally dormant until a configured treatment emits a
   `case_skeleton: true` beat (a future, unscheduled capability, not one of the five).
 - Last decision: 2026-09-05 — adopt the portable slice protocol; workers get one packet, never this document
-- Repository state: local `main` carries 5d + 5c + 5b + prior slice-protocol doc commits ahead of
-  `origin/main` by 6 (local-first delivery; push is Muxin's call). No feature branch open. No PRs
-  pushed.
+- Repository state: local `main` carries 5e + 5d + 5c + 5b + prior slice-protocol doc commits ahead
+  of `origin/main` by 10 (local-first delivery; push is Muxin's call). No feature branch open. No
+  PRs pushed.
 - Design spec for item 5: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
 - Standing constraints: see `## Standing constraints` below before delegating anything
 - Do not read past this block unless the slice packet cites a heading. Everything under
@@ -50,6 +53,22 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — item 5e accepted: routed pillar surfaced onto Content derivatives
+
+Ported the `/atomize` pillar-tagging capability (§5 row) into `generateConfiguredContent` as the
+**surfacing** port only. A read-only scout established the key fact: the pillar the piece was routed
+under already lives on disk in `routing.md`'s title line (read by `readPillar`,
+`src/review/reschedule.ts:42`), which `generateConfiguredContent` already loads — and recomputing it
+would need a Claude judgment call the configured path explicitly forbids (`jobs.ts:970`, "never
+invent a pillar … here"). So the faithful port is deterministic: `readPillar(folder)` once →
+`pillar: <value>` spliced onto derivative frontmatter beside 5c's `triageFrontmatter`; null pillar →
+no line, byte-identical output. Builder = Claude; low-risk metadata-only, so no cross-family audit
+and a Rule-7 self-vet merge (no hold). Coordinator-verified the diff (exact minimal splice) and the
+test (end-to-end stamp = `readPillar`'s value, 5c stamp preserved, `source.md` byte-exact, and a
+byte-identical no-pillar baseline). Gate `npm run check` unsandboxed **4181/484/0**. Merged to local
+`main` `df26d30`; branch deleted. Four item-5 capabilities remain (scoring/soft gate, thread check,
+quote-card captions, brief directives); `3a` still independently ready.
 
 ### 2026-09-05 — item 5d verified and HELD for Muxin: spin ported, skeleton gate un-dormanted
 

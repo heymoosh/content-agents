@@ -122,8 +122,26 @@ npm run check
 
 ## RESULT BLOCK (worker fills this in and returns it)
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
+- Changed paths: `src/review/jobs.ts` (+8/-1), `src/review/content-pillar-tag.test.ts` (new, 3 tests)
+- Outcome: `generateConfiguredContent` imports `readPillar` (`jobs.ts:25`), builds
+  `pillarFrontmatter` next to 5c's `triageFrontmatter` (`jobs.ts:1130-1136`,
+  `const routedPillar = readPillar(folder); ... routedPillar ? [\`pillar: ${routedPillar}\`] : []`),
+  and splices `...pillarFrontmatter` right after `...triageFrontmatter` at the frontmatter site
+  (`jobs.ts:1183`). Deterministic, no recompute, no model call. No pillar in `routing.md` → no line,
+  byte-identical output.
+- Checks run and results: focused `content-pillar-tag.test.ts` + `jobs.test.ts` = 117/117; `tsc
+  --noEmit` exit 0.
+- Evidence locations: test `src/review/content-pillar-tag.test.ts`; jobs edit `jobs.ts:25,1130-1136,1183`.
+- Unresolved: none.
+
+## Closeout result
+
+**ACCEPTED — merged to local `main`** (2026-09-05, `df26d30`). Coordinator-verified: read the full
+`jobs.ts` diff (the exact minimal `...pillarFrontmatter` splice after triage, `folder` in scope) and
+the test file (test 1 pins `readPillar`; test 2 proves the end-to-end stamp equals `readPillar`'s
+value, exactly one line, the 5c triage stamp still present, `source.md` byte-exact, rows pending;
+test 3 removes only the `pillar:` line + normalizes the slug-derived `request_id` and asserts
+byte-equality to the no-pillar baseline). Metadata-only, no composed-prose change → Rule-7 self-vet
+merge, no hold, no cross-family audit required. Closeout gate `npm run check` UNSANDBOXED: **exit 0,
+4181 pass / 484 suites / 0 fail / 0 skip**. Fast-forwarded `feat/content-pillar-5e` into `main`;
+branch deleted.
