@@ -22,6 +22,7 @@ import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { upsertFrontmatterField } from "../outreach/qualify.js";
 import { CONTENT, safeFolder, isValidLens } from "./rows.js";
+import { readPillar } from "./reschedule.js";
 import { extractSourceLines, roundCount } from "./develop.js";
 import { briefRevisePrompt, latestBriefPath } from "./serve.js";
 import { logCost } from "../util/cost-log.js";
@@ -1125,6 +1126,12 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
       ...(triageSourceClass ? [`source_class: ${triageSourceClass}`] : []),
       ...(triageCaseEvidence ? [`source_class_case: ${triageCaseEvidence}`] : []),
     ];
+    // The pillar the piece was routed under, read deterministically from routing.md's title line
+    // (readPillar) — never recomputed from config/pillars.yaml, which is a Claude judgment the
+    // configured path is forbidden to invent (:970). No title/pillar -> no line (matches the
+    // pillarSource: "none" convention), so the pillar-absent output stays byte-identical.
+    const routedPillar = readPillar(folder);
+    const pillarFrontmatter: string[] = routedPillar ? [`pillar: ${routedPillar}`] : [];
     // The per-platform spin angle for each routed candidate, computed BEFORE any write so its
     // value is both the gate input and the provenance stamp. A control is never spun (it stays
     // byte-for-byte exact); a treated candidate is spun only when it is source-traceable and its
@@ -1173,7 +1180,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         const sourceCtaUrl = request.sourceProvenance?.canonicalUrl && configuredSourceSupportsCta(request.sourceProvenance.canonicalUrl, sourceKind)
           ? request.sourceProvenance.canonicalUrl
           : null;
-        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...configuredEditorFrontmatter(variant, editorStamp), ...(routing.get(variant.platform)?.confidence === "exploration" ? ["exploration_probe: true"] : []), ...triageFrontmatter, ...(spinById.get(id)?.spin ? ["spin: true", `angle: ${variant.platform}`] : []), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
+        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...configuredEditorFrontmatter(variant, editorStamp), ...(routing.get(variant.platform)?.confidence === "exploration" ? ["exploration_probe: true"] : []), ...triageFrontmatter, ...pillarFrontmatter, ...(spinById.get(id)?.spin ? ["spin: true", `angle: ${variant.platform}`] : []), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
         writeFileSync(path, configuredDerivativeText(frontmatter, body, variant.identity.kind === "control"), { flag: "wx" }); created.push(path);
         const mediaOutput = mediaOutputs.find((output) => output.id === id)!;
         const stagePath = join(folder, "media-stages", `${id}.json`);
