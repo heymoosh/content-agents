@@ -60,6 +60,29 @@ export function checkDerivative(
       violations.push(`${file}: angle "${angleKey}" does not match a configured spin angle for platform "${platform}"`);
     }
   }
+  violations.push(...checkPlatformLimits(file, platform, body, platforms));
+  return violations;
+}
+
+// The per-platform character/word ceiling, split out of checkDerivative (SLICE-5B) so both the
+// /atomize validator and the configured Content generation path (src/review/jobs.ts
+// generateConfiguredContent) enforce the ONE config/platforms.yaml `max_chars`/`max_words` limit
+// through the same code — there is no second limit table to drift from. It intentionally checks
+// ONLY the length ceilings, never source_lines presence or spin-angle consistency: those are
+// /atomize frontmatter contracts that would misfire on a configured origin whose scoped exception
+// legitimately carries no source_lines (Venture, Charles, fiction) or no spin/angle frontmatter at
+// all. An unknown or limit-less platform yields no violation (the configured path already gates
+// platform validity via routing and variant construction), exactly as the omission-driven table
+// this replaced behaved.
+export function checkPlatformLimits(
+  file: string,
+  platform: string,
+  body: string,
+  platforms: Record<string, PlatformRule>
+): string[] {
+  const violations: string[] = [];
+  const rule = platforms[platform];
+  if (!rule) return violations;
   if (rule.max_chars && body.length > rule.max_chars) {
     violations.push(`${file}: ${body.length} chars > ${platform} limit ${rule.max_chars}`);
   }

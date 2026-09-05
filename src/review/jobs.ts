@@ -16,6 +16,8 @@ import { repoRoot } from "../db/db.js";
 import { appendRow, appendRows, readQueue, stampOrigin, type NewQueueRow } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { resolveAngle } from "../atomize/spin.js";
+import { checkPlatformLimits, checkSkeletonGate, checkCaseGate } from "../atomize/validate.js";
+import { readSourceClass, readCaseEvidence } from "../atomize/source-triage.js";
 import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { upsertFrontmatterField } from "../outreach/qualify.js";
@@ -1025,6 +1027,43 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         bodies = parseConfiguredEditorBodies(editorResult.stdout, treated, bodies, editor);
       }
       editorStamp = editor.stamp;
+    }
+    // SLICE-5B: enforce the applicable /atomize validate gates on the fully generated candidate
+    // bodies/frontmatter BEFORE any derivative file, media stage, or review-queue row is written.
+    // Placed ahead of the mkdir/write loop below so a single violation aborts the whole routed
+    // variant set atomically — a rejected generation leaves zero derivatives on disk and zero
+    // pending review rows. Which gates run, and why:
+    //  - Per-platform char/word limit (checkPlatformLimits): the live gate here. Limits come only
+    //    from config/platforms.yaml via loadPlatforms() — the same source configuredPlatformLimit()
+    //    reads — so the studio generation path and the atomize validator cannot diverge.
+    //  - Source-triage skeleton gate (checkSkeletonGate) and case-evidence gate (checkCaseGate):
+    //    run against the folder's recorded source-triage facts. Configured derivatives carry no
+    //    spin/angle or case_skeleton frontmatter today, so these are defensive — they pass unless a
+    //    derivative ever declares the case-skeleton beat treatment or a spin-angle on a
+    //    case-skeleton platform, and they never demand source_lines from a scoped-exception origin.
+    // Deliberately NOT ported from checkDerivative: its source_lines-presence and spin-angle checks,
+    // which are /atomize frontmatter contracts that would misfire on a configured origin whose
+    // scoped exception legitimately carries no source_lines (Venture, Charles, fiction). The routing
+    // include/skip gate is already consumed above (item 5a, the `variants` filter), never re-run here.
+    const gatePlatforms = loadPlatforms().platforms;
+    const gateSourceClass = readSourceClass(folder);
+    const gateCaseEvidence = readCaseEvidence(folder);
+    const gateCandidates = variants.map((variant) => {
+      const id = variant.identity.id;
+      const generated = variant.identity.kind === "control" ? request.originalInput : bodies.get(id)!.body;
+      const sourceLines = variant.identity.kind === "control" ? (authoritative?.sourceLines ?? []) : bodies.get(id)!.sourceLines;
+      return { file: `derivatives/${id}.md`, platform: variant.platform, body: generated, sourceLines };
+    });
+    const gateViolations: string[] = [];
+    for (const candidate of gateCandidates) {
+      gateViolations.push(...checkPlatformLimits(candidate.file, candidate.platform, candidate.body, gatePlatforms));
+    }
+    if (gateSourceClass) {
+      gateViolations.push(...checkSkeletonGate(gateCandidates.map(({ file, platform }) => ({ file, platform, spin: undefined, angle: undefined })), gateSourceClass));
+    }
+    gateViolations.push(...checkCaseGate(gateCandidates.map(({ file, platform, sourceLines }) => ({ file, platform, caseSkeleton: undefined, sourceLines })), gateCaseEvidence));
+    if (gateViolations.length) {
+      throw new Error(`configured generation failed platform validation before any write:\n  - ${gateViolations.join("\n  - ")}`);
     }
     mkdirSync(join(folder, "derivatives"), { recursive: true });
     mkdirSync(join(folder, "media-stages"), { recursive: true });

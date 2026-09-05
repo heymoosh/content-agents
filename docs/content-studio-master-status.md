@@ -5,13 +5,17 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight — item 5a landed and was accepted 2026-09-05
-- Slice packet: `docs/operations/launch-slices/SLICE-5B.md` — not written yet; write it before delegating
+- Current slice: none in flight — item 5b landed and was accepted 2026-09-05
+- Last accepted packet: `docs/operations/launch-slices/SLICE-5B.md` (Closeout PASS; gate 4165/484/0)
 - Blocked on: none
-- Next dependency-ready: `5B` — port the existing `validate` gates into configured Content generation
+- Next dependency-ready: any one of the seven remaining item-5 capabilities (pillar tagging, spin,
+  scoring/soft gate, thread check, quote-card captions, brief directives, source triage) — largely
+  independent now that routing (5a) and `validate` (5b) have landed; item `3a` (retire `/cycle`'s
+  review+publish steps) is also independently ready and depends on nothing. Packet not yet written.
 - Last decision: 2026-09-05 — adopt the portable slice protocol; workers get one packet, never this document
-- Repository state: `main` level with `origin/main`, clean tree, no open PRs, no slice worktree in flight
-- Design spec for 5B: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
+- Repository state: local `main` carries 5b + prior slice-protocol doc commits ahead of `origin/main`
+  (local-first delivery; push is Muxin's call); clean tree, no open PRs, no slice worktree in flight
+- Design spec for item 5: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
 - Standing constraints: see `## Standing constraints` below before delegating anything
 - Do not read past this block unless the slice packet cites a heading. Everything under
   `## Progress log` is append-only archive, not a second status source.
@@ -37,6 +41,37 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — item 5b accepted: `validate` gates ported into configured Content generation
+
+Slice 5B is accepted and landed on local `main`. `generateConfiguredContent` (`src/review/jobs.ts`)
+now enforces the applicable `/atomize` `validate` gates — per-platform char/word limits, the
+source-triage skeleton gate, and the case-evidence gate — over every routed candidate **before**
+any derivative file, media stage, or `review-queue.md` row is written; a violation throws and
+aborts the whole routed variant set atomically. Char/word limits were extracted from
+`checkDerivative` into a shared `checkPlatformLimits` (`src/atomize/validate.ts`) that both the
+atomize validator and the Content path call, reading limits only from `config/platforms.yaml` via
+`loadPlatforms()` — there is one limit source (the hardcoded `CONFIGURED_PLATFORM_LIMITS` table was
+already removed by P1, `c6842cd`). The `source_lines`-presence and spin-angle checks were
+deliberately **not** ported: they are `/atomize` frontmatter contracts that would misfire on a
+scoped-exception origin (Venture, Charles, fiction) that legitimately carries no tracing. The
+routing include/skip gate is already consumed by 5a and was not re-run. Skeleton/case gates are
+ported but defensive against today's configured frontmatter vocabulary (direct-helper tests prove
+both their firing and passing shapes).
+
+Coordinator/worker split, one packet: builder Claude, packet-only cross-family audit by Codex/GPT
+(zero established defects). The audit's one material coverage gap — atomicity proven with only a
+single variant — was converted to a checklist item and closed with a new two-included-platform
+abort test that proves the in-limit sibling is withheld too; two trivial hardenings folded in.
+Verification: focused file 7/7, wider focused run 98/0, `jobs.test.ts` 114/0, `tsc --noEmit` exit 0,
+and the single repo-wide gate `npm run check` unsandboxed **exit 0, 4165 tests / 484 suites / 0
+failures / 0 skips**. Bounded canary = the real `generateConfiguredContent` run inside the
+atomic-rejection tests (deterministic, no model call). Full packet and RESULT BLOCK:
+`docs/operations/launch-slices/SLICE-5B.md`.
+
+Item 5's remaining seven capabilities and item `3a` are the next dependency-ready work (see START
+HERE). Delivery is local-first: 5b sits on local `main` unpushed, along with the earlier
+slice-protocol doc commits; pushing is Muxin's call.
 
 ### 2026-09-05 — protocol migration
 
