@@ -152,8 +152,9 @@ or add a local copy.
 
 This section is the frozen procedure, and it is self-contained on purpose. Session prompts stay
 short because they point here. A coordinator that reads only this section, the master document's
-`## START HERE` block, and one slice packet has everything it needs. Nothing in this section
-depends on reading any other part of this file.
+`## START HERE` block, and one slice packet has everything it needs. Nothing in this
+section depends on reading any other part of this file, and every way a session can end is
+described here.
 
 ### Repo bindings
 
@@ -169,7 +170,7 @@ it is repository-neutral.
 | Repository-wide gate | `npm run check` (typecheck + unit tests). Run it unsandboxed — under the sandbox it reports roughly 196 phantom venture failures. In a fresh worktree run `npm run worktree:setup` once first, or every command fails on missing `node_modules`. |
 | Hygiene command | `bash scripts/repo-hygiene.sh --rescue` |
 | Closeout gate | none — record `PASS` or the leftover list in the slice packet |
-| Integration rule | one coordinator, one reviewed commit at a time, gate after each |
+| Integration rule | one coordinator, one reviewed commit at a time, a passing gate on the candidate before each integration commit |
 | Delivery boundary | branch `main`, remote `origin` (`heymoosh/content-agents`). Merge is local-first: the recorded local gate result is the merge proof. Hosted CI is a manual diagnostic — never push merely to obtain a CI result. |
 | Non-negotiable product rules | Extraction-first: never compose new claims, arguments, or worldview statements in Muxin's voice; text and image derivatives quote and trim verbatim and carry `source_lines`. The scoped exceptions (Content Studio treatments, common hook templates, video scripts, Build 3 Venture, Build 4 Charles) are enumerated in the root `CLAUDE.md` and never widen. Nothing publishes without Muxin's review in `review-queue.md`; committing generated content is not publishing. Generated copy follows `config/voice.yaml` — no em dashes, no AI tells. Prefer subscription and free model routes; every paid call is opt-in and logged to `data/cost-log.csv`. Never edit `docs/content-agents-backlog.md` as text — board writes go through `prose_kanban` only. |
 | Live or authenticated model slices | Fix the verification budget before starting: normally one authenticated canary per workflow and at most one retry. Isolate Git, operational data, secrets, ports, and model permissions in a disposable harness. Preserve successful model output when later validation fails. |
@@ -193,6 +194,12 @@ block is the only part a new session reads.
   packet cannot establish a claim, it names the missing evidence or requests a bounded excerpt
   rather than inferring that unseen code is correct or defective.
 
+The read limit governs *starting context* — what you load before doing the work. It never blocks
+evidence the session itself produces. The coordinator always reads worker `RESULT BLOCK`s, the
+candidate diff and its changed-file list, check and gate output, audit findings, and hygiene
+output, plus any file the current slice packet names as owned or cited. Reading those **is** the
+review this protocol requires, not a departure from it.
+
 A bigger sibling of the builder is not independent review. Never silently substitute a
 same-family audit; if cross-family tooling is unavailable, say so and stop.
 
@@ -202,7 +209,9 @@ A slice is the smallest thing that is demonstrably done, not the smallest thing 
 described. Every packet records: goal, difficulty, dependencies, owned files, files not to
 touch, acceptance criteria, the focused verification commands, the observable result, risk and
 whether an audit is required, and the builder and auditor families. Copy the packet template
-named in the bindings; do not invent a different shape.
+named in the bindings; do not invent a different shape. Handing a worker a packet always
+includes this protocol section — "only that packet" bounds what else the worker may read, not
+whether it receives the rules.
 
 Packets that share no owned files may run in parallel. Conflicting edits and all integration
 are serialized. Workers share one workspace and must preserve other sessions' changes.
@@ -284,6 +293,11 @@ acceptance test or reproduction, a state invariant where relevant, and a named s
 search covering every other use of an affected symbol. Close each item with a fix plus evidence,
 or an explicit supported disposition. Do not expand scope to satisfy speculative suggestions.
 
+Bound the repair loop. After two repair cycles on one finding produce no new evidence, stop and
+call it engineering-blocked: record the finding, what was tried, and the failing output in the
+slice packet, then take the stopping-without-acceptance branch below. Tell the owner it is blocked
+on engineering, not on a scope decision — it is not a question for them to answer.
+
 If repairs reveal skipped files, omitted verification, or early stopping, raise effort one notch
 on the same model. If they reveal a structural blind spot, change model or builder family.
 Change one variable at a time, and keep the auditor independent of whoever implements the repair.
@@ -298,27 +312,52 @@ never a reduced request.
 A test that asserts an argument was passed proves nothing about the process that ran. Assert the
 observable outcome.
 
+### Stopping without acceptance
+
+A session that stops before acceptance — blocked on an owner decision, out of usage, engineering-
+blocked, or without cross-family audit tooling — still closes out. It takes this branch instead of
+the accepted one:
+
+1. Do not commit the candidate. Leave the working tree as it stands.
+2. Run the hygiene command from the bindings so nothing is silently lost.
+3. Record in the slice packet, under a `## Stopped` heading: the blocker in one line, what was
+   actually verified, which paths hold retained work, and the single next action that unblocks it.
+4. Rewrite the master document's `## START HERE` block to point at that packet and that blocker,
+   then commit **only** the packet and the master-document edit, with a message saying the slice
+   is not accepted.
+5. Print the master document's full path and the repository root, then stop.
+
+This branch is always available. Nothing here requires an accepted slice before a session may end,
+and no session may end by leaving the master document stale.
+
 ### Closeout
 
 Before reporting a slice finished:
 
 1. Run the closeout gate from the bindings for the slice, and record `PASS` or the leftover.
-2. Run the hygiene command from the bindings. Commit or delete every untracked path it lists in
-   your own worktree, and report each path by name. Never leave a committed file beside an
-   untracked twin. "Clean" is not a report.
+2. Run the hygiene command from the bindings. Commit or delete every untracked path **this
+   session created**, and report each one by name. A path this session did not create is
+   reported and left in place — never delete or commit another session's work, even inside your
+   own worktree. Never leave a committed file beside an untracked twin. "Clean" is not a
+   report.
 3. Coordinator reviews the final diff and commits, master document updated in the same commit.
 
-## Ending a session
+### Ending a session
 
-1. Run the closeout above, including the hygiene command from the bindings.
+Run these in order. The document edits come **before** the hygiene pass and the commit, so they
+are covered by both.
+
+1. If the slice was not accepted, use `### Stopping without acceptance` above instead and stop
+   there. Otherwise run the closeout above through step 1.
 2. Rewrite the master document's `## START HERE` block **in place**, 15 lines maximum, pointers
    only: current slice and its packet path, blocked-on, next dependency-ready slice, last
    decision, repository root, and the master document's own path.
 3. Append everything narrative to `## Progress log`. Never rewrite a completed dated section —
    those are append-only history.
-4. If a detailed spec has to live in its own file, leave a breadcrumb both ways: the master
-   stays the single source of truth for status and decisions, the spec is design only, and the
-   spec's top block redirects here.
-5. Print the full path to the master document and to the repository root, then stop.
-
-<!-- END PORTABLE PROTOCOL -->
+4. If a detailed spec has to live in its own file, leave a breadcrumb both ways: the master stays
+   the single source of truth for status and decisions, the spec is design only, and the spec's
+   top block redirects here.
+5. Run the hygiene command from the bindings and settle every path it lists, per the closeout
+   rule above.
+6. Review the final diff and commit it, master document included in the same commit.
+7. Print the master document's full path and the repository root, then stop.
