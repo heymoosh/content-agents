@@ -213,8 +213,11 @@ named in the bindings; do not invent a different shape. Handing a worker a packe
 includes this protocol section — "only that packet" bounds what else the worker may read, not
 whether it receives the rules.
 
-Packets that share no owned files may run in parallel. Conflicting edits and all integration
-are serialized. Workers share one workspace and must preserve other sessions' changes.
+Prefer parallel work. Before spawning, split the slice's owned files into the largest number of
+lanes that share no file, and run one worker per lane at the same time. A packet with a single
+lane states in one line why the work does not divide — sequential is a result, not a default.
+Conflicting edits and all integration are serialized. Workers share one workspace and must
+preserve other sessions' changes, so no path may appear in two lanes.
 
 ### Writing a missing packet
 

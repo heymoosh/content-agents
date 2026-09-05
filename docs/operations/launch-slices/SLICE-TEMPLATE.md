@@ -18,6 +18,15 @@ Do not load the repository for context. Do not commit.
 
 ## Owned files
 
+Group the paths into lanes that share no file. Lanes run at the same time, one worker each.
+A single-lane packet needs a one-line reason why the work does not divide.
+
+### Lane A — <what this lane delivers>
+
+- <path>
+
+### Lane B — <what this lane delivers, or delete this lane>
+
 - <path>
 
 ## Do not touch
@@ -48,7 +57,7 @@ Do not load the repository for context. Do not commit.
 
 ## Families
 
-- Builder: <family and tier>
+- Builder: <family and tier> — one per lane above
 - Auditor: <different family and tier, or `not required`>
 
 ## Closeout
