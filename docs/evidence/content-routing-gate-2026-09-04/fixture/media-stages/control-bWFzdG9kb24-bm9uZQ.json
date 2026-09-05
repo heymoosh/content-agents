@@ -1,0 +1,10 @@
+{
+  "version": "configured-media-stage-v1",
+  "id": "control-bWFzdG9kb24-bm9uZQ",
+  "platform": "mastodon",
+  "media": "none",
+  "status": "staged",
+  "stage": "draft-ready",
+  "derivativePath": "derivatives/control-bWFzdG9kb24-bm9uZQ.md",
+  "approvalGate": "ordinary review-queue approval"
+}

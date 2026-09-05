@@ -1,0 +1,20 @@
+## RESULT BLOCK
+
+**P1-1 (flag verification): PASS — conditional on one argv assertion**
+**P1-2 (isolation-postcheck evidence): PASS**
+**Overall: PASS — cleared to fire the pinned invocation, after the two zero-cost pre-fire checks below.**
+
+### P1-1
+The stated standard (every flag confirmed in local help) is met: `--strict-config`, `--ephemeral`, `--ignore-user-config`, `--ignore-rules`, `--cd`, `--sandbox`, `--skip-git-repo-check`, `--output-last-message`, `-c/--config` in `codex exec --help`; `-a/--ask-for-approval` in `codex --help`. The read-only `env -i` auth-status check (exit 0, ChatGPT login, no model invoked) is adequate substitution for an authenticated preflight and consumes no budget. The `--ignore-user-config` vs. `CODEX_HOME` distinction is correctly scoped and does not affect syntax.
+
+One residual, from ambiguity in your description rather than the evidence: "places `-a never` BEFORE exec" reads two ways. I take the intended arrangement to be `-a never` as a **root** flag before `exec`, exec-only flags after — which is exactly consistent with where each was sourced in help, and closes the finding. If the wrapper instead emits `-a` **after** `exec`, that position is not covered by the evidence you cited, and a usage error there burns the final attempt on a parse failure.
+
+### P1-2
+Closed. The artifact exists with the recorded fields and the provenance is clean: additive separate file, post-dated to the discovery, originals and the attempt-1 behavior result unmodified. The content is a genuine isolation failure, not a retry pretext — `historicalLogsCopied=true` with 221 vs. 220 logs is inbound contamination, while `hostMutationObserved=false` and `behaviorResultPreserved=true` confirm nothing about the recorded outcome is being retracted or laundered. That is a sufficient documented basis for the one authorized retry. Same-base retention of both attempts is fine; my earlier new-base suggestion is withdrawn as unnecessary.
+
+### Pre-fire (both free, no model call, no budget)
+1. Confirm the literal argv ordering above — or `codex exec --help | grep ask-for-approval` if `-a` sits post-`exec`.
+2. Confirm the accepted isolation fix actually removes the historical-log copy into the run dir. If it does not, attempt-2 reproduces `ok=false` and exhausts the budget for nothing.
+
+### Requirement carried into attempt-2
+Because the budget closes on completion regardless of outcome, attempt-2 must write its own isolation pre/postcheck under `attempt-2/` **even on error or non-zero exit**, and must not write to `attempt-1/`. Evidence capture cannot be contingent on success, or a failed final run leaves no verifiable record.

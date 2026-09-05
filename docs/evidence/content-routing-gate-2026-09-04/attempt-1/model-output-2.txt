@@ -1,0 +1,12 @@
+[
+  {
+    "id": "treated-Ymx1ZXNreQ-bm9uZQ-c3VtbWFyeQ",
+    "recommendation": "revise",
+    "body": "One small AI workflow is more useful to most teams than another strategy deck. Start with changes a person can inspect and reject while keeping the original intact."
+  },
+  {
+    "id": "treated-bWFzdG9kb24-bm9uZQ-c3VtbWFyeQ",
+    "recommendation": "revise",
+    "body": "Another AI strategy deck is not what most teams need. Start with one small workflow that shows the person using it exactly what the model changed. Let that person reject the changes and keep the original."
+  }
+]

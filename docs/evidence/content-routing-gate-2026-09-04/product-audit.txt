@@ -1,0 +1,68 @@
+Plan-file writing is disabled in this session (no Write/ExitPlanMode tools available), so the audit is delivered inline as requested.
+
+```
+RESULT BLOCK
+```
+
+## VERDICT: PASS
+
+Scope: `requirements.md`, `implementation.diff`, `test-output.log` only. No introduced P0/P1 and no requirements gap. F1–F4 closures were re-derived from the diff, not accepted from the builder narrative. Everything remaining is P2 hardening; every new failure path is fail-closed with zero writes, so nothing threatens data or invalidates the canary — two items carry canary/full-check selection caveats.
+
+## Requirements coverage (traced to diff evidence)
+
+- **R1** — routing consumed at `jobs.ts:941-942`; `recorded-routing.ts` imports `route.js` **type-only**, so no analytics/config runtime code enters the generation path. Route modifiers survive because routing.md *is* the recorded output of triage/origin-block/cold-start/exploration/veto, not a recomputation.
+- **R2** — one filter at `jobs.ts:948` keyed on `variant.platform`, so control/treated/media on a skipped platform all vanish together; retained platforms keep every pair and their original `identity.id`. Saved request asserted unmutated plus `content-request.json` byte-compared.
+- **R3** — `jobs.ts:1046` emits `exploration_probe: true` only when recorded confidence is `exploration`; test asserts the stamp appears on exactly the probe platform and nowhere else.
+- **R4** — `preflightConfiguredGeneration(folder, request, treated)` keeps the original request as authority and only the filtered treated set as work; control body still `request.originalInput` (`:1037`); all queue rows asserted `pending`; no publish path touched.
+- **R5** — missing file → empty map → permissive; absent row → permissive; malformed/duplicate/empty → throw (`recorded-routing.ts:487-497`). `quote-card` is ungated because it is simply absent from routing.
+- **R6** — the `!variants.length` block (`jobs.ts:955-961`) precedes `buildConfiguredMediaOutputs` (`:966`), `preflightConfiguredGeneration` (`:973`) and `runQueued`. The refusal fixtures deliberately use `media: ["not-supported"]` with no provenance, so a routing-worded rejection is real proof the gate ran first.
+- **R7** — 20 + 12 + 5 new subtests plus 4 parser tests; 184 pass / 0 fail / 0 skipped.
+- **R8** — diff touches only `jobs.ts`, `recorded-routing.ts(.test)`, `content-generation.test.ts`. No pre-existing test was deleted (the old first test survives as context at the tail of the hunk).
+
+## Prior findings (verified, not accepted)
+
+- **F1 CLOSED** (was P1 introduced blocker). `jobs.ts:955-961` demands ≥1 wholly-occupied requested ID and every requested ID wholly occupied or wholly absent; anything else refuses. `subset-then-all-skipped` generates x with bluesky skipped, flips both to skip, asserts `{ids: [], existing: true}` **and** a full byte-for-byte folder snapshot. The 12-case matrix (masks 1–6 × completed/not) covers every half-created state alone and beside a complete ID.
+- **F2 CLOSED** (was P1 verification gap). `deps.runEngine` (`:932`, resolved `:974`) substitutes at all three call sites; production default unchanged. The prompt test disables the disposable fixture, asserts every excluded identity — including the *retained* platform's own control — and the string `"bluesky"` are absent from the complete prompt, compares transmitted payload id/platform pairs exactly, and derives stdout **from the transmitted payload**, so a widened prompt cannot pass via a separately filtered fixture. Phase arithmetic checks out: studio/human-inference/venture 2 each + fiction/charles 1 each = 8 calls, 3 drafting, 5 editing.
+- **F3 CLOSED** as an explicit ambiguity refusal, not a claimed schema rejection. `jobs.ts:945-947` refuses generic `community` only when no generic row exists and qualified rows do, before media/model/output work. The hardcoded IDs are correct: base64url("community") = `Y29tbXVuaXR5`; base64url("community:democratic-resilience") = `Y29tbXVuaXR5OmRlbW9jcmF0aWMtcmVzaWxpZW5jZQ`.
+- **F4 CLOSED**. The test drives the real `decideForPillar → mergeDecisions → routingMd → parseRecordedRouting` chain for three pillars, asserts one header and one merged row per platform, and pins the conflicting bluesky merge to `include/cold-start`. Column position is validated against the real writer, not a hand fixture; pipe-bearing rationales covered separately.
+
+Confidence cross-check: every line citation in the log (932, 934, 935, 936, 945, 948, 955-960, 974, 1009, 1037, 1043-1044, 1046) lands exactly where hunk headers `@@ -922,65 +923,89 @@` and `@@ -989,41 +1014,41 @@` place it.
+
+## Findings — all optional hardening, none blocking
+
+| ID | Class | Detail |
+|----|-------|--------|
+| P2-A | introduced strictness on pre-existing data | `recorded-routing.ts:492-494` throws on any confidence outside the 5-value allowlist, though confidence only drives the probe stamp, never include/skip. One real document refuses until routing is rerun. Fail-closed. **Canary caveat: pick a folder whose routing.md parses, or knowingly exercise the refusal.** |
+| P2-B | introduced | Widening skip→include over existing output hits `jobs.ts:969` and refuses. Correct preservation posture; no deletion recommended. |
+| P2-C | pre-existing mechanism, newly exercised | `node --test` runs files in parallel processes; the new test owns then removes/restores the single on-disk `.e2e-configured-engine-token` while other files that also drive `generateConfiguredContent` may be mid-run. A token mismatch falls through to a **real spawn**. Passed 184/184 here, but this is the one item worth deliberate attention before the pending full check. |
+| P2-D | introduced tradeoff | Legacy two-column routing.md has no confidence column, so a former exploration probe generates without `exploration_probe: true`. Deliberate; fail-open on the stamp only. |
+| P2-E | introduced | `deps.runEngine` is a model-transport seam on an exported production function. Benign today: both production callers pass three arguments and no route plumbing is added. |
+| P2-F | introduced, cosmetic | All-skipped + half-created throws the routing-worded "no routable configured variants", attributing a half-created-state refusal to routing. |
+| P2-G | introduced | The parser consumes every pipe-prefixed line in the document; a second table with different columns would refuse rather than be ignored. Scan reports zero extra-table documents, so scoping is correct by data. |
+| P2-H | consequence of R2, log-reported | A routed-down experiment hands off a subset/empty ID set while the saved record still names every variant; the log states the Venture bridge refuses empty/subset handoffs. Fail-closed, but an experiment can lose a platform arm at generation and stall downstream. |
+| — | pre-existing, out of scope by R8 | Derivatives generated before a platform was skipped remain pending in the queue; validate's `checkRoutingGate` is the compensating control and is excluded from this slice. |
+
+## Not verifiable inside audit scope (stated so it is not read as endorsed)
+
+The caller/symbol survey (`serve.ts:1585`, `page.ts:3301`, `experiment-content-handoff.ts:235`, `markExperimentContentHandoff`, Venture bridge), the routing-file scan counts (8/7/1 invalid-confidence/0 extra tables/0 repeated rows), and the RED log. The diff is *consistent* with all of them: no changes to those files, and no `routing.md` is ever written.
+
+## Next-builder checklist
+
+**Acceptance tests**
+1. Two different requested IDs half-created simultaneously (masks on both variants, not just index 0) under all-skip routing → same byte-preserving refusal.
+2. Widening case: generate with A included/B skipped, flip B to include, assert the exact `jobs.ts:969` refusal and that A's derivative/stage/row bytes are untouched — locks P2-B as intended, not accidental.
+3. Routed-down experiment: assert what the handoff records for subset and empty ID sets, pinning P2-H instead of discovering it in production.
+
+**State invariants**
+4. Every refusal path leaves `derivatives/`, `media-stages/` and `review-queue.md` byte-identical (already asserted; keep as the standing rule for any new refusal).
+5. `request.variants` / `content-request.json` are never mutated; the routed subset is a read-only projection and IDs never change.
+6. Nothing under `generateConfiguredContent` may create or modify `routing.md`.
+7. Occupancy is all-or-nothing per requested ID; a partially occupied ID always refuses, never returns `existing: true`.
+
+**Search every use of symbol**
+8. `generateConfiguredContent` — no HTTP/CLI/queue caller may populate the 4th `deps` argument; confirm every caller handles empty `ids` with `existing: true` (P2-E, P2-H).
+9. `parseRecordedRouting` / `RecordedRoutingDecision` — confirm the legacy validate parser stays separate and no second consumer depends on throw-on-unknown-confidence (P2-A).
+10. `CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN` / `.e2e-configured-engine-token` — enumerate every test file touching the shared marker **before** the full check; if more than one does, serialize that set (`--test-concurrency=1`) so no run can fall through to a real model spawn (P2-C).
+11. `exploration_probe` — confirm downstream analytics treats an absent stamp on a legacy two-column routing.md as "unknown", not "not a probe" (P2-D).
+
+**Gate ordering:** run the marker survey (item 10) before the full `npm run check`, and select the canary folder against item 9 / P2-A so the pre-existing invalid-confidence document does not read as a canary failure.

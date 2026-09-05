@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "execution": "live",
+  "completedAt": "2026-09-05T04:32:36.417Z",
+  "slug": "routing-gate-live-canary",
+  "engine": "codex-subscription",
+  "engineInvocations": 2,
+  "routedPlatforms": [
+    "bluesky",
+    "mastodon"
+  ],
+  "skippedPlatforms": [
+    "x"
+  ],
+  "outputIds": [
+    "control-Ymx1ZXNreQ-bm9uZQ",
+    "control-bWFzdG9kb24-bm9uZQ",
+    "treated-Ymx1ZXNreQ-bm9uZQ-c3VtbWFyeQ",
+    "treated-bWFzdG9kb24-bm9uZQ-c3VtbWFyeQ"
+  ],
+  "jobStatus": "done",
+  "reviewStatus": "pending",
+  "published": false
+}

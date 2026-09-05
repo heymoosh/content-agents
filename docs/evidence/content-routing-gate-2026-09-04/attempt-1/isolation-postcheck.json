@@ -1,0 +1,13 @@
+{
+  "ok": false,
+  "retryAuthorized": true,
+  "checkedAt": "2026-09-05T04:35:45Z",
+  "classification": "harness-isolation-failure",
+  "behaviorResultPreserved": true,
+  "expectedJobLogCount": 1,
+  "actualJobLogCount": 221,
+  "legacySourceLogCount": 220,
+  "historicalLogsCopied": true,
+  "hostMutationObserved": false,
+  "cause": "The harness passed the real account HOME, so jobs.ts migrated the legacy ~/.content-agents/logs/gui-jobs directory into the isolated CONTENT_AGENTS_DATA_ROOT with cpSync before writing the current job log."
+}

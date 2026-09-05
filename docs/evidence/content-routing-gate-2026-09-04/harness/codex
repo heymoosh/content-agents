@@ -1,0 +1,108 @@
+#!/bin/bash
+set -euo pipefail
+
+: "${CANARY_REAL_CODEX:?CANARY_REAL_CODEX is required}"
+: "${CANARY_REPO:?CANARY_REPO is required}"
+: "${CANARY_ATTEMPT_TMP:?CANARY_ATTEMPT_TMP is required}"
+: "${CANARY_ARTIFACTS:?CANARY_ARTIFACTS is required}"
+: "${CANARY_ENGINE_EXECUTION:?CANARY_ENGINE_EXECUTION is required}"
+if [[ "$CANARY_ENGINE_EXECUTION" != "live" && "$CANARY_ENGINE_EXECUTION" != "fake-cli-dry-run" ]]; then
+  echo "invalid canary execution label" >&2
+  exit 70
+fi
+if [[ ! -x "$CANARY_REAL_CODEX" || "$CANARY_REAL_CODEX" != /* ]]; then
+  echo "canary Codex wrapper refused a non-absolute or non-executable CLI path" >&2
+  exit 70
+fi
+if [[ "$CANARY_REPO" != /* || "$(pwd -P)" != "$CANARY_REPO" ]]; then
+  echo "canary Codex wrapper requires the pinned fixture cwd" >&2
+  exit 70
+fi
+if [[ "${1:-}" != "exec" ]]; then
+  echo "canary Codex wrapper permits only the production 'codex exec' shape" >&2
+  exit 70
+fi
+
+output_file=""
+prompt=""
+sandbox_count=0
+skip_git_count=0
+output_count=0
+shift
+while (($#)); do
+  case "$1" in
+    --sandbox)
+      (($# >= 2)) || { echo "missing Codex sandbox value" >&2; exit 70; }
+      [[ "$2" == "workspace-write" ]] || { echo "unexpected requested sandbox: $2" >&2; exit 70; }
+      sandbox_count=$((sandbox_count + 1))
+      shift 2
+      ;;
+    --skip-git-repo-check)
+      skip_git_count=$((skip_git_count + 1))
+      shift
+      ;;
+    --output-last-message)
+      (($# >= 2)) || { echo "missing Codex output path" >&2; exit 70; }
+      output_file="$2"
+      output_count=$((output_count + 1))
+      case "$output_file" in "$CANARY_ATTEMPT_TMP"/*) ;; *) echo "model output path escapes attempt tmp" >&2; exit 70 ;; esac
+      shift 2
+      ;;
+    -*)
+      echo "canary Codex wrapper refused unknown capability flag: $1" >&2
+      exit 70
+      ;;
+    *)
+      [[ -z "$prompt" ]] || { echo "canary Codex wrapper permits exactly one positional prompt" >&2; exit 70; }
+      prompt="$1"
+      shift
+      ;;
+  esac
+done
+
+if [[ "$sandbox_count" -ne 1 || "$skip_git_count" -ne 1 || "$output_count" -ne 1 || -z "$prompt" ]]; then
+  echo "canary Codex wrapper requires exactly the current production exec arguments" >&2
+  exit 70
+fi
+
+counter="$CANARY_ARTIFACTS/invocation-count"
+lock="$CANARY_ARTIFACTS/.invocation-lock"
+while ! mkdir "$lock" 2>/dev/null; do sleep 0.05; done
+count=0
+if [[ -f "$counter" ]]; then read -r count < "$counter"; fi
+count=$((count + 1))
+counter_tmp="$counter.$$"
+printf '%s\n' "$count" > "$counter_tmp"
+mv "$counter_tmp" "$counter"
+rmdir "$lock"
+
+safe_args=(
+  "-a" "never" "exec"
+  "--ephemeral" "--ignore-user-config" "--ignore-rules" "--strict-config"
+  "-c" "shell_environment_policy.inherit=none"
+  "-c" "mcp_servers={}"
+  "--cd" "$CANARY_REPO"
+  "--sandbox" "read-only"
+  "--skip-git-repo-check"
+  "--output-last-message" "$output_file"
+  "$prompt"
+)
+engine="fake-cli-dry-run"
+[[ "$CANARY_ENGINE_EXECUTION" == "live" ]] && engine="codex-subscription"
+capability_args='["-a","never","exec","--ephemeral","--ignore-user-config","--ignore-rules","--strict-config","-c","shell_environment_policy.inherit=none","-c","mcp_servers={}","--cd","<PINNED_FIXTURE>","--sandbox","read-only","--skip-git-repo-check","--output-last-message","<ATTEMPT_TMP>"]'
+record="$CANARY_ARTIFACTS/invocation-$count.json"
+printf '{"invocation":%s,"execution":"%s","engine":"%s","requested_sandbox":"workspace-write","enforced_sandbox":"read-only","pinned_cwd":true,"approval_policy":"never","ephemeral":true,"user_config_ignored":true,"mcp_config":"empty","sanitized_capability_args":%s,"completed":false}\n' \
+  "$count" "$CANARY_ENGINE_EXECUTION" "$engine" "$capability_args" > "$record"
+
+set +e
+"$CANARY_REAL_CODEX" "${safe_args[@]}"
+status=$?
+set -e
+
+if [[ -s "$output_file" ]]; then
+  cp "$output_file" "$CANARY_ARTIFACTS/model-output-$count.txt"
+  chmod 600 "$CANARY_ARTIFACTS/model-output-$count.txt"
+fi
+printf '{"invocation":%s,"execution":"%s","engine":"%s","requested_sandbox":"workspace-write","enforced_sandbox":"read-only","pinned_cwd":true,"approval_policy":"never","ephemeral":true,"user_config_ignored":true,"mcp_config":"empty","sanitized_capability_args":%s,"completed":true,"exit_code":%s,"output_preserved":%s}\n' \
+  "$count" "$CANARY_ENGINE_EXECUTION" "$engine" "$capability_args" "$status" "$(if [[ -s "$CANARY_ARTIFACTS/model-output-$count.txt" ]]; then printf true; else printf false; fi)" > "$record"
+exit "$status"

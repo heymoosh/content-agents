@@ -33,6 +33,7 @@ import { processAlive, type FileLease } from "../runtime/file-lock.js";
 import { migrateLegacyDataDirectory } from "../runtime/data-root.js";
 import { muxinVoiceFindings } from "../voice/configured.js";
 import { validateCharlesPersonaYaml } from "./charles-persona.js";
+import { parseRecordedRouting, type RecordedRoutingDecision } from "../strategy/recorded-routing.js";
 import {
   createFictionJobs,
   fictionDraftPrompt as fictionDraftPromptImpl,
@@ -927,26 +928,50 @@ function configuredMediaSourceInputs(folder: string): ConfiguredMediaSourceInput
   };
 }
 
-/** Generate every configured variant into the ordinary review queue; never approves or publishes. */
-export async function generateConfiguredContent(slug: string, request: ContentRequest, engine: Engine = "codex"): Promise<{ ids: string[]; existing?: boolean; engineExecution?: "disposable-injected" }> {
+/** Generate routed configured variants into the ordinary review queue; never approves or publishes. */
+export async function generateConfiguredContent(slug: string, request: ContentRequest, engine: Engine = "codex", deps: { runEngine?: typeof runClaudeSpawn } = {}): Promise<{ ids: string[]; existing?: boolean; engineExecution?: "disposable-injected" }> {
   const folder = safeFolder(slug);
   if (request.id !== slug) throw new Error("content request does not belong to this source folder");
   if (!request.variants.length) throw new Error("content request has no configured variants");
-  const ids = request.variants.map((variant) => variant.identity.id);
-  if (new Set(ids).size !== ids.length || ids.some((id) => !/^[\w.-]+$/.test(id))) throw new Error("content request has unsafe or duplicate variant ids");
-  const mediaOutputs = buildConfiguredMediaOutputs(request.variants, configuredMediaSourceInputs(folder));
+  const requestedIds = request.variants.map((variant) => variant.identity.id);
+  if (new Set(requestedIds).size !== requestedIds.length || requestedIds.some((id) => !/^[\w.-]+$/.test(id))) throw new Error("content request has unsafe or duplicate variant ids");
+  // routing.md is the complete recorded /atomize decision (defaults, cold start, source
+  // triage, origin blocks, Note reposts, exploration). Missing metadata/rows retain the
+  // legacy gate's compatibility; never invent a pillar or query unscoped analytics here.
+  const routingPath = join(folder, "routing.md");
+  const routing = existsSync(routingPath) ? parseRecordedRouting(readFileSync(routingPath, "utf8")) : new Map<string, RecordedRoutingDecision>();
+  // Configured IDs encode kind/platform/media, not a legacy community-<room>.md filename.
+  // A generic community selection carries no room to map; never guess past a room's veto.
+  if (request.variants.some((variant) => variant.platform === "community") && !routing.has("community") && [...routing.keys()].some((platform) => platform.startsWith("community:"))) {
+    throw new Error("configured community routing requires a qualified community:<id> platform; the generic community selection does not identify a destination");
+  }
+  const variants = request.variants.filter((variant) => routing.get(variant.platform)?.decision !== "skip");
   const existing = new Set(readQueue(folder).rows.map((row) => row.id));
-  const occupancy = ids.map((id) => ({
+  const occupancyFor = (id: string) => ({
     row: existing.has(id),
     file: existsSync(join(folder, "derivatives", `${id}.md`)),
     stage: existsSync(join(folder, "media-stages", `${id}.json`)),
-  }));
+  });
+  if (!variants.length) {
+    // A later routing change does not invalidate an already completed generation or delete
+    // its reviewable artifacts. Previously skipped IDs can be wholly absent, but every occupied
+    // ID must have its complete row/file/stage set. Fresh and half-created requests still refuse.
+    const occupancy = requestedIds.map((id) => Object.values(occupancyFor(id)));
+    if (occupancy.some((state) => state.every(Boolean)) && occupancy.every((state) => state.every(Boolean) || state.every((present) => !present))) return { ids: [], existing: true };
+    throw new Error("no routable configured variants; routing.md skips every selected platform");
+  }
+  // Select whole platforms, preserving their complete control/treatment/media sets and IDs.
+  // The saved request and experiment variables remain the original authorization record.
+  const ids = variants.map((variant) => variant.identity.id);
+  const mediaOutputs = buildConfiguredMediaOutputs(variants, configuredMediaSourceInputs(folder));
+  const occupancy = ids.map(occupancyFor);
   if (occupancy.every((state) => state.row && state.file && state.stage)) return { ids, existing: true };
   if (occupancy.some((state) => state.row || state.file || state.stage)) throw new Error("only some configured drafts or media stages exist; refusing to overwrite or duplicate them");
-  const treated = request.variants.filter((variant) => variant.identity.kind === "treated");
+  const treated = variants.filter((variant) => variant.identity.kind === "treated");
   // This policy gate deliberately precedes runQueued and every mkdir/write/append: a refused
   // origin-specific treatment leaves zero jobs, files, and review rows behind.
   const authoritative = preflightConfiguredGeneration(folder, request, treated);
+  const runEngine = deps.runEngine ?? runClaudeSpawn;
   return runQueued("content-generate", `Create configured drafts: ${slug}`, async (job) => {
     let bodies = new Map<string, { body: string; sourceLines: (number | string)[] }>();
     let engineExecution: "disposable-injected" | undefined;
@@ -959,7 +984,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         engineExecution = "disposable-injected";
         bodies = parseVentureConfiguredBodies(injected, treated);
       } else {
-        const result = await runClaudeSpawn(job, ventureConfiguredContentPrompt(request, treated), { timeoutMs: ATOMIZE_TIMEOUT_MS });
+        const result = await runEngine(job, ventureConfiguredContentPrompt(request, treated), { timeoutMs: ATOMIZE_TIMEOUT_MS });
         const failure = decodeSpawnFailure(result, job.id, { timeoutVerb: "Venture configured drafting", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`, exitVerb: "Venture configured drafting" });
         if (failure) throw new Error(failure.replace(/Claude/g, engineName(job)));
         bodies = parseVentureConfiguredBodies(result.stdout, treated);
@@ -975,7 +1000,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
           engineExecution = "disposable-injected";
           bodies = parseConfiguredVariantBodies(injected, treated, folder, sourceLines);
         } else {
-          const result = await runClaudeSpawn(job, configuredContentPrompt(request, treated, configuredSourceSegments(folder, sourceLines)), { timeoutMs: ATOMIZE_TIMEOUT_MS });
+          const result = await runEngine(job, configuredContentPrompt(request, treated, configuredSourceSegments(folder, sourceLines)), { timeoutMs: ATOMIZE_TIMEOUT_MS });
           const failure = decodeSpawnFailure(result, job.id, { timeoutVerb: "configured drafting", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`, exitVerb: "configured drafting" });
           if (failure) throw new Error(failure.replace(/Claude/g, engineName(job)));
           bodies = parseConfiguredVariantBodies(result.stdout, treated, folder, sourceLines);
@@ -994,7 +1019,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         engineExecution = "disposable-injected";
         bodies = parseConfiguredEditorBodies(injected, treated, bodies, editor);
       } else {
-        const editorResult = await runClaudeSpawn(job, editor.prompt(treated, bodies), { timeoutMs: ATOMIZE_TIMEOUT_MS, tools: "" });
+        const editorResult = await runEngine(job, editor.prompt(treated, bodies), { timeoutMs: ATOMIZE_TIMEOUT_MS, tools: "" });
         const editorFailure = decodeSpawnFailure(editorResult, job.id, { timeoutVerb: `${editor.kind} social editing`, timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`, exitVerb: `${editor.kind} social editing` });
         if (editorFailure) throw new Error(editorFailure.replace(/Claude/g, engineName(job)));
         bodies = parseConfiguredEditorBodies(editorResult.stdout, treated, bodies, editor);
@@ -1006,7 +1031,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
     const created: string[] = [];
     const queueRows: NewQueueRow[] = [];
     try {
-      for (const variant of request.variants) {
+      for (const variant of variants) {
         const id = variant.identity.id;
         const generated: ConfiguredAuthoritativeBody = variant.identity.kind === "control"
           ? { ...(authoritative ?? { body: request.originalInput, sourceLines: [] }), body: request.originalInput }
@@ -1018,7 +1043,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         const sourceCtaUrl = request.sourceProvenance?.canonicalUrl && configuredSourceSupportsCta(request.sourceProvenance.canonicalUrl, sourceKind)
           ? request.sourceProvenance.canonicalUrl
           : null;
-        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...configuredEditorFrontmatter(variant, editorStamp), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
+        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...configuredEditorFrontmatter(variant, editorStamp), ...(routing.get(variant.platform)?.confidence === "exploration" ? ["exploration_probe: true"] : []), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
         writeFileSync(path, configuredDerivativeText(frontmatter, body, variant.identity.kind === "control"), { flag: "wx" }); created.push(path);
         const mediaOutput = mediaOutputs.find((output) => output.id === id)!;
         const stagePath = join(folder, "media-stages", `${id}.json`);

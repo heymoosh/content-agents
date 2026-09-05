@@ -1,0 +1,106 @@
+{
+  "kind": "content_request",
+  "version": "content-request-v1",
+  "id": "routing-gate-live-canary",
+  "origin": "studio",
+  "descriptor": "A visible, reversible first AI workflow",
+  "originalInput": "Most teams do not need another AI strategy deck. They need one small workflow where a person can see what the model changed, reject it, and keep the original.",
+  "ventureId": null,
+  "ventureSource": null,
+  "sourceProvenance": {
+    "kind": "source",
+    "sourceLines": [
+      4
+    ],
+    "canonicalUrl": "https://www.humaninference.ai/essays/canary-source"
+  },
+  "sourceContext": null,
+  "experiment": null,
+  "selections": {
+    "treatments": [
+      "summary"
+    ],
+    "media": [],
+    "platforms": [
+      "x",
+      "bluesky",
+      "mastodon"
+    ]
+  },
+  "recommendations": {
+    "treatments": [],
+    "media": [],
+    "platforms": []
+  },
+  "control": {
+    "enabled": true
+  },
+  "variants": [
+    {
+      "identity": {
+        "id": "control-eA-bm9uZQ",
+        "requestId": "routing-gate-live-canary",
+        "kind": "control"
+      },
+      "platform": "x",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "control-Ymx1ZXNreQ-bm9uZQ",
+        "requestId": "routing-gate-live-canary",
+        "kind": "control"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "control-bWFzdG9kb24-bm9uZQ",
+        "requestId": "routing-gate-live-canary",
+        "kind": "control"
+      },
+      "platform": "mastodon",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-eA-bm9uZQ-c3VtbWFyeQ",
+        "requestId": "routing-gate-live-canary",
+        "kind": "treated"
+      },
+      "platform": "x",
+      "media": "none",
+      "treatments": [
+        "summary"
+      ]
+    },
+    {
+      "identity": {
+        "id": "treated-Ymx1ZXNreQ-bm9uZQ-c3VtbWFyeQ",
+        "requestId": "routing-gate-live-canary",
+        "kind": "treated"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": [
+        "summary"
+      ]
+    },
+    {
+      "identity": {
+        "id": "treated-bWFzdG9kb24-bm9uZQ-c3VtbWFyeQ",
+        "requestId": "routing-gate-live-canary",
+        "kind": "treated"
+      },
+      "platform": "mastodon",
+      "media": "none",
+      "treatments": [
+        "summary"
+      ]
+    }
+  ]
+}

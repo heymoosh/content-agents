@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "retryAuthorized": false,
+  "checkedAt": "2026-09-05T05:12:03.850Z",
+  "expectedJobLogCount": 1,
+  "actualJobLogCount": 1,
+  "historicalLogsCopied": false
+}

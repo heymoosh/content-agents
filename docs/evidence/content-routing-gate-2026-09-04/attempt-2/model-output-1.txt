@@ -1,0 +1,12 @@
+[
+  {
+    "id": "treated-Ymx1ZXNreQ-bm9uZQ-c3VtbWFyeQ",
+    "body": "Most teams need one small AI workflow before another strategy deck. Start with something a person can inspect, with the option to reject the model's changes and keep the original.",
+    "source_lines": [4]
+  },
+  {
+    "id": "treated-bWFzdG9kb24-bm9uZQ-c3VtbWFyeQ",
+    "body": "Most teams do not need another AI strategy deck. Start with one small workflow where a person can see exactly what the model changed. Give them the option to reject those changes and keep the original.",
+    "source_lines": [4]
+  }
+]

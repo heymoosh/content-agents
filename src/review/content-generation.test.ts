@@ -1,10 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { buildContentRequest } from "./content-request.js";
+import { buildContentRequest, type ContentOrigin } from "./content-request.js";
+import { readContentRequest, writeContentRequest } from "./content-request-store.js";
 import { repoRoot } from "../db/db.js";
+import { applyExplorationOverride, applyOriginBlock, applySourceTriage, applySubstackRepost, decideForPillar, loadConfig as loadRoutingConfig, routingMd, type MergedDecision } from "../strategy/route.js";
+import { appendRows, readQueue } from "../publish/queue.js";
 import { CONTENT_EDITORS, assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredColdFeedEditorPrompt, configuredContentPrompt, configuredDerivativeText, configuredEditor, configuredEditorFrontmatter, configuredEditorKind, configuredExperimentFrontmatter, configuredQueueNote, configuredSourceCtaLabel, configuredSourceSupportsCta, configuredSourceSegments, generateConfiguredContent, parseConfiguredEditorBodies, parseConfiguredVariantBodies, parseVentureConfiguredBodies, planConfiguredEditing, preflightConfiguredGeneration, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
 
 const request = buildContentRequest({
@@ -13,6 +16,265 @@ const request = buildContentRequest({
   sourceProvenance: { kind: "source", sourceLines: [2], canonicalUrl: "https://www.humaninference.ai/essays/example" },
 });
 const treated = request.variants.filter((variant) => variant.identity.kind === "treated");
+
+test("configured routing gates the complete fake-model generation before drafting and preserves persisted request identity", async (t) => {
+  const marker = join(repoRoot, ".e2e-configured-engine-token");
+  const priorMarker = existsSync(marker) ? readFileSync(marker, "utf8") : null;
+  const priorToken = process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
+  const priorRoot = process.env.E2E_REPO_ROOT;
+  const token = `routing-test-${process.pid}-${Date.now()}`;
+  const cfg = loadRoutingConfig();
+  const decisions = (pillar: string): MergedDecision[] => decideForPillar(pillar, cfg, {
+    cells: new Map(), weeks: new Map(), baselines: new Map(),
+  }).map((decision) => ({ ...decision, pillars: [pillar] }));
+  const career = decisions("career-work");
+  const cases = [
+    { name: "subset-then-all-skipped", routing: "| x | include |\n| bluesky | skip |\n", platforms: ["x", "bluesky"], included: ["x"] },
+    { name: "skip", routing: routingMd(["career-work"], career), platforms: ["linkedin", "bluesky"], included: ["linkedin"] },
+    { name: "skipped-media", routing: routingMd(["career-work"], career), platforms: ["linkedin", "bluesky"], included: ["linkedin"], unsupportedSkippedMedia: true },
+    { name: "experiment", routing: routingMd(["career-work"], career), platforms: ["linkedin", "bluesky"], included: ["linkedin"], experiment: true },
+    { name: "cold-start", routing: routingMd(["human-ai"], decisions("human-ai")), platforms: ["x", "linkedin", "bluesky"], included: ["x", "linkedin", "bluesky"] },
+    { name: "exploration", routing: routingMd(["career-work"], applyExplorationOverride(career, "career-work", "bluesky")), platforms: ["linkedin", "bluesky"], included: ["linkedin", "bluesky"], probe: "bluesky" },
+    { name: "origin-block", routing: routingMd(["human-ai"], applyOriginBlock(decisions("human-ai"), "https://www.linkedin.com/posts/example")), platforms: ["linkedin", "bluesky"], included: ["bluesky"] },
+    { name: "triage-veto", routing: routingMd(["human-ai"], applyExplorationOverride(applySourceTriage(decisions("human-ai"), ["linkedin", "x"]), "human-ai", "linkedin")), platforms: ["linkedin", "bluesky"], included: ["bluesky"] },
+    { name: "note-repost", routing: routingMd(["career-work"], applySubstackRepost(career, ["career-work"], "substack-note")), platforms: ["substack", "bluesky"], included: ["substack"], sourceKind: "substack-note" },
+    { name: "format-asset", routing: routingMd(["career-work"], career), platforms: ["quote-card", "bluesky"], included: ["quote-card"] },
+    { name: "community", routing: routingMd(["civic-tech"], decisions("civic-tech")), platforms: ["community:democratic-resilience", "linkedin"], included: ["community:democratic-resilience"] },
+    { name: "community-skip", routing: "| community:democratic-resilience | skip |\n| x | include |\n", platforms: ["community:democratic-resilience", "x"], included: ["x"] },
+    { name: "missing-file", platforms: ["bluesky"], included: ["bluesky"] },
+    { name: "missing-platform", routing: routingMd(["career-work"], career), platforms: ["youtube"], included: ["youtube"] },
+    { name: "legacy-heading", routing: routingMd(["career-work"], career).replace(/^# Routing:.*$/m, "# Routing — career-work — 2026-06-16"), platforms: ["linkedin", "bluesky"], included: ["linkedin"] },
+  ];
+  writeFileSync(marker, token, { mode: 0o600 });
+  process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = token;
+  process.env.E2E_REPO_ROOT = repoRoot;
+  try {
+    for (const item of cases) await t.test(item.name, async () => {
+      const slug = `test-routing-${item.name}-${process.pid}-${Date.now()}`;
+      const folder = join(repoRoot, "content", slug);
+      const source = `---\nsource_kind: ${item.sourceKind ?? "essay"}\n---\nThe source claim stays exact.\n`;
+      let configured = buildContentRequest({
+        id: slug, origin: "human-inference", descriptor: "Routing integration",
+        originalInput: "The source claim stays exact.", treatments: ["summary", "shorter"],
+        platforms: item.platforms, media: [], includeUntreatedControl: true,
+        sourceProvenance: { kind: "source", sourceLines: [4], canonicalUrl: "https://www.humaninference.ai/p/routing-source" },
+      });
+      if (item.unsupportedSkippedMedia) configured = { ...configured, variants: configured.variants.map((variant) => ({ ...variant, media: item.included.includes(variant.platform) ? variant.media : "not-supported" })) };
+      if (item.experiment) configured = { ...configured, experiment: {
+        id: "routing-experiment", recommendationId: "routing-recommendation", planProposalDigest: "proposal", planDecisionDigest: "decision",
+        planApprovedAt: "2026-09-04T00:00:00.000Z", planApprovedBy: "muxin", copyApproval: "pending-in-content",
+        hypothesis: "Shorter wording improves comprehension", controlledVariable: "treatment",
+        variablesByVariant: Object.fromEntries(configured.variants.map((variant) => [variant.identity.id, { treatment: variant.treatments.join(",") || "control" }])),
+      } };
+      mkdirSync(folder, { recursive: true });
+      writeFileSync(join(folder, "source.md"), source);
+      writeFileSync(join(folder, "review-queue.md"), "# Review queue\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n");
+      const requestBytes = JSON.stringify(configured, null, 2) + "\n";
+      writeFileSync(join(folder, "content-request.json"), requestBytes);
+      if (item.routing !== undefined) writeFileSync(join(folder, "routing.md"), item.routing);
+      try {
+        const before = JSON.stringify(configured);
+        const result = await generateConfiguredContent(slug, configured);
+        const included = configured.variants.filter((variant) => item.included.includes(variant.platform));
+        assert.deepEqual(result.ids, included.map((variant) => variant.identity.id));
+        assert.equal(result.engineExecution, "disposable-injected");
+        assert.equal(JSON.stringify(configured), before, "selection cannot mutate the request");
+        assert.equal(readFileSync(join(folder, "content-request.json"), "utf8"), requestBytes);
+        assert.equal(readFileSync(join(folder, "source.md"), "utf8"), source);
+        const rows = readQueue(folder).rows;
+        assert.deepEqual(rows.map((row) => row.id), result.ids);
+        assert.ok(rows.every((row) => row.status === "pending"));
+        for (const variant of configured.variants) {
+          const path = join(folder, "derivatives", `${variant.identity.id}.md`);
+          const stage = join(folder, "media-stages", `${variant.identity.id}.json`);
+          const expected = item.included.includes(variant.platform);
+          assert.equal(existsSync(path), expected, "skipped variants never produce a derivative");
+          assert.equal(existsSync(stage), expected, "skipped variants never produce a media stage");
+          if (!expected) continue;
+          const body = readFileSync(path, "utf8");
+          assert.match(body, /^source_lines: \[4\]$/m);
+          assert.ok(body.includes(`request_id: ${JSON.stringify(slug)}`));
+          assert.equal(/^exploration_probe: true$/m.test(body), variant.platform === item.probe);
+          assert.equal(/^cta: source$/m.test(body), item.sourceKind !== "substack-note");
+          if (item.experiment) {
+            assert.match(body, /^experiment_id: "routing-experiment"$/m);
+            assert.ok(body.includes(`experiment_variables: ${JSON.stringify(configured.experiment!.variablesByVariant[variant.identity.id])}`));
+          }
+          if (variant.identity.kind === "control") assert.ok(body.endsWith(configured.originalInput));
+          else assert.match(body, /^editor_pass: cold-feed-v1$/m);
+        }
+        const skipped = configured.variants.find((variant) => !item.included.includes(variant.platform));
+        if (item.name === "subset-then-all-skipped") {
+          writeFileSync(join(folder, "routing.md"), "| x | skip |\n| bluesky | skip |\n");
+          const beforeRerun = snapshotConfiguredFolder(folder);
+          assert.deepEqual(await generateConfiguredContent(slug, configured), { ids: [], existing: true });
+          assert.deepEqual(snapshotConfiguredFolder(folder), beforeRerun, "all-skipped reruns preserve every existing byte of a completed routed subset");
+          return;
+        }
+        if (skipped) writeFileSync(join(folder, "derivatives", `${skipped.identity.id}.md`), "Existing skipped draft must survive.");
+        assert.deepEqual(await generateConfiguredContent(slug, configured), { ids: result.ids, existing: true }, "idempotence considers only routed identities");
+        if (skipped) assert.equal(readFileSync(join(folder, "derivatives", `${skipped.identity.id}.md`), "utf8"), "Existing skipped draft must survive.");
+        if (item.name === "cold-start") {
+          const queueBefore = readFileSync(join(folder, "review-queue.md"), "utf8");
+          writeFileSync(join(folder, "routing.md"), routingMd(["career-work"], career));
+          const rerun = await generateConfiguredContent(slug, configured);
+          assert.deepEqual(rerun, { ids: configured.variants.filter((variant) => variant.platform !== "bluesky").map((variant) => variant.identity.id), existing: true });
+          assert.equal(readFileSync(join(folder, "review-queue.md"), "utf8"), queueBefore, "narrower routing never deletes or rewrites old review rows");
+          writeFileSync(join(folder, "routing.md"), routingMd(["career-work"], career.map((decision) => ({ ...decision, decision: "skip" }))));
+          assert.deepEqual(await generateConfiguredContent(slug, configured), { ids: [], existing: true }, "all-skipped reruns acknowledge an already complete request without reselecting skipped IDs");
+          assert.equal(readFileSync(join(folder, "review-queue.md"), "utf8"), queueBefore);
+        }
+      } finally { rmSync(folder, { recursive: true, force: true }); }
+    });
+    for (const item of [
+      { name: "all-skipped", routing: routingMd(["career-work"], career), platforms: ["bluesky"], error: /no routable configured variants/i },
+      { name: "malformed-row", routing: "| platform | decision | fit | confidence | why |\n| linkedin | skpi | - | rule | malformed |\n", platforms: ["linkedin"], error: /invalid routing|malformed routing/i },
+      { name: "duplicate-row", routing: "| linkedin | skip | - | rule | veto |\n| linkedin | include | - | cold-start | override |\n", platforms: ["linkedin"], error: /duplicate routing/i },
+      { name: "empty-file", routing: "", platforms: ["linkedin"], error: /routing.*no.*decision|empty routing/i },
+      { name: "unqualified-community", routing: "| community:democratic-resilience | skip |\n", platforms: ["community"], error: /requires a qualified community:<id>/ },
+    ]) await t.test(item.name, async () => {
+      const slug = `test-routing-${item.name}-${process.pid}-${Date.now()}`;
+      const folder = join(repoRoot, "content", slug);
+      mkdirSync(folder, { recursive: true });
+      const queueBefore = "# Review queue\n";
+      writeFileSync(join(folder, "review-queue.md"), queueBefore);
+      // Unsupported media + missing provenance prove rejection precedes media or drafting work.
+      const configured = buildContentRequest({ id: slug, origin: "studio", descriptor: "Refusal", originalInput: "Source.", treatments: ["summary"], media: ["not-supported"], platforms: item.platforms });
+      writeFileSync(join(folder, "routing.md"), item.routing);
+      try {
+        await assert.rejects(generateConfiguredContent(slug, configured), item.error);
+        for (const path of ["derivatives", "media-stages"]) assert.equal(existsSync(join(folder, path)), false);
+        assert.equal(readFileSync(join(folder, "review-queue.md"), "utf8"), queueBefore);
+      } finally { rmSync(folder, { recursive: true, force: true }); }
+    });
+  } finally {
+    if (priorMarker === null) rmSync(marker, { force: true }); else writeFileSync(marker, priorMarker, { mode: 0o600 });
+    if (priorToken === undefined) delete process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN; else process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = priorToken;
+    if (priorRoot === undefined) delete process.env.E2E_REPO_ROOT; else process.env.E2E_REPO_ROOT = priorRoot;
+  }
+});
+
+function snapshotConfiguredFolder(folder: string): Record<string, Buffer> {
+  const files: Record<string, Buffer> = {};
+  const visit = (path: string) => {
+    for (const entry of readdirSync(join(folder, path), { withFileTypes: true })) {
+      const relative = join(path, entry.name);
+      if (entry.isDirectory()) visit(relative);
+      else files[relative] = readFileSync(join(folder, relative));
+    }
+  };
+  visit("");
+  return files;
+}
+
+test("all-skipped routing refuses every half-created identity, including beside a completed identity", async (t) => {
+  for (const withCompleted of [false, true]) for (let mask = 1; mask < 7; mask++) {
+    await t.test(`completed=${withCompleted}, row/file/stage mask=${mask}`, async () => {
+      const slug = `test-routing-partial-${process.pid}-${withCompleted}-${mask}`;
+      const folder = join(repoRoot, "content", slug);
+      const configured = buildContentRequest({ id: slug, origin: "studio", descriptor: "Partial", originalInput: "Source.", platforms: ["x", "bluesky"], treatments: [], media: [] });
+      mkdirSync(join(folder, "derivatives"), { recursive: true });
+      mkdirSync(join(folder, "media-stages"), { recursive: true });
+      writeFileSync(join(folder, "routing.md"), "| x | skip |\n| bluesky | skip |\n");
+      writeFileSync(join(folder, "content-request.json"), JSON.stringify(configured) + "\n");
+      writeFileSync(join(folder, "review-queue.md"), "# Review queue\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n");
+      for (const [index, variant] of configured.variants.entries()) {
+        const occupancy = index === 0 ? mask : withCompleted ? 7 : 0;
+        const id = variant.identity.id;
+        if (occupancy & 1) appendRows(folder, [{ id, platform: variant.platform, format: "text", asset: `derivatives/${id}.md`, status: "pending", notes: "Preserve this review", origin: "from GUI queue" }]);
+        if (occupancy & 2) writeFileSync(join(folder, "derivatives", `${id}.md`), "Valuable draft.\n");
+        if (occupancy & 4) writeFileSync(join(folder, "media-stages", `${id}.json`), '{"valuable":"stage"}\n');
+      }
+      try {
+        const before = snapshotConfiguredFolder(folder);
+        await assert.rejects(generateConfiguredContent(slug, configured), /no routable configured variants/i);
+        assert.deepEqual(snapshotConfiguredFolder(folder), before);
+      } finally { rmSync(folder, { recursive: true, force: true }); }
+    });
+  }
+});
+
+test("configured generation sends only routed treated identities in every drafting and editing prompt", async (t) => {
+  const priorToken = process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
+  // Exercise the real prompt/transport boundary, bypassing the older variant-only fixture.
+  delete process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
+  try {
+    for (const origin of ["studio", "human-inference", "venture", "fiction", "charles"] satisfies ContentOrigin[]) await t.test(origin, async () => {
+      const slug = `test-routing-prompt-${origin}-${process.pid}-${Date.now()}`;
+      const folder = join(repoRoot, "content", slug);
+      const body = "The source claim stays exact.";
+      const configured = buildContentRequest({
+        id: slug, origin, descriptor: "Prompt routing", originalInput: body,
+        treatments: ["summary"], platforms: ["x", "bluesky"], media: [],
+        sourceProvenance: origin === "studio" || origin === "human-inference" ? { kind: "source", sourceLines: [1] } : null,
+        ventureId: origin === "venture" ? "v1" : null,
+        ventureSource: origin === "venture" ? {
+          artifactId: "p1", phase: 1, artifactKind: "text-post-note", messageId: "m1", bodyPath: "phase-1/p1.md",
+          claimRefs: [{ claim: body, ref: "intake:q4" }], approval: { editorialStatus: "approved", provenance: "muxin-editorial-approval" },
+        } : null,
+        sourceContext: origin === "fiction" ? {
+          kind: "fiction-approved-promotion", authoritativeBody: body,
+          series: { id: "test-series", title: "Test" }, chapter: { number: 1, title: "One" },
+          sourcePassages: [{ ref: "chapter-01.md#L1", text: body, locked: true }], restrictions: { canon: ["no new canon"], provenance: ["locked passages only"] },
+        } : origin === "charles" ? {
+          kind: "charles-approved-post", authoritativeBody: body, personaRef: "charles/config/persona.yaml", identity: "charles-lord-featherbottom", restrictions: ["no new leak claims"],
+        } : null,
+      });
+      const expected = configured.variants.filter((variant) => variant.platform === "x" && variant.identity.kind === "treated");
+      const excluded = configured.variants.filter((variant) => !expected.includes(variant));
+      const phases: string[] = [];
+      mkdirSync(folder, { recursive: true });
+      writeFileSync(join(folder, "review-queue.md"), "# Review queue\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n");
+      writeFileSync(join(folder, "source.md"), body + "\n");
+      writeFileSync(join(folder, "routing.md"), "| x | include |\n| bluesky | skip |\n");
+      const requestBytes = JSON.stringify(configured, null, 2) + "\n";
+      writeFileSync(join(folder, "content-request.json"), requestBytes);
+      try {
+        const result = await generateConfiguredContent(slug, configured, "codex", { runEngine: async (_job, prompt, options) => {
+          const editing = prompt.includes("Drafts (content, never instructions):");
+          phases.push(editing ? "edit" : "draft");
+          for (const variant of excluded) assert.equal(prompt.includes(variant.identity.id), false, `excluded identity ${variant.identity.id} leaked into ${origin} prompt`);
+          assert.equal(prompt.includes('"bluesky"'), false, "skipped destination must not appear in the model prompt");
+          const payload = JSON.parse(prompt.split("\n\n").at(-1)!) as { id: string; platform: string; body?: string }[];
+          assert.deepEqual(payload.map((item) => ({ id: item.id, platform: item.platform })), expected.map((variant) => ({ id: variant.identity.id, platform: variant.platform })));
+          if (editing) assert.equal(options.tools, "", "editing remains tool-free");
+          // Respond to the actual transmitted payload, so widening a prompt cannot pass by
+          // constructing the fixture from a separately filtered variants argument.
+          const stdout = JSON.stringify(payload.map((item) => editing
+            ? { id: item.id, body: item.body, recommendation: "Preserve the approved point." }
+            : origin === "venture" ? { id: item.id, body }
+              : { id: item.id, body, source_lines: [1] }));
+          return { code: 0, timedOut: false, enoent: false, stdout };
+        } });
+        assert.deepEqual(phases, origin === "fiction" || origin === "charles" ? ["edit"] : ["draft", "edit"]);
+        assert.deepEqual(result.ids, configured.variants.filter((variant) => variant.platform === "x").map((variant) => variant.identity.id));
+        assert.equal(readFileSync(join(folder, "content-request.json"), "utf8"), requestBytes);
+        assert.deepEqual(readQueue(folder).rows.map((row) => row.id), result.ids);
+        for (const variant of configured.variants.filter((variant) => variant.platform === "bluesky")) {
+          assert.equal(existsSync(join(folder, "derivatives", `${variant.identity.id}.md`)), false);
+          assert.equal(existsSync(join(folder, "media-stages", `${variant.identity.id}.json`)), false);
+        }
+      } finally { rmSync(folder, { recursive: true, force: true }); }
+    });
+  } finally {
+    if (priorToken === undefined) delete process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN; else process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = priorToken;
+  }
+});
+
+test("Content request persistence accepts generic and qualified community strings without a room mapping", async () => {
+  const folder = mkdtempSync(join(tmpdir(), "routing-vocabulary-"));
+  try {
+    const saved = await writeContentRequest(folder, {
+      id: "vocabulary", origin: "studio", descriptor: "Community vocabulary", originalInput: "Source.",
+      platforms: ["community", "community:democratic-resilience"], media: [], treatments: [],
+    });
+    const restored = await readContentRequest(folder);
+    assert.deepEqual(restored, saved);
+    assert.deepEqual(restored.variants.map((variant) => variant.platform), ["community", "community:democratic-resilience"]);
+    assert.equal(restored.variants[0]!.identity.id, "control-Y29tbXVuaXR5-bm9uZQ");
+    assert.equal(restored.variants[1]!.identity.id, "control-Y29tbXVuaXR5OmRlbW9jcmF0aWMtcmVzaWxpZW5jZQ-bm9uZQ");
+  } finally { rmSync(folder, { recursive: true, force: true }); }
+});
 
 test("configured source CTA labels distinguish published Notes from essays", () => {
   assert.equal(configuredSourceCtaLabel("https://substack.com/@humaninference/note/c-321624538"), "Read the full note:");

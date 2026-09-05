@@ -1,0 +1,7 @@
+source_worktree=/private/tmp/content-agents-routing-gate
+source_head=409bacf05565e90a37d92f2b405b7a3c390a71a5
+attempt=2
+execution=live
+fixture_git_commits=0
+fixture_git_remotes=0
+source_files_sha256=3ddabc9f93cc626bc60f64849f55d746e55317d87975633a0e5aa3160faae1a4
