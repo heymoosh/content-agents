@@ -207,6 +207,22 @@ named in the bindings; do not invent a different shape.
 Packets that share no owned files may run in parallel. Conflicting edits and all integration
 are serialized. Workers share one workspace and must preserve other sessions' changes.
 
+### Writing a missing packet
+
+If the START HERE block names a slice packet that does not exist, writing it **is**
+coordination, not a departure from the read limit. Without asking permission, the coordinator
+may read exactly these and nothing more:
+
+- the packet template named in the bindings;
+- the master document's standing-constraints or non-negotiables section, if it has one;
+- any heading in the master document that START HERE names;
+- a design spec that START HERE or the slice sequence names, limited to that slice's own
+  section plus the spec's dependency / running-order section.
+
+Draft the packet from those, then proceed. Stop for the owner only when the slice's goal or
+acceptance criteria are genuinely undecided. Permission to read a named input is not a decision
+and must not be escalated as one; the owner decides scope, not method.
+
 ### Model routing
 
 Start each kind of work on the model that is best at that kind of work *in one shot*, not the
