@@ -179,7 +179,13 @@ No closeout tool in this repo. The coordinator records `PASS` (audit clean, veri
 leftover list in this packet below, then — because this is a Rule 7 hold — surfaces the before/after
 sample and verdict to Muxin rather than merging. The slice is **accepted** only on Muxin's approval.
 
-Closeout result: **VERIFIED — HELD for Muxin (Rule 7)** (2026-09-05). Coordinator-verified: read the
+Closeout result: **ACCEPTED — merged to local `main`** (2026-09-05). Muxin approved the Rule-7
+before/after as option A: keep 5b's atomic skeleton-gate reject for reflective/fiction-promo sources
+routed to LinkedIn/X; the "fall back to non-case spin" alternative is an optional, unbuilt follow-on
+to raise only if reflective pieces get blocked in practice. Fast-forwarded to `b8eea12`; branch
+deleted. Below is the verification that preceded acceptance.
+
+Pre-acceptance verdict: **VERIFIED — HELD for Muxin (Rule 7)** (2026-09-05). Coordinator-verified: read the
 full diff and the test file; confirmed `configuredDraftSpinAngles` uses the SAME `resolvePlatformSpin`
 decision the gate/stamp uses, so the body is spun exactly when the label fires; confirmed the default
 (no spin map) `configuredContentPrompt` output is byte-identical (so `/atomize` is untouched) and the

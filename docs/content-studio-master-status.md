@@ -5,13 +5,14 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: SLICE-5D (spin) — built, cross-family-audited, and fully verified 2026-09-05, but
-  **HELD for Muxin's Rule-7 review** (it changes composed prose per platform, so it is a draft-PR
-  hold with a before/after sample, not a self-vet merge). Committed to branch `feat/content-spin-5d`,
-  NOT merged to `main`. Accepted only on Muxin's approval.
-- Last accepted packet: `docs/operations/launch-slices/SLICE-5C.md` (Closeout PASS; gate 4173/484/0).
-  SLICE-5D packet is `VERIFIED — HELD` (gate 4178/484/0), pending Muxin.
-- Blocked on: Muxin's approval of the SLICE-5D before/after sample (Rule-7 hold) before it merges.
+- Current slice: none in flight. SLICE-5D (spin) is **ACCEPTED and merged to local `main`**
+  (2026-09-05): Muxin approved the Rule-7 hold as option A (keep 5b's atomic skeleton-gate reject
+  for reflective/fiction-promo sources routed to LinkedIn/X; the "fall back to non-case spin"
+  variant is filed as an optional follow-on, unbuilt, to raise only if reflective pieces get
+  blocked in practice). Fast-forwarded to `b8eea12`; branch `feat/content-spin-5d` deleted.
+- Last accepted packet: `docs/operations/launch-slices/SLICE-5D.md` (Closeout PASS + Muxin approval;
+  gate 4178/484/0). SLICE-5C before it (gate 4173/484/0).
+- Blocked on: nothing. Pick the next dependency-ready slice below.
 - Next dependency-ready: any one of the five remaining item-5 capabilities (pillar tagging,
   scoring/soft gate, thread check, quote-card captions, brief directives) — largely independent now
   that routing (5a), `validate` (5b), source triage (5c), and spin (5d) have landed; item `3a`
@@ -20,9 +21,9 @@
   gate-rejection test. The case gate stays intentionally dormant until a configured treatment emits a
   `case_skeleton: true` beat (a future, unscheduled capability, not one of the five).
 - Last decision: 2026-09-05 — adopt the portable slice protocol; workers get one packet, never this document
-- Repository state: local `main` carries 5c + 5b + prior slice-protocol doc commits ahead of
-  `origin/main` (local-first delivery; push is Muxin's call). Branch `feat/content-spin-5d` holds the
-  verified-but-unmerged 5d commit (Rule-7 hold). No open PRs pushed; push is Muxin's call.
+- Repository state: local `main` carries 5d + 5c + 5b + prior slice-protocol doc commits ahead of
+  `origin/main` by 6 (local-first delivery; push is Muxin's call). No feature branch open. No PRs
+  pushed.
 - Design spec for item 5: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
 - Standing constraints: see `## Standing constraints` below before delegating anything
 - Do not read past this block unless the slice packet cites a heading. Everything under
