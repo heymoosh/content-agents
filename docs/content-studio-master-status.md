@@ -5,21 +5,24 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight — item 5c landed and was accepted 2026-09-05
-- Last accepted packet: `docs/operations/launch-slices/SLICE-5C.md` (Closeout PASS; gate 4173/484/0)
-- Blocked on: none
-- Next dependency-ready: any one of the six remaining item-5 capabilities (pillar tagging, spin,
+- Current slice: SLICE-5D (spin) — built, cross-family-audited, and fully verified 2026-09-05, but
+  **HELD for Muxin's Rule-7 review** (it changes composed prose per platform, so it is a draft-PR
+  hold with a before/after sample, not a self-vet merge). Committed to branch `feat/content-spin-5d`,
+  NOT merged to `main`. Accepted only on Muxin's approval.
+- Last accepted packet: `docs/operations/launch-slices/SLICE-5C.md` (Closeout PASS; gate 4173/484/0).
+  SLICE-5D packet is `VERIFIED — HELD` (gate 4178/484/0), pending Muxin.
+- Blocked on: Muxin's approval of the SLICE-5D before/after sample (Rule-7 hold) before it merges.
+- Next dependency-ready: any one of the five remaining item-5 capabilities (pillar tagging,
   scoring/soft gate, thread check, quote-card captions, brief directives) — largely independent now
-  that routing (5a), `validate` (5b), and source triage (5c) have landed; item `3a` (retire
-  `/cycle`'s review+publish steps) is also independently ready and depends on nothing. Packet not yet
-  written. NB: the **spin** slice carries a recorded follow-on from 5c — the skeleton/case gates are
-  wired but dormant in the Content path until spin populates candidate spin/angle/caseSkeleton; that
-  slice must un-dormant them and add the end-to-end gate-rejection test (see SLICE-5C Dependency
-  note).
+  that routing (5a), `validate` (5b), source triage (5c), and spin (5d) have landed; item `3a`
+  (retire `/cycle`'s review+publish steps) is also independently ready and depends on nothing. The
+  5c→spin follow-on is DISCHARGED: 5d un-dormanted the skeleton gate end to end and added the
+  gate-rejection test. The case gate stays intentionally dormant until a configured treatment emits a
+  `case_skeleton: true` beat (a future, unscheduled capability, not one of the five).
 - Last decision: 2026-09-05 — adopt the portable slice protocol; workers get one packet, never this document
 - Repository state: local `main` carries 5c + 5b + prior slice-protocol doc commits ahead of
-  `origin/main` (local-first delivery; push is Muxin's call); clean tree, no open PRs, no slice
-  worktree in flight
+  `origin/main` (local-first delivery; push is Muxin's call). Branch `feat/content-spin-5d` holds the
+  verified-but-unmerged 5d commit (Rule-7 hold). No open PRs pushed; push is Muxin's call.
 - Design spec for item 5: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
 - Standing constraints: see `## Standing constraints` below before delegating anything
 - Do not read past this block unless the slice packet cites a heading. Everything under
@@ -46,6 +49,30 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — item 5d verified and HELD for Muxin: spin ported, skeleton gate un-dormanted
+
+Slice 5D is built, cross-family-audited, and fully verified, but **not merged** — it is a Rule-7
+draft-PR hold on branch `feat/content-spin-5d`, because it changes composed prose per platform and so
+needs Muxin's before/after review. `generateConfiguredContent` (`src/review/jobs.ts`) now computes the
+per-platform spin decision (`resolvePlatformSpin` in `src/atomize/spin.ts`) and, for each spun treated
+variant, injects that platform's approved `spin_angles` angle (audience + angle text) into the
+source-grounded drafting prompt — mirroring the shipped `duplicatePrompt` contract — so the body is
+genuinely re-hooked to the approved angle rather than merely labelled. The same spin/angle is stamped
+into the derivative's provenance and fed to slice 5b's skeleton gate, which now FIRES end to end: a
+treated, source-traceable candidate spun to a case-skeleton platform (linkedin/x) whose recorded
+source class excludes the beat is rejected atomically. This discharges the 5c→spin follow-on
+(un-dormant the gate + add the end-to-end rejection test). The case gate stays intentionally dormant
+(the configured path emits no `case_skeleton: true` beat).
+
+A coordinator over-review caught the builder's first pass stamping `spin: true` without actually
+spinning the body (spin-on and spin-off produced byte-identical copy — a provenance overstatement and
+a miss of the packet's before/after Observable result). A scoped repair injected the approved angle
+into drafting so `spin: true` is earned; the cross-family Codex audit then found no correctness
+defect. Extraction-first held throughout: the angle re-frames only within cited source segments,
+controls stay byte-exact, voice passes, and no-source-essay origins (Venture, Charles) / substack-note
+sources are never spun. Focused 157/0, tsc 0, repo-wide `npm run check` unsandboxed 4178/484/0. Awaits
+Muxin's Rule-7 approval before merge.
 
 ### 2026-09-05 — item 5c accepted: source triage ported into configured Content generation
 
