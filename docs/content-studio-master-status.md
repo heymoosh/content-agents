@@ -1,6 +1,6 @@
 # Content Studio master status
 
-## START HERE — next session (updated 2026-09-04)
+## START HERE — next session (updated 2026-09-05)
 
 **Repo to work in:** `/Users/Muxin/Documents/GitHub/content-agents`, branch `main`.
 **This doc:** `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
@@ -15,26 +15,38 @@ is deferred, or its verification/audit decision changes.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-04 handoff #8) — Lane-C item 5a: port the platform-routing gate
+> ### ▶ NEXT ACTION (2026-09-05 handoff #9) — Lane-C item 5b: port validation
 > Work from `main` in a fresh feature worktree. Lane A is fully merged: **P1 #442**, **P2 #455
 > (`df02f09`)**, **item 1 #456 (`608f335`)**, and **item 2 #457 (`e53c6d3`)**. Decision 11's
 > per-room queues (slices 1.5/2/3) are also complete. There are no open PRs.
 >
-> **Build exactly item 5a first:** bring the `/atomize` platform-routing `include`/`skip`,
-> cold-start, and exploration-probe decision into the configured Content generation path, so it
-> determines which variants are generated. Do not combine it with the subsequent `validate` port
-> or the seven remaining item-5 capabilities. Read the design constraints in
-> `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order, then inspect only
-> the cited route/generation code. Acceptance: a deterministic integration test proves skipped
-> platforms generate no variants while included/cold-start/exploration cases retain their intended
-> variants; existing request/provenance/review-pending invariants remain unchanged; focused tests
-> and final `npm run check` pass; complete a cross-family audit before the one bounded live canary.
+> **Item 5a is DONE — `6a02b27` (2026-09-05).** `generateConfiguredContent` now consumes recorded
+> `routing.md` decisions before model/media/output work, filters whole skipped platforms, keeps
+> included control/treatment pairs, and stamps exploration probes. Source/request identities,
+> provenance, and pending review remain intact. Routed-subset reruns and ambiguous community
+> destinations have explicit, tested handling. **184 focused tests; final local check 4,158 tests /
+> 484 suites / zero failures or skips; Claude cross-family audit PASS; isolated live canary PASS.**
+> The first canary's behavior passed but its harness copied legacy logs; the corrected source-only
+> Git/HOME-isolated retry passed with one current log and no historical copies. Both attempts and
+> successful outputs are preserved; this workflow's live budget is exhausted. No push or PR was
+> made for this slice. Evidence and mandatory next-builder checklist:
+> `docs/evidence-content-routing-gate-2026-09-04.md`.
 >
-> Use the bounded verification contract in `CLAUDE.md`: early Claude architecture review if its
-> quota is available (it was quota-blocked this session), red/green + fake-model E2E, audit before
-> canary, P0/P1 fixes only, then one isolated authenticated canary and final `npm run check`.
-> The audit packet must contain only this slice's requirements, diff, and test log. Record P2
-> findings as the next-builder checklist in this master doc or a linked evidence file.
+> **Build exactly item 5b next:** port the applicable existing `validate` gates into configured
+> Content generation. Read `docs/content-room-alignment-plan.md` §5 and §Dependencies and running
+> order, then delegate inspection of `src/atomize/validate.ts`, its tests, and the relevant
+> generation/provenance seams. Map each gate and each room's scoped exception before editing.
+> Do not combine this with the seven remaining item-5 capabilities. Acceptance: deterministic
+> integration tests prove ported validation failures cannot leave partial output or review rows;
+> valid origin-specific requests retain 5a routing, exact controls, provenance, and pending review;
+> focused/fake-model tests, cross-family audit, bounded isolated canary, and local check pass.
+>
+> Use the bounded verification contract: early Claude architecture review, red/green + fake-model
+> E2E, packet-only cross-family audit before canary, P0/P1 fixes only, and the final local check.
+> Audit packets contain only this slice's requirements, diff, and test log. Close the linked
+> checklist up front, especially parser/caller searches and actual full-launcher isolation tests.
+> One existing routing file refuses an unsupported confidence value; this is recorded P2
+> strictness, not permission to silently weaken routing or rewrite operational content.
 >
 > 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — DONE, merged as
 >    PR #455 (`df02f09`).** `CONTENT_EDITORS` registry keyed by
@@ -115,7 +127,8 @@ section only when this one cites it.
 >    changing this evidence protocol, and after the Capture selector defect is repaired run Pass D once to
 >    confirm the GUI Venture case records `venture-social-v1`.
 >
->    Item 2 (Fiction/Charles) subsequently merged as #457 (`e53c6d3`). Lane C item 5a is now next.
+>    Item 2 (Fiction/Charles) subsequently merged as #457 (`e53c6d3`); Lane C item 5a is now
+>    complete as `6a02b27`. Item 5b is next.
 >    Decision 11's queue ladder is complete; no decision-11 slice remains.
 >
 > **Rule 7 (settled):** all slices merge after their scoped local verification and required audit pass.
@@ -126,7 +139,7 @@ section only when this one cites it.
 > lives in a `<script>` template literal so regex backslashes MUST be doubled (`\\s`), enforced by
 > `page.test.ts`; Fiction route tests MUST set `CONTENT_AGENTS_HOME` or they write the real inbox.
 >
-> **Handoff hygiene (2026-09-04, re-run at handoff #8):** run `bash scripts/repo-hygiene.sh --rescue`
+> **Handoff hygiene (2026-09-05, handoff #9):** run `bash scripts/repo-hygiene.sh --rescue`
 > from the repo root after recording this update. Commit every real status/evidence change and never
 > leave an untracked twin beside a committed artifact. `scripts/repo-hygiene.sh --rescue` previously
 > listed the same 5 stale local-only agent branches from
@@ -151,8 +164,8 @@ cross-family audit requirements; publishing still requires Muxin's normal conten
 **No open PRs. Start by building, not by triage.** The rest of the 2026-09-03 queue was resolved
 that day; what happened is under "PR hygiene" below, and you do not need it to begin.
 
-**Session of 2026-09-03 (evening) shipped P1 and item 4; a new decided scope — per-room queues
-(decision 11) — is approved to build. Start at P2 for lane A, or the per-room queues for lane B.**
+**Lane A and decision 11's per-room queues are complete. Continue Lane C's item-5
+capability ports from the current START HERE handoff.**
 
 - **P1 is DONE and MERGED — PR #442** (`c6842cd`, rebased onto `main` 2026-09-03). It deleted
   `CONFIGURED_PLATFORM_LIMITS` and resolves platform character limits from `config/platforms.yaml`
@@ -160,8 +173,8 @@ that day; what happened is under "PR hygiene" below, and you do not need it to b
   platform reachable as a `variant.platform`, config `max_chars` equals the retired table value (or
   both absent); `quote-card` is a media type, never a platform, so its 180-char config limit cannot
   introduce a new gate. A regression test pins the values. Merged after Muxin confirmed it needed no
-  hold (rule 7 covers only changes to *how content is created*, not limit-sourcing). **P2 branches
-  on `main` now.**
+  hold under the then-current rule 7. **P2 subsequently merged as #455; the separate
+  content-generation review hold was retired on 2026-09-04.**
 - **Item 4 (Fiction leg) is DONE and MERGED — PR #443** (`d682d77`). Studio Start
   (`POST /api/captures/start`) now takes an optional `room` (default `"Content"`, backwards
   compatible) and, for `room: "Fiction"`, lands the capture as a **durable inbox idea** via the
@@ -193,9 +206,9 @@ Remaining, in order:
    future hardening checklist: `docs/evidence-fiction-charles-editor-2026-09-04.md`.
 2. **Lane B: Decision 11's per-room queues are complete.** Item 4 Fiction, item 6, 3a, and the
    content-request fix are done, as are the contracts-first 1.5 slices and all queues.
-3. **Lane C, item 5a (platform-routing gate port), is next** — same `jobs.ts` generation region.
-   Its detailed design is `docs/content-room-alignment-plan.md` §5; follow the narrowly scoped
-   handoff above rather than re-reading this history.
+3. **Lane C item 5a is complete (`6a02b27`); item 5b (validation port) is next** — same `jobs.ts`
+   generation region. Its design is `docs/content-room-alignment-plan.md` §5; follow the narrowly
+   scoped handoff above rather than re-reading this history.
 
 ### Ground rules that bite immediately
 
@@ -1208,8 +1221,9 @@ are ordinary operations, not gates.
    `content-request.json` so already-drafted work becomes reviewable. The `/atomize` capability
    port collides with the editor lane on the same file and queues behind it; retiring `/cycle`'s
    drafting step depends on that port finishing. The full inventory, dependency chain, parallelism
-   table and rule 7 split is `docs/content-room-alignment-plan.md`. **Nothing in it is approved to
-   build.**
+   table is `docs/content-room-alignment-plan.md`. **These capabilities are authorized under
+   Standing authorization above; the current START HERE handoff owns sequence and completion.
+   The separate rule-7 review hold was retired on 2026-09-04.**
 11. **Per-room queues, and Studio Start files into them (Muxin, 2026-09-03 — approved to build).**
    Refines decision 10's "Studio creates nothing itself": Studio Start's safe create action is to
    file a routed capture into the destination room's own queue as a durable item — it still
