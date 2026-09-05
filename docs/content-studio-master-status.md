@@ -47,19 +47,32 @@ section only when this one cites it.
 > One existing routing file refuses an unsupported confidence value; this is recorded P2
 > strictness, not permission to silently weaken routing or rewrite operational content.
 >
-> **Exit state:** item 5b has not started. Implementation `6a02b27` and evidence/handoff `571f39c`
-> are on local `main`, not pushed. The routing-gate feature worktree and branch were removed after
-> landing; committed evidence is under `docs/evidence/content-routing-gate-2026-09-04/`.
+> **Exit state:** item 5b has not started. Implementation `6a02b27`, evidence/handoff `571f39c`
+> and `ab8f4b6`, plus the ledger record `1889296`, are all **pushed to `origin/main`** as of
+> 2026-09-05; local `main` and `origin/main` are level and there are no open PRs. Committed
+> evidence is under `docs/evidence/content-routing-gate-2026-09-04/`.
 > Do not rerun item 5a's exhausted canary or push merely to obtain CI. Set a fresh, explicit
 > verification budget for item 5b before starting it. No new product decision is needed to begin.
 >
-> **Handoff hygiene:** the requested root rescue ran on 2026-09-05 and preserved an unrelated
-> tracked modification to `data/notes-spread-ledger.jsonl` in `refs/wip/content-agents`
-> (`9eb4582`). Leave that working-tree change intact; it is not part of this slice. No untracked
-> paths were listed. Five pre-existing local-only agent branches remain untouched (names under
-> “Prior-slice handoff details” below). Primary checkout stays on `main`.
-> This documentation-only handoff also passed a fresh root `npm run check`: typecheck and
-> 4,158/4,158 tests, 484 suites, zero failures/skips (2026-09-05; exit 0), plus `git diff --check`.
+> **Open question for Muxin (2026-09-05, not blocking 5b):** a coordinator/worker workflow
+> migration was proposed and is undecided — add `## Slice protocol` and `## Ending a session`
+> to `AGENTS.md`, create `docs/operations/launch-slices/` for one-slice worker packets, and cut
+> this START HERE block to ~15 lines of pointers with the narrative moved to a Progress log.
+> Nothing has been built for it. Her new short start/end session prompts reference those section
+> names and that directory, so they are inert until she approves the setup.
+>
+> **Handoff hygiene (2026-09-05):** root rescue ran; the two appended
+> `data/notes-spread-ledger.jsonl` rows from the 2026-09-05 scheduled Notes run were committed as
+> `1889296` (operational data, no behavior change) rather than left uncommitted. Working tree is
+> clean, no untracked paths. Three stale `/private/tmp` worktrees for already-merged work
+> (fiction-charles-editors, routing-gate-5a, venture-editor) were removed and the fully merged
+> local branch `feat/content-routing-gate-5a` deleted. Three worktrees remain by design and were
+> left alone: Codex's `~/.codex/worktrees/3728/content-agents`, `content-agents-worktrees/
+> content-studio-master-status-recovery`, and `.claude/worktrees/content-studio-ui-recovery`
+> (branch `agent/studio-functionality`). Five pre-existing local-only agent branches remain
+> untouched (names under “Prior-slice handoff details” below). Primary checkout stays on `main`.
+> Fresh root `npm run check` passed unsandboxed: typecheck and 4,158/4,158 tests, 484 suites,
+> zero failures/skips (2026-09-05; exit 0).
 
 ### Prior-slice handoff details — history/reference only
 
