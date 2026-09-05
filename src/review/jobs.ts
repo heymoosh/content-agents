@@ -17,7 +17,7 @@ import { appendRow, appendRows, readQueue, stampOrigin, type NewQueueRow } from 
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { resolveAngle } from "../atomize/spin.js";
 import { checkPlatformLimits, checkSkeletonGate, checkCaseGate } from "../atomize/validate.js";
-import { readSourceClass, readCaseEvidence } from "../atomize/source-triage.js";
+import { readSourceClass, readCaseEvidence, classifyContentOriginClass, type SourceClass } from "../atomize/source-triage.js";
 import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { upsertFrontmatterField } from "../outreach/qualify.js";
@@ -1037,17 +1037,54 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
     //    from config/platforms.yaml via loadPlatforms() — the same source configuredPlatformLimit()
     //    reads — so the studio generation path and the atomize validator cannot diverge.
     //  - Source-triage skeleton gate (checkSkeletonGate) and case-evidence gate (checkCaseGate):
-    //    run against the folder's recorded source-triage facts. Configured derivatives carry no
-    //    spin/angle or case_skeleton frontmatter today, so these are defensive — they pass unless a
-    //    derivative ever declares the case-skeleton beat treatment or a spin-angle on a
-    //    case-skeleton platform, and they never demand source_lines from a scoped-exception origin.
+    //    run against the source-triage facts. Configured derivatives carry no spin/angle or
+    //    case_skeleton frontmatter today, so these are defensive — they pass unless a derivative
+    //    ever declares the case-skeleton beat treatment or a spin-angle on a case-skeleton platform,
+    //    and they never demand source_lines from a scoped-exception origin.
     // Deliberately NOT ported from checkDerivative: its source_lines-presence and spin-angle checks,
     // which are /atomize frontmatter contracts that would misfire on a configured origin whose
     // scoped exception legitimately carries no source_lines (Venture, Charles, fiction). The routing
     // include/skip gate is already consumed above (item 5a, the `variants` filter), never re-run here.
+    //
+    // SLICE-5C: source triage. /atomize records source_class in source.md at step 2.5; the
+    // configured path has no interactive triage step, so it classifies deterministically by origin
+    // (classifyContentOriginClass) as a FALLBACK — a class already recorded in source.md
+    // (readSourceClass) always wins, so /atomize's judgment is never overridden. The resolved class
+    // + case evidence are RECORDED into each variant's derivative frontmatter below
+    // (triageFrontmatter) AND are the exact values passed into the two gate calls, so the recorded
+    // fact and the gate input are one value, not a stale default.
+    //
+    // These two gates are intentionally DORMANT in the configured path today, NOT firing: their
+    // trigger conditions are `spin===true && angle===platform` (skeleton) and `caseSkeleton===true`
+    // (case), and the configured path has no spin/angle/case-skeleton computation at all — spin is
+    // Claude-inline in /atomize and is a separate, not-yet-ported item-5 slice. So the call site
+    // below passes spin/angle/caseSkeleton as `undefined` (no configured candidate declares a beat),
+    // and no configured candidate can meet a trigger. What 5c changes is that the *class/case facts*
+    // are now real and recorded and threaded into the gate calls, so the gates will enforce
+    // correctly the moment the future spin slice populates candidate spin/angle/caseSkeleton — no
+    // second wiring change needed. Deliberately NOT written back to source.md: that file's
+    // `source_lines` provenance is 1-indexed into source.md as it sits on disk, so inserting a
+    // frontmatter line would shift every body line a derivative traces to (a rule-1 traceability
+    // break) and would violate the source.md-unchanged invariant the generation path already holds.
+    // Scoped exceptions are honored by classifyContentOriginClass returning `undefined` for an
+    // origin with no source essay (Venture, Charles): no class is stamped, they are never forced
+    // into a source_lines-demanding class.
     const gatePlatforms = loadPlatforms().platforms;
-    const gateSourceClass = readSourceClass(folder);
-    const gateCaseEvidence = readCaseEvidence(folder);
+    const triageSourceClass: SourceClass | undefined = readSourceClass(folder) ?? classifyContentOriginClass(request.origin);
+    // Case evidence only applies to a source that carries an essay-style class; an origin with no
+    // essay (undefined class) records none. A recorded source_class_case (readCaseEvidence) wins;
+    // otherwise fail-safe to "not_found" (never claim a real third-party case without a judgment).
+    const triageCaseEvidence: "found" | "not_found" | undefined = triageSourceClass
+      ? (readCaseEvidence(folder) ?? "not_found")
+      : undefined;
+    const gateSourceClass = triageSourceClass;
+    const gateCaseEvidence = triageCaseEvidence;
+    // The triage facts recorded into each variant's provenance/frontmatter — the same values the
+    // gates above consumed. Empty for a scoped-exception origin with no class (Venture, Charles).
+    const triageFrontmatter: string[] = [
+      ...(triageSourceClass ? [`source_class: ${triageSourceClass}`] : []),
+      ...(triageCaseEvidence ? [`source_class_case: ${triageCaseEvidence}`] : []),
+    ];
     const gateCandidates = variants.map((variant) => {
       const id = variant.identity.id;
       const generated = variant.identity.kind === "control" ? request.originalInput : bodies.get(id)!.body;
@@ -1082,7 +1119,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         const sourceCtaUrl = request.sourceProvenance?.canonicalUrl && configuredSourceSupportsCta(request.sourceProvenance.canonicalUrl, sourceKind)
           ? request.sourceProvenance.canonicalUrl
           : null;
-        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...configuredEditorFrontmatter(variant, editorStamp), ...(routing.get(variant.platform)?.confidence === "exploration" ? ["exploration_probe: true"] : []), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
+        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...configuredEditorFrontmatter(variant, editorStamp), ...(routing.get(variant.platform)?.confidence === "exploration" ? ["exploration_probe: true"] : []), ...triageFrontmatter, ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
         writeFileSync(path, configuredDerivativeText(frontmatter, body, variant.identity.kind === "control"), { flag: "wx" }); created.push(path);
         const mediaOutput = mediaOutputs.find((output) => output.id === id)!;
         const stagePath = join(folder, "media-stages", `${id}.json`);

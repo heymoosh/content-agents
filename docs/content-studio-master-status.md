@@ -5,16 +5,21 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight — item 5b landed and was accepted 2026-09-05
-- Last accepted packet: `docs/operations/launch-slices/SLICE-5B.md` (Closeout PASS; gate 4165/484/0)
+- Current slice: none in flight — item 5c landed and was accepted 2026-09-05
+- Last accepted packet: `docs/operations/launch-slices/SLICE-5C.md` (Closeout PASS; gate 4173/484/0)
 - Blocked on: none
-- Next dependency-ready: any one of the seven remaining item-5 capabilities (pillar tagging, spin,
-  scoring/soft gate, thread check, quote-card captions, brief directives, source triage) — largely
-  independent now that routing (5a) and `validate` (5b) have landed; item `3a` (retire `/cycle`'s
-  review+publish steps) is also independently ready and depends on nothing. Packet not yet written.
+- Next dependency-ready: any one of the six remaining item-5 capabilities (pillar tagging, spin,
+  scoring/soft gate, thread check, quote-card captions, brief directives) — largely independent now
+  that routing (5a), `validate` (5b), and source triage (5c) have landed; item `3a` (retire
+  `/cycle`'s review+publish steps) is also independently ready and depends on nothing. Packet not yet
+  written. NB: the **spin** slice carries a recorded follow-on from 5c — the skeleton/case gates are
+  wired but dormant in the Content path until spin populates candidate spin/angle/caseSkeleton; that
+  slice must un-dormant them and add the end-to-end gate-rejection test (see SLICE-5C Dependency
+  note).
 - Last decision: 2026-09-05 — adopt the portable slice protocol; workers get one packet, never this document
-- Repository state: local `main` carries 5b + prior slice-protocol doc commits ahead of `origin/main`
-  (local-first delivery; push is Muxin's call); clean tree, no open PRs, no slice worktree in flight
+- Repository state: local `main` carries 5c + 5b + prior slice-protocol doc commits ahead of
+  `origin/main` (local-first delivery; push is Muxin's call); clean tree, no open PRs, no slice
+  worktree in flight
 - Design spec for item 5: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
 - Standing constraints: see `## Standing constraints` below before delegating anything
 - Do not read past this block unless the slice packet cites a heading. Everything under
@@ -41,6 +46,30 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — item 5c accepted: source triage ported into configured Content generation
+
+Slice 5C is accepted and landed on local `main`. `generateConfiguredContent` (`src/review/jobs.ts`)
+now runs source triage and records the real `source_class`/`source_class_case` into each variant's
+derivative provenance before any write, threading the same values into slice 5b's skeleton and case
+gate calls. A class recorded in `source.md` by `/atomize` wins; a new deterministic fallback
+(`classifyContentOriginClass` in `src/atomize/source-triage.ts`: fiction→`fiction-promo`,
+studio/human-inference→`frame-native`, venture/charles/unknown→`undefined`) supplies the class when
+the folder has none. `source.md` is never mutated or invented — recording goes to derivative
+frontmatter, because `source_lines` is 1-indexed into `source.md` and inserting a line would shift
+every traced body line (a rule-1 traceability break). Scoped exceptions are honored: Venture and
+Charles get no class stamp and no fabricated `source_lines`; fiction is stamped `fiction-promo`.
+
+Honest scope correction, made during the slice: the packet's first draft (this coordinator's)
+over-promised that the skeleton/case gates would fire end to end. They cannot yet — the configured
+path computes no spin/angle/caseSkeleton (spin is a separate, not-yet-ported item-5 capability), so
+those gates are wired but **dormant**; the call site passes `undefined` and no configured candidate
+declares a beat. The cross-family Codex audit caught the over-claim; the packet was reframed to the
+true deliverable (triage recorded + wired, enforcement deferred) and a scoped repair corrected the
+code comment, relabeled the gate tests as unit-level, added a dormancy test, and added
+fiction/charles `:813`-branch generation tests (8 tests total). Follow-on recorded for the spin
+slice: un-dormant the gates and add the end-to-end rejection test then. Second Codex pass: no new
+real defects. Repo-wide `npm run check` unsandboxed: 4173/484/0.
 
 ### 2026-09-05 — item 5b accepted: `validate` gates ported into configured Content generation
 

@@ -21,6 +21,22 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 export const SOURCE_CLASSES = ["frame-native", "reflective", "fiction-promo"] as const;
 export type SourceClass = (typeof SOURCE_CLASSES)[number];
 
+// Deterministic source classification for the configured Content generation path (SLICE-5C).
+// /atomize classifies via Claude's inline judgment at step 2.5 and records it in source.md
+// (readSourceClass reads that). The configured path (generateConfiguredContent) has no interactive
+// triage step, so it classifies deterministically by request origin — but ONLY as a fallback: a
+// class already recorded in source.md (readSourceClass) always wins, so /atomize's judgment is
+// never overridden. Scoped-exception origins with no source essay (Venture, Charles) return
+// `undefined` on purpose — they must NOT be stamped with a class that implies an extraction-first
+// essay + case-skeleton logic (CLAUDE.md rule 1's scoped exceptions). Fiction is the composed
+// fiction teaser, which IS the `fiction-promo` bucket (never source_lines-demanding). An unknown
+// origin string also returns undefined — fail-safe, never guess a bucket.
+export function classifyContentOriginClass(origin: string): SourceClass | undefined {
+  if (origin === "fiction") return "fiction-promo";
+  if (origin === "studio" || origin === "human-inference") return "frame-native";
+  return undefined; // venture, charles (no source essay) and any unknown origin
+}
+
 // Platforms that carry the LinkedIn/X case-skeleton beat template (config/platforms.yaml
 // spin_angles.linkedin / .x) — the "conversion-facing treatment" a reflective source excludes
 // from its platform subset entirely, per the card's bucket rules.
