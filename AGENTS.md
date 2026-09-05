@@ -213,11 +213,21 @@ named in the bindings; do not invent a different shape. Handing a worker a packe
 includes this protocol section — "only that packet" bounds what else the worker may read, not
 whether it receives the rules.
 
-Prefer parallel work. Before spawning, split the slice's owned files into the largest number of
-lanes that share no file, and run one worker per lane at the same time. A packet with a single
-lane states in one line why the work does not divide — sequential is a result, not a default.
-Conflicting edits and all integration are serialized. Workers share one workspace and must
-preserve other sessions' changes, so no path may appear in two lanes.
+Prefer parallel work, but only where it is provably safe. Workers share one working tree — they
+are concurrent processes on the same files, not isolated copies — so parallelism is safe only
+when the lanes cannot touch. Split the owned files into the largest number of lanes for which
+**all three** hold, and state in the packet that they hold:
+
+- No path appears in two lanes, and no lane creates, moves or deletes a path inside another
+  lane's directories.
+- No lane runs a repo-wide command that rewrites files — formatters, codegen, migrations,
+  `--fix` linters. Those belong to the coordinator, after every lane has finished.
+- Each lane's focused verification reads and writes only its own files.
+
+If any of the three cannot be shown, run the lanes one at a time. Serial is the safe fallback
+and needs no justification; a single-lane packet states in one line why the work does not
+divide. Conflicting edits and all integration are always serialized, and workers must preserve
+other sessions' changes.
 
 ### Writing a missing packet
 

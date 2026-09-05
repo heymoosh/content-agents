@@ -18,8 +18,12 @@ Do not load the repository for context. Do not commit.
 
 ## Owned files
 
-Group the paths into lanes that share no file. Lanes run at the same time, one worker each.
-A single-lane packet needs a one-line reason why the work does not divide.
+Group the paths into lanes. Lanes run at the same time, one worker each, but only if all three
+safety conditions in the protocol hold — no shared path or directory, no repo-wide rewriting
+command inside a lane, and lane-local verification. Confirm below that they hold, or run the
+lanes one at a time. A single-lane packet needs a one-line reason why the work does not divide.
+
+Parallel-safe: <yes — all three conditions hold | no — lanes run one at a time because ...>
 
 ### Lane A — <what this lane delivers>
 
