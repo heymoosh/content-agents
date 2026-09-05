@@ -70,6 +70,10 @@ Two consequences for how work is arranged:
 
 ## Bounded verification contract
 
+This is the detailed budget for live and authenticated model work only. The general per-slice
+procedure is `## Slice protocol` below, which is self-contained and restates the budget line a
+worker needs; this section expands it and does not compete with it.
+
 For context-heavy or authenticated model workflows, keep proof of behavior separate from adjacent
 hardening. Fix the verification budget before work begins (normally one authenticated canary per
 workflow and at most one retry), and use this order:
@@ -141,3 +145,164 @@ The live-verification harness (hermetic fixture test + bounded live canary, gate
 (`run-fixture-test.sh`, `run-canary.sh`) — this repo deliberately has no `verify/` tree of its own.
 Machinery PRs opened here that cite harness evidence should reference it by that path; don't expect
 or add a local copy.
+
+<!-- BEGIN PORTABLE PROTOCOL -->
+
+## Slice protocol
+
+This section is the frozen procedure, and it is self-contained on purpose. Session prompts stay
+short because they point here. A coordinator that reads only this section, the master document's
+`## START HERE` block, and one slice packet has everything it needs. Nothing in this section
+depends on reading any other part of this file.
+
+### Repo bindings
+
+This table is the only part of the protocol that changes between repositories. Everything below
+it is repository-neutral.
+
+| Binding | This repository |
+| --- | --- |
+| Repository root | the worktree you were launched in — never `cd` to another checkout |
+| Master document | `docs/content-studio-master-status.md` |
+| Slice packets | `docs/operations/launch-slices/SLICE-<ID>.md` |
+| Packet template | `docs/operations/launch-slices/SLICE-TEMPLATE.md` |
+| Repository-wide gate | `npm run check` (typecheck + unit tests). Run it unsandboxed — under the sandbox it reports roughly 196 phantom venture failures. In a fresh worktree run `npm run worktree:setup` once first, or every command fails on missing `node_modules`. |
+| Hygiene command | `bash scripts/repo-hygiene.sh --rescue` |
+| Closeout gate | none — record `PASS` or the leftover list in the slice packet |
+| Integration rule | one coordinator, one reviewed commit at a time, gate after each |
+| Delivery boundary | branch `main`, remote `origin` (`heymoosh/content-agents`). Merge is local-first: the recorded local gate result is the merge proof. Hosted CI is a manual diagnostic — never push merely to obtain a CI result. |
+| Non-negotiable product rules | Extraction-first: never compose new claims, arguments, or worldview statements in Muxin's voice; text and image derivatives quote and trim verbatim and carry `source_lines`. The scoped exceptions (Content Studio treatments, common hook templates, video scripts, Build 3 Venture, Build 4 Charles) are enumerated in the root `CLAUDE.md` and never widen. Nothing publishes without Muxin's review in `review-queue.md`; committing generated content is not publishing. Generated copy follows `config/voice.yaml` — no em dashes, no AI tells. Prefer subscription and free model routes; every paid call is opt-in and logged to `data/cost-log.csv`. Never edit `docs/content-agents-backlog.md` as text — board writes go through `prose_kanban` only. |
+| Live or authenticated model slices | Fix the verification budget before starting: normally one authenticated canary per workflow and at most one retry. Isolate Git, operational data, secrets, ports, and model permissions in a disposable harness. Preserve successful model output when later validation fails. |
+| Machine facts that bite | System `grep` is ugrep 7.5.0: never combine `-q` with `-v` — count then test. There is no coreutils `timeout` binary. `git pull` piped through `tail`/`head` prints "Updating a..b" before a would-be-overwritten abort, so verify with `git status -sb`. |
+
+The master document is the single source of truth for status and decisions. Its `## START HERE`
+block is the only part a new session reads.
+
+### Roles
+
+- **Coordinator** — the session the owner talks to. Reads this section, the master document's
+  `## START HERE` block, and the current slice packet. Nothing else. It does not load the
+  repository "for context" and it does not implement. Under the integration rule it is the only
+  role that commits or integrates, one reviewed commit at a time.
+- **Worker** — a subagent the coordinator spawns. Reads this section and exactly one slice
+  packet. It implements, runs the packet's declared checks, and returns a `RESULT BLOCK`. It
+  never commits.
+- **Auditor** — a subagent from a different model family than the builder. Receives the slice's
+  acceptance criteria, the candidate diff, the changed-file list, and the focused check output.
+  It never receives the master document, the repository tree, or a worker transcript. If that
+  packet cannot establish a claim, it names the missing evidence or requests a bounded excerpt
+  rather than inferring that unseen code is correct or defective.
+
+A bigger sibling of the builder is not independent review. Never silently substitute a
+same-family audit; if cross-family tooling is unavailable, say so and stop.
+
+### Slice packet contract
+
+A slice is the smallest thing that is demonstrably done, not the smallest thing that can be
+described. Every packet records: goal, difficulty, dependencies, owned files, files not to
+touch, acceptance criteria, the focused verification commands, the observable result, risk and
+whether an audit is required, and the builder and auditor families. Copy the packet template
+named in the bindings; do not invent a different shape.
+
+Packets that share no owned files may run in parallel. Conflicting edits and all integration
+are serialized. Workers share one workspace and must preserve other sessions' changes.
+
+### Model routing
+
+Start each kind of work on the model that is best at that kind of work *in one shot*, not the
+cheapest that might pass. Cost-effective means the least total tokens to *verified* completion,
+counting missed requirements, retries, audits, and repairs — not the price of one attempt.
+
+- Coordination, slice boundaries, acceptance calls, integration decisions: strong model.
+- Bounded reading, inventories, mechanical edits, status writing: lighter model.
+- Difficult or high-stakes implementation: strong model.
+- Claude for frontend and Codex for backend are defaults, not rules.
+
+Usage limits override every routing preference. When one hits, record status in the master
+document first, then stop.
+
+### Worker contract
+
+A worker returns a compact `RESULT BLOCK` and nothing else: changed paths, outcome, checks run
+with their results, evidence locations, and unresolved items. Do not relay worker transcripts
+and do not re-summarize the plan; cite section headings instead.
+
+### Completion sequence
+
+Run in this order. Do not start an expensive repository-wide gate while known audit or repair
+work remains.
+
+1. Implement only the assigned slice.
+2. Run the packet's declared acceptance checks and the relevant regression checks.
+3. Fix focused-check failures.
+4. Obtain the cross-family audit when the slice requires one.
+5. Reproduce and repair established findings, rerun affected checks, and obtain independent
+   closure of material findings.
+6. Freeze the audit-cleared candidate on a detached checkout — never review the live tree.
+7. Run the repository-wide gate from the bindings table. It is the one gate; run it once, last.
+8. Close the slice through the mandatory closeout gate (below).
+9. The coordinator reviews the final diff and commits only after acceptance, audit closure, and
+   a passing gate, keeping the master document current in the same commit.
+
+If the final gate exposes a defect, repair it, rerun the affected checks, obtain independent
+review of any material change, and rerun the gate on a new frozen candidate.
+
+Verify a gate by its exit code. A `| tail` pipe reports success when the gate failed.
+
+### Mandatory closeout gate
+
+Every worker slice finishes through the closeout gate named in the bindings. It runs the
+declared check and retains only this slice's bounded evidence, then persists `PASS` or an
+actionable list of what is left. Where a repository has no such tool, the coordinator records
+`PASS` or the leftover list in the slice packet itself before the slice can close.
+
+Audit meaningful behavior changes and high-stakes slices before integration. Tiny mechanical
+slices may share one audit at a coherent capability boundary, but every slice still gets focused
+checks and a diff review.
+
+### Findings and escalation
+
+Require the auditor to separate established defects, verification gaps, and optional
+improvements. Convert every material finding into a builder checklist item carrying evidence, an
+acceptance test or reproduction, a state invariant where relevant, and a named symbol or file
+search covering every other use of an affected symbol. Close each item with a fix plus evidence,
+or an explicit supported disposition. Do not expand scope to satisfy speculative suggestions.
+
+If repairs reveal skipped files, omitted verification, or early stopping, raise effort one notch
+on the same model. If they reveal a structural blind spot, change model or builder family.
+Change one variable at a time, and keep the auditor independent of whoever implements the repair.
+
+The owner decides product scope. Engineering questions are yours to decide and act on, including
+which of two routes reaches a fixed product goal. Where a countable target cannot be met by the
+target repository, the answer is a sourcing requirement added to the plan, stated plainly —
+never a reduced request.
+
+### Verify the outcome, not the call
+
+A test that asserts an argument was passed proves nothing about the process that ran. Assert the
+observable outcome.
+
+### Closeout
+
+Before reporting a slice finished:
+
+1. Run the closeout gate from the bindings for the slice, and record `PASS` or the leftover.
+2. Run the hygiene command from the bindings. Commit or delete every untracked path it lists in
+   your own worktree, and report each path by name. Never leave a committed file beside an
+   untracked twin. "Clean" is not a report.
+3. Coordinator reviews the final diff and commits, master document updated in the same commit.
+
+## Ending a session
+
+1. Run the closeout above, including the hygiene command from the bindings.
+2. Rewrite the master document's `## START HERE` block **in place**, 15 lines maximum, pointers
+   only: current slice and its packet path, blocked-on, next dependency-ready slice, last
+   decision, repository root, and the master document's own path.
+3. Append everything narrative to `## Progress log`. Never rewrite a completed dated section —
+   those are append-only history.
+4. If a detailed spec has to live in its own file, leave a breadcrumb both ways: the master
+   stays the single source of truth for status and decisions, the spec is design only, and the
+   spec's top block redirects here.
+5. Print the full path to the master document and to the repository root, then stop.
+
+<!-- END PORTABLE PROTOCOL -->

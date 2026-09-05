@@ -1,18 +1,56 @@
 # Content Studio master status
 
-## START HERE — next session (updated 2026-09-05)
+## START HERE
 
-**Repo to work in:** `/Users/Muxin/Documents/GitHub/content-agents`, branch `main`.
-**This doc:** `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
-Continue in a fresh feature worktree based on local `main`, not an old slice worktree.
+- Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
+- This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
+- Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
+- Current slice: none in flight — item 5a landed and was accepted 2026-09-05
+- Slice packet: `docs/operations/launch-slices/SLICE-5B.md` — not written yet; write it before delegating
+- Blocked on: none
+- Next dependency-ready: `5B` — port the existing `validate` gates into configured Content generation
+- Last decision: 2026-09-05 — adopt the portable slice protocol; workers get one packet, never this document
+- Repository state: `main` level with `origin/main`, clean tree, no open PRs, no slice worktree in flight
+- Design spec for 5B: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
+- Standing constraints: see `## Standing constraints` below before delegating anything
+- Do not read past this block unless the slice packet cites a heading. Everything under
+  `## Progress log` is append-only archive, not a second status source.
 
-**This doc is the single source of truth for status + decisions.** Use
-`docs/content-room-alignment-plan.md` only as the detailed design/reference specification for
-room-model item 5; its top block redirects back here. Update this file whenever a slice lands,
-is deferred, or its verification/audit decision changes.
+## Standing constraints
 
-**Read only this section to start.** Everything below it is history and reference; open a named
-section only when this one cites it.
+These bind every slice and every worker here. They are product and safety rules, not engineering
+taste, and they are restated in full in `AGENTS.md` → `## Slice protocol` → Repo bindings so a
+worker holding only that section and its packet still has them.
+
+- **Extraction-first.** Never compose new claims, arguments, or worldview statements in Muxin's
+  voice. Text and image derivatives quote and trim verbatim and carry `source_lines`. The scoped
+  exceptions (Content Studio treatments, common hook templates, video scripts, Build 3 Venture,
+  Build 4 Charles) are enumerated in the root `CLAUDE.md` and never widen.
+- **Nothing publishes without Muxin's review** in `review-queue.md`. Committing generated content
+  is not publishing.
+- **Voice:** `config/voice.yaml` governs every word a human will read. No em dashes, no AI tells.
+- **Cost:** prefer subscription and free routes; every paid call is opt-in and logged to
+  `data/cost-log.csv`.
+- **Board writes go through `prose_kanban` only** — never edit `docs/content-agents-backlog.md`
+  as text.
+
+## Progress log
+
+Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — protocol migration
+
+Adopted the portable slice protocol. `AGENTS.md` gained `## Slice protocol` (with this
+repository's bindings) and `## Ending a session`; `docs/operations/launch-slices/` was created
+with `SLICE-TEMPLATE.md`; this block was cut to pointers and the previous handoff narrative moved
+below. The short start and end session prompts now resolve. Closeout for the session that
+preceded this one: five previously local-only commits pushed to `origin/main`, the 2026-09-05
+notes-spread ledger rows committed, three stale `/private/tmp` worktrees for already-merged work
+removed along with the merged branch `feat/content-routing-gate-5a`, and a fresh unsandboxed
+`npm run check` passing at 4,158/4,158 tests across 484 suites. Five pre-existing local-only
+`agent/*` branches still carry unpushed work and remain untouched pending Muxin's call.
+
+### 2026-09-05 — handoff #10: item 5a landed, item 5b next
 
 > ### ▶ NEXT ACTION (2026-09-05 handoff #10) — Lane-C item 5b: port validation
 > Work from `main` in a fresh feature worktree. Lane A is fully merged: **P1 #442**, **P2 #455
