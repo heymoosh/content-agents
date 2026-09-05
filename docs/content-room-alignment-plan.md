@@ -3,8 +3,9 @@
 > **Design/reference only — status and decisions live in**
 > [`docs/content-studio-master-status.md`](content-studio-master-status.md). **Do not use this
 > document's historical “approved”, “done”, PR, or sequencing prose as current status.** The next
-> build is master-plan handoff #8: Lane-C item 5a, the platform-routing-gate port. Read §5 and
-> §Dependencies and running order here only after reading that handoff.
+> action is always in the master's **START HERE** section. Read §5 and
+> §Dependencies and running order here only when that handoff directs you to them. Do not maintain
+> a second current-slice pointer in this design specification.
 
 Written 2026-09-02 after tracing what the Studio, Content, Fiction, Charles and Venture rooms
 actually do. Muxin's stated model:

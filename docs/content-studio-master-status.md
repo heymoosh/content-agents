@@ -4,8 +4,7 @@
 
 **Repo to work in:** `/Users/Muxin/Documents/GitHub/content-agents`, branch `main`.
 **This doc:** `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
-The `content-agents-worktrees/content-studio-master-status-recovery` worktree is merged and
-disposable — do not continue in it.
+Continue in a fresh feature worktree based on local `main`, not an old slice worktree.
 
 **This doc is the single source of truth for status + decisions.** Use
 `docs/content-room-alignment-plan.md` only as the detailed design/reference specification for
@@ -15,7 +14,7 @@ is deferred, or its verification/audit decision changes.
 **Read only this section to start.** Everything below it is history and reference; open a named
 section only when this one cites it.
 
-> ### ▶ NEXT ACTION (2026-09-05 handoff #9) — Lane-C item 5b: port validation
+> ### ▶ NEXT ACTION (2026-09-05 handoff #10) — Lane-C item 5b: port validation
 > Work from `main` in a fresh feature worktree. Lane A is fully merged: **P1 #442**, **P2 #455
 > (`df02f09`)**, **item 1 #456 (`608f335`)**, and **item 2 #457 (`e53c6d3`)**. Decision 11's
 > per-room queues (slices 1.5/2/3) are also complete. There are no open PRs.
@@ -48,6 +47,25 @@ section only when this one cites it.
 > One existing routing file refuses an unsupported confidence value; this is recorded P2
 > strictness, not permission to silently weaken routing or rewrite operational content.
 >
+> **Exit state:** item 5b has not started. Implementation `6a02b27` and evidence/handoff `571f39c`
+> are on local `main`, not pushed. The routing-gate feature worktree and branch were removed after
+> landing; committed evidence is under `docs/evidence/content-routing-gate-2026-09-04/`.
+> Do not rerun item 5a's exhausted canary or push merely to obtain CI. Set a fresh, explicit
+> verification budget for item 5b before starting it. No new product decision is needed to begin.
+>
+> **Handoff hygiene:** the requested root rescue ran on 2026-09-05 and preserved an unrelated
+> tracked modification to `data/notes-spread-ledger.jsonl` in `refs/wip/content-agents`
+> (`9eb4582`). Leave that working-tree change intact; it is not part of this slice. No untracked
+> paths were listed. Five pre-existing local-only agent branches remain untouched (names under
+> “Prior-slice handoff details” below). Primary checkout stays on `main`.
+> This documentation-only handoff also passed a fresh root `npm run check`: typecheck and
+> 4,158/4,158 tests, 484 suites, zero failures/skips (2026-09-05; exit 0), plus `git diff --check`.
+
+### Prior-slice handoff details — history/reference only
+
+The current next action and delivery state are in START HERE above. The following records explain
+completed work; they are not instructions to reopen it.
+
 > 0. **~~Build P2 — editor registry + un-fuse editor from provenance (decision 10b2)~~ — DONE, merged as
 >    PR #455 (`df02f09`).** `CONTENT_EDITORS` registry keyed by
 >    `request.origin` (studio/fiction/charles/venture, each its own prompt + voice rubric + `editor_pass`
@@ -139,10 +157,8 @@ section only when this one cites it.
 > lives in a `<script>` template literal so regex backslashes MUST be doubled (`\\s`), enforced by
 > `page.test.ts`; Fiction route tests MUST set `CONTENT_AGENTS_HOME` or they write the real inbox.
 >
-> **Handoff hygiene (2026-09-05, handoff #9):** run `bash scripts/repo-hygiene.sh --rescue`
-> from the repo root after recording this update. Commit every real status/evidence change and never
-> leave an untracked twin beside a committed artifact. `scripts/repo-hygiene.sh --rescue` previously
-> listed the same 5 stale local-only agent branches from
+> **Historical branch inventory, rechecked at handoff #10 (2026-09-05):** the rescue script listed
+> the same 5 pre-existing local-only agent branches from
 > 2026-08-24→27 (`agent/cs2-jobs-outreach-charles-extract`, `agent/cs2-page-room-pure-helpers`,
 > `agent/cs2-serve-walled-room-routes`, `agent/cs3-studio-durable-handoff`,
 > `agent/cs6-parallel-safe-ui-completion`) — prior-session work, unclassified, left untouched; verify
