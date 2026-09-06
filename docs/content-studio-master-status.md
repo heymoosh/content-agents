@@ -12,15 +12,15 @@
   `44eb355` (4185/485/0), 5E `df26d30`, 5D `b8eea12`, 5C, 5B. 5G was declined and reverted.
 - Blocked on: nothing. Pick the next dependency-ready slice below.
 - Next dependency-ready, all independent:
-  (a) **Studio cards cannot publish** — found during 5H, its own slice. A configured card row keeps
-  `platform: "linkedin"`/`"x"`, but `publish:cards` selects only `quote-card` platforms
-  (`src/publish/cards.ts:78`), so a card generated in the Content room never reaches the card
-  publisher. 5H made the card's copy correct; this makes it shippable. **Highest value of the three
-  — without it the Content room cannot deliver a card at all.**
-  (b) **one card image shared across platforms** — also found during 5H. Configured generation
-  renders a SEPARATE image per platform (output path keyed per variant id) instead of `/atomize`'s
-  one-image-fanned-out model. Cost and visual-consistency, not correctness.
-  (c) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a `posts.*` column from 5F's
+  (a) **one card image per platform instead of one shared** — found during 5H. Configured
+  generation stages and renders a SEPARATE image per card variant (`media-stages/<variant id>.json`,
+  `configuredMediaStage`), so a request targeting LinkedIn and X renders the card twice. Because
+  `configuredCardQuote` is deterministic on the approved source and the shared `quote-card`
+  char limit, both renders normally paint the SAME quote — duplicate cost and a duplicate render
+  path for one artifact, not two different cards. `/atomize` already does the right thing: ONE image,
+  fanned out to per-platform rows. Muxin flagged this directly (2026-09-05): "Don't we just build 1
+  image and put it across different places?" **Highest value of the two.**
+  (b) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a `posts.*` column from 5F's
   Placed-log marker and `grade-bets.ts` to key on it (the confirm half; judgment-touching, scope
   after Muxin sees 5F rows).
   Also open, gated on Muxin connecting accounts rather than on any decision: **Charles and Fiction
@@ -28,10 +28,22 @@
 - **§5 is CLOSED** (2026-09-05, SLICE-5H). Five capabilities ported, three declined — the
   scoring/soft gate, the home-brand thread-check, and the strategy-brief directives — and
   quote-card post text shipped. **Item `3b`** (retire `/cycle`'s drafting step) is therefore
-  unblocked; it takes the stronger verification because it removes a drafting path. Weigh whether it
-  should wait on (a): until Studio cards can publish, `/atomize` is still the only path that ships a
-  card. Item `3a` has been DONE since 2026-09-02 (`/cycle` SKILL.md carries its "Retired steps"
-  section).
+  unblocked; it takes the stronger verification because it removes a drafting path. It does NOT need
+  to wait on (a) — see the correction below: a Content-room card already has a working publish route.
+  Item `3a` has been DONE since 2026-09-02 (`/cycle` SKILL.md carries its "Retired steps" section).
+- **CORRECTION (2026-09-05), retracting a claim this block carried for one revision:** it said a
+  Content-room card "cannot publish at all" because `publish:cards` selects only `quote-card`
+  platforms (`src/publish/cards.ts:78`). **That was wrong, and `cards.ts` was the wrong file to
+  reason from.** Configured-media rows never route to `publishCards` OR to `publishText`:
+  `scheduleKind` (`src/review/studio-scheduling.ts:64`) tests `isConfiguredMediaRow` BEFORE the
+  `TEXT_PLATFORMS` check and returns kind `"media"`, whose only delivery route is **Postiz**
+  (`studio-scheduling.ts:460` — "media rows are Postiz-only"). Postiz credentials have been in the
+  main-checkout `.env` since 2026-09-02, so the route is live. What IS true is narrower: a
+  configured card cannot go through Typefully, and the older `publish:cards` path skips it by
+  design. **Process note:** the false claim came from reading one selector in `cards.ts` and
+  stopping, without asking what else selects that row — the same "read the list, not the code path"
+  failure logged one entry below about the §5 archaeology table. Before filing a "cannot X" finding,
+  trace the dispatcher, not one candidate handler.
 - Last decision: 2026-09-05 — **Charles will auto-post** (reversing `/charles` never-posts) and
   **strategy-brief directives declined**. See the Progress log entry of the same date for both.
   Before that, 2026-09-05 — **scoring/soft gate declined outright** (SLICE-5G): almost nothing
