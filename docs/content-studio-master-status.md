@@ -5,20 +5,22 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight. Last resolved: **SLICE-5I and SLICE-5J both ACCEPTED**
-  (2026-09-05), built and audited in parallel on provably disjoint files. 5I: two Content-page rows
-  off one approved quote definition now share a single render, keyed on the definition rather than
-  the stage id. 5J: a Content-page image row for x/linkedin/bluesky reaches Postiz first and falls
-  back to a native Typefully image draft when Postiz provably created nothing. One gate for both:
-  **4236/487/0**.
-- Last accepted packet: `docs/operations/launch-slices/SLICE-5J.md` and `SLICE-5I.md` (both carry a
-  RESULT BLOCK). Prior: 5H, 5F `44eb355` (4185/485/0), 5E `df26d30`, 5D `b8eea12`, 5C, 5B. 5G was
-  declined and reverted.
+- Current slice: none in flight. Last resolved: **SLICE-5K ACCEPTED** (2026-09-06). The Postiz path
+  is now the sixth `checkReuse` caller: a row the reuse guard refuses is not created on Postiz,
+  claims no slot, is not marked published, and — the part that mattered — does not fall through to
+  SLICE-5J's Typefully backup route. A guard block means do not place this row anywhere, not try
+  the other provider. Gate **4248/488/0**. Cross-family audit returned **zero established defects**;
+  one repair cycle, test-only.
+- Last accepted packet: `docs/operations/launch-slices/SLICE-5K.md` (carries a RESULT BLOCK with the
+  audit adjudication and one leftover that item (c) below must honour). Prior: 5J and 5I
+  (2026-09-05, parallel, 4236/487/0), 5H, 5F `44eb355` (4185/485/0), 5E `df26d30`, 5D `b8eea12`,
+  5C, 5B. 5G was declined and reverted.
 - **NOT PUSHED.** Muxin, 2026-09-05: "No pushing till this thing works." Local `main` is ahead of
   `origin/main` by design. Do not push until she says the system works.
 - Blocked on: nothing. Pick the next dependency-ready slice below.
 - Next dependency-ready, all independent:
-  (0) **the Postiz path never consults the reuse guard** — found during 5J, the highest-value item
+  (0) **DONE — SLICE-5K, accepted 2026-09-06.** Kept here for the reasoning. **The Postiz path never
+  consulted the reuse guard** — found during 5J, the highest-value item
   here because it is a correctness hole in a guard Muxin will assume is protecting her. Five
   publishers (`typefully`, `cards`, `tiktok`, `youtube`, `substack`) call `checkReuse` before
   creating. Postiz does not. The only `checkReuse` in `studio-scheduling.ts` is at line 459, inside
@@ -27,9 +29,8 @@
   it. Proved empirically during 5J: with the guard answering "not allowed," Postiz posts anyway.
   What prevents a duplicate today is only `setStatus(…, "published")` taking the row out of
   `approve`, so it needs a deliberate re-approval after a completed placement. Pre-existing and
-  affecting all six row kinds routed to Postiz; 5J newly makes media rows a two-route case. Scope
-  it as SLICE-5K: make the Postiz path consult the guard like the other five do. Kept out of 5J
-  because it changes behavior for every Postiz row and needs its own audit.
+  affecting all six row kinds routed to Postiz; 5J newly makes media rows a two-route case. Scoped
+  as SLICE-5K and accepted; read `SLICE-5K.md` → `## RESULT BLOCK` before touching that path again.
   (a) **DONE — SLICE-5I, accepted 2026-09-05.** Kept here for the reasoning; the decision record
   matters more than the item. **one card image per platform instead of one shared** — found during 5H. Configured
   generation stages and renders a SEPARATE image per card variant (`media-stages/<variant id>.json`,
@@ -50,8 +51,33 @@
   (b) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a `posts.*` column from 5F's
   Placed-log marker and `grade-bets.ts` to key on it (the confirm half; judgment-touching, scope
   after Muxin sees 5F rows).
-  Also open, gated on Muxin connecting accounts rather than on any decision: **Charles and Fiction
-  provider delivery** (see Last decision).
+  (c) **Substack posting through our own script** — DECIDED 2026-09-06, deferred by Muxin, do not
+  build yet. This **supersedes** the earlier "Charles and Fiction provider delivery, gated on Muxin
+  connecting accounts" item. Both Charles and Fiction publish to Substack. Typefully does not
+  support Substack as a destination, and the routes that might would cost Muxin a second paid
+  account. Her decision, verbatim in substance: rather than pay for another account, reuse the
+  approach the existing Substack **analytics pull** already uses — the saved-session real-Chrome
+  agent against the Substack dashboard — and build the mirror of it for **posting**. Root
+  `CLAUDE.md` rule 3 already sanctions exactly this shape: "Where no usable API exists (e.g.
+  Substack), a constrained browser agent MAY post, but only on content Muxin has approved." So this
+  is not a new exception, it is the sanctioned path. Rule 2 still governs — only `approve` rows
+  ship, nothing auto-posts unreviewed.
+  **Open questions to settle when this is scoped, not now:** `src/publish/substack.ts` already
+  exists and is one of the five publishers that calls `checkReuse` — establish what it actually does
+  today before designing anything, rather than assuming it is or is not a working poster (this
+  block has been wrong three times by reading one file and stopping). Also unsettled: whether the
+  pull agent's saved session can be reused for writes or needs its own, and whether Charles and
+  Fiction post to one publication or two.
+  **Carried debt this item must pay (from SLICE-5K, 2026-09-06):** the Postiz pre-flight reuse
+  check calls `checkReuse(slug, platform)` without a `brandId`, deliberately matching
+  `runPublisher`'s recovery call so the two cannot drift. That is provably harmless *today* only
+  because `src/publish/delivery-policy.ts` makes `mode: "provider"` reachable for
+  `human-inference` alone (line 43) — charles is hard-coded to `manual` (line 34), fiction to
+  `blocked` (line 37) — and `human-inference` is `checkReuse`'s default brand. **Giving Charles a
+  provider route breaks that equivalence.** Pass the brand at BOTH call sites in the same change,
+  or the guard will silently check Charles's rows under the Human Inference brand.
+  **Muxin's stated priority, 2026-09-06: get Human Inference posting live first.** This item waits
+  behind that. Do not start it until she says so.
 - **§5 is CLOSED** (2026-09-05, SLICE-5H). Five capabilities ported, three declined — the
   scoring/soft gate, the home-brand thread-check, and the strategy-brief directives — and
   quote-card post text shipped. **Item `3b`** (retire `/cycle`'s drafting step) is therefore
@@ -92,7 +118,12 @@
   stopping, without asking what else selects that row — the same "read the list, not the code path"
   failure logged one entry below about the §5 archaeology table. Before filing a "cannot X" finding,
   trace the dispatcher, not one candidate handler.
-- Last decision: 2026-09-05 — **Charles will auto-post** (reversing `/charles` never-posts) and
+- Last decision: 2026-09-06 — **Substack posting gets its own script, modelled on the existing
+  Substack analytics pull; deferred behind getting Human Inference posting live.** See item (c)
+  above. It replaces the assumption that Charles and Fiction delivery was waiting on Muxin
+  connecting a provider account: the real blocker is that their destination is Substack, which the
+  connected providers do not reach without a second paid account she does not want to buy.
+  Before that, 2026-09-05 — **Charles will auto-post** (reversing `/charles` never-posts) and
   **strategy-brief directives declined**. See the Progress log entry of the same date for both.
   Before that, 2026-09-05 — **scoring/soft gate declined outright** (SLICE-5G): almost nothing
   reads the scores, the signal was never validated against engagement, and the port cost a model

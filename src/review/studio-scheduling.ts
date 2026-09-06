@@ -414,6 +414,32 @@ function reuseGuardPlatform(kind: ScheduleKind, row: QueueRow): string | null {
   }
 }
 
+/** Wording for a guard skip whose reason this process cannot re-derive (no keyed platform, or the
+ *  guard now answers "allowed" — i.e. the publisher skipped the row for some other reason). */
+const REUSE_GUARD_UNSPECIFIED = "not scheduled: blocked by the reuse guard (check the server log for the reason)";
+
+/**
+ * The reuse guard's verdict for ONE row, as the `scheduleError` string it should come back with, or
+ * null when placement is allowed (or when no guard key exists for the kind — outreach-lock).
+ *
+ * One function serves both callers on purpose: the Postiz PRE-FLIGHT in scheduleApproved (which must
+ * refuse before anything is claimed or created) and runPublisher's after-the-fact recovery (which
+ * explains a publisher that already skipped silently). Keying and wording therefore cannot drift
+ * into two versions, and the Content page reads one message however the refusal was reached.
+ */
+function reuseGuardBlock(folder: string, kind: ScheduleKind, row: QueueRow): string | null {
+  const platform = reuseGuardPlatform(kind, row);
+  if (!platform) return null;
+  const reuse = checkReuse(basename(folder), platform);
+  if (reuse.allowed) return null;
+  // Machine-parseable shape: reconcile.ts's reuseGuardEligibility re-derives "eligible again in N
+  // days" from this exact string, read back off the row's own notes days later with no fs/network
+  // call of its own. Do not reword it without updating that reader.
+  return reuse.lastPlacedAt !== undefined && reuse.minDays !== undefined
+    ? `blocked by reuse guard, last placed to ${platform} ${reuse.lastPlacedAt} (min_reuse_days: ${reuse.minDays})`
+    : REUSE_GUARD_UNSPECIFIED;
+}
+
 type ScheduleOutcome = { scheduled: unknown; scheduleError: string | null };
 type FolderPublisher = (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
 
@@ -452,22 +478,12 @@ async function runPublisher(
   try {
     const done = await fn(folder, { onlyIds: [row.id], ...(deliveryPolicy ? { deliveryPolicy } : {}) });
     if (done.length === 0) {
-      // The publisher didn't throw, so recompute the check it silently skipped on to find out WHY —
-      // when it's the reuse guard, persist a machine-parseable reason (reconcile.ts's
-      // reuseGuardEligibility below re-derives "eligible again in N days" from this same shape,
-      // reading it back off the row's own notes, days later, with no fs/network call of its own).
-      const platform = reuseGuardPlatform(kind, row);
-      const reuse = platform ? checkReuse(basename(folder), platform) : { allowed: true };
-      if (!reuse.allowed && reuse.lastPlacedAt !== undefined && reuse.minDays !== undefined) {
-        return {
-          scheduled: null,
-          scheduleError: `blocked by reuse guard, last placed to ${platform} ${reuse.lastPlacedAt} (min_reuse_days: ${reuse.minDays})`,
-        };
-      }
-      return {
-        scheduled: null,
-        scheduleError: "not scheduled: blocked by the reuse guard (check the server log for the reason)",
-      };
+      // The publisher didn't throw, so recompute the check it silently skipped on to find out WHY.
+      // Still reached for every non-Postiz route (and for the Postiz media row that falls back to
+      // publishCards): those publishers own their own guard call, so this branch is the only thing
+      // that turns their silent skip into a reason. The Postiz pre-flight below does NOT make it
+      // dead — a publisher can return [] for reasons the guard knows nothing about.
+      return { scheduled: null, scheduleError: reuseGuardBlock(folder, kind, row) ?? REUSE_GUARD_UNSPECIFIED };
     }
     return { scheduled: done[0], scheduleError: null };
   } catch (e) {
@@ -543,6 +559,21 @@ export async function scheduleApproved(
     if (policy.mode === "manual") return { scheduled: writeReadyToPaste(folder, row, policy), scheduleError: null };
     if (!policy.providerAccountId) return { scheduled: null, scheduleError: "delivery policy blocked: provider account mapping is missing" };
     if (provider === "postiz") {
+      // PRE-FLIGHT reuse guard — Postiz is the sixth caller. typefully.ts, cards.ts, tiktok.ts,
+      // youtube.ts and substack.ts each ask the guard before they create anything; the Postiz path
+      // asked nobody, so an approved row inside its reuse window was placed anyway (what kept a
+      // duplicate off the wire was only setStatus taking a placed row out of `approve`).
+      //
+      // It sits HERE, at the top of the one branch every Postiz row passes through, for two reasons:
+      //   - before defaultPublishPostiz, so no slot is claimed and data/publish-schedule.jsonl is
+      //     untouched for a row that will not ship;
+      //   - before the try/catch below, so a refusal can never be mistaken for SLICE-5J's
+      //     "Postiz provably created nothing" and re-sent down the Typefully backup route. A guard
+      //     block means do not place this row ANYWHERE, not try the other provider.
+      // Non-Postiz routes are deliberately not gated here: their own publishers already check, and a
+      // second check would be exactly the double-gating this dispatch must not add.
+      const reuseBlock = reuseGuardBlock(folder, kind, row);
+      if (reuseBlock) return { scheduled: null, scheduleError: reuseBlock };
       const capability = selected.postizCapability;
       if (!capability) return { scheduled: null, scheduleError: "configured Postiz capability was not retained for scheduling" };
       try {
