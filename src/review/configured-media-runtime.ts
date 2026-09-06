@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -7,7 +7,7 @@ import { getImage } from "../providers/registry.js";
 import { burnCaptions, renderAudiogram } from "../video/burn-captions.js";
 import { logCost } from "../util/cost-log.js";
 import { tryAcquireFileLease } from "../runtime/file-lock.js";
-import { configuredCardQuoteDerivative, isConfiguredCardMedia } from "./configured-media.js";
+import { configuredCardImagePath, configuredCardQuoteDerivative, configuredCardRenderDerivative, configuredCardSourceLine, isConfiguredCardMedia, isConfiguredCardRenderName } from "./configured-media.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 
 export interface PersistedConfiguredMediaStage {
@@ -18,6 +18,12 @@ export interface PersistedConfiguredMediaStage {
   stage: string;
   plan: unknown;
   primitives: string[];
+  /**
+   * For card media, the definition file the renderer reads. Content-addressed since SLICE-5I, so
+   * several variants of one request share it; absent on a stage written before it existed, which
+   * falls back to the per-variant `<id>-quote` name.
+   */
+  quoteDerivativePath?: string;
   sourcePaths?: string[];
   approval?: { approvedAt: string; digest: string };
   rendered?: {
@@ -42,26 +48,63 @@ export type ConfiguredMediaRenderer = (
 ) => Promise<ConfiguredMediaRenderResult>;
 
 type ConfiguredMediaPromoter = (folder: string, id: string, update: { asset: string; notes: string }) => boolean;
-const configuredMediaStageLanes = new Map<string, Promise<void>>();
+const configuredMediaLanes = new Map<string, Promise<void>>();
 
-async function withConfiguredMediaStageLane<T>(folder: string, id: string, task: () => Promise<T>): Promise<T> {
-  stagePath(folder, id); // validates id before it participates in either an in-memory or filesystem lock path
-  const key = `${resolve(folder)}\0${id}`;
-  const previous = configuredMediaStageLanes.get(key) ?? Promise.resolve();
+/**
+ * One critical section: an in-process queue so concurrent callers take turns, plus a filesystem
+ * lease so a second process fails closed rather than interleaving. Keyed by an arbitrary name
+ * because a card render is shared by several stages and therefore cannot be guarded by a stage id.
+ */
+async function withConfiguredMediaLane<T>(
+  folder: string,
+  key: string,
+  lockPath: string,
+  contention: string,
+  task: () => Promise<T>,
+): Promise<T> {
+  const laneKey = `${resolve(folder)}\0${key}`;
+  const previous = configuredMediaLanes.get(laneKey) ?? Promise.resolve();
   let release!: () => void;
   const turn = new Promise<void>((resolveTurn) => { release = resolveTurn; });
   const tail = previous.catch(() => undefined).then(() => turn);
-  configuredMediaStageLanes.set(key, tail);
+  configuredMediaLanes.set(laneKey, tail);
   await previous.catch(() => undefined);
-  const lease = tryAcquireFileLease(join(folder, "media-stages", ".locks", `${id}.execute.lock`), { staleMs: 30 * 60_000 });
+  const lease = tryAcquireFileLease(lockPath, { staleMs: 30 * 60_000 });
   try {
-    if (!lease) throw new Error(`configured media stage ${id} is already executing in another process`);
+    if (!lease) throw new Error(contention);
     return await task();
   } finally {
     lease?.release();
     release();
-    if (configuredMediaStageLanes.get(key) === tail) configuredMediaStageLanes.delete(key);
+    if (configuredMediaLanes.get(laneKey) === tail) configuredMediaLanes.delete(laneKey);
   }
+}
+
+async function withConfiguredMediaStageLane<T>(folder: string, id: string, task: () => Promise<T>): Promise<T> {
+  stagePath(folder, id); // validates id before it participates in either an in-memory or filesystem lock path
+  return withConfiguredMediaLane(
+    folder, `stage\0${id}`,
+    join(folder, "media-stages", ".locks", `${id}.execute.lock`),
+    `configured media stage ${id} is already executing in another process`,
+    task,
+  );
+}
+
+/**
+ * The lane a shared card render runs in. Keyed on the RENDER name, not on a stage id: two variants
+ * of one request resolve to the same render and would otherwise hold two distinct leases, so both
+ * could see the outputs missing and spawn renderers writing the same files, or one could reuse
+ * files the other was still writing. Always taken inside the stage lane, never the reverse, so two
+ * variants sharing a render can never deadlock on each other.
+ */
+async function withConfiguredCardRenderLane<T>(folder: string, renderName: string, task: () => Promise<T>): Promise<T> {
+  if (!/^[\w.-]+$/.test(renderName)) throw new Error("bad configured card render name");
+  return withConfiguredMediaLane(
+    folder, `render\0${renderName}`,
+    join(folder, "media-stages", ".locks", `${renderName}.render.lock`),
+    `configured card render ${renderName} is already running in another process`,
+    task,
+  );
 }
 
 function stagePath(folder: string, id: string): string {
@@ -86,8 +129,20 @@ export function approveConfiguredMediaStage(folder: string, id: string): Persist
   return approved;
 }
 
-function stageDigest(stage: Pick<PersistedConfiguredMediaStage, "id" | "media" | "stage" | "plan" | "primitives" | "sourcePaths">): string {
-  return createHash("sha256").update(JSON.stringify({ id: stage.id, media: stage.media, stage: stage.stage, plan: stage.plan, primitives: stage.primitives, sourcePaths: stage.sourcePaths ?? [] })).digest("hex");
+/**
+ * The approval digest. `quoteDerivativePath` is covered ONLY when the stage records it: the plan
+ * digest binds the quote TEXT, but a definition file also carries the `scheme:` that picks the
+ * palette, so repointing an approved stage at a different definition holding the same words would
+ * otherwise repaint it in an unapproved treatment with no renewed approval. Omitting the key when
+ * the field is absent keeps a stage written before it existed hashing byte-for-byte as it did, so
+ * no live approval is invalidated by adding this.
+ */
+function stageDigest(stage: Pick<PersistedConfiguredMediaStage, "id" | "media" | "stage" | "plan" | "primitives" | "sourcePaths" | "quoteDerivativePath">): string {
+  return createHash("sha256").update(JSON.stringify({
+    id: stage.id, media: stage.media, stage: stage.stage, plan: stage.plan,
+    primitives: stage.primitives, sourcePaths: stage.sourcePaths ?? [],
+    ...(stage.quoteDerivativePath !== undefined ? { quoteDerivativePath: stage.quoteDerivativePath } : {}),
+  })).digest("hex");
 }
 
 function verifiedRelativeAsset(folder: string, relative: string): string {
@@ -301,31 +356,51 @@ async function attachReviewedConfiguredMediaFilesUnlocked(
 /**
  * The exact still-render invocation for a configured card, and the assets it produces.
  *
- * The card is drawn from `derivatives/<id>-quote.md` (the short verbatim quote), not from
+ * The card is drawn from the quote definition derivative (the short verbatim quote), not from
  * `derivatives/<id>.md` (the post text that frames it). renderStill names its PNG and MP4 after the
- * derivative it is handed, so pointing it at the quote companion also moves the rendered card to
- * `images/<id>-quote.png`/`.mp4`, the same name `buildConfiguredMediaOutputs` records as the
- * stage's `outputPath`. Exported so the argv and the asset names are checked as values.
+ * derivative it is handed, so the definition's name IS the render's name — the same name
+ * `buildConfiguredMediaOutputs` records as the stage's `outputPath`.
+ *
+ * SLICE-5I: that name comes from the stage's recorded `quoteDerivativePath`, which generation
+ * content-addresses from the render inputs, so several platforms in one request share one
+ * definition and therefore one render. A stage written before that field existed falls back to its
+ * per-variant `<id>-quote` name and keeps rendering on its own. Exported so the argv and the asset
+ * names are checked as values.
  */
 export function configuredQuoteCardRender(
-  stage: Pick<PersistedConfiguredMediaStage, "id" | "media">,
+  stage: Pick<PersistedConfiguredMediaStage, "id" | "media" | "quoteDerivativePath">,
   folder: string,
 ): {
   readonly quoteDerivative: string;
+  readonly quoteName: string;
   readonly command: readonly [string, ...string[]];
   readonly primaryAsset: string;
   readonly assets: readonly string[];
 } {
-  const quoteName = configuredCardQuoteDerivative(stage.id);
-  const still = `images/${quoteName}.png`;
-  const animated = `images/${quoteName}.mp4`;
+  const quoteName = recordedCardQuoteName(stage);
+  const still = configuredCardImagePath("static-quote-card", quoteName);
+  const animated = configuredCardImagePath("animated-quote-card", quoteName);
   const isStill = stage.media === "static-quote-card";
   return {
     quoteDerivative: `derivatives/${quoteName}.md`,
+    quoteName,
     command: ["npm", "run", "render", "--", "--still", folder, "--quote", quoteName],
     primaryAsset: isStill ? still : animated,
     assets: isStill ? [still, animated] : [animated, still],
   };
+}
+
+/**
+ * The definition name recorded on the stage, or the legacy per-variant one. The recorded value ends
+ * up in argv and in a path, so it is constrained to the same shape a stage id is: one plain
+ * `derivatives/<name>.md` segment, never a traversal.
+ */
+function recordedCardQuoteName(stage: Pick<PersistedConfiguredMediaStage, "id" | "quoteDerivativePath">): string {
+  const recorded = stage.quoteDerivativePath;
+  if (recorded === undefined) return configuredCardQuoteDerivative(stage.id);
+  const match = /^derivatives\/([\w.-]+)\.md$/.exec(recorded);
+  if (!match || match[1].includes("..")) throw new Error(`configured card stage records an unsafe quote derivative path: ${recorded}`);
+  return match[1];
 }
 
 /**
@@ -345,10 +420,93 @@ export function assertApprovedCardQuoteOnDisk(
   }
   const path = join(folder, quoteDerivative);
   if (!existsSync(path)) throw new Error(`configured card has no quote derivative to render: ${quoteDerivative}`);
-  const onDisk = splitFrontmatter(readFileSync(path, "utf8")).body.trim();
+  const definition = readFileSync(path, "utf8");
+  const onDisk = splitFrontmatter(definition).body.trim();
   if (onDisk !== approved.trim()) {
     throw new Error(`configured card quote derivative ${quoteDerivative} no longer matches its approved render plan; approve the current quote again`);
   }
+  // A content-addressed render name is self-verifying: recompute the key from the exact bytes the
+  // renderer is about to read, so the name stays an honest claim about the file. That claim is what
+  // makes reusing an existing render safe.
+  //
+  // Gated on the stage RECORDING its definition path, never on the filename looking addressed: a
+  // stage from before that field existed falls back to `<id>-quote`, and an id that happens to read
+  // like a content address would otherwise fail this check for an approved, unchanged quote.
+  if (!configuredCardRenderIsAddressed(stage)) return;
+  const name = basename(quoteDerivative, ".md");
+  if (configuredCardRenderDerivative({ media: stage.media, definition, sourceLine: configuredCardSourceLine(folder) }) !== name) {
+    throw new Error(`configured card render ${quoteDerivative} no longer matches the render inputs its name encodes; regenerate the card`);
+  }
+}
+
+/**
+ * True when the stage's own record binds its render name to the definition's bytes: it names the
+ * definition AND that name is a content address. Only such a render may be shared or reused, because
+ * only then does an existing file of that name provably hold this card. A stage that records the
+ * legacy `<id>-quote` path names a file whose image can outlive a re-approved quote, so it renders
+ * on its own every time, exactly as before.
+ */
+export function configuredCardRenderIsAddressed(stage: Pick<PersistedConfiguredMediaStage, "quoteDerivativePath">): boolean {
+  return stage.quoteDerivativePath !== undefined && isConfiguredCardRenderName(basename(stage.quoteDerivativePath, ".md"));
+}
+
+/**
+ * A card render's completion marker.
+ *
+ * Existence of the output paths is NOT evidence that a render finished: a renderer that dies partway
+ * leaves both expected files present but empty or truncated, and the next variant sharing that name
+ * would reuse the wreckage and promote it. The marker is written only after the renderer returns
+ * without throwing AND every asset is on disk, and it is renamed into place so a reader never sees a
+ * half-written one. A failed render therefore leaves no marker, and the next attempt re-renders.
+ *
+ * Only an ADDRESSED render is marked. A legacy per-variant name is never reused, so a marker under
+ * one would be state nothing ever reads; keeping the marker set to exactly the reusable renders is
+ * what lets its presence mean one thing.
+ */
+const CARD_RENDER_MARKER_VERSION = "configured-card-render-v1";
+
+interface ConfiguredCardRenderTarget {
+  readonly quoteName: string;
+  readonly assets: readonly string[];
+}
+
+function cardRenderMarkerPath(folder: string, renderName: string): string {
+  return join(folder, "media-stages", ".renders", `${renderName}.json`);
+}
+
+function configuredCardRenderIsComplete(folder: string, render: ConfiguredCardRenderTarget): boolean {
+  const marker = cardRenderMarkerPath(folder, render.quoteName);
+  if (!existsSync(marker)) return false;
+  try {
+    const parsed = JSON.parse(readFileSync(marker, "utf8")) as { version?: string; render?: string; assets?: string[] };
+    if (parsed.version !== CARD_RENDER_MARKER_VERSION || parsed.render !== render.quoteName) return false;
+    if (JSON.stringify([...(parsed.assets ?? [])].sort()) !== JSON.stringify([...render.assets].sort())) return false;
+  } catch {
+    return false; // an unreadable marker proves nothing; re-render rather than trust it
+  }
+  return render.assets.every((asset) => existsSync(join(folder, asset)));
+}
+
+/**
+ * A renderer that exits 0 having written nothing is a failure, so every card render proves its
+ * declared assets exist. Kept separate from the marker because this check applies to EVERY render,
+ * while the marker is written only for a render that can actually be reused.
+ */
+function assertConfiguredCardRenderProduced(folder: string, render: ConfiguredCardRenderTarget): void {
+  const missing = render.assets.filter((asset) => !existsSync(join(folder, asset)));
+  if (missing.length) throw new Error(`configured card render produced no verified output: ${missing.join(", ")}`);
+}
+
+function markConfiguredCardRenderComplete(folder: string, render: ConfiguredCardRenderTarget): void {
+  assertConfiguredCardRenderProduced(folder, render);
+  const marker = cardRenderMarkerPath(folder, render.quoteName);
+  mkdirSync(dirname(marker), { recursive: true });
+  const temp = `${marker}.${process.pid}.tmp`;
+  writeFileSync(temp, JSON.stringify({
+    version: CARD_RENDER_MARKER_VERSION, render: render.quoteName,
+    assets: [...render.assets], completedAt: new Date().toISOString(),
+  }, null, 2) + "\n");
+  renameSync(temp, marker);
 }
 
 function wordCaptions(text: string): { text: string; startMs: number; endMs: number }[] {
@@ -361,9 +519,34 @@ export const defaultConfiguredMediaRenderer: ConfiguredMediaRenderer = async (st
   mkdirSync(outDir, { recursive: true });
   if (isConfiguredCardMedia(stage.media)) {
     const render = configuredQuoteCardRender(stage, folder);
-    assertApprovedCardQuoteOnDisk(stage, folder, render.quoteDerivative);
-    const [command, ...args] = render.command;
-    execFileSync(command, args, { stdio: "inherit" });
+    const addressed = configuredCardRenderIsAddressed(stage);
+    // SLICE-5I: validate, decide, render and mark are ONE decision, all inside the render-name lane.
+    //
+    // The quote assertion belongs in here rather than outside: it reads the definition off disk and
+    // the spawned renderer reads it again, so validating outside the lane would leave a window
+    // between the two. Nothing in this repository writes a definition during that window today, but
+    // the guarantee should come from the lane, not from no current caller violating it. It runs on
+    // the reuse path too — a reused render is still only served to a stage whose approved quote
+    // still matches the definition its name encodes.
+    //
+    // The lane also means two variants sharing one render cannot both decide to render, and neither
+    // can read files the other is still writing. Reuse needs the completion marker as well as the
+    // files, so a render that died partway is re-run rather than promoted; a stale marker whose
+    // assets went missing is cleared first.
+    await withConfiguredCardRenderLane(folder, render.quoteName, async () => {
+      assertApprovedCardQuoteOnDisk(stage, folder, render.quoteDerivative);
+      if (addressed && configuredCardRenderIsComplete(folder, render)) return;
+      rmSync(cardRenderMarkerPath(folder, render.quoteName), { force: true });
+      const [command, ...args] = render.command;
+      execFileSync(command, args, { stdio: "inherit" });
+      // Every render must prove it produced its declared assets, addressed or not: a renderer that
+      // exits 0 having written nothing is a failure. Only the MARKER is addressed-only, because only
+      // an addressed render is ever reused — a marker for a legacy name is state nothing reads.
+      assertConfiguredCardRenderProduced(folder, render);
+      if (addressed) markConfiguredCardRenderComplete(folder, render);
+    });
+    // The card renderer is free (local Remotion still + local HyperFrames animation) and logs no
+    // cost row; sharing therefore adds none and removes none.
     return { primaryAsset: render.primaryAsset, assets: [...render.assets], costUsd: 0 };
   }
   if (stage.media === "short-video-script") {

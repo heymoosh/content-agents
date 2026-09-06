@@ -5,14 +5,33 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight. Last resolved: **SLICE-5H ACCEPTED** (2026-09-05) — a configured
-  quote card's on-image quote is now separate from its post text; gate 4204/485/0. **This closes
-  the §5 port.**
-- Last accepted packet: `docs/operations/launch-slices/SLICE-5H.md` (Closeout ACCEPTED). Prior: 5F
-  `44eb355` (4185/485/0), 5E `df26d30`, 5D `b8eea12`, 5C, 5B. 5G was declined and reverted.
+- Current slice: none in flight. Last resolved: **SLICE-5I and SLICE-5J both ACCEPTED**
+  (2026-09-05), built and audited in parallel on provably disjoint files. 5I: two Content-page rows
+  off one approved quote definition now share a single render, keyed on the definition rather than
+  the stage id. 5J: a Content-page image row for x/linkedin/bluesky reaches Postiz first and falls
+  back to a native Typefully image draft when Postiz provably created nothing. One gate for both:
+  **4236/487/0**.
+- Last accepted packet: `docs/operations/launch-slices/SLICE-5J.md` and `SLICE-5I.md` (both carry a
+  RESULT BLOCK). Prior: 5H, 5F `44eb355` (4185/485/0), 5E `df26d30`, 5D `b8eea12`, 5C, 5B. 5G was
+  declined and reverted.
+- **NOT PUSHED.** Muxin, 2026-09-05: "No pushing till this thing works." Local `main` is ahead of
+  `origin/main` by design. Do not push until she says the system works.
 - Blocked on: nothing. Pick the next dependency-ready slice below.
 - Next dependency-ready, all independent:
-  (a) **one card image per platform instead of one shared** — found during 5H. Configured
+  (0) **the Postiz path never consults the reuse guard** — found during 5J, the highest-value item
+  here because it is a correctness hole in a guard Muxin will assume is protecting her. Five
+  publishers (`typefully`, `cards`, `tiktok`, `youtube`, `substack`) call `checkReuse` before
+  creating. Postiz does not. The only `checkReuse` in `studio-scheduling.ts` is at line 459, inside
+  `runPublisher`'s `done.length === 0` branch — reason-recovery for a publisher that already
+  skipped, not a pre-flight gate, and the Postiz path returns from its own catch without reaching
+  it. Proved empirically during 5J: with the guard answering "not allowed," Postiz posts anyway.
+  What prevents a duplicate today is only `setStatus(…, "published")` taking the row out of
+  `approve`, so it needs a deliberate re-approval after a completed placement. Pre-existing and
+  affecting all six row kinds routed to Postiz; 5J newly makes media rows a two-route case. Scope
+  it as SLICE-5K: make the Postiz path consult the guard like the other five do. Kept out of 5J
+  because it changes behavior for every Postiz row and needs its own audit.
+  (a) **DONE — SLICE-5I, accepted 2026-09-05.** Kept here for the reasoning; the decision record
+  matters more than the item. **one card image per platform instead of one shared** — found during 5H. Configured
   generation stages and renders a SEPARATE image per card variant (`media-stages/<variant id>.json`,
   `configuredMediaStage`), so a request targeting LinkedIn and X renders the card twice. Because
   `configuredCardQuote` is deterministic on the approved source and the shared `quote-card`
@@ -46,7 +65,16 @@
   `scheduleKind` (`src/review/studio-scheduling.ts:64`) tests `isConfiguredMediaRow` BEFORE the
   `TEXT_PLATFORMS` check and returns kind `"media"`, whose only delivery route is **Postiz**
   (`studio-scheduling.ts:460` — "media rows are Postiz-only"). Postiz credentials have been in the
-  main-checkout `.env` since 2026-09-02, so the route is live. What IS true is narrower: a
+  main-checkout `.env` since 2026-09-02, so the route is live.
+  **SECOND CORRECTION (2026-09-05, found while building 5J): "the route is live" was also wrong.**
+  Configured-media rows were not reaching Postiz *at all* in production. A media row's
+  `provisionalProvider` is `"manual"`, `decideDeliveryPolicy(human-inference, "manual")` returns
+  `mode: "manual"`, and `scheduleApproved` wrote ready-to-paste and returned **before** Postiz
+  discovery ever ran. So Muxin's reported symptom — "Typefully got stripped out" — was really
+  "the Content page had no working scheduled route for cards by either provider." SLICE-5J restores
+  both. The lesson is the same one logged below, one level deeper: a dispatch table naming a route
+  is not evidence the route is reached. **Follow the value, not the table.**
+  What IS true is narrower: a
   configured card cannot go through Typefully, and the older `publish:cards` path skips it by
   design. That narrower fact is **a real gap, not just a design choice** (raised by Muxin,
   2026-09-05, who read Typefully as the standing backup — she is right that it is): §"universal

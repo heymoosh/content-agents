@@ -4,7 +4,7 @@ import { join, isAbsolute, basename } from "node:path";
 import { pathToFileURL } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
+import { readQueue, setStatus, appendPublishLog, appendBetPlacement, type QueueRow } from "./queue.js";
 import {
   loadCtaConfig,
   loadCanonicalUrl,
@@ -76,9 +76,56 @@ export function cardCopy(folder: string, rowId: string): { text: string; fm: Rec
 // of keeping its own independently-maintained copy that could drift out of sync with this one.
 export const isQuoteCardRow = (platform: string): boolean => basePlatform(platform) === "quote-card";
 
-function approvedCards(folder: string) {
+// The asset shape only jobs.ts's configured-media writer produces. The single definition — studio
+// -scheduling.ts's isConfiguredMediaRow imports it rather than keeping a second copy of the regex.
+export const isConfiguredMediaAsset = (asset: string): boolean => /^(media-stages|configured-media)\//.test(asset);
+
+/**
+ * The three destinations Typefully can actually post to. Deliberately NOT typefully.ts's
+ * TEXT_PLATFORMS, which also carries mastodon and threads: Typefully's native image-draft route
+ * covers x/linkedin/bluesky only, so a mastodon or threads media row must keep its manual path.
+ */
+export const TYPEFULLY_CARD_PLATFORMS: ReadonlySet<string> = new Set(["x", "linkedin", "bluesky"]);
+
+/**
+ * Backup route eligibility for a Content-page configured-media row (Muxin, 2026-09-05: "Content page
+ * should be able to also use Typefully if Postiz doesn't work"). Returns the Typefully destination
+ * for a row this publisher can take, or null for one it must leave on the manual ready-to-paste
+ * path. Postiz stays the first choice — this only says whether a backup exists, never that it is used.
+ *
+ * Excluded on purpose:
+ *   • format "video" — the animated-card mp4. Typefully's card route here uploads one image.
+ *   • a carousel manifest — a multi-slide Postiz-only shape, not one rendered image.
+ *   • any destination outside x/linkedin/bluesky (instagram, threads, tiktok, facebook, mastodon…).
+ */
+export function mediaFallbackTarget(row: Pick<QueueRow, "platform" | "format" | "asset">): string | null {
+  if (!isConfiguredMediaAsset(row.asset)) return null;
+  if (row.format !== "image") return null;
+  if (row.asset.endsWith("carousel-manifest.json")) return null;
+  return TYPEFULLY_CARD_PLATFORMS.has(row.platform) ? row.platform : null;
+}
+
+/** The Typefully destination for a row this publisher owns: a card's `:<target>` suffix, or a media row's own platform. */
+function rowTarget(row: Pick<QueueRow, "platform" | "format" | "asset">): string | null {
+  return isQuoteCardRow(row.platform) ? cardTarget(row.platform) : mediaFallbackTarget(row);
+}
+
+/**
+ * Quote-card rows are selected exactly as they always were, including under a bare folder sweep.
+ *
+ * A configured-media row is different: approval alone must never put it on this route. Typefully is
+ * the BACKUP for those rows, not a second default, and only studio-scheduling.ts's
+ * scheduleMediaViaTypefully is allowed to decide that Postiz could not take one. So an eligible
+ * media row joins the batch only when the caller NAMED it in `onlyIds` — which that fallback path
+ * always does (runPublisher passes `onlyIds: [row.id]`) and which the standalone CLI
+ * (`npm run publish:cards <folder>`, which calls publishCards with no opts) never does. Without
+ * this gate a direct CLI sweep would schedule an approved media row through Typefully with Postiz
+ * available and willing.
+ */
+function approvedCards(folder: string, onlyIds?: string[]) {
   const { rows } = readQueue(folder);
-  return rows.filter((r) => r.status === "approve" && isQuoteCardRow(r.platform));
+  return rows.filter((r) => r.status === "approve"
+    && (isQuoteCardRow(r.platform) || (mediaFallbackTarget(r) !== null && onlyIds !== undefined && onlyIds.includes(r.id))));
 }
 
 // Idempotency for a row that already has a live Typefully draft from a prior run. Unlike the old
@@ -114,6 +161,8 @@ async function runCheck(folder: string | null): Promise<void> {
 
   if (folder) {
     const cards = approvedCards(folder);
+    // No onlyIds here on purpose: this dry run reports exactly what a bare CLI sweep would do, and
+    // a bare sweep never takes a configured-media row (see approvedCards).
     console.log(`\n${cards.length} approved quote-card row(s) in ${folder}:`);
     if (cards.length > 0) {
       const canonicalUrl = loadCanonicalUrl(folder);
@@ -126,7 +175,7 @@ async function runCheck(folder: string | null): Promise<void> {
         const rendered = existsSync(imagePath) ? "rendered" : "NOT RENDERED — run `npm run render -- --still`";
         const { text, fm } = cardCopy(folder, c.id);
         const { ctas } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
-        const target = cardTarget(c.platform) ?? "UNSUPPORTED (legacy fan-out — split into quote-card:<x|linkedin|bluesky>)";
+        const target = rowTarget(c) ?? "UNSUPPORTED (legacy fan-out — split into quote-card:<x|linkedin|bluesky>)";
         const linkNote = ctas.length > 0 ? `link → ${ctas.map((cta) => cta.url).join(", ")}` : "no link";
         console.log(`  • ${c.id} → ${target}  ${c.asset} (${rendered})  ${linkNote}`);
         console.log(`      caption: ${text.replace(/\s+/g, " ").slice(0, 100)}${text.length > 100 ? "…" : ""}`);
@@ -159,10 +208,14 @@ export async function publishCards(
   folder: string,
   opts: { onlyIds?: string[]; atOverride?: string; forceReuse?: boolean; deliveryPolicy?: DeliveryPolicyDecision } = {}
 ): Promise<ScheduledCard[]> {
-  let cards = approvedCards(folder);
+  let cards = approvedCards(folder, opts.onlyIds);
+  // NOT redundant with the line above: approvedCards consults onlyIds only to authorize a MEDIA
+  // row onto the backup route. Quote-card rows come back from it whether or not they were named,
+  // so this is still the filter that narrows a card sweep to the requested ids. Removing it would
+  // make publishCards(folder, { onlyIds: [oneMediaRow] }) also schedule every approved card there.
   if (opts.onlyIds) cards = cards.filter((r) => opts.onlyIds!.includes(r.id));
   if (cards.length === 0) {
-    console.log("no approved quote-card rows in the review queue");
+    console.log("no approved quote-card or Typefully-eligible media rows in the review queue");
     return [];
   }
   const deliveryDecision = assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
@@ -201,12 +254,15 @@ export async function publishCards(
   const failures: string[] = [];
   for (const row of cards) {
     try {
-      const target = cardTarget(row.platform); // "x" | "linkedin" | "bluesky" | null (legacy fan-out)
+      const isCardRow = isQuoteCardRow(row.platform);
+      const target = rowTarget(row); // "x" | "linkedin" | "bluesky" | null (legacy fan-out)
       if (!target) {
         throw new Error(
-          `${row.id}: legacy fan-out quote-card row (no ":<platform>" target) can't ship through Typefully, ` +
-            `which needs one platform per draft — split it into quote-card:<x|linkedin|bluesky> rows ` +
-            `(see .claude/skills/atomize/SKILL.md step 7).`
+          isCardRow
+            ? `${row.id}: legacy fan-out quote-card row (no ":<platform>" target) can't ship through Typefully, ` +
+              `which needs one platform per draft — split it into quote-card:<x|linkedin|bluesky> rows ` +
+              `(see .claude/skills/atomize/SKILL.md step 7).`
+            : `${row.id}: not a Typefully-eligible media row (needs an image on x | linkedin | bluesky)`
         );
       }
       if (!TEXT_PLATFORMS.has(target)) {
@@ -243,15 +299,21 @@ export async function publishCards(
       if (atIso) {
         scheduledFor = atIso;
       } else {
+        // Cards claim the `quote-card` cadence window; a configured-media image row claims its own
+        // destination's window, exactly like the Postiz route it is backing up
+        // (defaultPublishPostiz: windowKey = destination) and like a text post. Either way the
+        // per-day cap and weekly volume for `target` are enforced by conflictPlatforms + the shared
+        // ledger, so a fallback draft can never exceed what that platform already allows.
+        const windowKey = isCardRow ? "quote-card" : target;
         scheduledFor = claimSlots({
-          windowKey: "quote-card",
+          windowKey,
           conflictPlatforms: [target],
           count: 1,
           asset: `${basename(folder)}/${row.id}`,
           by: "cards",
         }).times[0];
         if (!scheduledFor || scheduledFor === "next-free-slot") {
-          throw new Error("no card slot available — give config/platforms.yaml a `quote-card` cadence (posts_per_week + slot_days + slot_time_pst)");
+          throw new Error(`no slot available — give config/platforms.yaml a \`${windowKey}\` cadence (posts_per_week + slot_days + slot_time_pst)`);
         }
       }
 

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { appendBetPlacement, appendPublishLog, setStatus, type QueueRow } from "../publish/queue.js";
 import { buildPosts, loadPlatformMax, publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
 import { loadCanonicalUrl, loadContentTypesConfig, loadCtaConfig, loadSourceKind, resolveCtaLines, resolvePrimaryCtaDestination } from "../publish/cta.js";
-import { publishCards, isQuoteCardRow, cardTarget, basePlatform, cardCopy } from "../publish/cards.js";
+import { publishCards, isQuoteCardRow, cardTarget, basePlatform, cardCopy, isConfiguredMediaAsset, mediaFallbackTarget } from "../publish/cards.js";
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
 import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
@@ -17,6 +17,7 @@ import {
   createPostizTransport,
   fetchPostizCapabilities,
   postizMediaUploadVerified,
+  PostizRateLimitError,
   resolveConfiguredPostizCapability,
   selectDeliveryRoute,
   uploadPostizMedia,
@@ -47,7 +48,7 @@ import {
 // is preserved: the row was already set to approve; scheduling only mirrors what /publish would do).
 export type ScheduleKind = "text" | "card" | "tiktok" | "video" | "substack" | "outreach-lock" | "media";
 export const isConfiguredMediaRow = (row: Pick<QueueRow, "format" | "asset">): boolean =>
-  (row.format === "image" || row.format === "video") && /^(media-stages|configured-media)\//.test(row.asset);
+  (row.format === "image" || row.format === "video") && isConfiguredMediaAsset(row.asset);
 export function scheduleKind(row: QueueRow): ScheduleKind | null {
   if (isQuoteCardRow(row.platform)) return "card";
   // Configured-media image/video rows (any destination, e.g. instagram/facebook, or a text-platform
@@ -106,11 +107,21 @@ function postizShape(row: QueueRow): { destination: PostizDestination; media: Po
   return { destination, media };
 }
 
-function legacyProvider(kind: ScheduleKind): SelectedSchedulingProvider {
-  // "media" (configured-media image/video rows not owned by a quote-card/short/tiktok scheduler)
-  // has no Typefully/PostPeer/YouTube fallback — Postiz is the only route, so an unconfigured
-  // instance falls back to manual ready-to-paste, same as outreach-lock's non-schedulable rows.
-  if (kind === "media") return { provider: "manual" as never };
+/**
+ * Postiz stays the FIRST choice for every kind. This names the route to use when Postiz is not an
+ * option at all — either it is unconfigured, or discovery authoritatively said it cannot take this
+ * destination/media shape.
+ *
+ * For "media" (configured-media image/video rows not owned by a quote-card/short/tiktok scheduler)
+ * the backup is Typefully, but only for the rows Typefully can actually take: a rendered single
+ * image on x/linkedin/bluesky (cards.ts's mediaFallbackTarget). Everything else — a video row, a
+ * carousel, instagram/threads/tiktok/facebook/mastodon/youtube — keeps the manual ready-to-paste
+ * path it has today, same as outreach-lock's non-schedulable rows.
+ */
+function legacyProvider(kind: ScheduleKind, row?: QueueRow): SelectedSchedulingProvider {
+  if (kind === "media") {
+    return row && mediaFallbackTarget(row) ? { provider: "typefully" } : { provider: "manual" as never };
+  }
   return { provider: kind === "text" || kind === "card" ? "typefully" : kind === "tiktok" ? "postpeer" : kind === "video" ? "youtube" : "substack" };
 }
 
@@ -121,7 +132,9 @@ export async function selectConfiguredProvider(row: QueueRow, deps: Pick<Schedul
   const shape = postizShape(row);
   const env = deps.postizEnv ?? process.env;
   const configured = Boolean(deps.fetchPostizRegistry || (env.POSTIZ_BASE_URL?.trim() && env.POSTIZ_API_KEY?.trim()));
-  if (!configured || !shape) return legacyProvider(kind);
+  // Trigger 1 of 3 for the media backup route: Postiz is not configured at all, so nothing was
+  // ever sent to it and a second route cannot double-post.
+  if (!configured || !shape) return legacyProvider(kind, row);
   let registry: PostizCapabilityRegistry;
   try {
     registry = deps.fetchPostizRegistry
@@ -134,16 +147,16 @@ export async function selectConfiguredProvider(row: QueueRow, deps: Pick<Schedul
   }
   const requiresLocalMediaUpload = shape.media !== "text" && !/^https?:\/\//.test(row.asset);
   const route = selectDeliveryRoute(registry, shape.destination, shape.media, { requiresLocalMediaUpload });
-  // "media" rows have no legacy Typefully/PostPeer/YouTube/Substack handler wired for them (the
-  // dispatch table at the bottom of scheduleApproved has no "media" case), so any non-Postiz
-  // outcome — including an incidental legacy-route match selectDeliveryRoute would offer a
-  // text/card/video/substack kind — falls back to manual ready-to-paste instead of a route this
-  // row's kind can't actually use.
+  // Trigger 2 of 3: discovery is authoritative and says Postiz cannot take this destination/media
+  // shape. No create was attempted, so the backup route cannot double-post. A "media" row still
+  // only ever reaches Typefully through legacyProvider's own eligibility test — an incidental
+  // postpeer/youtube/substack route selectDeliveryRoute would offer another kind is not a handler
+  // this row shape can use, so those keep the manual ready-to-paste path.
   if (route === "unsupported") {
-    if (kind === "media") return legacyProvider(kind);
+    if (kind === "media") return legacyProvider(kind, row);
     throw new Error(`no delivery provider supports ${shape.destination}/${shape.media}`);
   }
-  if (route !== "postiz") return kind === "media" ? legacyProvider(kind) : { provider: route };
+  if (route !== "postiz") return kind === "media" ? legacyProvider(kind, row) : { provider: route };
   return { provider: "postiz", postizCapability: resolveConfiguredPostizCapability(registry, shape.destination, shape.media, env) };
 }
 
@@ -391,6 +404,9 @@ function reuseGuardPlatform(kind: ScheduleKind, row: QueueRow): string | null {
   switch (kind) {
     case "text": return row.platform;
     case "card": return cardTarget(row.platform) ?? basePlatform(row.platform);
+    // A media row on the Typefully backup route goes through publishCards, whose reuse-guard call
+    // site keys on the destination platform — which for a configured-media row is row.platform.
+    case "media": return row.platform;
     case "tiktok": return "tiktok";
     case "video": return "youtube";
     case "substack": return "substack";
@@ -398,11 +414,90 @@ function reuseGuardPlatform(kind: ScheduleKind, row: QueueRow): string | null {
   }
 }
 
-// A publisher can also skip a row WITHOUT throwing (the reuse guard) — it just logs a console.warn
+type ScheduleOutcome = { scheduled: unknown; scheduleError: string | null };
+type FolderPublisher = (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
+
+/**
+ * A Postiz create failure is only safe to retry on a second route when it is unambiguous that
+ * NOTHING was created. The rate-limit rejection is the one such outcome: Postiz's throttler guard
+ * (90 creates/hour, instance-wide) runs before the create controller, so the post never reached it.
+ * Everything else — a validation 400, a 5xx, a socket hang-up after the request left — may or may
+ * not have created the draft, and re-sending it elsewhere is how one approved row ships twice.
+ *
+ * ONLY the typed error counts. Message text is not evidence of provenance: an error raised anywhere
+ * else that merely quotes recognized rate-limit wording would otherwise authorize a second provider
+ * for a create that may already have succeeded. This runs inside scheduleApproved's own catch, on
+ * the raw error `deps.publishPostiz` threw, so the type is still intact here — nothing has been
+ * flattened to a string yet. If a future path genuinely loses the type before this point, restore a
+ * structured marker on the error rather than widening this test back to string matching.
+ */
+function isPostizNothingCreated(error: unknown): boolean {
+  return error instanceof PostizRateLimitError;
+}
+
+// Run one folder publisher for a single row, turning a silent reuse-guard skip into a real
+// scheduleError. A publisher can skip a row WITHOUT throwing (the reuse guard) — it just logs a
+// console.warn
 // and returns []. That must still surface as a scheduleError, not fall through silently: `done[0]
 // ?? null` alone can't tell "no scheduler owns this row" (kind === null, a genuine no-op) apart
 // from "a scheduler ran but skipped this row" (kind set, done === []) — and the GUI showed a bare
 // "Approved" for both.
+async function runPublisher(
+  fn: FolderPublisher,
+  folder: string,
+  row: QueueRow,
+  kind: ScheduleKind,
+  deliveryPolicy?: DeliveryPolicyDecision,
+): Promise<ScheduleOutcome> {
+  try {
+    const done = await fn(folder, { onlyIds: [row.id], ...(deliveryPolicy ? { deliveryPolicy } : {}) });
+    if (done.length === 0) {
+      // The publisher didn't throw, so recompute the check it silently skipped on to find out WHY —
+      // when it's the reuse guard, persist a machine-parseable reason (reconcile.ts's
+      // reuseGuardEligibility below re-derives "eligible again in N days" from this same shape,
+      // reading it back off the row's own notes, days later, with no fs/network call of its own).
+      const platform = reuseGuardPlatform(kind, row);
+      const reuse = platform ? checkReuse(basename(folder), platform) : { allowed: true };
+      if (!reuse.allowed && reuse.lastPlacedAt !== undefined && reuse.minDays !== undefined) {
+        return {
+          scheduled: null,
+          scheduleError: `blocked by reuse guard, last placed to ${platform} ${reuse.lastPlacedAt} (min_reuse_days: ${reuse.minDays})`,
+        };
+      }
+      return {
+        scheduled: null,
+        scheduleError: "not scheduled: blocked by the reuse guard (check the server log for the reason)",
+      };
+    }
+    return { scheduled: done[0], scheduleError: null };
+  } catch (e) {
+    return { scheduled: null, scheduleError: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Send an eligible configured-media image row down the Typefully backup route (publishCards, whose
+ * per-row work is already exactly this: rendered image + derivatives/<id>.md caption + a claimed
+ * slot + the reuse guard + a native scheduled draft). Reached ONLY from the three trigger points in
+ * scheduleApproved; it never decides for itself that Postiz failed.
+ *
+ * The typefully policy is resolved fresh here: a caller-supplied decision for `postiz` authorizes
+ * Postiz, not Typefully, so it cannot carry over to a different provider.
+ */
+async function scheduleMediaViaTypefully(
+  folder: string,
+  row: QueueRow,
+  deps: SchedulerDeps,
+  policyDecision: DeliveryPolicyDecision | undefined,
+): Promise<ScheduleOutcome> {
+  const supplied = policyDecision?.provider === "typefully" ? policyDecision : undefined;
+  const policy = supplied ?? (deps.resolveDeliveryPolicy ?? resolveDeliveryPolicy)(folder, "typefully");
+  if (policy.mode === "blocked") return { scheduled: null, scheduleError: `delivery policy blocked: ${policy.reason}` };
+  if (policy.mode === "manual") return { scheduled: writeReadyToPaste(folder, row, policy), scheduleError: null };
+  if (!policy.providerAccountId) return { scheduled: null, scheduleError: "delivery policy blocked: provider account mapping is missing" };
+  return runPublisher(deps.publishCards, folder, row, "media", supplied);
+}
+
 export async function scheduleApproved(
   folder: string,
   row: QueueRow,
@@ -418,7 +513,7 @@ export async function scheduleApproved(
     // discovery. Besides being faster, this guarantees those origins make zero network calls.
     // Use the legacy route only as a provisional provider name; provider-authorized origins are
     // resolved again below after the actual Postiz-first route is known.
-    const provisionalProvider = legacyProvider(kind).provider;
+    const provisionalProvider = legacyProvider(kind, row).provider;
     const provisionalPolicy = policyDecision
       ?? (deps.resolveDeliveryPolicy
         ? deps.resolveDeliveryPolicy(folder, provisionalProvider)
@@ -452,12 +547,25 @@ export async function scheduleApproved(
       if (!capability) return { scheduled: null, scheduleError: "configured Postiz capability was not retained for scheduling" };
       try {
         return { scheduled: await (deps.publishPostiz ?? defaultPublishPostiz)(folder, row, capability, policy), scheduleError: null };
-      } catch (e) { return { scheduled: null, scheduleError: e instanceof Error ? e.message : String(e) }; }
+      } catch (e) {
+        // Trigger 3 of 3, and the ONLY one that runs after Postiz was actually contacted: a
+        // rate-limit rejection, whose guard runs before the create controller, so nothing was
+        // created and the slot was released. Every other create failure is AMBIGUOUS — Postiz may
+        // already hold the draft — so it returns its scheduleError and never takes a second route.
+        if (kind === "media" && mediaFallbackTarget(row) && isPostizNothingCreated(e)) {
+          return scheduleMediaViaTypefully(folder, row, deps, policyDecision);
+        }
+        return { scheduled: null, scheduleError: e instanceof Error ? e.message : String(e) };
+      }
     }
-    // "media" rows have no legacy publisher below (no Typefully/PostPeer/YouTube/Substack handler
-    // knows this row shape) — every non-"postiz"/"manual"/"blocked" outcome above is a caller
-    // error (e.g. an explicit policyDecision naming a legacy provider this kind can't use).
-    if (kind === "media") return { scheduled: null, scheduleError: `delivery policy resolved ${provider} for a media row, but media rows are Postiz-only` };
+    // A media row reaches a non-Postiz provider only as the Typefully backup route for a row
+    // Typefully can take (triggers 1 and 2, decided in selectConfiguredProvider). Any other
+    // non-"postiz"/"manual"/"blocked" outcome is a caller error — e.g. an explicit policyDecision
+    // naming a legacy provider no handler knows how to use for this row shape.
+    if (kind === "media") {
+      if (provider === "typefully" && mediaFallbackTarget(row)) return scheduleMediaViaTypefully(folder, row, deps, policyDecision);
+      return { scheduled: null, scheduleError: `delivery policy resolved ${provider} for a media row, but media rows are Postiz-only` };
+    }
   }
   const fn =
     kind === "text" ? deps.publishText
@@ -466,28 +574,5 @@ export async function scheduleApproved(
     : kind === "substack" ? deps.publishSubstack
     : kind === "outreach-lock" ? deps.lockOutreachMessage
     : deps.publishShorts;
-  try {
-    const done = await fn(folder, { onlyIds: [row.id], ...(policyDecision ? { deliveryPolicy: policyDecision } : {}) });
-    if (done.length === 0) {
-      // The publisher didn't throw, so recompute the check it silently skipped on to find out WHY —
-      // when it's the reuse guard, persist a machine-parseable reason (reconcile.ts's
-      // reuseGuardEligibility below re-derives "eligible again in N days" from this same shape,
-      // reading it back off the row's own notes, days later, with no fs/network call of its own).
-      const platform = reuseGuardPlatform(kind, row);
-      const reuse = platform ? checkReuse(basename(folder), platform) : { allowed: true };
-      if (!reuse.allowed && reuse.lastPlacedAt !== undefined && reuse.minDays !== undefined) {
-        return {
-          scheduled: null,
-          scheduleError: `blocked by reuse guard, last placed to ${platform} ${reuse.lastPlacedAt} (min_reuse_days: ${reuse.minDays})`,
-        };
-      }
-      return {
-        scheduled: null,
-        scheduleError: "not scheduled: blocked by the reuse guard (check the server log for the reason)",
-      };
-    }
-    return { scheduled: done[0], scheduleError: null };
-  } catch (e) {
-    return { scheduled: null, scheduleError: e instanceof Error ? e.message : String(e) };
-  }
+  return runPublisher(fn, folder, row, kind, policyDecision);
 }

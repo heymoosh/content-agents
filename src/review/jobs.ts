@@ -30,7 +30,7 @@ import { buildEngineSpawn, enginePrompt, ENGINE_COMMANDS, ENGINE_LABELS, type En
 import type { ContentOrigin, ContentRequest, ContentVariant } from "./content-request.js";
 import { assertReviewedMechanismGenerationAuthorization, containsPersonalBeliefReversal } from "./reviewed-mechanism-recommendations.js";
 import type { BrandId } from "../identity/brand.js";
-import { CONFIGURED_CARD_MEDIA, configuredCardQuoteDerivative, configuredMediaPlan, configuredMediaStage, isConfiguredCardMedia, isConfiguredCardQuoteDerivative, type ConfiguredMediaPlan, type ConfiguredMediaSourceInputs, type ConfiguredMediaStage } from "./configured-media.js";
+import { CONFIGURED_CARD_MEDIA, configuredCardImagePath, configuredCardQuoteDerivative, configuredCardRenderDerivative, configuredCardSourceLine, configuredMediaPlan, configuredMediaStage, isConfiguredCardMedia, isConfiguredCardQuoteDerivative, type ConfiguredMediaPlan, type ConfiguredMediaSourceInputs, type ConfiguredMediaStage } from "./configured-media.js";
 import { acquireJobExecutionLease, readDurableJobs, recoverAbandonedJobs, removeDurableJobs, upsertDurableJob } from "../runtime/durable-jobs.js";
 import { processAlive, type FileLease } from "../runtime/file-lock.js";
 import { migrateLegacyDataDirectory } from "../runtime/data-root.js";
@@ -982,10 +982,19 @@ export interface ConfiguredMediaOutput {
   };
 }
 
-/** Preflight the whole request before generation starts, so one unavailable medium leaves no partial output. */
+/**
+ * Preflight the whole request before generation starts, so one unavailable medium leaves no partial
+ * output.
+ *
+ * `cardRenderNames` maps a card variant's id to its shared, content-addressed render name. That name
+ * is knowable only once the quote itself exists, so the preflight pass runs without it and falls
+ * back to the per-variant name; the pass that actually writes the stage records supplies it, which
+ * is how two platforms end up recording one definition file and one rendered image.
+ */
 export function buildConfiguredMediaOutputs(
   variants: readonly ContentVariant[],
   inputs: ConfiguredMediaSourceInputs = {},
+  cardRenderNames: ReadonlyMap<string, string> = new Map(),
 ): ConfiguredMediaOutput[] {
   const shortVideos = variants.filter((variant) => variant.media === "short-video-script");
   if (shortVideos.length > 1) {
@@ -1008,7 +1017,7 @@ export function buildConfiguredMediaOutputs(
     const staged = configuredMediaStage(variant.media, variant.identity.id, stagedInputs);
     // A card renders from its quote companion, so both the file the renderer reads and the image it
     // writes are named after that companion, not after the post text derivative.
-    const quoteName = configuredCardQuoteDerivative(variant.identity.id);
+    const quoteName = cardRenderNames.get(variant.identity.id) ?? configuredCardQuoteDerivative(variant.identity.id);
     return {
       id: variant.identity.id,
       queue: staged.queue,
@@ -1016,7 +1025,7 @@ export function buildConfiguredMediaOutputs(
         version: "configured-media-stage-v1", id: variant.identity.id, platform: variant.platform,
         media: variant.media, status: "staged", stage: staged.stage, derivativePath,
         ...(isConfiguredCardMedia(variant.media) ? { quoteDerivativePath: `derivatives/${quoteName}.md` } : {}),
-        ...(staged.stage === "render-required" ? { outputPath: variant.media === "static-quote-card" ? `images/${quoteName}.png` : `images/${quoteName}.mp4` } : {}),
+        ...(staged.stage === "render-required" ? { outputPath: configuredCardImagePath(variant.media, quoteName) } : {}),
         approvalGate: staged.stage === "storyboard-required"
           ? "the inspectable source-bound media plan must be explicitly approved before the storyboard-derived render runs"
           : staged.stage === "render-required"
@@ -1048,6 +1057,26 @@ function configuredMediaSourceInputs(folder: string): ConfiguredMediaSourceInput
 }
 
 /**
+ * Where a card variant's quote definition lives: whatever its stage record points at, because the
+ * name is content-addressed and therefore shared with any sibling whose card is byte-identical. A
+ * record written before that field existed falls back to the per-variant name it used then.
+ */
+function configuredCardQuoteFile(folder: string, id: string): string {
+  const stagePath = join(folder, "media-stages", `${id}.json`);
+  if (existsSync(stagePath)) {
+    try {
+      const record = JSON.parse(readFileSync(stagePath, "utf8")) as { quoteDerivativePath?: unknown };
+      if (typeof record.quoteDerivativePath === "string" && /^derivatives\/[\w.-]+\.md$/.test(record.quoteDerivativePath)) {
+        return join(folder, record.quoteDerivativePath);
+      }
+    } catch {
+      // An unreadable stage is already incomplete occupancy; fall through to the legacy name.
+    }
+  }
+  return join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`);
+}
+
+/**
  * Backfill the quote companion for a card whose generation predates it, so a card written under the
  * old one-string contract is repairable instead of permanently unrenderable.
  *
@@ -1064,11 +1093,11 @@ export function repairConfiguredCardQuotes(
   fallbackText: () => string,
 ): string[] {
   const repaired: string[] = [];
+  const sourceLine = configuredCardSourceLine(folder);
   for (const variant of variants) {
     const id = variant.identity.id;
     if (!isConfiguredCardMedia(variant.media)) continue;
-    const quotePath = join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`);
-    if (existsSync(quotePath)) continue;
+    if (existsSync(configuredCardQuoteFile(folder, id))) continue;
     const stagePath = join(folder, "media-stages", `${id}.json`);
     const stage = JSON.parse(readFileSync(stagePath, "utf8")) as { status?: string; approval?: unknown };
     if (stage.status === "rendered" || stage.status === "promotion-pending") continue;
@@ -1079,9 +1108,20 @@ export function repairConfiguredCardQuotes(
       refs.length ? "" : fallbackText(),
       configuredCardQuoteLimit(),
     );
-    writeFileSync(quotePath, configuredCardQuoteText(quote), { flag: "wx" });
+    // The repaired definition is content-addressed like a freshly generated one, so two legacy
+    // variants whose card is identical converge on the one file and the one render. An identical
+    // definition already on disk is reused, never rewritten.
+    const definition = configuredCardQuoteText(quote);
+    const quoteName = configuredCardRenderDerivative({ media: variant.media, definition, sourceLine });
+    const quotePath = join(folder, "derivatives", `${quoteName}.md`);
+    if (!existsSync(quotePath)) writeFileSync(quotePath, definition, { flag: "wx" });
     const { approval: _staleApproval, ...record } = stage;
-    writeFileSync(stagePath, JSON.stringify({ ...record, status: "staged", plan: configuredMediaPlan(variant.media, quote.body) }, null, 2) + "\n");
+    writeFileSync(stagePath, JSON.stringify({
+      ...record, status: "staged",
+      quoteDerivativePath: `derivatives/${quoteName}.md`,
+      outputPath: configuredCardImagePath(variant.media, quoteName),
+      plan: configuredMediaPlan(variant.media, quote.body),
+    }, null, 2) + "\n");
     repaired.push(id);
   }
   return repaired;
@@ -1116,7 +1156,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
     file: existsSync(join(folder, "derivatives", `${id}.md`)),
     stage: existsSync(join(folder, "media-stages", `${id}.json`)),
     ...(isConfiguredCardMedia(mediaById.get(id) ?? "")
-      ? { quote: existsSync(join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`)) }
+      ? { quote: existsSync(configuredCardQuoteFile(folder, id)) }
       : {}),
   });
   const occupancyComplete = (state: Record<string, boolean>) => Object.values(state).every(Boolean);
@@ -1131,7 +1171,8 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
   // Select whole platforms, preserving their complete control/treatment/media sets and IDs.
   // The saved request and experiment variables remain the original authorization record.
   const ids = variants.map((variant) => variant.identity.id);
-  const mediaOutputs = buildConfiguredMediaOutputs(variants, configuredMediaSourceInputs(folder));
+  const mediaSourceInputs = configuredMediaSourceInputs(folder);
+  const mediaOutputs = buildConfiguredMediaOutputs(variants, mediaSourceInputs);
   const occupancy = ids.map(occupancyFor);
   if (occupancy.every(occupancyComplete)) return { ids, existing: true };
   // Everything but a card's quote companion is present: a card generated before the companion
@@ -1312,12 +1353,30 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         cardQuoteLimit,
       ));
     });
+    // SLICE-5I: one square 1080x1080 card per distinct set of render inputs, shared by every
+    // platform that asked for it. The name is the digest of what the renderer actually reads — the
+    // definition file's exact bytes (quote plus its `scheme:`), the folder's in-asset source line,
+    // and the media that decides whether the .png or the .mp4 is the deliverable — so two platforms
+    // whose card is byte-identical converge on ONE definition and ONE render, while a different
+    // quote, palette, or provenance hashes elsewhere and still renders on its own.
+    const cardSourceLine = configuredCardSourceLine(folder);
+    const cardDefinitions = new Map<string, string>();
+    const cardRenderNames = new Map<string, string>();
+    for (const [id, quote] of cardQuotes) {
+      const definition = configuredCardQuoteText(quote);
+      cardDefinitions.set(id, definition);
+      cardRenderNames.set(id, configuredCardRenderDerivative({ media: mediaById.get(id)!, definition, sourceLine: cardSourceLine }));
+    }
     const gateViolations: string[] = [];
     for (const candidate of gateCandidates) {
       gateViolations.push(...checkPlatformLimits(candidate.file, candidate.platform, candidate.body, gatePlatforms));
     }
-    for (const [id, quote] of cardQuotes) {
-      gateViolations.push(...checkPlatformLimits(`derivatives/${configuredCardQuoteDerivative(id)}.md`, "quote-card", quote.body, gatePlatforms));
+    // Gate each distinct card once: a shared definition is one file and one limit check, so a
+    // sharing request cannot report the same overrun twice.
+    const gatedCardQuotes = new Map<string, string>();
+    for (const [id, quote] of cardQuotes) gatedCardQuotes.set(cardRenderNames.get(id)!, quote.body);
+    for (const [name, body] of gatedCardQuotes) {
+      gateViolations.push(...checkPlatformLimits(`derivatives/${name}.md`, "quote-card", body, gatePlatforms));
     }
     if (gateSourceClass) {
       gateViolations.push(...checkSkeletonGate(gateCandidates.map(({ file, platform, spin, angle }) => ({ file, platform, spin, angle })), gateSourceClass));
@@ -1328,6 +1387,11 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
     }
     mkdirSync(join(folder, "derivatives"), { recursive: true });
     mkdirSync(join(folder, "media-stages"), { recursive: true });
+    // Re-derive the stage records now that the shared render names exist, so each card's recorded
+    // quoteDerivativePath/outputPath name the file the renderer will actually read and write.
+    const stagedOutputs = cardRenderNames.size
+      ? buildConfiguredMediaOutputs(variants, mediaSourceInputs, cardRenderNames)
+      : mediaOutputs;
     const created: string[] = [];
     const queueRows: NewQueueRow[] = [];
     try {
@@ -1351,10 +1415,15 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         // quote never ships alone, out of context.
         const cardQuote = cardQuotes.get(id);
         if (cardQuote) {
-          const quotePath = join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`);
-          writeFileSync(quotePath, configuredCardQuoteText(cardQuote), { flag: "wx" }); created.push(quotePath);
+          // SLICE-5I: written once per distinct card. A sibling variant whose definition is
+          // byte-identical finds it already here and points at the same file, so one card is one
+          // definition and one render no matter how many platforms asked for it.
+          const quotePath = join(folder, "derivatives", `${cardRenderNames.get(id)!}.md`);
+          if (!existsSync(quotePath)) {
+            writeFileSync(quotePath, cardDefinitions.get(id)!, { flag: "wx" }); created.push(quotePath);
+          }
         }
-        const mediaOutput = mediaOutputs.find((output) => output.id === id)!;
+        const mediaOutput = stagedOutputs.find((output) => output.id === id)!;
         const stagePath = join(folder, "media-stages", `${id}.json`);
         // The render plan carries the QUOTE for a card, so the renderer paints the quote and not
         // the post text; every other medium still plans off the derivative body.

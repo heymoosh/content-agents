@@ -1,3 +1,8 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { splitFrontmatter } from "../util/frontmatter.js";
+
 /**
  * Authoritative capability registry for media choices exposed by the Content workbench.
  *
@@ -67,6 +72,76 @@ export function configuredCardQuoteDerivative(id: string): string {
 /** True for the quote companion itself, so the post-text rules are never applied to the quote. */
 export function isConfiguredCardQuoteDerivative(name: string): boolean {
   return name.length > CARD_QUOTE_SUFFIX.length && name.endsWith(CARD_QUOTE_SUFFIX);
+}
+
+/**
+ * Everything that determines the pixels of ONE configured card render.
+ *
+ * `definition` is the exact text of the quote definition file the renderer reads: its body is the
+ * quote painted on the card and its frontmatter carries the `scheme:` that picks the palette, so
+ * two definitions differing in any byte are two different cards. `sourceLine` is the in-asset
+ * source line the still renderer reads from the folder's source.md. `media` is part of the set
+ * because a static card's deliverable is the `.png` and an animated card's is the `.mp4`: those are
+ * never one render, even when the text on them is the same.
+ *
+ * This set is the WHOLE key. A future aspect ratio would be one more field here, so sharing would
+ * split on aspect — one extra render — rather than degrading to one render per platform. Muxin's
+ * 2026-09-05 decision keeps every card square at 1080x1080, so no such field exists today.
+ */
+export interface ConfiguredCardRenderInputs {
+  readonly media: string;
+  readonly definition: string;
+  readonly sourceLine: string;
+}
+
+const CARD_RENDER_PREFIX = "card-";
+const CARD_RENDER_KEY_CHARS = 32;
+
+export function configuredCardRenderKey(inputs: ConfiguredCardRenderInputs): string {
+  return createHash("sha256")
+    .update(JSON.stringify([inputs.media, inputs.sourceLine, inputs.definition]))
+    .digest("hex")
+    .slice(0, CARD_RENDER_KEY_CHARS);
+}
+
+/**
+ * The shared, content-addressed name of a card render: its definition `derivatives/<name>.md` and
+ * its rendered `images/<name>.png` / `.mp4`.
+ *
+ * Derived from the render inputs and never from a variant id or a platform name, so several
+ * platforms in one request whose card is byte-identical resolve to ONE definition file and ONE
+ * rendered file, while two genuinely different cards can never land on the same name.
+ */
+export function configuredCardRenderDerivative(inputs: ConfiguredCardRenderInputs): string {
+  return `${CARD_RENDER_PREFIX}${configuredCardRenderKey(inputs)}${CARD_QUOTE_SUFFIX}`;
+}
+
+/**
+ * True for a content-addressed render name, false for the legacy per-variant `<id>-quote`. Only a
+ * content-addressed name is safe to reuse off disk: its bytes are provably the ones that produced
+ * the file, whereas a per-variant name can outlive the quote it was rendered from.
+ */
+export function isConfiguredCardRenderName(name: string): boolean {
+  return new RegExp(`^${CARD_RENDER_PREFIX}[0-9a-f]{${CARD_RENDER_KEY_CHARS}}${CARD_QUOTE_SUFFIX}$`).test(name);
+}
+
+/** Where the still renderer writes a card of this media. Square 1080x1080 either way. */
+export function configuredCardImagePath(media: string, renderName: string): string {
+  return `images/${renderName}${media === "static-quote-card" ? ".png" : ".mp4"}`;
+}
+
+/**
+ * The in-asset source line the still renderer paints under the attribution: source.md's title,
+ * suppressed for a Substack Note (whose first line is not a title). Read here rather than inferred,
+ * because it is a render input: editing it changes the pixels and must therefore change the key.
+ */
+export function configuredCardSourceLine(folder: string): string {
+  try {
+    const { fm } = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8"));
+    return typeof fm.title === "string" && fm.source_kind !== "substack-note" ? fm.title : "";
+  } catch {
+    return ""; // no source.md (e.g. a bare quote) — the renderer omits the source line
+  }
 }
 
 export type ConfiguredMedia = keyof typeof CONFIGURED_MEDIA;

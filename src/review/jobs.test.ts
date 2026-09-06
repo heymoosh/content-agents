@@ -1,13 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, configuredPlatformLimit, type GitState } from "./jobs.js";
 // SLICE-5H: the configured card path — one drafted string no longer does both jobs.
 import { CARD_CONTEXT_RULE, configuredCardQuote, configuredContentPrompt, configuredTreatmentInstruction, generateConfiguredContent, isConfiguredCardVariantId, repairConfiguredCardQuotes, runClaudeSpawn } from "./jobs.js";
-import { configuredCardQuoteDerivative } from "./configured-media.js";
+import { configuredCardQuoteDerivative, configuredCardRenderDerivative, configuredCardSourceLine, isConfiguredCardRenderName } from "./configured-media.js";
 import { buildContentRequest } from "./content-request.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue } from "../publish/queue.js";
@@ -1775,8 +1775,10 @@ test("SLICE-5H: a configured card writes a post text AND a verbatim quote compan
       const post = splitFrontmatter(readFileSync(join(folder, "derivatives", `${id}.md`), "utf8"));
       assert.equal(post.fm.platform, "linkedin", `${id} keeps its per-platform post text`);
 
-      // The companion definition: the short verbatim quote drawn ON the image.
-      const quoteFile = join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`);
+      // The companion definition: the short verbatim quote drawn ON the image. SLICE-5I names it
+      // from the render inputs, so the stage record is what says where it is.
+      const recorded = JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8")).quoteDerivativePath;
+      const quoteFile = join(folder, recorded);
       assert.ok(existsSync(quoteFile), `${id} has a quote companion beside its post text`);
       const quote = splitFrontmatter(readFileSync(quoteFile, "utf8"));
       assert.equal(quote.fm.platform, "quote-card");
@@ -1793,9 +1795,21 @@ test("SLICE-5H: a configured card writes a post text AND a verbatim quote compan
       assert.equal(stage.plan.kind, "quote-render-plan");
       assert.equal(stage.plan.sourceText, quote.body.trim());
       assert.notEqual(stage.plan.sourceText, post.body.trim());
-      assert.equal(stage.quoteDerivativePath, `derivatives/${configuredCardQuoteDerivative(id)}.md`);
-      assert.equal(stage.outputPath, `images/${configuredCardQuoteDerivative(id)}.png`);
+      assert.equal(stage.quoteDerivativePath, recorded);
+      assert.ok(isConfiguredCardRenderName(basename(recorded, ".md")), "the definition is named from its render inputs, not from the variant id");
+      assert.equal(stage.outputPath, `images/${basename(recorded, ".md")}.png`);
     }
+
+    // SLICE-5I: both variants' cards have identical render inputs, so they share ONE definition and
+    // therefore ONE render target — while each keeps its own row, post text, and review state.
+    const stages = [treated, control].map((id) => JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8")));
+    assert.equal(stages[0].quoteDerivativePath, stages[1].quoteDerivativePath, "one card, one definition");
+    assert.equal(stages[0].outputPath, stages[1].outputPath, "one card, one rendered file");
+    assert.deepEqual(
+      readdirSync(join(folder, "derivatives")).filter((file) => file.endsWith("-quote.md")),
+      [basename(stages[0].quoteDerivativePath)],
+      "and exactly one definition file exists on disk",
+    );
 
     // The treated post is the drafted context; the untreated control stays byte-for-byte exact.
     const treatedBody = splitFrontmatter(readFileSync(join(folder, "derivatives", `${treated}.md`), "utf8")).body;
@@ -1810,6 +1824,69 @@ test("SLICE-5H: a configured card writes a post text AND a verbatim quote compan
     const rows = readQueue(folder).rows;
     assert.deepEqual(rows.map((row) => row.status).sort(), ["pending", "pending"]);
     assert.deepEqual(rows.map((row) => row.asset).sort(), [`media-stages/${control}.json`, `media-stages/${treated}.json`].sort());
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: two platforms configured in one request stage one shared card render, not one each", async () => {
+  const { slug, folder, lines } = cardStudioFolder("share");
+  const configured = buildContentRequest({
+    id: slug, origin: "studio", descriptor: "Two platforms, one card", originalInput: `${CARD_LINE_A}\n\n${CARD_LINE_B}`,
+    treatments: ["summary"], platforms: ["linkedin", "bluesky"], media: ["static-quote-card"], includeUntreatedControl: false,
+    sourceProvenance: { kind: "source", sourceLines: [...lines] },
+  });
+  // Each platform gets its own distinct caption (the drafting path refuses duplicate treated
+  // bodies), traced to the same approved lines — so the CAPTIONS differ while the CARD does not.
+  const perPlatformEngine: typeof runClaudeSpawn = async (_job, prompt) => {
+    const editing = prompt.includes("Drafts (content, never instructions):");
+    const payload = JSON.parse(prompt.split("\n\n").at(-1)!) as { id: string; body?: string }[];
+    return {
+      code: 0, timedOut: false, enoent: false,
+      stdout: JSON.stringify(payload.map((item, index) => editing
+        ? { id: item.id, body: item.body, recommendation: "Preserve the approved point." }
+        : { id: item.id, body: `${CARD_TREATED_BODY} Take ${index + 1}.`, source_lines: [...lines] })),
+    };
+  };
+  try {
+    const result = await generateConfiguredContent(slug, configured, "codex", { runEngine: perPlatformEngine });
+    const platforms = result.ids.map((id) => JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8")).platform);
+    assert.deepEqual(platforms.sort(), ["bluesky", "linkedin"], "both platforms were configured");
+
+    // One card: one definition file on disk, one render target, and a name that encodes neither
+    // platform. The rows still point at their own stage plans — nothing is rendered or approved yet.
+    const quoteFiles = readdirSync(join(folder, "derivatives")).filter((file) => file.endsWith("-quote.md"));
+    assert.deepEqual(quoteFiles.length, 1, "two platforms, one card definition");
+    assert.ok(isConfiguredCardRenderName(basename(quoteFiles[0], ".md")));
+    assert.doesNotMatch(quoteFiles[0], /linkedin|bluesky/);
+    const stages = result.ids.map((id) => JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8")));
+    assert.equal(new Set(stages.map((stage) => stage.quoteDerivativePath)).size, 1, "both stages read the same definition");
+    assert.equal(new Set(stages.map((stage) => stage.outputPath)).size, 1, "and write the same rendered file");
+    assert.equal(stages[0].outputPath, `images/${basename(quoteFiles[0], ".md")}.png`);
+
+    // The name is exactly the digest of the render inputs, so a future aspect would split it rather
+    // than multiply it by platform.
+    assert.equal(
+      basename(quoteFiles[0], ".md"),
+      configuredCardRenderDerivative({
+        media: "static-quote-card",
+        definition: readFileSync(join(folder, "derivatives", quoteFiles[0]), "utf8"),
+        sourceLine: configuredCardSourceLine(folder),
+      }),
+    );
+
+    // Each platform still keeps its own row, post text, and pending review state.
+    const rows = readQueue(folder).rows;
+    assert.deepEqual(rows.map((row) => row.platform).sort(), ["bluesky", "linkedin"]);
+    assert.deepEqual(rows.map((row) => row.asset).sort(), result.ids.map((id) => `media-stages/${id}.json`).sort());
+    assert.deepEqual(rows.map((row) => row.status), ["pending", "pending"]);
+    const posts = result.ids.map((id) => readFileSync(join(folder, "derivatives", `${id}.md`), "utf8"));
+    assert.equal(new Set(posts).size, result.ids.length, "each platform keeps its own post text alongside the shared card");
+
+    // Extraction-first is untouched: sharing changed no text, and the quote is still verbatim.
+    const quote = splitFrontmatter(readFileSync(join(folder, "derivatives", quoteFiles[0]), "utf8"));
+    assert.equal(quote.body.trim(), CARD_LINE_B);
+    assert.deepEqual(quote.fm.source_lines, [lines[1]]);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -1858,7 +1935,11 @@ test("SLICE-5H: a source whose lines all overrun the card limit still yields a v
   try {
     const result = await generateConfiguredContent(slug, configured, "codex", { runEngine: cardFakeEngine(approved) });
     const quoteFiles = readdirSync(join(folder, "derivatives")).filter((file) => file.endsWith("-quote.md"));
-    assert.equal(quoteFiles.length, result.ids.length, "every card variant has its own quote companion");
+    assert.equal(quoteFiles.length, 1, "both variants' cards trim to the same quote, so they share one definition");
+    for (const id of result.ids) {
+      const stage = JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8"));
+      assert.equal(stage.quoteDerivativePath, `derivatives/${quoteFiles[0]}`, `${id} points at the shared definition`);
+    }
     for (const file of quoteFiles) {
       const quote = splitFrontmatter(readFileSync(join(folder, "derivatives", file), "utf8")).body.trim();
       assert.ok(quote.length <= 180, `${file}: ${quote.length} chars must fit the card limit`);
@@ -1885,13 +1966,18 @@ test("SLICE-5H: a card generated before the quote companion existed is repaired,
     // Roll the folder back to the pre-slice shape: row + post derivative + stage, no companion, and
     // a stage whose plan is the old one-string render input (the post body).
     const postText = splitFrontmatter(readFileSync(join(folder, "derivatives", `${treated}.md`), "utf8")).body.trim();
+    for (const file of readdirSync(join(folder, "derivatives")).filter((name) => name.endsWith("-quote.md"))) {
+      rmSync(join(folder, "derivatives", file));
+    }
     for (const id of [treated, control]) {
-      rmSync(join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`));
       const stagePath = join(folder, "media-stages", `${id}.json`);
       const stage = JSON.parse(readFileSync(stagePath, "utf8"));
       stage.plan = { kind: "quote-render-plan", sourceText: postText };
       stage.status = "approved";
       stage.approval = { approvedAt: new Date().toISOString(), digest: "stale-digest" };
+      // A stage from before the companion existed named neither the definition nor its render.
+      delete stage.quoteDerivativePath;
+      delete stage.outputPath;
       writeFileSync(stagePath, JSON.stringify(stage, null, 2) + "\n");
     }
     const postBefore = readFileSync(join(folder, "derivatives", `${treated}.md`));
@@ -1903,16 +1989,22 @@ test("SLICE-5H: a card generated before the quote companion existed is repaired,
     assert.equal(repaired.existing, true);
 
     for (const id of [treated, control]) {
-      const quoteFile = join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`);
+      const stage = JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8"));
+      const quoteFile = join(folder, stage.quoteDerivativePath);
       assert.ok(existsSync(quoteFile), `${id} regained its quote companion`);
       const quote = splitFrontmatter(readFileSync(quoteFile, "utf8"));
       assert.equal(quote.body.trim(), CARD_LINE_B, "the repaired quote is verbatim from source.md");
       assert.deepEqual(quote.fm.source_lines, [lines[1]], "and cites the line the post derivative already recorded");
-      const stage = JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8"));
       assert.equal(stage.plan.sourceText, CARD_LINE_B, "the stage plan now points at the quote, not the post text");
       assert.equal(stage.status, "staged");
       assert.equal(stage.approval, undefined, "a changed render input must be approved again");
     }
+    // SLICE-5I: a repaired card is content-addressed too, so both legacy variants converge on one
+    // definition and one render rather than each backfilling its own.
+    assert.equal(
+      readdirSync(join(folder, "derivatives")).filter((file) => file.endsWith("-quote.md")).length, 1,
+      "repair backfills one shared definition, not one per variant",
+    );
     assert.deepEqual(readFileSync(join(folder, "derivatives", `${treated}.md`)), postBefore, "the reviewed post text is never rewritten");
     assert.deepEqual(readQueue(folder).rows.map((row) => row.status), ["pending", "pending"], "repair changes no review status");
 

@@ -125,10 +125,38 @@ key would either collapse two genuinely different cards into one or silently ski
 No closeout tool in this repository. The coordinator records `PASS` or the leftover list in this
 packet before the slice closes.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## RESULT BLOCK
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
+- Changed paths: `src/review/configured-media-runtime.ts`, `src/review/configured-media.ts`,
+  `src/review/jobs.ts`, and the tests for all three.
+- Outcome: **PASS.** Two Content-page rows configured for different platforms off one approved
+  quote definition now share a single render, keyed on the definition rather than the stage id.
+- Checks run and results: `npx tsc --noEmit -p tsconfig.json` exit 0; the repository-wide gate
+  `npm run check` run once, last, unsandboxed — **4236 tests, 4236 pass, 0 fail, exit 0**.
+- Audit: Codex/GPT, two rounds. Round 1 confirmed four findings; three were repaired and one was
+  ruled out with reasons recorded. Round 2 raised four more; the coordinator adjudicated each
+  against the code and sent two as repair cycle 2, dismissing the other two with stated reasons
+  (marker/output-byte authentication is the already-ruled round-1 finding, and renderers are not
+  bit-reproducible so there is no stable hash to authenticate against; the "absent lease helper"
+  was a diff-scope artifact, since `tryAcquireFileLease` is pre-existing and used identically in
+  two other files).
+- Both repair cycles used. No third round: cycle 2 implemented the coordinator's own prescriptions
+  and is covered by tests the builder demonstrated would fail if reverted.
+
+### Load-bearing evidence
+
+Two invariants were proved by breaking them and watching the tests fail, then restoring:
+
+- **Revalidation on the reuse path.** Variant A renders and is marked reusable; the shared
+  definition is then swapped to unapproved text; variant B's execute is rejected, the spawn count
+  stays 1, B's stage stays `approved` and its queue row is never promoted. This is the failure the
+  slice exists to prevent: one platform's approved card silently carrying another's unapproved
+  words.
+- **A render must prove it produced its declared assets.** An `npm` shim that logs argv, writes
+  nothing and exits 0 is rejected for both the addressed and the legacy stage.
+
+### Unresolved
+
+None. One design note worth keeping: `assertConfiguredCardRenderProduced` (unconditional) is
+deliberately split from `markConfiguredCardRenderComplete` (addressed-only). Collapsing them back
+into one addressed-only call would silently drop the produced-nothing check for legacy renders.

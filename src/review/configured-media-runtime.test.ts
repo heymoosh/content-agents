@@ -1,10 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 import { approveConfiguredMediaStage, assertApprovedCardQuoteOnDisk, attachReviewedConfiguredMediaFiles, configuredQuoteCardRender, defaultConfiguredMediaRenderer, executeConfiguredMediaStage, type PersistedConfiguredMediaStage } from "./configured-media-runtime.js";
 import { tryAcquireFileLease } from "../runtime/file-lock.js";
+import { configuredCardImagePath, configuredCardRenderDerivative, configuredCardSourceLine } from "./configured-media.js";
+import { readQueue } from "../publish/queue.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
+import { repoRoot } from "../db/db.js";
 
 const IMAGE_BYTES = {
   png: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]),
@@ -97,6 +102,442 @@ test("SLICE-5H: a quote edited after approval never reaches the image", async ()
     () => assertApprovedCardQuoteOnDisk({ ...stage, plan: { kind: "quote-render-plan" } }, folder, "derivatives/m1-quote.md"),
     /no inspectable quote render plan/,
   );
+});
+
+// ── SLICE-5I: one square card render shared across every platform in a request ────────────────
+//
+// The dispatcher shells out to `npm run render`, so the test puts a fake `npm` first on PATH. It
+// records every argv and writes the two files renderStill writes (the PNG and its free animated
+// companion), which is what makes "how many renders happened" an observable fact on disk rather
+// than a spy on an internal call.
+function cardRequestFolder(
+  cards: readonly { readonly id: string; readonly platform: string; readonly media: string; readonly quote: string; readonly scheme?: string }[],
+): { folder: string; names: Map<string, string> } {
+  const folder = mkdtempSync(join(tmpdir(), "configured-media-share-"));
+  mkdirSync(join(folder, "media-stages"));
+  mkdirSync(join(folder, "derivatives"));
+  const names = new Map<string, string>();
+  const header = "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n";
+  const rows = cards.map((card) => {
+    const definition = `---\nplatform: quote-card\n${card.scheme ? `scheme: ${card.scheme}\n` : ""}source_lines: [4]\n---\n\n${card.quote}\n`;
+    const name = configuredCardRenderDerivative({ media: card.media, definition, sourceLine: configuredCardSourceLine(folder) });
+    names.set(card.id, name);
+    writeFileSync(join(folder, "derivatives", `${name}.md`), definition);
+    writeFileSync(join(folder, "derivatives", `${card.id}.md`), `---\nplatform: ${card.platform}\n---\n\nPost text for ${card.platform}.\n`);
+    writeFileSync(join(folder, "media-stages", `${card.id}.json`), JSON.stringify({
+      version: "configured-media-stage-v1", id: card.id, platform: card.platform, media: card.media,
+      status: "staged", stage: "render-required", derivativePath: `derivatives/${card.id}.md`,
+      quoteDerivativePath: `derivatives/${name}.md`,
+      outputPath: configuredCardImagePath(card.media, name),
+      plan: { kind: "quote-render-plan", sourceText: card.quote }, primitives: ["injected"],
+    }));
+    return `| ${card.id} | ${card.platform} | image | media-stages/${card.id}.json | — | — | — | pending | | from GUI queue |\n`;
+  });
+  writeFileSync(join(folder, "review-queue.md"), header + rows.join(""));
+  return { folder, names };
+}
+
+/**
+ * A `npm` shim that logs its argv and writes exactly the files the real still renderer writes.
+ *
+ * `bytes` marks whose output a file holds; `fail` reproduces the case existence alone cannot see (a
+ * renderer that creates both output paths and THEN dies, leaving truncated files behind); and
+ * `produce: false` is the renderer that exits 0 having written nothing at all.
+ */
+function fakeRenderer(
+  folder: string,
+  options: { readonly bytes?: string; readonly fail?: boolean; readonly produce?: boolean; readonly log?: string } = {},
+): { dir: string; log: string; calls: () => string[][] } {
+  const dir = mkdtempSync(join(tmpdir(), "fake-npm-"));
+  const log = options.log ?? join(dir, "calls.log");
+  const images = JSON.stringify(join(folder, "images"));
+  const writes = options.produce === false ? [] : [
+    `mkdir -p ${images}`,
+    `printf '%s' ${JSON.stringify(options.bytes ?? "rendered")} > ${images}/"$last".png`,
+    `printf '%s' ${JSON.stringify(options.bytes ?? "rendered")} > ${images}/"$last".mp4`,
+  ];
+  writeFileSync(join(dir, "npm"), [
+    "#!/bin/sh",
+    `printf '%s\\n' "$*" >> ${JSON.stringify(log)}`,
+    'for a in "$@"; do last="$a"; done',
+    ...writes,
+    options.fail ? "exit 1" : "",
+    "",
+  ].join("\n"));
+  chmodSync(join(dir, "npm"), 0o755);
+  return {
+    dir, log,
+    calls: () => (existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean).map((line) => line.split(" ")) : []),
+  };
+}
+
+async function withFakeNpm<T>(dir: string, task: () => Promise<T>): Promise<T> {
+  const previous = process.env.PATH;
+  process.env.PATH = `${dir}:${previous ?? ""}`;
+  try { return await task(); } finally { process.env.PATH = previous; }
+}
+
+test("SLICE-5I: two platforms whose card is identical render once and both rows promote to that one file", async () => {
+  const quote = "Careful teams ship the smaller first step.";
+  const { folder, names } = cardRequestFolder([
+    { id: "linkedin-card", platform: "linkedin", media: "static-quote-card", quote },
+    { id: "bluesky-card", platform: "bluesky", media: "static-quote-card", quote },
+  ]);
+  const npm = fakeRenderer(folder);
+  const costLog = join(repoRoot, "data", "cost-log.csv");
+  const costBefore = existsSync(costLog) ? readFileSync(costLog, "utf8") : null;
+  try {
+    // The render inputs, not the variant id or the platform, decide the name.
+    assert.equal(names.get("linkedin-card"), names.get("bluesky-card"));
+    const shared = names.get("linkedin-card")!;
+    assert.doesNotMatch(shared, /linkedin|bluesky|card-quote$/, "the name encodes neither a platform nor a variant id");
+
+    for (const id of ["linkedin-card", "bluesky-card"]) {
+      approveConfiguredMediaStage(folder, id);
+      const result = await withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, id, defaultConfiguredMediaRenderer));
+      assert.equal(result.primaryAsset, `images/${shared}.png`, `${id} promotes to the shared render`);
+      assert.equal(result.costUsd, 0, "the card renderer is free");
+    }
+
+    // One render, one file. The second platform reused the first's output instead of re-rendering,
+    // and its promotion did not fail because the file already existed.
+    const calls = npm.calls();
+    assert.equal(calls.length, 1, "the identical card is rendered exactly once");
+    assert.deepEqual(calls[0].slice(-2), ["--quote", shared]);
+    assert.deepEqual(readdirSync(join(folder, "images")).sort(), [`${shared}.mp4`, `${shared}.png`]);
+
+    // Each platform keeps its own row, its own post text, and its own review state; only the image
+    // is shared.
+    const rows = readQueue(folder).rows;
+    assert.deepEqual(rows.map((row) => row.asset), [`images/${shared}.png`, `images/${shared}.png`]);
+    assert.deepEqual(rows.map((row) => row.platform), ["linkedin", "bluesky"]);
+    assert.deepEqual(rows.map((row) => row.status), ["pending", "pending"], "sharing publishes nothing");
+    assert.notEqual(
+      readFileSync(join(folder, "derivatives/linkedin-card.md"), "utf8"),
+      readFileSync(join(folder, "derivatives/bluesky-card.md"), "utf8"),
+      "each platform keeps its own post text",
+    );
+    for (const id of ["linkedin-card", "bluesky-card"]) {
+      assert.equal(JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8")).status, "rendered");
+      assert.ok(existsSync(join(folder, "configured-media", id, "render-manifest.json")), `${id} keeps its own render manifest`);
+    }
+
+    // Extraction-first: the shared render paints the approved quote and nothing else.
+    assert.equal(splitFrontmatter(readFileSync(join(folder, "derivatives", `${shared}.md`), "utf8")).body.trim(), quote);
+
+    // A free local render logs no cost row, so sharing one adds none.
+    assert.equal(existsSync(costLog) ? readFileSync(costLog, "utf8") : null, costBefore, "a shared card render appends no cost row");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(npm.dir, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: cards whose render inputs genuinely differ are never collapsed into one render", async () => {
+  const quote = "Careful teams ship the smaller first step.";
+  const cards = [
+    { id: "same-text-still", platform: "linkedin", media: "static-quote-card", quote },
+    // Same words, different deliverable: a .png and a .mp4 are two renders, never one.
+    { id: "same-text-animated", platform: "bluesky", media: "animated-quote-card", quote },
+    // Same words, different palette: the scheme is painted, so it splits the key.
+    { id: "other-scheme", platform: "x", media: "static-quote-card", quote, scheme: "ink" },
+    // Different words entirely.
+    { id: "other-quote", platform: "substack", media: "static-quote-card", quote: "Roadmaps fail for boring reasons." },
+  ] as const;
+  const { folder, names } = cardRequestFolder(cards);
+  const npm = fakeRenderer(folder);
+  try {
+    assert.equal(new Set(names.values()).size, cards.length, "four distinct cards, four distinct render names");
+    for (const card of cards) {
+      approveConfiguredMediaStage(folder, card.id);
+      await withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, card.id, defaultConfiguredMediaRenderer));
+    }
+    assert.equal(npm.calls().length, cards.length, "each distinct card renders on its own");
+    const rows = readQueue(folder).rows;
+    assert.equal(new Set(rows.map((row) => row.asset)).size, cards.length, "and each row promotes to its own file");
+    assert.equal(rows.find((row) => row.id === "same-text-animated")!.asset, `images/${names.get("same-text-animated")}.mp4`);
+    assert.equal(rows.find((row) => row.id === "same-text-still")!.asset, `images/${names.get("same-text-still")}.png`);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(npm.dir, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: a definition swapped under a content-addressed name is refused before anything renders", async () => {
+  const { folder, names } = cardRequestFolder([
+    { id: "linkedin-card", platform: "linkedin", media: "static-quote-card", quote: "Careful teams ship the smaller first step." },
+  ]);
+  const npm = fakeRenderer(folder);
+  try {
+    const stage = approveConfiguredMediaStage(folder, "linkedin-card");
+    // The plan digest covers the quote text, but a definition also carries the `scheme:` that picks
+    // the palette. Repainting the approved words in an unapproved treatment breaks the name's claim
+    // about its own bytes, so the render refuses instead of reusing or producing the wrong card.
+    writeFileSync(
+      join(folder, "derivatives", `${names.get("linkedin-card")}.md`),
+      `---\nplatform: quote-card\nscheme: ink\nsource_lines: [4]\n---\n\nCareful teams ship the smaller first step.\n`,
+    );
+    await assert.rejects(
+      withFakeNpm(npm.dir, () => defaultConfiguredMediaRenderer(stage, folder)),
+      /no longer matches the render inputs its name encodes/,
+    );
+    assert.equal(npm.calls().length, 0, "a refused card render spawns nothing");
+    assert.equal(existsSync(join(folder, "images")), false, "and writes no image");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(npm.dir, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: a render that dies after creating its output paths is re-run, never promoted as leftovers", async () => {
+  const { folder, names } = cardRequestFolder([
+    { id: "linkedin-card", platform: "linkedin", media: "static-quote-card", quote: "Careful teams ship the smaller first step." },
+  ]);
+  const shared = names.get("linkedin-card")!;
+  const broken = fakeRenderer(folder, { bytes: "truncated", fail: true });
+  const good = fakeRenderer(folder, { bytes: "rendered", log: broken.log });
+  try {
+    approveConfiguredMediaStage(folder, "linkedin-card");
+    // The renderer creates both expected paths and then fails. Existence alone would call this done.
+    await assert.rejects(withFakeNpm(broken.dir, () => executeConfiguredMediaStage(folder, "linkedin-card", defaultConfiguredMediaRenderer)));
+    assert.equal(readFileSync(join(folder, "images", `${shared}.png`), "utf8"), "truncated", "the wreckage is on disk");
+    assert.equal(existsSync(join(folder, "media-stages", ".renders", `${shared}.json`)), false, "a failed render leaves no completion marker");
+    assert.equal(JSON.parse(readFileSync(join(folder, "media-stages/linkedin-card.json"), "utf8")).status, "approved", "and nothing was promoted");
+
+    const result = await withFakeNpm(good.dir, () => executeConfiguredMediaStage(folder, "linkedin-card", defaultConfiguredMediaRenderer));
+    assert.equal(good.calls().length, 2, "the retry re-runs the render instead of trusting the leftovers");
+    assert.equal(readFileSync(join(folder, "images", `${shared}.png`), "utf8"), "rendered", "and the promoted file is the completed one");
+    assert.equal(result.primaryAsset, `images/${shared}.png`);
+    assert.ok(existsSync(join(folder, "media-stages", ".renders", `${shared}.json`)), "a completed render is marked");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(broken.dir, { recursive: true, force: true });
+    rmSync(good.dir, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: a second variant never reuses an unmarked output left by a broken render", async () => {
+  const quote = "Careful teams ship the smaller first step.";
+  const { folder, names } = cardRequestFolder([
+    { id: "linkedin-card", platform: "linkedin", media: "static-quote-card", quote },
+    { id: "bluesky-card", platform: "bluesky", media: "static-quote-card", quote },
+  ]);
+  const shared = names.get("linkedin-card")!;
+  const npm = fakeRenderer(folder, { bytes: "rendered" });
+  try {
+    // Exactly what a renderer killed partway leaves behind: both expected paths, no marker.
+    mkdirSync(join(folder, "images"), { recursive: true });
+    for (const extension of ["png", "mp4"]) writeFileSync(join(folder, "images", `${shared}.${extension}`), "truncated");
+
+    approveConfiguredMediaStage(folder, "bluesky-card");
+    const result = await withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, "bluesky-card", defaultConfiguredMediaRenderer));
+    assert.equal(npm.calls().length, 1, "the unmarked output is re-rendered, not reused");
+    assert.equal(readFileSync(join(folder, "images", `${shared}.png`), "utf8"), "rendered");
+    assert.equal(result.primaryAsset, `images/${shared}.png`);
+
+    // Once marked, the sibling really does reuse it: the guard costs nothing when the render is sound.
+    approveConfiguredMediaStage(folder, "linkedin-card");
+    await withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, "linkedin-card", defaultConfiguredMediaRenderer));
+    assert.equal(npm.calls().length, 1, "a marked, complete render is still shared");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(npm.dir, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: the render lane is held on the render name, so variants sharing one card cannot render concurrently", async () => {
+  const quote = "Careful teams ship the smaller first step.";
+  const { folder, names } = cardRequestFolder([
+    { id: "linkedin-card", platform: "linkedin", media: "static-quote-card", quote },
+    { id: "bluesky-card", platform: "bluesky", media: "static-quote-card", quote },
+  ]);
+  const shared = names.get("linkedin-card")!;
+  const npm = fakeRenderer(folder);
+  // Another process holding the RENDER lease, not either variant's stage lease.
+  const held = tryAcquireFileLease(join(folder, "media-stages", ".locks", `${shared}.render.lock`));
+  try {
+    assert.ok(held, "the render lease was free to take");
+    for (const id of ["linkedin-card", "bluesky-card"]) {
+      approveConfiguredMediaStage(folder, id);
+      await assert.rejects(
+        withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, id, defaultConfiguredMediaRenderer)),
+        new RegExp(`configured card render ${shared} is already running`),
+        `${id} waits on the shared render, not on its own stage id`,
+      );
+    }
+    assert.equal(npm.calls().length, 0, "neither variant rendered into the contended paths");
+    assert.equal(existsSync(join(folder, "images")), false);
+  } finally {
+    held?.release();
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(npm.dir, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: repointing an approved stage at another definition invalidates its approval", async () => {
+  const quote = "Careful teams ship the smaller first step.";
+  const { folder } = cardRequestFolder([
+    { id: "linkedin-card", platform: "linkedin", media: "static-quote-card", quote },
+  ]);
+  const npm = fakeRenderer(folder);
+  try {
+    approveConfiguredMediaStage(folder, "linkedin-card");
+    // A second definition holding the SAME approved words in a different palette, written under its
+    // own correctly computed content address, so the name check alone would wave it through.
+    const repainted = `---\nplatform: quote-card\nscheme: ink\nsource_lines: [4]\n---\n\n${quote}\n`;
+    const repaintedName = configuredCardRenderDerivative({ media: "static-quote-card", definition: repainted, sourceLine: configuredCardSourceLine(folder) });
+    writeFileSync(join(folder, "derivatives", `${repaintedName}.md`), repainted);
+    const stagePath = join(folder, "media-stages/linkedin-card.json");
+    const stage = JSON.parse(readFileSync(stagePath, "utf8"));
+    stage.quoteDerivativePath = `derivatives/${repaintedName}.md`;
+    writeFileSync(stagePath, JSON.stringify(stage, null, 2) + "\n");
+
+    await assert.rejects(
+      withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, "linkedin-card", defaultConfiguredMediaRenderer)),
+      /changed after approval/,
+      "the definition a stage points at is part of what was approved",
+    );
+    // Pointing the field at a name that is not a content address does not slip past it either.
+    stage.quoteDerivativePath = "derivatives/linkedin-card-quote.md";
+    writeFileSync(stagePath, JSON.stringify(stage, null, 2) + "\n");
+    await assert.rejects(
+      withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, "linkedin-card", defaultConfiguredMediaRenderer)),
+      /changed after approval/,
+    );
+    assert.equal(npm.calls().length, 0, "no unapproved card was rendered");
+    assert.equal(existsSync(join(folder, "images")), false);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(npm.dir, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: a stage written before quoteDerivativePath existed keeps its digest and still renders", async () => {
+  // Two legacy shapes at once: no recorded definition path, and an id that happens to read like a
+  // content address. Neither may be treated as a claim about the definition's bytes.
+  const legacyId = `card-${"a1b2c3d4".repeat(4)}`;
+  assert.equal(legacyId.length, "card-".length + 32);
+  const folder = mkdtempSync(join(tmpdir(), "configured-media-legacy-"));
+  const npm = fakeRenderer(folder);
+  try {
+    mkdirSync(join(folder, "media-stages"));
+    mkdirSync(join(folder, "derivatives"));
+    const quote = "Roadmaps fail for boring reasons.";
+    const legacy = {
+      version: "configured-media-stage-v1", id: legacyId, media: "static-quote-card",
+      status: "staged", stage: "render-required", plan: { kind: "quote-render-plan", sourceText: quote },
+      primitives: ["injected"],
+    };
+    writeFileSync(join(folder, "media-stages", `${legacyId}.json`), JSON.stringify(legacy));
+    writeFileSync(join(folder, "derivatives", `${legacyId}-quote.md`), `---\nplatform: quote-card\nsource_lines: [4]\n---\n\n${quote}\n`);
+    writeFileSync(join(folder, "review-queue.md"),
+      `| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| ${legacyId} | linkedin | image | media-stages/${legacyId}.json | — | — | — | pending | | from GUI queue |\n`);
+
+    // The digest is byte-for-byte the pre-slice one: adding the field to the input never touched a
+    // stage that does not record it.
+    const approved = approveConfiguredMediaStage(folder, legacyId);
+    assert.equal(approved.approval!.digest, createHash("sha256").update(JSON.stringify({
+      id: legacyId, media: "static-quote-card", stage: "render-required",
+      plan: legacy.plan, primitives: legacy.primitives, sourcePaths: [],
+    })).digest("hex"), "a legacy stage hashes exactly as it did before");
+
+    // And it renders: an unchanged, approved quote is not failed by a name-shape coincidence.
+    const result = await withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, legacyId, defaultConfiguredMediaRenderer));
+    assert.equal(result.primaryAsset, `images/${legacyId}-quote.png`);
+    assert.deepEqual(npm.calls()[0].slice(-2), ["--quote", `${legacyId}-quote`]);
+    // A legacy name is never shared: its image can outlive a re-approved quote, so it re-renders.
+    // It therefore leaves no completion marker either — the marker set is exactly the reusable
+    // renders, never dead state nothing reads.
+    assert.equal(existsSync(join(folder, "media-stages", ".renders", `${legacyId}-quote.json`)), false,
+      "a legacy render is never reusable, so it is never marked");
+    const stagePath = join(folder, "media-stages", `${legacyId}.json`);
+    const { rendered: _finished, ...rerun } = JSON.parse(readFileSync(stagePath, "utf8"));
+    writeFileSync(stagePath, JSON.stringify({ ...rerun, status: "approved" }, null, 2) + "\n");
+    writeFileSync(join(folder, "review-queue.md"),
+      `| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| ${legacyId} | linkedin | image | media-stages/${legacyId}.json | — | — | — | pending | | from GUI queue |\n`);
+    await withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, legacyId, defaultConfiguredMediaRenderer));
+    assert.equal(npm.calls().length, 2, "a legacy per-variant render is never reused");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(npm.dir, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: a render that exits clean having produced nothing fails, addressed or legacy", async () => {
+  // The marker is addressed-only, but the produced-its-assets check is not: a renderer that returns
+  // success and wrote no files is a failure for every card, including one that can never be reused.
+  const quote = "Roadmaps fail for boring reasons.";
+  const addressed = cardRequestFolder([
+    { id: "linkedin-card", platform: "linkedin", media: "static-quote-card", quote },
+  ]);
+  const legacyId = "legacy-card";
+  const legacyFolder = mkdtempSync(join(tmpdir(), "configured-media-empty-"));
+  const silentAddressed = fakeRenderer(addressed.folder, { produce: false });
+  const silentLegacy = fakeRenderer(legacyFolder, { produce: false });
+  try {
+    approveConfiguredMediaStage(addressed.folder, "linkedin-card");
+    await assert.rejects(
+      withFakeNpm(silentAddressed.dir, () => executeConfiguredMediaStage(addressed.folder, "linkedin-card", defaultConfiguredMediaRenderer)),
+      /configured card render produced no verified output/,
+    );
+    assert.equal(existsSync(join(addressed.folder, "media-stages", ".renders")), false, "and nothing was marked complete");
+
+    mkdirSync(join(legacyFolder, "media-stages"));
+    mkdirSync(join(legacyFolder, "derivatives"));
+    writeFileSync(join(legacyFolder, "media-stages", `${legacyId}.json`), JSON.stringify({
+      version: "configured-media-stage-v1", id: legacyId, media: "static-quote-card", status: "staged",
+      stage: "render-required", plan: { kind: "quote-render-plan", sourceText: quote }, primitives: ["injected"],
+    }));
+    writeFileSync(join(legacyFolder, "derivatives", `${legacyId}-quote.md`), `---\nplatform: quote-card\nsource_lines: [4]\n---\n\n${quote}\n`);
+    writeFileSync(join(legacyFolder, "review-queue.md"),
+      `| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| ${legacyId} | linkedin | image | media-stages/${legacyId}.json | — | — | — | pending | | from GUI queue |\n`);
+    approveConfiguredMediaStage(legacyFolder, legacyId);
+    await assert.rejects(
+      withFakeNpm(silentLegacy.dir, () => executeConfiguredMediaStage(legacyFolder, legacyId, defaultConfiguredMediaRenderer)),
+      /configured card render produced no verified output/,
+      "a legacy render still has to prove it produced its assets",
+    );
+    assert.equal(JSON.parse(readFileSync(join(legacyFolder, "media-stages", `${legacyId}.json`), "utf8")).status, "approved");
+  } finally {
+    rmSync(addressed.folder, { recursive: true, force: true });
+    rmSync(legacyFolder, { recursive: true, force: true });
+    rmSync(silentAddressed.dir, { recursive: true, force: true });
+    rmSync(silentLegacy.dir, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5I: reusing a shared render still revalidates the approved quote against the definition", async () => {
+  const quote = "Careful teams ship the smaller first step.";
+  const { folder, names } = cardRequestFolder([
+    { id: "linkedin-card", platform: "linkedin", media: "static-quote-card", quote },
+    { id: "bluesky-card", platform: "bluesky", media: "static-quote-card", quote },
+  ]);
+  const shared = names.get("linkedin-card")!;
+  const npm = fakeRenderer(folder);
+  try {
+    approveConfiguredMediaStage(folder, "linkedin-card");
+    await withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, "linkedin-card", defaultConfiguredMediaRenderer));
+    assert.equal(npm.calls().length, 1);
+    assert.ok(existsSync(join(folder, "media-stages", ".renders", `${shared}.json`)), "the render is marked reusable");
+
+    // The definition is swapped after the render was marked. The reuse path must still validate it
+    // before serving that file to the second stage — the assertion is not skipped when nothing is
+    // spawned.
+    writeFileSync(join(folder, "derivatives", `${shared}.md`), `---\nplatform: quote-card\nsource_lines: [4]\n---\n\nUnapproved text nobody reviewed.\n`);
+    approveConfiguredMediaStage(folder, "bluesky-card");
+    await assert.rejects(
+      withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, "bluesky-card", defaultConfiguredMediaRenderer)),
+      /no longer matches its approved render plan/,
+      "a reused render is only served to a stage whose approved quote still matches the definition",
+    );
+    assert.equal(npm.calls().length, 1, "and the refusal spawns nothing");
+    assert.equal(JSON.parse(readFileSync(join(folder, "media-stages/bluesky-card.json"), "utf8")).status, "approved");
+    assert.equal(readQueue(folder).rows.find((row) => row.id === "bluesky-card")!.asset, "media-stages/bluesky-card.json",
+      "the second row was never promoted onto the shared file");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(npm.dir, { recursive: true, force: true });
+  }
 });
 
 test("render refuses a plan changed after its explicit approval", async () => {
