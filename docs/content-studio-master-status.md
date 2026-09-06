@@ -5,32 +5,23 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight. SLICE-5E (pillar tagging) is **ACCEPTED and merged to local `main`**
-  (2026-09-05, `df26d30`): metadata-only surfacing of the routed pillar from `routing.md` onto
-  derivative frontmatter via `readPillar`, deterministic, no recompute — a Rule-7 self-vet merge, no
-  hold. Gate 4181/484/0. Branch deleted. (SLICE-5D spin before it: ACCEPTED `b8eea12`, Muxin's Rule-7
-  option A — keep 5b's atomic skeleton-gate reject for reflective/fiction-promo → LinkedIn/X; the
-  "fall back to non-case spin" alternative is an optional, unbuilt follow-on to raise only if
-  reflective pieces get blocked in practice.)
-- Last accepted packet: `docs/operations/launch-slices/SLICE-5E.md` (Closeout ACCEPTED; gate
-  4181/484/0). SLICE-5D before it (4178/484/0, + Muxin approval); SLICE-5C (4173/484/0).
+- Current slice: none in flight. Last accepted: **SLICE-5F** (experiment lineage → bets ledger),
+  merged to local `main` (2026-09-05, `44eb355`), gate 4185/485/0. See Progress log for narrative.
+- Last accepted packet: `docs/operations/launch-slices/SLICE-5F.md` (Closeout ACCEPTED). Prior: 5E
+  `df26d30` (4181/484/0), 5D `b8eea12`, 5C, 5B.
 - Blocked on: nothing. Pick the next dependency-ready slice below.
-- Next dependency-ready: any one of the four remaining item-5 capabilities (scoring/soft gate,
-  thread check, quote-card captions, brief directives) — largely independent now
-  that routing (5a), `validate` (5b), source triage (5c), spin (5d), and pillar tagging (5e) have
-  landed; item `3a`
-  (retire `/cycle`'s review+publish steps) is also independently ready and depends on nothing. The
-  5c→spin follow-on is DISCHARGED: 5d un-dormanted the skeleton gate end to end and added the
-  gate-rejection test. The case gate stays intentionally dormant until a configured treatment emits a
-  `case_skeleton: true` beat (a future, unscheduled capability, not one of the five).
-- Last decision: 2026-09-05 — adopt the portable slice protocol; workers get one packet, never this document
-- Repository state: local `main` carries 5e + 5d + 5c + 5b + prior slice-protocol doc commits ahead
-  of `origin/main` by 10 (local-first delivery; push is Muxin's call). No feature branch open. No
-  PRs pushed.
+- Next dependency-ready: (a) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a
+  `posts.*` column from 5F's Placed-log marker and `grade-bets.ts` to key on it (the confirm half;
+  judgment-touching, scope after Muxin sees 5F rows); (b) scoring/soft gate; (c) thread-check —
+  decided as a surfaced flag, never an auto-body-rewrite; (d) quote-card captions; (e) item `3a`
+  (retire `/cycle`'s review+publish). All independent.
+- Last decision: 2026-09-05 — experiments are signal-driven, **tracked and proven, not auto-applied**:
+  build the record/track seam (5F), not machine auto-steering; thread-check surfaces a flag only.
+- Repository state: local `main` ahead of `origin/main` by ~12 (local-first; push is Muxin's call).
+  No feature branch open, no PRs pushed.
 - Design spec for item 5: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
-- Standing constraints: see `## Standing constraints` below before delegating anything
-- Do not read past this block unless the slice packet cites a heading. Everything under
-  `## Progress log` is append-only archive, not a second status source.
+- Standing constraints: see `## Standing constraints` below. Do not read past this block unless a
+  slice packet cites a heading; `## Progress log` is append-only archive, not a second status source.
 
 ## Standing constraints
 
@@ -53,6 +44,31 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — item 5f accepted: experiment lineage recorded into the bets ledger
+
+Reframed the old "brief directives" item-5 slot after a decision from Muxin: the migration is toward
+running **signal-driven content experiments that are tracked and proven, not auto-applied**. That
+settles the shape — build the record/track seam, not machine auto-steering (and thread-check, when it
+comes, surfaces a flag; it never auto-rewrites a body). Scouting then found the actual gap. The
+configured Content path already stamps full experiment lineage onto each experiment derivative's
+frontmatter (`experiment_id`, `experiment_recommendation_id`, `experiment_plan_decision_digest`,
+`experiment_variables` — `configuredExperimentFrontmatter`, `src/review/jobs.ts:682`), so "which post
+is an experiment" is captured at generation. But the measure/confirm chain was broken at the first
+link: `/publish`'s bets recorder (`appendBetPlacement`, `src/publish/queue.ts`) harvested only the
+legacy `from_brief`/`directives_applied` fields and read none of the `experiment_*` lineage, so a
+published experiment post never landed in `briefs/bets.md` **as an experiment**. SLICE-5F closes that
+link: `appendBetPlacement` now writes an additive ` | experiment: <id> | recommendation: <recId>`
+marker read from the frontmatter already handed to it, mirroring the existing `spin`/`cadence`/`cta`
+markers (recommendation guarded on `experiment_id` so it never dangles; absent `experiment_id` →
+byte-identical line). Builder = Claude, single lane; additive measurement-only, no composed prose, so
+no cross-family audit and a Rule-7 self-vet merge (no hold). Coordinator-verified the full diff
+against the packet (segments additive, before the quoted prefix, no other marker reordered) and the
+test block (all four acceptance cases incl. an exact byte-identical baseline). Gate `npm run check`
+unsandboxed **4185/485/0** (+4 tests / +1 suite vs. 5e's 4181/484 — exactly the new marker block).
+Merged to local `main` `44eb355`; branch deleted. Remaining: the experiment-grading follow-on (the
+confirm half — `tag-source` column + `grade-bets` keying, judgment-touching, out of 5F's scope), plus
+scoring/soft gate, thread-check (as a flag), quote-card captions, and `3a`.
 
 ### 2026-09-05 — item 5e accepted: routed pillar surfaced onto Content derivatives
 
