@@ -7,8 +7,8 @@
 // like an atomize job (previously only atomize jobs queued; the other four spawned unbounded).
 // Split out of serve.ts (Codebase review Phase 5c).
 
-import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, createWriteStream, rmSync, realpathSync } from "node:fs";
-import { join, basename, resolve } from "node:path";
+import { readFileSync, writeFileSync, readdirSync, existsSync, lstatSync, mkdirSync, createWriteStream, rmSync, realpathSync } from "node:fs";
+import { join, basename, dirname, resolve, isAbsolute, sep } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -2137,6 +2137,130 @@ export function continueJobProgressed(before: ContinueArtifacts, after: Continue
   return after.rows > before.rows || after.derivatives > before.derivatives;
 }
 
+// There is exactly ONE live producer of `--continue <folder>` today: the notes picker (serve.ts
+// POST /api/notes/pick), which enqueues scaffoldContentFolder's ABSOLUTE dir verbatim.
+// buildFormatArg (above) emits the repo-relative `content/<slug>` shape but currently has no
+// production caller — only its own definition and tests. The relative branch below, and the test
+// covering it, are kept deliberately as cheap insurance for the day that shape comes back, not
+// because a caller exists.
+//
+// The bug this resolver exists to kill: a bare join(repoRoot, folder) concatenates an absolute
+// second argument onto the root instead of discarding it, so the notes path named a directory that
+// never exists. Counts read 0 before and 0 after, a run that worked reported "added no new rows or
+// derivatives", and stampFolderEngine never ran. Normalizing here rather than at the producer keeps
+// the argument the /atomize subprocess actually receives untouched, and gives the containment check
+// one home.
+//
+// Containment canonicalizes both sides first, so a symlink planted at content/escape cannot walk
+// out of the tree (a purely lexical prefix test accepts it, then counts and STAMPS files outside
+// the repository), and so a path alias of the same real directory (macOS /var vs /private/var) is
+// not falsely refused.
+export interface ContinueTarget {
+  folder: string; // as the producer wrote it — what job.error quotes back to Muxin
+  folderAbs: string; // canonical, containment-checked: what the artifact counts actually read
+  lens?: string;
+}
+// Three outcomes, deliberately NOT two. "Unparseable" is an argument this module did not build, and
+// it keeps its historic escape hatch: spawn, verify by exit code only, stamp nothing. "Refused" is
+// a well-formed argument naming a folder outside content/ — a real refusal, which fails the job
+// without spawning anything. Folding the second into the first is how a no-op run on `content` or
+// on a sibling directory came to report success.
+export type ContinueResolution =
+  | { kind: "ok"; target: ContinueTarget }
+  | { kind: "refused"; folder: string }
+  | { kind: "unparseable" };
+
+// The canonical form of a path whose leaf may not exist yet: realpath the deepest ancestor that
+// does exist, then re-append the rest. realpathSync throws on a missing path, and a continue job
+// legitimately names a folder before /atomize has written into it, so the throw is not an answer.
+// Null means "could not establish where this path really points", which is a refusal, never a
+// fallback to the lexical form.
+function canonicalPath(target: string): string | null {
+  const trailing: string[] = [];
+  let head = resolve(target);
+  for (;;) {
+    try {
+      return trailing.length ? join(realpathSync(head), ...trailing) : realpathSync(head);
+    } catch (e) {
+      // ENOENT is the ordinary case: the folder does not exist yet, so step up and keep looking.
+      // Any other errno (EACCES, ELOOP, ENOTDIR) means the answer is unknowable, not "missing".
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") return null;
+      // ENOENT from realpath but the entry itself is there = a dangling symlink. Walking past it
+      // would re-append its NAME under a canonical ancestor and call that contained, while the OS
+      // still follows the link to wherever it actually points.
+      let entry;
+      try {
+        entry = lstatSync(head, { throwIfNoEntry: false });
+      } catch {
+        return null;
+      }
+      if (entry) return null;
+      const parent = dirname(head);
+      if (parent === head) return null; // reached the filesystem root with nothing resolved
+      trailing.unshift(basename(head));
+      head = parent;
+    }
+  }
+}
+
+export function resolveContinueArg(arg: string, root: string = repoRoot): ContinueResolution {
+  const parsed = parseContinueArg(arg);
+  if (!parsed) return { kind: "unparseable" };
+  // No `..` segment, ever, checked before any resolution. resolve() collapses `..` lexically,
+  // ahead of symlinks, so a checked path and the raw string handed to the /atomize subprocess can
+  // name two different directories. No producer emits a `..` segment, and parseContinueArg already
+  // refuses one in a `--cut` value, so this is the existing contract rather than new policy.
+  if (parsed.folder.split(/[\\/]/).includes("..")) return { kind: "refused", folder: parsed.folder };
+  const folderAbs = canonicalPath(isAbsolute(parsed.folder) ? parsed.folder : resolve(root, parsed.folder));
+  const contentRoot = canonicalPath(resolve(root, "content"));
+  if (!folderAbs || !contentRoot || !folderAbs.startsWith(contentRoot + sep)) {
+    return { kind: "refused", folder: parsed.folder };
+  }
+  return { kind: "ok", target: { folder: parsed.folder, folderAbs, lens: parsed.lens } };
+}
+
+// Everything a continue job concludes: did the folder actually grow, what does the job row say,
+// and — on success — the engine stamp and the "→ review" link. Split out of runContinueJob so the
+// verdict is testable against a real folder without spawning `claude`. A refused resolution
+// settles here too, and runContinueJob calls it BEFORE the spawn in that case.
+export function settleContinueRun(
+  // Narrowed to the fields the verdict reads and writes, so a test can hand it a plain job-shaped
+  // object instead of a whole live Job.
+  job: Pick<Job, "id" | "arg" | "engine" | "status" | "slugs" | "error">,
+  resolution: ContinueResolution,
+  before: ContinueArtifacts | null,
+  failure: string | null,
+): void {
+  if (resolution.kind === "refused") {
+    job.status = "failed";
+    job.error = `refused to format ${resolution.folder}: a continue job only runs on a folder inside content/.`;
+    return;
+  }
+  const target = resolution.kind === "ok" ? resolution.target : null;
+  // An unparseable arg degrades to exit-code-only verification rather than failing a run we can't
+  // inspect — and is never stamped.
+  const progressed =
+    !target || !before ? true : continueJobProgressed(before, continueArtifactCounts(target.folderAbs, target.lens));
+  job.status = !failure && progressed ? "done" : "failed";
+  if (job.status === "done") {
+    if (target) {
+      job.slugs = [basename(target.folderAbs)]; // enables the jobs pill's "→ review" jump link
+      try {
+        stampFolderEngine(target.folderAbs, job.engine ?? "claude");
+      } catch {
+        // Deliberate: best-effort tagging only, never fail a working run over it. This is the same
+        // rule the atomize-family branch of drain() already applies to its own stampOrigin/
+        // stampFolderEngine pair, and it is a behaviour change from the pre-SLICE-5M code, where an
+        // exception here escaped before the job settled at all.
+      }
+    }
+    return;
+  }
+  job.error =
+    failure ??
+    `formatting ran but added no new rows or derivatives in ${target?.folder ?? job.arg}. Check the view-log link${logTailSuffix(job.id)}`;
+}
+
 interface AtomizeRunResult {
   code: number | null;
   timedOut: boolean;
@@ -2215,10 +2339,16 @@ async function runDevelopJob(job: Job): Promise<void> {
 // "created no new content folder" error and no "→ review" link (hit by both the notes-pick flow
 // and the Develop tab's Format for platforms). Verified instead by in-folder artifact: queue rows
 // or the targeted derivatives dir grew.
-async function runContinueJob(job: Job): Promise<void> {
-  const parsed = parseContinueArg(job.arg);
-  const folderAbs = parsed ? join(repoRoot, parsed.folder) : null;
-  const before = folderAbs ? continueArtifactCounts(folderAbs, parsed?.lens) : null;
+export async function runContinueJob(job: Job): Promise<void> {
+  const resolved = resolveContinueArg(job.arg);
+  // A refused folder never reaches the subprocess. Settling here, ahead of runAtomizeJob, is the
+  // difference between "refused" and merely "unverified".
+  if (resolved.kind === "refused") {
+    settleContinueRun(job, resolved, null, null);
+    return;
+  }
+  const target = resolved.kind === "ok" ? resolved.target : null;
+  const before = target ? continueArtifactCounts(target.folderAbs, target.lens) : null;
   const result = await runAtomizeJob(job);
   const failure = decodeSpawnFailure(result, job.id, {
     // The rendered name for this step is "Format for platforms" (the vision bans the word
@@ -2227,19 +2357,7 @@ async function runContinueJob(job: Job): Promise<void> {
     timeoutVerb: "Formatting for platforms", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`,
     exitVerb: "Formatting for platforms", includeTailOnTimeout: true,
   });
-  // An unparseable arg (not built by this module) degrades to exit-code-only verification rather
-  // than failing a run we can't inspect.
-  const progressed =
-    !folderAbs || !before ? true : continueJobProgressed(before, continueArtifactCounts(folderAbs, parsed?.lens));
-  job.status = !failure && progressed ? "done" : "failed";
-  if (job.status === "done") {
-    if (parsed) job.slugs = [basename(parsed.folder)]; // enables the jobs pill's "→ review" jump link
-    if (folderAbs) stampFolderEngine(folderAbs, job.engine ?? "claude");
-    return;
-  }
-  job.error =
-    failure ??
-    `formatting ran but added no new rows or derivatives in ${parsed?.folder ?? job.arg}. Check the view-log link${logTailSuffix(job.id)}`;
+  settleContinueRun(job, resolved, before, failure);
 }
 
 

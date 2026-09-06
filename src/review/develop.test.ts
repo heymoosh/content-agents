@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, realpathSync, symlinkSync } from "node:fs";
+import { isAbsolute, join, sep } from "node:path";
 import { tmpdir } from "node:os";
 import {
   readAdvice,
@@ -20,7 +20,18 @@ import {
   contentSessionForFolder,
   type Advice,
 } from "./develop.js";
-import { buildFormatArg, parseContinueArg, continueJobProgressed } from "./jobs.js";
+import {
+  buildFormatArg,
+  parseContinueArg,
+  continueJobProgressed,
+  continueArtifactCounts,
+  resolveContinueArg,
+  settleContinueRun,
+  runContinueJob,
+  jobLogPath,
+} from "./jobs.js";
+import { scaffoldContentFolder } from "../atomize/new-content.js";
+import { repoRoot } from "../db/db.js";
 
 // A minimal content folder: source.md (the verbatim material) + review-queue.md (what makes a
 // folder a real content folder everywhere else in this GUI).
@@ -256,6 +267,376 @@ test("continueJobProgressed: growth in queue rows OR derivatives counts as progr
   assert.equal(continueJobProgressed({ rows: 3, derivatives: 0 }, { rows: 8, derivatives: 0 }), true);
   assert.equal(continueJobProgressed({ rows: 3, derivatives: 2 }, { rows: 3, derivatives: 5 }), true);
   assert.equal(continueJobProgressed({ rows: 3, derivatives: 2 }, { rows: 3, derivatives: 2 }), false);
+});
+
+// ── SLICE-5M: a continue job must inspect the folder that was actually written ───────────────────
+// There is exactly ONE live producer of `--continue <folder>`: the notes picker (serve.ts POST
+// /api/notes/pick), which enqueues scaffoldContentFolder's ABSOLUTE dir. buildFormatArg emits the
+// repo-relative `content/<slug>` shape but has no production caller today — its relative branch and
+// the test below are kept deliberately as cheap insurance, not because a caller exists.
+//
+// The old consumer did join(repoRoot, folder), which concatenates an absolute argument onto the
+// root instead of discarding it, so the notes flow counted artifacts in a directory that does not
+// exist: a run that produced rows and derivatives reported "added no new rows or derivatives" and
+// never reached stampFolderEngine.
+
+const QUEUE_HEADER =
+  "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n" +
+  "|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n";
+const QUEUE_ROW = "| x-1 | x | text | derivatives/x-1.md | 5 | 4 | yes | pending |  | from GUI queue |\n";
+const SCAFFOLD_SUBDIRS = ["derivatives", "images", "video", "ready-to-paste"];
+
+// A scaffolded-but-not-yet-formatted content folder inside a throwaway repo root: source.md, an
+// empty queue, empty subfolders. Pinned to scaffoldContentFolder's real output by the fixture test
+// below, so it cannot drift from what the notes picker actually hands the queue. `root` is
+// realpath'd because macOS hands out /var/... temp dirs that canonicalize to /private/var/...
+function scaffoldedRoot(slug = "2026-09-05-a-note"): { root: string; rawRoot: string; folderAbs: string; slug: string } {
+  const rawRoot = mkdtempSync(join(tmpdir(), "continue-root-"));
+  const root = realpathSync(rawRoot);
+  const folderAbs = join(root, "content", slug);
+  for (const sub of SCAFFOLD_SUBDIRS) mkdirSync(join(folderAbs, sub), { recursive: true });
+  writeFileSync(join(folderAbs, "source.md"), "---\ntitle: \"A note\"\n---\n\nThe note body.\n");
+  writeFileSync(join(folderAbs, "review-queue.md"), `# Review queue — A note\n\n${QUEUE_HEADER}`);
+  return { root, rawRoot, folderAbs, slug };
+}
+
+// What a working /atomize --continue run leaves behind: one queue row and the derivative it names.
+function runProducedArtifacts(folderAbs: string): void {
+  writeFileSync(join(folderAbs, "review-queue.md"), `# Review queue — A note\n\n${QUEUE_HEADER}${QUEUE_ROW}`);
+  writeFileSync(join(folderAbs, "derivatives", "x-1.md"), "---\nplatform: x\n---\n\nThe drafted post.\n");
+}
+
+function fakeContinueJob(arg: string) {
+  return { id: "job-continue-test", arg, engine: "codex" as const, status: "running" as const, slugs: [] as string[], error: null as string | null };
+}
+
+// A whole job-shaped record, for the one test that drives the real runContinueJob. Deliberately NOT
+// stopped: a stopped job never spawns anyway, which would make a no-spawn assertion prove nothing.
+function fullContinueJob(arg: string) {
+  return {
+    id: "job-slice5m-refused", kind: "continue" as const, label: "Note: refused", arg, engine: "codex" as const,
+    status: "running" as const, slugs: [] as string[], error: null as string | null,
+    createdAt: Date.now(), startedAt: Date.now(), finishedAt: null, lastStdoutLine: null,
+    steps: [] as string[], stepTotal: null, step: 0, failedAtStep: null, retryable: false, ask: null, answer: null,
+    lastSpawn: undefined as { code: number | null; timedOut: boolean; enoent: boolean } | undefined,
+  };
+}
+
+function tableLines(text: string): string[] {
+  return text.split("\n").filter((l) => l.startsWith("|"));
+}
+
+test("the fixture below is the shape scaffoldContentFolder really returns", () => {
+  // R4: pin the synthetic folder to the real scaffolder, so this suite breaks if that shape moves.
+  // Writes into the repo's own content/ (the only place scaffoldContentFolder can write) and
+  // removes it again.
+  const real = scaffoldContentFolder({
+    title: `slice5m fixture check ${Date.now()}`,
+    origin: "pasted-text",
+    publishedAt: null,
+    text: "Fixture body.",
+  });
+  const fx = scaffoldedRoot();
+  try {
+    // The notes picker hands exactly this string to addJob("continue", `--continue ${dir}`).
+    assert.equal(isAbsolute(real), true, "scaffoldContentFolder returns an absolute path");
+    assert.equal(real.startsWith(join(repoRoot, "content") + sep), true);
+    assert.deepEqual(readdirSync(fx.folderAbs).sort(), readdirSync(real).sort());
+    assert.deepEqual(
+      tableLines(readFileSync(join(fx.folderAbs, "review-queue.md"), "utf8")),
+      tableLines(readFileSync(join(real, "review-queue.md"), "utf8")),
+    );
+    // A freshly scaffolded folder is empty by the artifact check's own reckoning, which is what
+    // makes "did this run add anything" a meaningful question.
+    assert.deepEqual(continueArtifactCounts(real), { rows: 0, derivatives: 0 });
+  } finally {
+    rmSync(real, { recursive: true, force: true });
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("a continue job on the notes picker's ABSOLUTE folder concludes 'done' and stamps the engine", () => {
+  const { root, folderAbs, slug } = scaffoldedRoot();
+  try {
+    // Exactly the arg serve.ts POST /api/notes/pick builds: `--continue ` + the absolute dir
+    // scaffoldContentFolder returned.
+    const arg = `--continue ${folderAbs}`;
+    const resolved = resolveContinueArg(arg, root);
+    assert.equal(resolved.kind, "ok", "an absolute folder inside content/ must resolve, not be refused");
+    const target = resolved.kind === "ok" ? resolved.target : null;
+    assert.equal(target!.folderAbs, folderAbs);
+
+    // The regression itself: the old join(root, folder) named a directory that never exists, so
+    // both snapshots were zero no matter what the run wrote.
+    const concatenated = join(root, folderAbs);
+    assert.equal(existsSync(concatenated), false);
+
+    const before = continueArtifactCounts(target!.folderAbs, target!.lens);
+    assert.deepEqual(before, { rows: 0, derivatives: 0 });
+    runProducedArtifacts(folderAbs);
+
+    const job = fakeContinueJob(arg);
+    settleContinueRun(job, resolved, before, null);
+
+    // The outcome, not the path string: the job reports the run worked and links back to the folder.
+    assert.equal(job.status, "done");
+    assert.equal(job.error, null);
+    assert.deepEqual(job.slugs, [slug]);
+    // stampFolderEngine reached the real folder and stamped the derivative the queue row names.
+    assert.match(readFileSync(join(folderAbs, "derivatives", "x-1.md"), "utf8"), /^engine: codex$/m);
+
+    // And the same run, verified the old way, would still have reported failure — proof the test
+    // fixture is not simply always-green.
+    const stale = continueArtifactCounts(concatenated);
+    assert.equal(continueJobProgressed(before, stale), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an absolute folder given by a path ALIAS still resolves to the same real directory", () => {
+  // macOS hands out /var/... and /tmp/... temp dirs whose real paths live under /private/...; a
+  // lexical containment test refuses that alias outright. Canonicalizing both sides accepts it and
+  // lands on the same directory the picker meant.
+  const { root, rawRoot, folderAbs, slug } = scaffoldedRoot();
+  const alias = join(rawRoot, "content", slug);
+  try {
+    assert.notEqual(alias, folderAbs, "this platform's tmpdir is not aliased; the case is untested here");
+    const resolved = resolveContinueArg(`--continue ${alias}`, root);
+    assert.equal(resolved.kind, "ok", "an alias of a folder inside content/ must not be refused");
+    const target = resolved.kind === "ok" ? resolved.target : null;
+    assert.equal(target!.folderAbs, folderAbs);
+
+    const before = continueArtifactCounts(target!.folderAbs, target!.lens);
+    runProducedArtifacts(folderAbs);
+    const job = fakeContinueJob(`--continue ${alias}`);
+    settleContinueRun(job, resolved, before, null);
+    assert.equal(job.status, "done");
+    assert.deepEqual(job.slugs, [slug]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a continue job on buildFormatArg's RELATIVE folder still resolves to the same real directory", () => {
+  // Insurance only: buildFormatArg has no production caller today. Kept so the relative shape is
+  // covered if one returns.
+  const { root, folderAbs, slug } = scaffoldedRoot();
+  try {
+    const resolved = resolveContinueArg(buildFormatArg(slug, "extract"), root);
+    assert.equal(resolved.kind, "ok");
+    const target = resolved.kind === "ok" ? resolved.target : null;
+    assert.equal(target!.folderAbs, folderAbs, "the relative producer must reach the same directory");
+
+    const before = continueArtifactCounts(target!.folderAbs, target!.lens);
+    runProducedArtifacts(folderAbs);
+    const job = fakeContinueJob(buildFormatArg(slug, "extract"));
+    settleContinueRun(job, resolved, before, null);
+    assert.equal(job.status, "done");
+    assert.deepEqual(job.slugs, [slug]);
+
+    // A cut lens rides through resolution unchanged — same folder, lens preserved for the
+    // cuts/<lens>/derivatives snapshot.
+    assert.deepEqual(resolveContinueArg(buildFormatArg(slug, "short"), root), {
+      kind: "ok",
+      target: { folder: `content/${slug}`, folderAbs, lens: "short" },
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a continue run that genuinely produced nothing still reports no progress", () => {
+  const { root, folderAbs, slug } = scaffoldedRoot();
+  try {
+    const arg = `--continue ${folderAbs}`;
+    const resolved = resolveContinueArg(arg, root);
+    const target = resolved.kind === "ok" ? resolved.target : null;
+    const before = continueArtifactCounts(target!.folderAbs, target!.lens);
+    // No runProducedArtifacts() — the subprocess exited clean and wrote nothing.
+    const job = fakeContinueJob(arg);
+    settleContinueRun(job, resolved, before, null);
+    assert.equal(job.status, "failed");
+    assert.match(job.error!, /added no new rows or derivatives/);
+    assert.match(job.error!, new RegExp(slug));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a continue run whose subprocess failed reports 'failed' even though artifacts grew", () => {
+  // R5: growth is necessary, not sufficient. A run that wrote rows and then died still failed, and
+  // the spawn's own message wins over the artifact wording.
+  const { root, folderAbs } = scaffoldedRoot();
+  try {
+    const arg = `--continue ${folderAbs}`;
+    const resolved = resolveContinueArg(arg, root);
+    const target = resolved.kind === "ok" ? resolved.target : null;
+    const before = continueArtifactCounts(target!.folderAbs, target!.lens);
+    runProducedArtifacts(folderAbs);
+    const job = fakeContinueJob(arg);
+    settleContinueRun(job, resolved, before, "Formatting for platforms failed (exit 1)");
+    assert.equal(job.status, "failed");
+    assert.equal(job.error, "Formatting for platforms failed (exit 1)");
+    assert.deepEqual(job.slugs, [], "a failed run gets no review jump link");
+    // And nothing was stamped, because the stamp only ever runs on a done verdict.
+    assert.doesNotMatch(readFileSync(join(folderAbs, "derivatives", "x-1.md"), "utf8"), /engine:/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a folder outside the content tree is REFUSED: the job fails, and nothing outside is read or stamped", () => {
+  const { root, folderAbs } = scaffoldedRoot();
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "continue-outside-")));
+  try {
+    // Traversal, an absolute path elsewhere on disk, and the content root itself are all refused —
+    // where the old join(repoRoot, folder) would have walked straight out of the repository.
+    for (const folder of ["../evil", "content/../../evil", join(outside, "evil"), "content", `${root}-worktrees/x`]) {
+      assert.deepEqual(resolveContinueArg(`--continue ${folder}`, root), { kind: "refused", folder }, folder);
+    }
+    // The pre-existing lens rejection is untouched: an invalid --cut is still refused at parse, and
+    // an argument this module never built stays "unparseable" (its own, older escape hatch).
+    assert.equal(parseContinueArg("--continue content/x --cut ../evil"), null);
+    assert.deepEqual(resolveContinueArg(`--continue ${folderAbs} --cut ../evil`, root), { kind: "unparseable" });
+    assert.deepEqual(resolveContinueArg("https://example.com", root), { kind: "unparseable" });
+
+    // The verdict, not just the resolver: a refused folder FAILS the job. It used to report "done"
+    // for a run that did nothing, because refusal shared the unparseable escape hatch.
+    mkdirSync(join(outside, "derivatives"), { recursive: true });
+    writeFileSync(join(outside, "review-queue.md"), `# Review queue\n\n${QUEUE_HEADER}${QUEUE_ROW}`);
+    const untouched = "---\nplatform: x\n---\n\nSomeone else's file.\n";
+    writeFileSync(join(outside, "derivatives", "x-1.md"), untouched);
+    const job = fakeContinueJob(`--continue ${outside}`);
+    settleContinueRun(job, resolveContinueArg(`--continue ${outside}`, root), null, null);
+    assert.equal(job.status, "failed");
+    assert.match(job.error!, /^refused to format /);
+    assert.match(job.error!, new RegExp(outside.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.deepEqual(job.slugs, [], "a refused folder never gets a review jump link");
+    assert.equal(readFileSync(join(outside, "derivatives", "x-1.md"), "utf8"), untouched);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("a SYMLINK planted inside content/ cannot walk a continue job out of the tree", () => {
+  // A lexical prefix check accepts content/escape and then counts, and STAMPS, files outside the
+  // repository. Canonicalizing both sides before the check is what refuses it.
+  const { root } = scaffoldedRoot();
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "continue-symlink-")));
+  try {
+    mkdirSync(join(outside, "derivatives"), { recursive: true });
+    writeFileSync(join(outside, "review-queue.md"), `# Review queue\n\n${QUEUE_HEADER}${QUEUE_ROW}`);
+    const untouched = "---\nplatform: x\n---\n\nOutside the repository.\n";
+    writeFileSync(join(outside, "derivatives", "x-1.md"), untouched);
+    symlinkSync(outside, join(root, "content", "escape"));
+
+    const arg = "--continue content/escape";
+    const resolved = resolveContinueArg(arg, root);
+    assert.deepEqual(resolved, { kind: "refused", folder: "content/escape" });
+    const job = fakeContinueJob(arg);
+    settleContinueRun(job, resolved, null, null);
+    assert.equal(job.status, "failed");
+    assert.deepEqual(job.slugs, []);
+    assert.equal(readFileSync(join(outside, "derivatives", "x-1.md"), "utf8"), untouched, "no stamp outside the tree");
+    // The same symlink named absolutely is refused too.
+    assert.deepEqual(resolveContinueArg(`--continue ${join(root, "content", "escape")}`, root).kind, "refused");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("a DANGLING symlink inside content/ is refused, not treated as a folder yet to be created", () => {
+  // realpath fails with ENOENT on a dangling link exactly as it does on a folder /atomize has not
+  // written yet. Walking past it re-appends its name under a canonical ancestor and calls that
+  // contained, while the OS keeps following the link outside the tree.
+  const { root } = scaffoldedRoot();
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "continue-dangling-")));
+  try {
+    symlinkSync(join(outside, "not-created"), join(root, "content", "dangling"));
+    assert.equal(existsSync(join(root, "content", "dangling")), false, "the link target really is missing");
+    const resolved = resolveContinueArg("--continue content/dangling", root);
+    assert.deepEqual(resolved, { kind: "refused", folder: "content/dangling" });
+    const job = fakeContinueJob("--continue content/dangling");
+    settleContinueRun(job, resolved, null, null);
+    assert.equal(job.status, "failed");
+    assert.deepEqual(job.slugs, []);
+    // A folder that genuinely does not exist yet is still fine: only the dangling link is refused.
+    assert.equal(resolveContinueArg("--continue content/not-written-yet", root).kind, "ok");
+  } finally {
+    rmSync(join(root, "content", "dangling"), { force: true });
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("a folder whose canonical path cannot be read (EACCES) is refused, not accepted lexically", () => {
+  const { root } = scaffoldedRoot();
+  const locked = join(root, "content", "locked");
+  try {
+    mkdirSync(join(locked, "inner"), { recursive: true });
+    chmodSync(locked, 0o000);
+    if (existsSync(join(locked, "inner"))) return; // running as root: the permission bit means nothing
+    assert.deepEqual(resolveContinueArg("--continue content/locked/inner", root), {
+      kind: "refused",
+      folder: "content/locked/inner",
+    });
+  } finally {
+    chmodSync(locked, 0o755);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a `..` segment is refused before resolution, so the checked path is the one the subprocess gets", () => {
+  // resolve() collapses `..` lexically, ahead of symlinks: `content/link/../marker` checks out as
+  // `content/marker` while the OS, following the real link, lands on `<outside>/marker`. The job
+  // hands the raw string to /atomize, so checking the collapsed form checks a different directory.
+  const { root } = scaffoldedRoot();
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "continue-dotdot-")));
+  try {
+    mkdirSync(join(outside, "child"), { recursive: true });
+    symlinkSync(join(outside, "child"), join(root, "content", "link"));
+    assert.deepEqual(resolveContinueArg("--continue content/link/../marker", root), {
+      kind: "refused",
+      folder: "content/link/../marker",
+    });
+    // The discrepancy the refusal exists to close: the collapsed form names a directory inside the
+    // tree, and it is NOT the directory the OS would have reached.
+    assert.equal(resolveContinueArg("--continue content/marker", root).kind, "ok");
+  } finally {
+    rmSync(join(root, "content", "link"), { force: true });
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("runContinueJob settles a refused folder WITHOUT spawning the formatter", async () => {
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "continue-nospawn-")));
+  // The job is NOT stopped, so nothing short-circuits the spawn path but the refusal branch itself.
+  // Emptying PATH is the safety net: if that branch regresses, the spawn is entered and fails fast
+  // with ENOENT instead of launching a real `/atomize` run — and an entered spawn is exactly what
+  // the assertions below detect (runCommandSpawn opens the job log before spawning, and records
+  // lastSpawn when the child closes).
+  const savedPath = process.env.PATH;
+  const job = fullContinueJob(`--continue ${outside}`);
+  rmSync(jobLogPath(job.id), { force: true }); // a stale log from an earlier run must not mask a spawn
+  try {
+    process.env.PATH = "";
+    await runContinueJob(job);
+  } finally {
+    // Restore absence as absence: assigning `undefined` to an env var stores the string
+    // "undefined", which would follow every later test in this process.
+    if (savedPath === undefined) delete process.env.PATH;
+    else process.env.PATH = savedPath;
+    rmSync(outside, { recursive: true, force: true });
+  }
+  assert.equal(job.status, "failed");
+  assert.match(job.error!, /^refused to format /);
+  assert.doesNotMatch(job.error!, /isn't on this server's PATH/);
+  assert.equal(job.lastSpawn, undefined, "a spawn would have recorded its result on the job");
+  assert.equal(existsSync(jobLogPath(job.id)), false, "a spawn would have opened a job log");
 });
 
 // ── The source picker's tags ────────────────────────────────────────────────────────────────────
