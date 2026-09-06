@@ -13,21 +13,27 @@
 - Blocked on: nothing. Pick the next dependency-ready slice below.
 - Next dependency-ready: (a) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a
   `posts.*` column from 5F's Placed-log marker and `grade-bets.ts` to key on it (the confirm half;
-  judgment-touching, scope after Muxin sees 5F rows); (b) quote-card captions; (c) strategy-brief
-  directives (`from_brief` / `directives_applied` — verified unported: neither string appears in
-  `src/review/jobs.ts`). All independent. **Two §5 rows are now declined, not deferred: the
-  scoring/soft gate and the home-brand thread-check.** Once (b) and (c) land, the §5 port is done and
-  **item `3b`** (retire `/cycle`'s drafting step) unblocks — it is gated on Content being able to do
-  what `/atomize` does, and it takes the stronger verification because it removes a drafting path.
+  judgment-touching, scope after Muxin sees 5F rows); (b) **quote-card post text** (renamed from
+  "captions", 2026-09-05). Independent of each other. **Three §5 rows are now declined, not
+  deferred: the scoring/soft gate, the home-brand thread-check, and the strategy-brief directives.**
+  (b) is the last remaining §5 row, so once it lands the port is done and **item `3b`** (retire
+  `/cycle`'s drafting step) unblocks — it is gated on Content being able to do what `/atomize` does,
+  and it takes the stronger verification because it removes a drafting path. Also open, gated on
+  Muxin connecting accounts, not on any decision: **Charles and Fiction provider delivery** (see
+  Last decision).
   Corrected 2026-09-05: an earlier (d) named item `3a`, which has been DONE since 2026-09-02
-  (`/cycle` SKILL.md carries its "Retired steps" section), and the directives row was missing.
-- Last decision: 2026-09-05 — **scoring/soft gate declined outright** (SLICE-5G): almost nothing
+  (`/cycle` SKILL.md carries its "Retired steps" section).
+- Last decision: 2026-09-05 — **Charles will auto-post** (reversing `/charles` never-posts) and
+  **strategy-brief directives declined**. See the Progress log entry of the same date for both.
+  Before that, 2026-09-05 — **scoring/soft gate declined outright** (SLICE-5G): almost nothing
   reads the scores, the signal was never validated against engagement, and the port cost a model
   call per Studio run. Read `SLICE-5G.md` → `## Closeout result` before re-proposing it. Before
   that, 2026-09-05 — experiments are signal-driven, **tracked and proven, not auto-applied**: build
   the record/track seam (5F), not machine auto-steering; thread-check surfaces a flag only.
 - Standing bar this sets for remaining §5 rows: a capability is worth porting only if something
-  actually consumes its output. Check the consumers before scoping the packet.
+  actually consumes its output. Check the consumers before scoping the packet. Second bar, added
+  2026-09-05: a capability whose job a newer system already does better is redundant even when its
+  own consumers are healthy — check for a parallel chain, not just for a dead one.
 - Repository state: local `main` ahead of `origin/main` by ~12 (local-first; push is Muxin's call).
   No feature branch open, no PRs pushed.
 - Design spec for item 5: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
@@ -55,6 +61,67 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — Charles WILL auto-post; strategy-brief directives DECLINED; quote-card row renamed
+
+Three resolutions from one conversation with Muxin.
+
+**1. Charles auto-posts. The never-posts rule is reversed.** Muxin: "NO I DO want Charles to auto
+post as well as in being reviewed in the Content page etc. I thought that was already clear from the
+fact that Charles page and Fiction page has a way to send a draft of whatever we built on those
+pages into the Content page to start creating social posts for. Why would this be different."
+
+She is right, and the inconsistency was real: `src/review/charles-content-handoff.ts` already sends
+Charles drafts into Content, and then `delivery-policy.ts:32` refuses to dispatch them. Half a
+pipeline. The refusal was not an account gap — it was `charles/AGENTS.md` and CLAUDE.md rule 1's
+Charles exception ("`/charles` never posts — delivery is ready-to-paste, Muxin pastes it herself"),
+which this coordinator read as her standing decision and restated to her. It was not.
+
+Auto-post here means **dispatch after her approval in the queue**, not unreviewed posting. Rule 2 is
+untouched.
+
+Three steps, only the first of which was a decision: (i) the reversal, made here; (ii) a Charles
+provider account connected, plus Fiction's — Muxin, same conversation: "eventually I'd like to link
+up accounts for Fiction and Charles profiles but right now let's just finish getting the Human
+Inference related functionality out the door"; (iii) drop the `mode: "manual"` branch in
+`src/publish/delivery-policy.ts` so Charles routes like any other brand.
+
+**`charles/AGENTS.md` and CLAUDE.md are deliberately NOT yet edited.** They still describe the code
+as it actually behaves today, which is correct until (ii) and (iii) land. Flipping the prose first
+would make the docs lie. Whoever builds (iii) must change all three in the same slice. Fiction is
+the same shape and simpler: its block is purely the missing account (refusing to reuse the Human
+Inference identity), so it clears with config alone, no code decision.
+
+**2. Strategy-brief directives declined — superseded, not dead.** Muxin: "didn't we build the whole,
+'hey it needs to learn what works and proposes experiments' so is the strategy brief just redundant
+now?" Partly. Two parallel learn-and-grade chains exist. Old: brief writes directives → she accepts
+some → stamped `from_brief`/`directives_applied` → `/publish` logs a bet → `/strategy` grades it.
+New (`src/grow/`): Signals proposes an experiment carrying an observation, hypothesis, controlled
+variable and held constants → content request → published with `experiment_id` → graded. Verified
+that nothing bridges them: no caller converts `BriefRecommendation` (`src/review/signals.ts`) into
+`SignalsExperimentRecommendationInput` (`src/grow/experiment-slice.ts`). They duplicate. The newer
+chain states what is being tested; the older one only tags a post with which bullet inspired it.
+
+**The brief itself stays, and this is the load-bearing half of the finding.** Muxin: "I don't want an
+empty Signals page." `readSignals` parses the latest brief for the Signals page's channel-confidence
+table and its DO MORE/TEST/DO LESS list, and the page's "Refresh brief" button runs a real
+`/strategy` (`serve.ts:663`). Delete the brief and Signals goes blank. Only the stamp-and-grade
+mechanism hanging off it is obsolete.
+
+**3. "Quote-card captions" renamed to "quote-card post text."** Muxin: "'captions' isn't really the
+right word, it ought to be 'quote card post text' because you're saying the body of the post itself
+needs to be generated in which case YES agree." The old name read as visual subtext under the image.
+It is the body of the post that carries the card. Confirmed in the same conversation that the
+transport is Typefully (`uploadMedia` + `media_ids`, `src/publish/cards.ts`), not Postiz, and that it
+already works — the gap is only that Studio's Content path cannot generate the per-platform body.
+
+**§5 tally: five ported, three declined, one remaining** (quote-card post text).
+
+**Generalizable finding, second bar for §5.** The scorer and thread-check were declined because
+nothing consumed them. Directives were declined for a different reason: its consumers are healthy,
+but a newer system does its job better. So the archaeology check needs both questions — is anything
+reading this, *and* is something else already doing this. A capability can be alive and still
+redundant.
 
 ### 2026-09-05 — thread-check DECLINED: the scorer's sibling, dropped on the same grounds
 
