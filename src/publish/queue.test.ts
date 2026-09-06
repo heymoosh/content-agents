@@ -450,3 +450,88 @@ describe("cutRowId / rowLens: id-prefix convention for grouping rows by lens", (
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+// appendBetPlacement's experiment-lineage marker (SLICE-5F): when the configured Content path
+// stamps experiment_id / experiment_recommendation_id onto a derivative's frontmatter
+// (configuredExperimentFrontmatter, src/review/jobs.ts), /publish records it as an
+// `| experiment: <id> | recommendation: <id>` segment so the published experiment post lands in
+// briefs/bets.md *as an experiment*. Same isolation mechanism as the cta/cadence blocks above.
+describe("appendBetPlacement: experiment-lineage marker", () => {
+  const originalBetsPath = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+  let testDir: string;
+  let testBetsPath: string;
+
+  before(() => {
+    testDir = mkdtempSync(join(tmpdir(), "queue-bets-experiment-test-"));
+    testBetsPath = join(testDir, "bets.md");
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = testBetsPath;
+  });
+
+  after(() => {
+    if (originalBetsPath === undefined) delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+    else process.env.CONTENT_AGENTS_TEST_BETS_PATH = originalBetsPath;
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function lineFor(rowId: string): string {
+    const line = readFileSync(testBetsPath, "utf8").split("\n").find((l) => l.includes(`[essay-01/${rowId}]`));
+    assert.ok(line, `no Placed-log row found for essay-01/${rowId}`);
+    return line!;
+  }
+
+  test("experiment_id + experiment_recommendation_id writes both segments before the quoted prefix", () => {
+    appendBetPlacement(
+      "essay-01",
+      "x-1",
+      "x",
+      "typefully draft 1",
+      { experiment_id: "experiment:opening", experiment_recommendation_id: "signals:opening" },
+      "some posted text long enough to match"
+    );
+    assert.match(
+      lineFor("x-1"),
+      /\| experiment: experiment:opening \| recommendation: signals:opening \| "some posted text long enough to match"$/
+    );
+  });
+
+  test("experiment_id alone writes the experiment segment and no recommendation segment", () => {
+    appendBetPlacement(
+      "essay-01",
+      "x-2",
+      "x",
+      "typefully draft 2",
+      { experiment_id: "experiment:opening" },
+      "other posted text long enough to match"
+    );
+    const line = lineFor("x-2");
+    assert.match(line, /\| experiment: experiment:opening \|/);
+    assert.ok(!/\| recommendation:/.test(line), "no dangling recommendation segment");
+  });
+
+  test("a recommendation with no experiment_id writes neither segment", () => {
+    appendBetPlacement(
+      "essay-01",
+      "x-3",
+      "x",
+      "typefully draft 3",
+      { experiment_recommendation_id: "signals:opening" },
+      "third posted text long enough to match"
+    );
+    const line = lineFor("x-3");
+    assert.ok(!/\| experiment:/.test(line), "no experiment segment without experiment_id");
+    assert.ok(!/\| recommendation:/.test(line), "no recommendation segment without experiment_id");
+  });
+
+  test("no experiment fields yields a line byte-identical to the pre-change baseline", () => {
+    appendBetPlacement("essay-01", "x-4", "x", "typefully draft 4", {}, "fourth posted text long enough to match");
+    // Strip only the ISO timestamp; the rest of the line must match the pre-SLICE-5F template exactly.
+    const withoutTs = lineFor("x-4").replace(
+      /^- placed \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z /,
+      "- placed <ts> "
+    );
+    assert.equal(
+      withoutTs,
+      '- placed <ts> [essay-01/x-4] x → typefully draft 4 | "fourth posted text long enough to match"'
+    );
+  });
+});

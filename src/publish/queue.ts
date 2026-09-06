@@ -312,7 +312,19 @@ export function appendBetPlacement(
   // this back to stamp posts.cadence_source. Same placement rule as the other markers — before
   // the quoted prefix, so the end-anchored quote regex still finds the text at the line's tail.
   const cadence = cadenceSource ? ` | cadence:${cadenceSource}` : "";
+  // Experiment-lineage marker (SLICE-5F): the configured Content path stamps experiment_id /
+  // experiment_recommendation_id onto each experiment derivative's frontmatter
+  // (configuredExperimentFrontmatter, src/review/jobs.ts). Record it here so a published experiment
+  // post lands in the feedback-loop memory (briefs/bets.md) *as an experiment*, the first link in
+  // the measure/confirm chain. The recommendation segment is only written when experiment_id is
+  // also present, so it never dangles. Same placement rule as the other markers — before the quoted
+  // prefix, so tag-source's end-anchored quote regex still finds the text at the line's tail.
+  const experiment = fm.experiment_id ? ` | experiment: ${String(fm.experiment_id)}` : "";
+  const recommendation =
+    fm.experiment_id && fm.experiment_recommendation_id
+      ? ` | recommendation: ${String(fm.experiment_recommendation_id)}`
+      : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
-  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${outreachMessage}${cta}${cadence}${prefix}`;
+  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${outreachMessage}${cta}${cadence}${experiment}${recommendation}${prefix}`;
   writeFileSync(path, existing.replace(/\n*$/, "\n") + line + "\n");
 }
