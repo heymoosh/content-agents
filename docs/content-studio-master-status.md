@@ -14,8 +14,14 @@
 - Next dependency-ready: (a) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a
   `posts.*` column from 5F's Placed-log marker and `grade-bets.ts` to key on it (the confirm half;
   judgment-touching, scope after Muxin sees 5F rows); (b) thread-check — decided as a surfaced flag,
-  never an auto-body-rewrite; (c) quote-card captions; (d) item `3a` (retire `/cycle`'s
-  review+publish). All independent. **Scoring/soft gate is no longer on this list — declined.**
+  never an auto-body-rewrite; (c) quote-card captions; (d) strategy-brief directives
+  (`from_brief` / `directives_applied` — verified unported: neither string appears in
+  `src/review/jobs.ts`). All independent. **Scoring/soft gate is no longer on this list — declined.**
+  Corrected 2026-09-05: the previous (d) named item `3a`, which has been DONE since 2026-09-02
+  (`/cycle` SKILL.md carries its "Retired steps" section); and the directives row was missing
+  entirely. The real §5 tail is thread-check, quote-card captions, directives. Once all three land,
+  **item `3b`** (retire `/cycle`'s drafting step) unblocks — it is gated on Content being able to do
+  what `/atomize` does, and it takes the stronger verification because it removes a drafting path.
 - Last decision: 2026-09-05 — **scoring/soft gate declined outright** (SLICE-5G): almost nothing
   reads the scores, the signal was never validated against engagement, and the port cost a model
   call per Studio run. Read `SLICE-5G.md` → `## Closeout result` before re-proposing it. Before
