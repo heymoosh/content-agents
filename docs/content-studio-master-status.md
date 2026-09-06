@@ -5,7 +5,19 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight. Last resolved: **SLICE-5K ACCEPTED** (2026-09-06). The Postiz path
+- Current slice: none in flight. Last resolved: **SLICE-5L ACCEPTED** (2026-09-06) — item `3b`,
+  retire `/cycle`'s drafting step, done as a **partial** retirement. Gate **4248/488/0**, no `.ts`
+  file changed. `/cycle` step 3 is retired for the three inputs the Content room was *demonstrated*
+  to handle (Substack essay URL, local text/markdown file, pasted text) and **kept** for two it was
+  demonstrated not to: **voice memos** and **the `/video` offer**. The proof is
+  `docs/operations/launch-slices/SLICE-5L-coverage.md`, one traced code path per input kind.
+  The cross-family audit returned **"do not accept as written"** and was right — the first
+  submission retired `/video` and asserted a Notes path on the strength of code nothing reaches.
+  One repair cycle; the surviving retirements are exactly the set the auditor independently
+  confirmed.
+  **Three production defects were found and deliberately not fixed** (the slice measured the room,
+  it did not change it). They are the next obvious work — see item (d) below.
+- Before that: **SLICE-5K ACCEPTED** (2026-09-06). The Postiz path
   is now the sixth `checkReuse` caller: a row the reuse guard refuses is not created on Postiz,
   claims no slot, is not marked published, and — the part that mattered — does not fall through to
   SLICE-5J's Typefully backup route. A guard block means do not place this row anywhere, not try
@@ -76,14 +88,47 @@
   `blocked` (line 37) — and `human-inference` is `checkReuse`'s default brand. **Giving Charles a
   provider route breaks that equivalence.** Pass the brand at BOTH call sites in the same change,
   or the guard will silently check Charles's rows under the Human Inference brand.
+  **CONFIRMED by Muxin, 2026-09-06: "Brand id will be needed."** This is no longer debt to weigh —
+  it is required work. It does not have to wait for item (c): it is a two-call-site change in
+  `src/review/studio-scheduling.ts` plus tests, cheap and independently verifiable, and it can be
+  taken as its own micro-slice at any point. If it is still unpaid when (c) is scoped, (c) pays it.
   **Muxin's stated priority, 2026-09-06: get Human Inference posting live first.** This item waits
   behind that. Do not start it until she says so.
+  (d) **Three Content-room defects found by SLICE-5L, recorded and unfixed.** Read
+  `SLICE-5L.md` → `## RESULT BLOCK` and `SLICE-5L-coverage.md` items 4-6 before touching any of
+  them. All three are the "listed but not reached" shape, which is now this project's signature bug.
+  **(d1) A successful Notes drafting job reports failure — the only user-visible one, and the one
+  to fix first.** `scaffoldContentFolder` returns an absolute path (`new-content.ts:125`),
+  `serve.ts:1786` enqueues it as `--continue ${r.dir}`, and `runContinueJob` does
+  `join(repoRoot, parsed.folder)` (`jobs.ts:2220`), which concatenates rather than discarding.
+  `continueArtifactCounts` then inspects a directory that does not exist, so before and after are
+  both zero and the job says "formatting ran but added no new rows or derivatives" on a run that
+  worked. `stampFolderEngine` (`jobs.ts:2237`) is in the same unreachable `done` branch and never
+  runs. Reproduced empirically with the real parser, not reasoned about. The user-facing cost is
+  that it teaches Muxin to distrust a feature that works.
+  **(d2) The GUI spawns `/atomize` and `/video` without `--brand`.** `runAtomizeJob`
+  (`jobs.ts:2150`) and `runVideoJob` (`jobs.ts:2163`) both omit it, while
+  `.claude/skills/atomize/SKILL.md:7-8` and `.claude/skills/video/SKILL.md:7-9` each require a
+  canonical brand and forbid a Human Inference fallback. `runDevelopJob` is unaffected —
+  `/develop` takes no brand. **Note the shape:** this is the same class of bug as item (c)'s
+  brandId debt — a brand that must be threaded through and is not. Worth fixing in one pass with it.
+  **(d3) `rowEl` (`page.ts:1466`) is dead code.** Zero callers; the live row renderer is
+  `reviewScanRowEl` (`page.ts:1595`, called at `:1807`). The "Generate storyboard" button lives
+  there, which is why `/cycle` keeps the `/video` offer. `onAction` is wired only at `page.ts:1590`,
+  inside `rowEl`, so its `approve-media-plan` (`:1719`), `render-media` (`:1724`) and
+  `attach-reviewed-media` (`:1729`) branches are unreachable too. **Blast radius not measured — do
+  that before scoping a fix**, and expect it to be bigger than the storyboard button.
 - **§5 is CLOSED** (2026-09-05, SLICE-5H). Five capabilities ported, three declined — the
   scoring/soft gate, the home-brand thread-check, and the strategy-brief directives — and
   quote-card post text shipped. **Item `3b`** (retire `/cycle`'s drafting step) is therefore
   unblocked; it takes the stronger verification because it removes a drafting path. It does NOT need
   to wait on (a) — see the correction below: a Content-room card already has a working publish route.
   Item `3a` has been DONE since 2026-09-02 (`/cycle` SKILL.md carries its "Retired steps" section).
+  **Item `3b` is now scoped as `SLICE-5L.md` and in flight (2026-09-06.)** One caution recorded there
+  and repeated here because it is the standing trap: **"§5 is closed" is not evidence that the
+  Content room does what `/atomize` does.** §5 declined three capabilities outright. The plan's own
+  warning — "retiring drafting first would remove the only working path" — is satisfied by a traced
+  code path per input kind, not by a dependency marked done.
 - **CORRECTION (2026-09-05), retracting a claim this block carried for one revision:** it said a
   Content-room card "cannot publish at all" because `publish:cards` selects only `quote-card`
   platforms (`src/publish/cards.ts:78`). **That was wrong, and `cards.ts` was the wrong file to
@@ -118,7 +163,21 @@
   stopping, without asking what else selects that row — the same "read the list, not the code path"
   failure logged one entry below about the §5 archaeology table. Before filing a "cannot X" finding,
   trace the dispatcher, not one candidate handler.
-- Last decision: 2026-09-06 — **Substack posting gets its own script, modelled on the existing
+- Last decision: 2026-09-06 — **brand id is required, not optional.** Muxin, on the SLICE-5K
+  leftover: "Brand id will be needed." Recorded against item (c) above; may be paid earlier as its
+  own micro-slice.
+  Also 2026-09-06 — **next slice is item `3b`, retiring `/cycle`'s drafting step** (Muxin: "continue
+  with the next slice - retiring /cycle"). Scoped as `SLICE-5L.md`, coverage proof first. The skill
+  is deliberately **not renamed** in that slice — the alignment plan floats "a name that says what
+  they do", but renaming a command Muxin types, referenced across a dozen docs, is a decision she
+  has not made. Coordinator call, reversible, flagged to her. **Outcome: accepted as a partial
+  retirement** — three inputs retired, voice memos and the `/video` offer kept, with three
+  production defects recorded as item (d).
+  **Standing lesson this slice paid for twice in one day:** "§5 is closed" and "the route is in the
+  dispatch table" are the same error wearing different clothes. A retirement, a capability claim, or
+  a "cannot X" finding needs a path traced from something a person clicks to the artifact on disk.
+  Cite the caller, not the definition.
+  Before that, 2026-09-06 — **Substack posting gets its own script, modelled on the existing
   Substack analytics pull; deferred behind getting Human Inference posting live.** See item (c)
   above. It replaces the assumption that Charles and Fiction delivery was waiting on Muxin
   connecting a provider account: the real blocker is that their destination is Substack, which the
@@ -134,8 +193,16 @@
   actually consumes its output. Check the consumers before scoping the packet. Second bar, added
   2026-09-05: a capability whose job a newer system already does better is redundant even when its
   own consumers are healthy — check for a parallel chain, not just for a dead one.
-- Repository state: local `main` ahead of `origin/main` by ~12 (local-first; push is Muxin's call).
+- Repository state: local `main` ahead of `origin/main` by ~24 (local-first; push is Muxin's call).
   No feature branch open, no PRs pushed.
+- Recurring working-tree noise, not a defect: `data/notes-spread-ledger.jsonl` shows as modified
+  most days. The 12:00 `notes-daily` cron (`src/cron/notes-daily.ts`) fetches Muxin's Substack Notes
+  and appends one `{noteId, url, spreadAt, platforms: []}` line per note it has not seen before.
+  `platforms` is always `[]` — the cron **drafts and publishes nothing**; the ledger is a seen-list
+  so tomorrow's run does not re-flag the same note. Actual spreading happens when Muxin runs "Pull
+  Substack Notes" in the review GUI. Leave the appended lines in place; commit them with whatever
+  else is going in, or leave them for the next commit. Never revert them — a reverted line makes the
+  cron re-flag a note she already handled.
 - Design spec for item 5: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
 - Standing constraints: see `## Standing constraints` below. Do not read past this block unless a
   slice packet cites a heading; `## Progress log` is append-only archive, not a second status source.
