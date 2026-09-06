@@ -24,9 +24,10 @@
   aspect: `remotion/Root.tsx:53-75` declares BOTH card Stills (`QuoteCard`, `QuoteImageCard`) at a
   hardcoded 1080x1080, no size prop, no aspect parameter, and `config/platforms.yaml` carries no
   per-platform image dimensions. So there is **no mobile/portrait card variant today** — verified,
-  not assumed. Build the slice as: render once per DISTINCT aspect a request needs, share that
-  render across every platform that takes it. With one aspect in the codebase that is literally one
-  image; adding a portrait size later then costs one extra render, not one per platform.
+  not assumed. **DECIDED (Muxin, 2026-09-05): square only for now, to get the app usable ASAP.**
+  No aspect parameter, no portrait variant, no per-platform dimensions in this slice. The sharing
+  key is still built off render inputs rather than platform, so adding a second aspect later costs
+  one extra render instead of one per platform. Scoped as **`SLICE-5I.md`** (2026-09-05).
   (b) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a `posts.*` column from 5F's
   Placed-log marker and `grade-bets.ts` to key on it (the confirm half; judgment-touching, scope
   after Muxin sees 5F rows).
