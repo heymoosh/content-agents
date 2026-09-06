@@ -20,6 +20,13 @@
   path for one artifact, not two different cards. `/atomize` already does the right thing: ONE image,
   fanned out to per-platform rows. Muxin flagged this directly (2026-09-05): "Don't we just build 1
   image and put it across different places?" **Highest value of the two.**
+  **The correct axis is ASPECT RATIO, not platform** (Muxin, 2026-09-05). Today there is only one
+  aspect: `remotion/Root.tsx:53-75` declares BOTH card Stills (`QuoteCard`, `QuoteImageCard`) at a
+  hardcoded 1080x1080, no size prop, no aspect parameter, and `config/platforms.yaml` carries no
+  per-platform image dimensions. So there is **no mobile/portrait card variant today** — verified,
+  not assumed. Build the slice as: render once per DISTINCT aspect a request needs, share that
+  render across every platform that takes it. With one aspect in the codebase that is literally one
+  image; adding a portrait size later then costs one extra render, not one per platform.
   (b) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a `posts.*` column from 5F's
   Placed-log marker and `grade-bets.ts` to key on it (the confirm half; judgment-touching, scope
   after Muxin sees 5F rows).
@@ -40,7 +47,14 @@
   (`studio-scheduling.ts:460` — "media rows are Postiz-only"). Postiz credentials have been in the
   main-checkout `.env` since 2026-09-02, so the route is live. What IS true is narrower: a
   configured card cannot go through Typefully, and the older `publish:cards` path skips it by
-  design. **Process note:** the false claim came from reading one selector in `cards.ts` and
+  design. That narrower fact is **a real gap, not just a design choice** (raised by Muxin,
+  2026-09-05, who read Typefully as the standing backup — she is right that it is): §"universal
+  capability" row for quote cards allows "native Typefully image drafts only after an explicit
+  unsupported result", but the configured-media row directly below it says "Postiz only; manual
+  ready-to-paste when discovery reports no support". So an `/atomize` card has a Typefully image
+  fallback and a Content-page card does not — and the Content page is the only place Muxin
+  publishes from. Postiz rate-limits at 90 creates/hour instance-wide. Not yet scoped as a slice;
+  note it before shipping (a). **Process note:** the false claim came from reading one selector in `cards.ts` and
   stopping, without asking what else selects that row — the same "read the list, not the code path"
   failure logged one entry below about the §5 archaeology table. Before filing a "cannot X" finding,
   trace the dispatcher, not one candidate handler.
