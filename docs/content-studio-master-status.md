@@ -13,15 +13,14 @@
 - Blocked on: nothing. Pick the next dependency-ready slice below.
 - Next dependency-ready: (a) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a
   `posts.*` column from 5F's Placed-log marker and `grade-bets.ts` to key on it (the confirm half;
-  judgment-touching, scope after Muxin sees 5F rows); (b) thread-check — decided as a surfaced flag,
-  never an auto-body-rewrite; (c) quote-card captions; (d) strategy-brief directives
-  (`from_brief` / `directives_applied` — verified unported: neither string appears in
-  `src/review/jobs.ts`). All independent. **Scoring/soft gate is no longer on this list — declined.**
-  Corrected 2026-09-05: the previous (d) named item `3a`, which has been DONE since 2026-09-02
-  (`/cycle` SKILL.md carries its "Retired steps" section); and the directives row was missing
-  entirely. The real §5 tail is thread-check, quote-card captions, directives. Once all three land,
+  judgment-touching, scope after Muxin sees 5F rows); (b) quote-card captions; (c) strategy-brief
+  directives (`from_brief` / `directives_applied` — verified unported: neither string appears in
+  `src/review/jobs.ts`). All independent. **Two §5 rows are now declined, not deferred: the
+  scoring/soft gate and the home-brand thread-check.** Once (b) and (c) land, the §5 port is done and
   **item `3b`** (retire `/cycle`'s drafting step) unblocks — it is gated on Content being able to do
   what `/atomize` does, and it takes the stronger verification because it removes a drafting path.
+  Corrected 2026-09-05: an earlier (d) named item `3a`, which has been DONE since 2026-09-02
+  (`/cycle` SKILL.md carries its "Retired steps" section), and the directives row was missing.
 - Last decision: 2026-09-05 — **scoring/soft gate declined outright** (SLICE-5G): almost nothing
   reads the scores, the signal was never validated against engagement, and the port cost a model
   call per Studio run. Read `SLICE-5G.md` → `## Closeout result` before re-proposing it. Before
@@ -56,6 +55,34 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — thread-check DECLINED: the scorer's sibling, dropped on the same grounds
+
+Muxin, reading the remaining §5 list: "I would NOT need a thread check. If we retired scorer I don't
+know why we'd keep its sibling." Declined before a packet was written — no code was ever built for
+it, unlike 5G.
+
+The two are the same artifact. `src/atomize/thread-check.ts` was added 2026-07-04, the same day as
+`storytelling.ts` and in the same `/atomize` CLI generation, and its own header comment describes the
+identical contract: Claude judges inline, writes a `thread_check` frontmatter verdict, "never a hard
+gate (surface/suggest only)", and appends a `threadCheckNote()` to the review row's `notes` cell. Its
+only machine consumer is a non-blocking `console.log` at `src/atomize/validate.ts:312`, exactly like
+the scorer's at `:318`. `readQueue` does not read it. Applying the standing consumers bar to it took
+one grep and gave the same answer.
+
+`/atomize` keeps thread-check running as it does today. This declines the *port into Studio*, not the
+existing behavior.
+
+**Where this leaves §5:** five rows ported (routing 5a, validate 5b, source triage 5c, spin 5d,
+pillar 5e), two declined (scoring, thread-check), two remaining (quote-card captions, strategy-brief
+directives).
+
+**The generalizable finding, recorded because it will recur.** The §5 table was built by inventorying
+what `/atomize` does and diffing it against Studio's Content path. That makes it an archaeology list,
+not a requirements list — it inherited the old CLI's leftovers alongside the capabilities Muxin
+actually wants. Two of nine rows turned out to be leftovers. The consumers bar catches those, but a
+cheaper question catches them earlier: **did Muxin ask for this, or did `/atomize` merely happen to
+have it.** Ask that of a row before scoping its packet.
 
 ### 2026-09-05 — item 5g DECLINED: the scoring/soft-gate port, built then dropped
 

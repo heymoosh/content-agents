@@ -166,7 +166,7 @@ The following exist only in the `/atomize` skill and its scripts, and have no eq
 | Pillar tagging and `extracts.md` | `/atomize` step 3, `config/pillars.yaml` |
 | Spin angles per platform | `src/atomize/spin.ts`, `config/platforms.yaml` |
 | ~~Scoring (native, brand, hook, narrative, resonance, CTA) and the soft gate~~ — **DECLINED, will not be ported** (Muxin, 2026-09-05): almost nothing reads the scores (`readQueue` skips those three cells; only `validate.ts:318` prints an advisory), the signal was never validated against real engagement, and the port cost a model call on every Studio run. Reasoning: `docs/operations/launch-slices/SLICE-5G.md` → `## Closeout result`. `/atomize` keeps scoring as it does today. | `src/atomize/storytelling.ts` |
-| Home-brand thread check | `src/atomize/thread-check.ts` |
+| ~~Home-brand thread check~~ — **DECLINED, will not be ported** (Muxin, 2026-09-05): the scorer's sibling, and declined on the same grounds. Same origin (2026-07-04, the `/atomize` CLI), same shape (an advisory verdict written to the unread `notes` cell), same sole machine consumer (a `console.log` at `validate.ts:312`). Muxin: "If we retired scorer I don't know why we'd keep its sibling." `/atomize` keeps it as it does today. | `src/atomize/thread-check.ts` |
 | `npm run validate` (char/word limits, routing gate, skeleton gate, case gate) | `src/atomize/validate.ts` |
 | Per-platform quote-card context captions | `/atomize` step 7 |
 | Strategy brief directives (`from_brief`, `directives_applied`) | `/atomize` step 2 |
