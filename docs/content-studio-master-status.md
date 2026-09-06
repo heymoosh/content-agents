@@ -5,18 +5,24 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight. Last accepted: **SLICE-5F** (experiment lineage → bets ledger),
-  merged to local `main` (2026-09-05, `44eb355`), gate 4185/485/0. See Progress log for narrative.
+- Current slice: none in flight. Last resolved: **SLICE-5G — DECLINED and reverted** (2026-09-05),
+  not merged, nothing left in the tree. Last *accepted*: **SLICE-5F** (experiment lineage → bets
+  ledger), local `main` `44eb355`, gate 4185/485/0. See Progress log for narrative.
 - Last accepted packet: `docs/operations/launch-slices/SLICE-5F.md` (Closeout ACCEPTED). Prior: 5E
   `df26d30` (4181/484/0), 5D `b8eea12`, 5C, 5B.
 - Blocked on: nothing. Pick the next dependency-ready slice below.
 - Next dependency-ready: (a) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a
   `posts.*` column from 5F's Placed-log marker and `grade-bets.ts` to key on it (the confirm half;
-  judgment-touching, scope after Muxin sees 5F rows); (b) scoring/soft gate; (c) thread-check —
-  decided as a surfaced flag, never an auto-body-rewrite; (d) quote-card captions; (e) item `3a`
-  (retire `/cycle`'s review+publish). All independent.
-- Last decision: 2026-09-05 — experiments are signal-driven, **tracked and proven, not auto-applied**:
-  build the record/track seam (5F), not machine auto-steering; thread-check surfaces a flag only.
+  judgment-touching, scope after Muxin sees 5F rows); (b) thread-check — decided as a surfaced flag,
+  never an auto-body-rewrite; (c) quote-card captions; (d) item `3a` (retire `/cycle`'s
+  review+publish). All independent. **Scoring/soft gate is no longer on this list — declined.**
+- Last decision: 2026-09-05 — **scoring/soft gate declined outright** (SLICE-5G): almost nothing
+  reads the scores, the signal was never validated against engagement, and the port cost a model
+  call per Studio run. Read `SLICE-5G.md` → `## Closeout result` before re-proposing it. Before
+  that, 2026-09-05 — experiments are signal-driven, **tracked and proven, not auto-applied**: build
+  the record/track seam (5F), not machine auto-steering; thread-check surfaces a flag only.
+- Standing bar this sets for remaining §5 rows: a capability is worth porting only if something
+  actually consumes its output. Check the consumers before scoping the packet.
 - Repository state: local `main` ahead of `origin/main` by ~12 (local-first; push is Muxin's call).
   No feature branch open, no PRs pushed.
 - Design spec for item 5: `docs/content-room-alignment-plan.md` §5 and §Dependencies and running order
@@ -44,6 +50,44 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — item 5g DECLINED: the scoring/soft-gate port, built then dropped
+
+Scoped, built, verified, and then reverted unmerged on Muxin's decision. Recording it because the
+reasoning generalizes to the remaining §5 rows.
+
+The packet (`SLICE-5G.md`) would have had `generateConfiguredContent` score every derivative on the
+six `/atomize` dimensions and surface the storytelling soft gate. Scouting had already found the
+awkward part: no deterministic scorer exists anywhere in the repo — in `/atomize` the scores are
+Claude's inline judgment, and `storytelling.ts` is only the plumbing that reads them. So the port
+could not be a code move; the configured path would have to actually judge, which meant introducing
+the first non-composition model call into that path. The design answered that carefully (one batched
+call strictly after bodies are written, injectable, fail-open, below the `gateViolations` throw so no
+score could reach the abort path, on the $0 subscription analyst seam). The builder delivered it
+complete: 182 focused tests passing, `tsc` clean, 88/88 regression unsandboxed, and a live canary
+that made one call at `costUsd: 0` and parsed correctly.
+
+Muxin then questioned the premise — "I don't remember EVER using a scorer on my content BEFORE we
+published" — and the check that followed ended the slice. **Almost nothing reads the scores.**
+`readQueue` (`src/publish/queue.ts:57`) parses cells 1,2,3,4 and jumps to cell 8 for status; the
+`native`/`brand`/`cta` cells are never read. Publishing, `tag-source.ts`, `grade-bets.ts`, and
+`resonance` never see them. The only machine consumer in the repository is `validate.ts:318`, which
+prints one non-blocking advisory line. The scores are numbers in a table for a human's eyes. Nor was
+the signal ever validated: Claude grading its own draft has never been tested against real
+engagement. And the port carried a real cost — the scorer fired on *every* configured run, unlike
+every other model call in that path, which is why the first regression pass spawned live CLI calls
+inside `npm test` (254s) and broke 5E's byte-identity assertion. The builder guarded it correctly,
+but the need for a guard was the tell.
+
+Declined, not deferred. Working tree restored; nothing committed. `/atomize` keeps scoring exactly as
+it does today (real queues have carried `| 5 | 4 | yes |` and `flag: spin pass suggested (low:
+narrative)` since June) and `storytelling.ts` is untouched. Two narrower successors were offered and
+not taken — port only the storytelling flag into the notes cell, or first prove the scores predict
+engagement — both recorded in the packet's closeout so the reasoning is not relitigated from scratch.
+
+The generalizable lesson, now a line in START HERE: a §5 capability is worth porting only if
+something actually consumes its output. Check the consumers before scoping the packet, not after
+building it. That check costs one grep; skipping it cost a full slice.
 
 ### 2026-09-05 — item 5f accepted: experiment lineage recorded into the bets ledger
 
