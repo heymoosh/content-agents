@@ -7,6 +7,8 @@ import { getImage } from "../providers/registry.js";
 import { burnCaptions, renderAudiogram } from "../video/burn-captions.js";
 import { logCost } from "../util/cost-log.js";
 import { tryAcquireFileLease } from "../runtime/file-lock.js";
+import { configuredCardQuoteDerivative, isConfiguredCardMedia } from "./configured-media.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
 
 export interface PersistedConfiguredMediaStage {
   version: "configured-media-stage-v1";
@@ -296,6 +298,59 @@ async function attachReviewedConfiguredMediaFilesUnlocked(
   return checkpointConfiguredMedia(folder, id, stage, { primaryAsset, assets: [primaryAsset, ...slides], costUsd: 0 }, promote, "reviewed-attachment");
 }
 
+/**
+ * The exact still-render invocation for a configured card, and the assets it produces.
+ *
+ * The card is drawn from `derivatives/<id>-quote.md` (the short verbatim quote), not from
+ * `derivatives/<id>.md` (the post text that frames it). renderStill names its PNG and MP4 after the
+ * derivative it is handed, so pointing it at the quote companion also moves the rendered card to
+ * `images/<id>-quote.png`/`.mp4`, the same name `buildConfiguredMediaOutputs` records as the
+ * stage's `outputPath`. Exported so the argv and the asset names are checked as values.
+ */
+export function configuredQuoteCardRender(
+  stage: Pick<PersistedConfiguredMediaStage, "id" | "media">,
+  folder: string,
+): {
+  readonly quoteDerivative: string;
+  readonly command: readonly [string, ...string[]];
+  readonly primaryAsset: string;
+  readonly assets: readonly string[];
+} {
+  const quoteName = configuredCardQuoteDerivative(stage.id);
+  const still = `images/${quoteName}.png`;
+  const animated = `images/${quoteName}.mp4`;
+  const isStill = stage.media === "static-quote-card";
+  return {
+    quoteDerivative: `derivatives/${quoteName}.md`,
+    command: ["npm", "run", "render", "--", "--still", folder, "--quote", quoteName],
+    primaryAsset: isStill ? still : animated,
+    assets: isStill ? [still, animated] : [animated, still],
+  };
+}
+
+/**
+ * The approval digest covers the stage plan, but renderStill reads the quote off disk, so the file
+ * is a SECOND render input the digest never saw: editing the companion after approval would paint
+ * unapproved (possibly non-verbatim, possibly over-length) text onto the card. Bind the two here,
+ * before anything is spawned, so the only text that can reach the image is the approved quote.
+ */
+export function assertApprovedCardQuoteOnDisk(
+  stage: Readonly<PersistedConfiguredMediaStage>,
+  folder: string,
+  quoteDerivative: string,
+): void {
+  const approved = (stage.plan as { sourceText?: unknown } | null | undefined)?.sourceText;
+  if (typeof approved !== "string" || !approved.trim()) {
+    throw new Error("approved card stage has no inspectable quote render plan");
+  }
+  const path = join(folder, quoteDerivative);
+  if (!existsSync(path)) throw new Error(`configured card has no quote derivative to render: ${quoteDerivative}`);
+  const onDisk = splitFrontmatter(readFileSync(path, "utf8")).body.trim();
+  if (onDisk !== approved.trim()) {
+    throw new Error(`configured card quote derivative ${quoteDerivative} no longer matches its approved render plan; approve the current quote again`);
+  }
+}
+
 function wordCaptions(text: string): { text: string; startMs: number; endMs: number }[] {
   return text.split(/\s+/).filter(Boolean).map((word, index) => ({ text: word, startMs: index * 320, endMs: (index + 1) * 320 }));
 }
@@ -304,11 +359,12 @@ function wordCaptions(text: string): { text: string; startMs: number; endMs: num
 export const defaultConfiguredMediaRenderer: ConfiguredMediaRenderer = async (stage, folder) => {
   const outDir = join(folder, "configured-media", stage.id);
   mkdirSync(outDir, { recursive: true });
-  if (stage.media === "static-quote-card" || stage.media === "animated-quote-card") {
-    execFileSync("npm", ["run", "render", "--", "--still", folder, "--quote", stage.id], { stdio: "inherit" });
-    const primaryAsset = `images/${stage.id}${stage.media === "static-quote-card" ? ".png" : ".mp4"}`;
-    const companion = `images/${stage.id}${stage.media === "static-quote-card" ? ".mp4" : ".png"}`;
-    return { primaryAsset, assets: [primaryAsset, companion], costUsd: 0 };
+  if (isConfiguredCardMedia(stage.media)) {
+    const render = configuredQuoteCardRender(stage, folder);
+    assertApprovedCardQuoteOnDisk(stage, folder, render.quoteDerivative);
+    const [command, ...args] = render.command;
+    execFileSync(command, args, { stdio: "inherit" });
+    return { primaryAsset: render.primaryAsset, assets: [...render.assets], costUsd: 0 };
   }
   if (stage.media === "short-video-script") {
     const plan = stage.plan as { sourceText?: string; scenes?: string[] };

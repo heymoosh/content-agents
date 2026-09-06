@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { approveConfiguredMediaStage, attachReviewedConfiguredMediaFiles, executeConfiguredMediaStage } from "./configured-media-runtime.js";
+import { approveConfiguredMediaStage, assertApprovedCardQuoteOnDisk, attachReviewedConfiguredMediaFiles, configuredQuoteCardRender, defaultConfiguredMediaRenderer, executeConfiguredMediaStage, type PersistedConfiguredMediaStage } from "./configured-media-runtime.js";
 import { tryAcquireFileLease } from "../runtime/file-lock.js";
 
 const IMAGE_BYTES = {
@@ -21,7 +21,7 @@ function fixture(media: string, id = "m1") {
   return folder;
 }
 
-for (const [media, primary] of [["static-quote-card","images/m1.png"],["animated-quote-card","images/m1.mp4"],["short-video-script","video/short.mp4"],["image","configured-media/m1/image.png"],["image-carousel","configured-media/m1/carousel-manifest.json"],["video-caption-package","configured-media/m1/caption-manifest.json"],["audiogram","configured-media/m1/audiogram.mp4"]] as const) {
+for (const [media, primary] of [["static-quote-card","images/m1-quote.png"],["animated-quote-card","images/m1-quote.mp4"],["short-video-script","video/short.mp4"],["image","configured-media/m1/image.png"],["image-carousel","configured-media/m1/carousel-manifest.json"],["video-caption-package","configured-media/m1/caption-manifest.json"],["audiogram","configured-media/m1/audiogram.mp4"]] as const) {
   test(`${media} requires approval, verifies injected output, then promotes the queue asset`, async () => {
     const folder = fixture(media);
     await assert.rejects(executeConfiguredMediaStage(folder, "m1", async () => ({ primaryAsset: primary, assets:[primary], costUsd:0 })), /not approved/);
@@ -38,6 +38,67 @@ for (const [media, primary] of [["static-quote-card","images/m1.png"],["animated
   });
 }
 
+test("SLICE-5H: a card renders from its quote companion, not from the post text derivative", () => {
+  const still = configuredQuoteCardRender({ id: "treated-eA-c3RhdGljLXF1b3RlLWNhcmQ-c3VtbWFyeQ", media: "static-quote-card" }, "/content/post");
+  assert.equal(still.quoteDerivative, "derivatives/treated-eA-c3RhdGljLXF1b3RlLWNhcmQ-c3VtbWFyeQ-quote.md");
+  assert.deepEqual([...still.command], [
+    "npm", "run", "render", "--", "--still", "/content/post",
+    "--quote", "treated-eA-c3RhdGljLXF1b3RlLWNhcmQ-c3VtbWFyeQ-quote",
+  ]);
+  assert.equal(still.primaryAsset, "images/treated-eA-c3RhdGljLXF1b3RlLWNhcmQ-c3VtbWFyeQ-quote.png");
+  assert.deepEqual([...still.assets], [still.primaryAsset, "images/treated-eA-c3RhdGljLXF1b3RlLWNhcmQ-c3VtbWFyeQ-quote.mp4"]);
+
+  const animated = configuredQuoteCardRender({ id: "m1", media: "animated-quote-card" }, "/content/post");
+  assert.equal(animated.primaryAsset, "images/m1-quote.mp4");
+  assert.deepEqual([...animated.assets], ["images/m1-quote.mp4", "images/m1-quote.png"]);
+  assert.deepEqual([...animated.command].slice(-2), ["--quote", "m1-quote"]);
+});
+
+// A card fixture whose stage plan is an approved quote, with the companion the renderer reads.
+function cardFixture(quote = "Roadmaps fail for boring reasons."): { folder: string; stage: PersistedConfiguredMediaStage } {
+  const folder = fixture("static-quote-card");
+  const path = join(folder, "media-stages/m1.json");
+  const stage = { ...JSON.parse(readFileSync(path, "utf8")), stage: "render-required", plan: { kind: "quote-render-plan", sourceText: quote } };
+  writeFileSync(path, JSON.stringify(stage));
+  mkdirSync(join(folder, "derivatives"));
+  writeFileSync(join(folder, "derivatives/m1-quote.md"), `---\nplatform: quote-card\nsource_lines: [4]\n---\n\n${quote}\n`);
+  return { folder, stage: approveConfiguredMediaStage(folder, "m1") };
+}
+
+test("SLICE-5H: the card renderer refuses before spawning when the quote derivative is missing", async () => {
+  const { folder, stage } = cardFixture();
+  rmSync(join(folder, "derivatives/m1-quote.md"));
+  await assert.rejects(
+    defaultConfiguredMediaRenderer(stage, folder),
+    /no quote derivative to render: derivatives\/m1-quote\.md/,
+  );
+  assert.equal(existsSync(join(folder, "images")), false, "a refused card render writes no image");
+});
+
+test("SLICE-5H: a quote edited after approval never reaches the image", async () => {
+  const approvedQuote = "Roadmaps fail for boring reasons.";
+  const { folder, stage } = cardFixture(approvedQuote);
+  // The approval digest covers the stage plan, but the renderer reads the companion off disk, so
+  // the file is its own unapproved input: swapping it must refuse, not paint the new text.
+  writeFileSync(join(folder, "derivatives/m1-quote.md"), `---\nplatform: quote-card\nsource_lines: [4]\n---\n\nUnapproved text nobody reviewed, and long past the card limit besides.\n`);
+
+  await assert.rejects(
+    defaultConfiguredMediaRenderer(stage, folder),
+    /derivatives\/m1-quote\.md no longer matches its approved render plan/,
+  );
+  assert.equal(existsSync(join(folder, "images")), false, "a refused card render writes no image");
+  assert.equal(JSON.parse(readFileSync(join(folder, "media-stages/m1.json"), "utf8")).status, "approved", "and nothing was promoted");
+
+  // Restoring the approved quote clears the refusal: the check binds text, not file mtime.
+  writeFileSync(join(folder, "derivatives/m1-quote.md"), `---\nplatform: quote-card\nsource_lines: [4]\n---\n\n${approvedQuote}\n`);
+  assert.doesNotThrow(() => assertApprovedCardQuoteOnDisk(stage, folder, "derivatives/m1-quote.md"));
+  // A stage with no inspectable quote plan is refused outright rather than rendering something.
+  assert.throws(
+    () => assertApprovedCardQuoteOnDisk({ ...stage, plan: { kind: "quote-render-plan" } }, folder, "derivatives/m1-quote.md"),
+    /no inspectable quote render plan/,
+  );
+});
+
 test("render refuses a plan changed after its explicit approval", async () => {
   const folder = fixture("image");
   approveConfiguredMediaStage(folder, "m1");
@@ -53,7 +114,7 @@ test("promotion failure checkpoints verified output and retry promotes without r
   let renders = 0;
   const renderer = async (_stage: unknown, root: string) => {
     renders++;
-    const primary = "images/m1.png";
+    const primary = "images/m1-quote.png";
     const out = join(root, primary); mkdirSync(dirname(out), { recursive:true }); writeFileSync(out, "verified once");
     return { primaryAsset: primary, assets: [primary], costUsd: 1.25 };
   };
@@ -67,7 +128,7 @@ test("promotion failure checkpoints verified output and retry promotes without r
   const result = await executeConfiguredMediaStage(folder, "m1", renderer);
   assert.equal(renders, 1, "retry must not rerun a renderer or incur provider cost again");
   assert.equal(result.costUsd, 1.25);
-  assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /images\/m1\.png/);
+  assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /images\/m1-quote\.png/);
   assert.equal(JSON.parse(readFileSync(join(folder, "media-stages/m1.json"), "utf8")).status, "rendered");
 });
 

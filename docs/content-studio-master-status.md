@@ -5,24 +5,33 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight. Last resolved: **SLICE-5G — DECLINED and reverted** (2026-09-05),
-  not merged, nothing left in the tree. Last *accepted*: **SLICE-5F** (experiment lineage → bets
-  ledger), local `main` `44eb355`, gate 4185/485/0. See Progress log for narrative.
-- Last accepted packet: `docs/operations/launch-slices/SLICE-5F.md` (Closeout ACCEPTED). Prior: 5E
-  `df26d30` (4181/484/0), 5D `b8eea12`, 5C, 5B.
+- Current slice: none in flight. Last resolved: **SLICE-5H ACCEPTED** (2026-09-05) — a configured
+  quote card's on-image quote is now separate from its post text; gate 4204/485/0. **This closes
+  the §5 port.**
+- Last accepted packet: `docs/operations/launch-slices/SLICE-5H.md` (Closeout ACCEPTED). Prior: 5F
+  `44eb355` (4185/485/0), 5E `df26d30`, 5D `b8eea12`, 5C, 5B. 5G was declined and reverted.
 - Blocked on: nothing. Pick the next dependency-ready slice below.
-- Next dependency-ready: (a) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a
-  `posts.*` column from 5F's Placed-log marker and `grade-bets.ts` to key on it (the confirm half;
-  judgment-touching, scope after Muxin sees 5F rows); (b) **quote-card post text** (renamed from
-  "captions", 2026-09-05). Independent of each other. **Three §5 rows are now declined, not
-  deferred: the scoring/soft gate, the home-brand thread-check, and the strategy-brief directives.**
-  (b) is the last remaining §5 row, so once it lands the port is done and **item `3b`** (retire
-  `/cycle`'s drafting step) unblocks — it is gated on Content being able to do what `/atomize` does,
-  and it takes the stronger verification because it removes a drafting path. Also open, gated on
-  Muxin connecting accounts, not on any decision: **Charles and Fiction provider delivery** (see
-  Last decision).
-  Corrected 2026-09-05: an earlier (d) named item `3a`, which has been DONE since 2026-09-02
-  (`/cycle` SKILL.md carries its "Retired steps" section).
+- Next dependency-ready, all independent:
+  (a) **Studio cards cannot publish** — found during 5H, its own slice. A configured card row keeps
+  `platform: "linkedin"`/`"x"`, but `publish:cards` selects only `quote-card` platforms
+  (`src/publish/cards.ts:78`), so a card generated in the Content room never reaches the card
+  publisher. 5H made the card's copy correct; this makes it shippable. **Highest value of the three
+  — without it the Content room cannot deliver a card at all.**
+  (b) **one card image shared across platforms** — also found during 5H. Configured generation
+  renders a SEPARATE image per platform (output path keyed per variant id) instead of `/atomize`'s
+  one-image-fanned-out model. Cost and visual-consistency, not correctness.
+  (c) **experiment-grading follow-on** — teach `tag-source.ts` to stamp a `posts.*` column from 5F's
+  Placed-log marker and `grade-bets.ts` to key on it (the confirm half; judgment-touching, scope
+  after Muxin sees 5F rows).
+  Also open, gated on Muxin connecting accounts rather than on any decision: **Charles and Fiction
+  provider delivery** (see Last decision).
+- **§5 is CLOSED** (2026-09-05, SLICE-5H). Five capabilities ported, three declined — the
+  scoring/soft gate, the home-brand thread-check, and the strategy-brief directives — and
+  quote-card post text shipped. **Item `3b`** (retire `/cycle`'s drafting step) is therefore
+  unblocked; it takes the stronger verification because it removes a drafting path. Weigh whether it
+  should wait on (a): until Studio cards can publish, `/atomize` is still the only path that ships a
+  card. Item `3a` has been DONE since 2026-09-02 (`/cycle` SKILL.md carries its "Retired steps"
+  section).
 - Last decision: 2026-09-05 — **Charles will auto-post** (reversing `/charles` never-posts) and
   **strategy-brief directives declined**. See the Progress log entry of the same date for both.
   Before that, 2026-09-05 — **scoring/soft gate declined outright** (SLICE-5G): almost nothing
@@ -61,6 +70,49 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-05 — SLICE-5H ACCEPTED: a card's quote and its post text are finally two things (§5 closed)
+
+Gate 4204/485/0, exit 0, unsandboxed. Packet:
+`docs/operations/launch-slices/SLICE-5H.md` (Closeout ACCEPTED, with `## Audit record` and
+`## Deviations accepted by the coordinator`).
+
+**The row understated the problem.** "Quote-card post text" was listed as a missing capability. It
+was actually a defect: Studio drafted a card variant's body like any ordinary post and then rendered
+**that same string onto the image** (`jobs.ts:1184` → `configured-media.ts:125` → `render.ts:60`).
+One string was the derivative body, the render plan's `sourceText`, and the text painted on the
+card. So a Studio card either wore a full platform post on its face or shipped a bare quote as its
+post body. Either way the quote went out without context — the exact failure `/atomize` step 7 was
+built to prevent (Muxin, 2026-07-03). Two related blind spots came with it: initial drafting gave
+card variants no card-specific instruction at all (`isCardCaption` existed only in the REVISE path,
+and its legacy regex could not match a base64url Studio id).
+
+Fixed by splitting the two texts: `derivatives/<id>.md` keeps the post text, a new
+`derivatives/<id>-quote.md` holds the verbatim ≤180-char quote, and the render plan points at the
+quote. Muxin's 2026-07-03 decision already answered the product question, so it was not re-asked.
+
+**The audit earned its keep.** Codex, against a Claude builder, found that the companion file was a
+SECOND render input the approval digest never covered: `renderStill` reads it off disk, so editing
+it after approval would paint unapproved, possibly non-verbatim text onto the card — defeating the
+guarantee the slice existed to provide. Also that pre-existing cards would be stranded
+(complete-looking, unrenderable, unrepairable), and that the byte-identity criterion had been tested
+for one media value on selected fields rather than bytes. All three closed with outcome-asserting
+tests; the byte baseline was captured for real by stashing the implementation.
+
+**Two card items deferred to their own slices, both found here.** Configured card rows keep
+`platform: "linkedin"`/`"x"` while `publish:cards` selects only `quote-card` platforms
+(`cards.ts:78`), so **a Studio card cannot publish at all today** — 5H made its copy correct without
+making it shippable. And configured generation renders a separate image per platform instead of
+sharing one card. The first is now the highest-value next slice.
+
+**§5 is closed: five ported, three declined, one shipped here.** Item `3b` unblocks, with the
+caveat that `/atomize` remains the only path that can actually ship a card until the publish-routing
+slice lands.
+
+**What the three declines plus this one say together.** The archaeology list produced three rows
+worth nothing and one row that understated a real defect. Reading a capability list is no substitute
+for reading the code path: the same inventory that over-reported dead weight under-reported live
+breakage.
 
 ### 2026-09-05 — Charles WILL auto-post; strategy-brief directives DECLINED; quote-card row renamed
 

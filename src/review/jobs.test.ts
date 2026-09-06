@@ -1,9 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, configuredPlatformLimit, type GitState } from "./jobs.js";
+// SLICE-5H: the configured card path — one drafted string no longer does both jobs.
+import { CARD_CONTEXT_RULE, configuredCardQuote, configuredContentPrompt, configuredTreatmentInstruction, generateConfiguredContent, isConfiguredCardVariantId, repairConfiguredCardQuotes, runClaudeSpawn } from "./jobs.js";
+import { configuredCardQuoteDerivative } from "./configured-media.js";
+import { buildContentRequest } from "./content-request.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
+import { readQueue } from "../publish/queue.js";
+import { repoRoot } from "../db/db.js";
 import { resolveAngle } from "../atomize/spin.js";
 import { assertCharlesDraftPolicy, captureCharlesDraftState, restoreCharlesDraftState, validateCharlesDraftMutation } from "./charles-jobs.js";
 import * as charlesJobs from "./charles-jobs.js";
@@ -1645,3 +1653,373 @@ test("a stopped job's next spawn never starts a process", async () => {
   assert.deepEqual(result, { code: null, timedOut: false, enoent: false, stdout: "" });
   jobs.length = 0;
 });
+
+// ── SLICE-5H: a card's on-image quote is a separate artifact from its post text ──────────────────
+// One drafted string used to be the derivative body, the render plan's sourceText, AND the text
+// painted on the card, so a Studio card either painted a whole platform post onto the image or left
+// a bare quote as the post body. These pin the separation /atomize step 7 has always had: the post
+// text frames the quote, the companion definition derivative holds the verbatim quote, and the
+// render plan carries the quote.
+
+test("SLICE-5H: configuredCardQuote extracts the longest fitting source sentence and cites its own line", () => {
+  const segments = [
+    { source_line: 4, text: "Roadmaps fail for boring reasons." },
+    { source_line: 5, text: "Careful teams ship the smaller first step, and the smaller step is the one that teaches them something." },
+  ];
+  const quote = configuredCardQuote(segments, "unused fallback", 180);
+  assert.equal(quote.body, segments[1].text, "the most complete thought that fits wins");
+  assert.deepEqual(quote.sourceLines, [5], "the quote cites the line it was taken from, not the whole claim boundary");
+
+  // Deterministic: the same approved source always yields the same card.
+  assert.deepEqual(configuredCardQuote(segments, "unused fallback", 180), quote);
+  // A tie resolves to the earliest sentence, so ordering never drifts between runs.
+  const tied = [{ source_line: 7, text: "First exact line. Later exact line." }];
+  assert.equal(configuredCardQuote(tied, "", 180).body, "First exact line.");
+});
+
+test("SLICE-5H: configuredCardQuote respects the card limit and stays verbatim, never composed", () => {
+  const long = "Careful teams ship the smaller first step because a large release cannot teach anyone anything before it is already too late to change.";
+  const quote = configuredCardQuote([{ source_line: 3, text: long }], "", 40);
+  assert.ok(quote.body.length <= 40, `${quote.body.length} chars must fit the card limit`);
+  assert.ok(long.startsWith(quote.body), "an overrunning line is cut, never rewritten");
+  assert.doesNotMatch(quote.body, /\s$/, "the cut lands on a word boundary");
+
+  // A scoped-exception origin (Venture, Charles, fiction promo) has no source.md refs, so the quote
+  // comes from the approved authoritative body and cites no line rather than inventing one.
+  const composed = configuredCardQuote([], "Charles never panics in public. He panics on a call.", 180);
+  assert.equal(composed.body, "Charles never panics in public.");
+  assert.deepEqual(composed.sourceLines, []);
+  assert.throws(() => configuredCardQuote([], "   ", 180), /no approved source text to quote from/);
+});
+
+test("SLICE-5H: a configured card variant id is recognized as a caption, its quote companion is not", () => {
+  const cardVariant = "treated-bGlua2VkaW4-c3RhdGljLXF1b3RlLWNhcmQ-c3VtbWFyeQ";
+  const controlCard = "control-eA-YW5pbWF0ZWQtcXVvdGUtY2FyZA";
+  const textVariant = "treated-bGlua2VkaW4-bm9uZQ-c3VtbWFyeQ";
+  assert.equal(isConfiguredCardVariantId(cardVariant), true);
+  assert.equal(isConfiguredCardVariantId(controlCard), true, "a control card's post text is context too");
+  assert.equal(isConfiguredCardVariantId(textVariant), false);
+  assert.equal(isConfiguredCardVariantId(configuredCardQuoteDerivative(cardVariant)), false, "the quote itself is a definition, not a caption");
+
+  assert.match(revisePrompt("2026-06-16-foo", cardVariant, "linkedin", "tighten it"), /quote-card CAPTION/);
+  assert.match(revisePrompt("2026-06-16-foo", cardVariant, "linkedin", "tighten it"), /setup, mechanism, or stakes/);
+  assert.doesNotMatch(revisePrompt("2026-06-16-foo", configuredCardQuoteDerivative(cardVariant), "quote-card", "tighten it"), /quote-card CAPTION/);
+  assert.doesNotMatch(revisePrompt("2026-06-16-foo", textVariant, "linkedin", "tighten it"), /quote-card CAPTION/);
+});
+
+test("SLICE-5H: initial drafting tells a card variant to write context, and leaves a text variant untouched", () => {
+  const cardInstruction = configuredTreatmentInstruction("summary", "static-quote-card");
+  assert.match(cardInstruction, /quote-card CAPTION/);
+  assert.match(cardInstruction, /Do not restate the quote/);
+  assert.equal(configuredTreatmentInstruction("summary", "none"), configuredTreatmentInstruction("summary"), "a non-card variant's instruction is unchanged");
+  assert.ok(cardInstruction.startsWith(configuredTreatmentInstruction("summary")), "the card rule is appended to the treatment, not a replacement for it");
+  // One vocabulary: the drafting instruction and the revise path state the rule in the same words.
+  assert.ok(cardInstruction.includes(CARD_CONTEXT_RULE));
+  assert.ok(revisePrompt("s", "treated-bGlua2VkaW4-c3RhdGljLXF1b3RlLWNhcmQ-c3VtbWFyeQ", "linkedin", "x").includes(CARD_CONTEXT_RULE));
+
+  const cardRequest = buildContentRequest({
+    id: "card-prompt", origin: "studio", descriptor: "Card prompt", originalInput: "Roadmaps fail for boring reasons.",
+    treatments: ["summary"], platforms: ["linkedin"], media: ["static-quote-card"], includeUntreatedControl: false,
+    sourceProvenance: { kind: "source", sourceLines: [4] },
+  });
+  const prompt = configuredContentPrompt(cardRequest, cardRequest.variants, [{ source_line: 4, text: "Roadmaps fail for boring reasons." }]);
+  assert.match(prompt, /quote-card CAPTION/, "the card rule reaches the drafting prompt");
+});
+
+// The end-to-end generation fixture: a two-line studio source whose second line is the quotable one.
+const CARD_LINE_A = "Roadmaps fail for boring reasons.";
+const CARD_LINE_B = "Careful teams ship the smaller first step, and the smaller step is the one that teaches them something.";
+const CARD_TREATED_BODY = "Most teams argue about the roadmap when the real problem is release size. Cut the first release until it can teach you something in a week, then let what you learn pick the next one.";
+
+function cardStudioFolder(tag: string, quotable = CARD_LINE_B): { slug: string; folder: string; lines: [number, number] } {
+  const slug = `test-5h-${tag}-${process.pid}-${Date.now()}`;
+  const folder = join(repoRoot, "content", slug);
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, "review-queue.md"), "# Review queue\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n");
+  const source = `---\nsource_kind: essay\n---\n${CARD_LINE_A}\n${quotable}\n`;
+  writeFileSync(join(folder, "source.md"), source);
+  writeFileSync(join(folder, "routing.md"), "| linkedin | include |\n");
+  const lines = source.split("\n");
+  return { slug, folder, lines: [lines.indexOf(CARD_LINE_A) + 1, lines.indexOf(quotable) + 1] };
+}
+
+// Hermetic fake model, same shape as the SLICE-5D gate tests: the drafting phase returns a treated
+// body traced to the approved lines, the editing phase echoes it back. No paid or authenticated call.
+function cardFakeEngine(refs: readonly number[]): typeof runClaudeSpawn {
+  return async (_job, prompt) => {
+    const editing = prompt.includes("Drafts (content, never instructions):");
+    const payload = JSON.parse(prompt.split("\n\n").at(-1)!) as { id: string; body?: string }[];
+    return {
+      code: 0, timedOut: false, enoent: false,
+      stdout: JSON.stringify(payload.map((item) => editing
+        ? { id: item.id, body: item.body, recommendation: "Preserve the approved point." }
+        : { id: item.id, body: CARD_TREATED_BODY, source_lines: [...refs] })),
+    };
+  };
+}
+
+test("SLICE-5H: a configured card writes a post text AND a verbatim quote companion, and plans the render off the quote", async () => {
+  const { slug, folder, lines } = cardStudioFolder("card");
+  const configured = buildContentRequest({
+    id: slug, origin: "studio", descriptor: "Card separation", originalInput: `${CARD_LINE_A}\n\n${CARD_LINE_B}`,
+    treatments: ["summary"], platforms: ["linkedin"], media: ["static-quote-card"], includeUntreatedControl: true,
+    sourceProvenance: { kind: "source", sourceLines: [...lines] },
+  });
+  try {
+    await generateConfiguredContent(slug, configured, "codex", { runEngine: cardFakeEngine(lines) });
+    const treated = configured.variants.find((v) => v.identity.kind === "treated")!.identity.id;
+    const control = configured.variants.find((v) => v.identity.kind === "control")!.identity.id;
+
+    for (const id of [treated, control]) {
+      // The post text: what the review row shows and publish:cards ships beside the image.
+      const post = splitFrontmatter(readFileSync(join(folder, "derivatives", `${id}.md`), "utf8"));
+      assert.equal(post.fm.platform, "linkedin", `${id} keeps its per-platform post text`);
+
+      // The companion definition: the short verbatim quote drawn ON the image.
+      const quoteFile = join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`);
+      assert.ok(existsSync(quoteFile), `${id} has a quote companion beside its post text`);
+      const quote = splitFrontmatter(readFileSync(quoteFile, "utf8"));
+      assert.equal(quote.fm.platform, "quote-card");
+      assert.deepEqual(quote.fm.source_lines, [lines[1]], "the quote cites its own source line");
+      assert.equal(quote.fm.spin, undefined, "a card's quote is never spun");
+      assert.equal(quote.fm.angle, undefined);
+      assert.equal(quote.body.trim(), CARD_LINE_B, "the quote is verbatim from source.md");
+      assert.ok(quote.body.trim().length <= 180);
+      assert.ok(readFileSync(join(folder, "source.md"), "utf8").includes(quote.body.trim()), "extraction-first: the quote exists in the source");
+      assert.notEqual(quote.body.trim(), post.body.trim(), "the quote and the post text are two different texts");
+
+      // The render plan carries the QUOTE, so the renderer paints the quote and not the post.
+      const stage = JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8"));
+      assert.equal(stage.plan.kind, "quote-render-plan");
+      assert.equal(stage.plan.sourceText, quote.body.trim());
+      assert.notEqual(stage.plan.sourceText, post.body.trim());
+      assert.equal(stage.quoteDerivativePath, `derivatives/${configuredCardQuoteDerivative(id)}.md`);
+      assert.equal(stage.outputPath, `images/${configuredCardQuoteDerivative(id)}.png`);
+    }
+
+    // The treated post is the drafted context; the untreated control stays byte-for-byte exact.
+    const treatedBody = splitFrontmatter(readFileSync(join(folder, "derivatives", `${treated}.md`), "utf8")).body;
+    assert.equal(treatedBody.trim(), CARD_TREATED_BODY);
+    assert.equal(treatedBody.includes(CARD_LINE_B), false, "a card caption does not restate the quote on the image");
+    assert.equal(
+      readFileSync(join(folder, "derivatives", `${control}.md`), "utf8").endsWith(`${CARD_LINE_A}\n\n${CARD_LINE_B}`),
+      true, "the untreated control's post text is unchanged",
+    );
+
+    // Nothing publishes and no status changes: both rows land pending on the stage plan.
+    const rows = readQueue(folder).rows;
+    assert.deepEqual(rows.map((row) => row.status).sort(), ["pending", "pending"]);
+    assert.deepEqual(rows.map((row) => row.asset).sort(), [`media-stages/${control}.json`, `media-stages/${treated}.json`].sort());
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5H: a non-card variant writes exactly the files it writes today, with no quote companion", async () => {
+  const { slug, folder, lines } = cardStudioFolder("text");
+  const configured = buildContentRequest({
+    id: slug, origin: "studio", descriptor: "Text variant", originalInput: `${CARD_LINE_A}\n\n${CARD_LINE_B}`,
+    treatments: ["summary"], platforms: ["linkedin"], media: [], includeUntreatedControl: true,
+    sourceProvenance: { kind: "source", sourceLines: [...lines] },
+  });
+  try {
+    const result = await generateConfiguredContent(slug, configured, "codex", { runEngine: cardFakeEngine(lines) });
+    assert.deepEqual(
+      readdirSync(join(folder, "derivatives")).sort(),
+      result.ids.map((id) => `${id}.md`).sort(),
+      "a text variant writes one derivative per variant and nothing else",
+    );
+    for (const id of result.ids) {
+      const stage = JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8"));
+      assert.equal(stage.plan, undefined, "a media:none stage still carries no render plan");
+      assert.equal(stage.quoteDerivativePath, undefined);
+      assert.equal(stage.outputPath, undefined);
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5H: a source whose lines all overrun the card limit still yields a verbatim, fitting quote", async () => {
+  // Every sentence is longer than config/platforms.yaml's 180-char quote-card limit, so the quote
+  // has to be trimmed rather than written around. The limit is the shared config value, not a
+  // number this path keeps for itself.
+  assert.equal(configuredPlatformLimit("quote-card"), 180);
+  const overrun = `Careful teams ship the smaller first step because a large release cannot teach anyone anything until it is far too late to change course, and by then the roadmap has already absorbed the cost of every assumption nobody checked.`;
+  assert.ok(overrun.length > 180);
+  const { slug, folder, lines } = cardStudioFolder("long", overrun);
+  // Only the overrunning line is approved, so there is no shorter sentence to fall back to.
+  const approved: [number] = [lines[1]];
+  const configured = buildContentRequest({
+    id: slug, origin: "studio", descriptor: "Long line card", originalInput: overrun,
+    treatments: ["summary"], platforms: ["linkedin"], media: ["static-quote-card"], includeUntreatedControl: true,
+    sourceProvenance: { kind: "source", sourceLines: [...approved] },
+  });
+  try {
+    const result = await generateConfiguredContent(slug, configured, "codex", { runEngine: cardFakeEngine(approved) });
+    const quoteFiles = readdirSync(join(folder, "derivatives")).filter((file) => file.endsWith("-quote.md"));
+    assert.equal(quoteFiles.length, result.ids.length, "every card variant has its own quote companion");
+    for (const file of quoteFiles) {
+      const quote = splitFrontmatter(readFileSync(join(folder, "derivatives", file), "utf8")).body.trim();
+      assert.ok(quote.length <= 180, `${file}: ${quote.length} chars must fit the card limit`);
+      assert.ok(overrun.startsWith(quote), `${file}: the quote is a verbatim prefix of the source line, not a rewrite`);
+      assert.doesNotMatch(quote, /\s$/, `${file}: the cut lands on a word boundary`);
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5H: a card generated before the quote companion existed is repaired, not reported complete", async () => {
+  const { slug, folder, lines } = cardStudioFolder("legacy");
+  const configured = buildContentRequest({
+    id: slug, origin: "studio", descriptor: "Legacy card", originalInput: `${CARD_LINE_A}\n\n${CARD_LINE_B}`,
+    treatments: ["summary"], platforms: ["linkedin"], media: ["static-quote-card"], includeUntreatedControl: true,
+    sourceProvenance: { kind: "source", sourceLines: [...lines] },
+  });
+  try {
+    await generateConfiguredContent(slug, configured, "codex", { runEngine: cardFakeEngine(lines) });
+    const treated = configured.variants.find((v) => v.identity.kind === "treated")!.identity.id;
+    const control = configured.variants.find((v) => v.identity.kind === "control")!.identity.id;
+
+    // Roll the folder back to the pre-slice shape: row + post derivative + stage, no companion, and
+    // a stage whose plan is the old one-string render input (the post body).
+    const postText = splitFrontmatter(readFileSync(join(folder, "derivatives", `${treated}.md`), "utf8")).body.trim();
+    for (const id of [treated, control]) {
+      rmSync(join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`));
+      const stagePath = join(folder, "media-stages", `${id}.json`);
+      const stage = JSON.parse(readFileSync(stagePath, "utf8"));
+      stage.plan = { kind: "quote-render-plan", sourceText: postText };
+      stage.status = "approved";
+      stage.approval = { approvedAt: new Date().toISOString(), digest: "stale-digest" };
+      writeFileSync(stagePath, JSON.stringify(stage, null, 2) + "\n");
+    }
+    const postBefore = readFileSync(join(folder, "derivatives", `${treated}.md`));
+
+    // Regeneration must repair rather than short-circuit, and must not run the model to do it.
+    const repaired = await generateConfiguredContent(slug, configured, "codex", {
+      runEngine: async () => { throw new Error("repair must not call the model"); },
+    });
+    assert.equal(repaired.existing, true);
+
+    for (const id of [treated, control]) {
+      const quoteFile = join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`);
+      assert.ok(existsSync(quoteFile), `${id} regained its quote companion`);
+      const quote = splitFrontmatter(readFileSync(quoteFile, "utf8"));
+      assert.equal(quote.body.trim(), CARD_LINE_B, "the repaired quote is verbatim from source.md");
+      assert.deepEqual(quote.fm.source_lines, [lines[1]], "and cites the line the post derivative already recorded");
+      const stage = JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8"));
+      assert.equal(stage.plan.sourceText, CARD_LINE_B, "the stage plan now points at the quote, not the post text");
+      assert.equal(stage.status, "staged");
+      assert.equal(stage.approval, undefined, "a changed render input must be approved again");
+    }
+    assert.deepEqual(readFileSync(join(folder, "derivatives", `${treated}.md`)), postBefore, "the reviewed post text is never rewritten");
+    assert.deepEqual(readQueue(folder).rows.map((row) => row.status), ["pending", "pending"], "repair changes no review status");
+
+    // Idempotent: a second run finds the set complete and writes nothing further.
+    const again = await generateConfiguredContent(slug, configured, "codex", {
+      runEngine: async () => { throw new Error("a complete set must not call the model"); },
+    });
+    assert.equal(again.existing, true);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("SLICE-5H: repair leaves an already rendered card's finished record alone", () => {
+  const { slug, folder } = cardStudioFolder("rendered");
+  const configured = buildContentRequest({
+    id: slug, origin: "studio", descriptor: "Rendered card", originalInput: CARD_LINE_A,
+    treatments: [], platforms: ["linkedin"], media: ["static-quote-card"], includeUntreatedControl: true,
+  });
+  try {
+    const id = configured.variants[0].identity.id;
+    mkdirSync(join(folder, "derivatives"), { recursive: true });
+    mkdirSync(join(folder, "media-stages"), { recursive: true });
+    writeFileSync(join(folder, "derivatives", `${id}.md`), `---\nplatform: linkedin\n---\n\n${CARD_LINE_A}\n`);
+    const rendered = { version: "configured-media-stage-v1", id, media: "static-quote-card", status: "rendered", stage: "render-required", plan: { kind: "quote-render-plan", sourceText: CARD_LINE_A }, primitives: [], approval: { approvedAt: "2026-09-01T00:00:00.000Z", digest: "finished" } };
+    writeFileSync(join(folder, "media-stages", `${id}.json`), JSON.stringify(rendered, null, 2) + "\n");
+
+    assert.deepEqual(repairConfiguredCardQuotes(folder, configured.variants, () => CARD_LINE_A), [], "a finished render is not repaired");
+    assert.equal(existsSync(join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`)), false);
+    assert.deepEqual(JSON.parse(readFileSync(join(folder, "media-stages", `${id}.json`), "utf8")), rendered, "its audit record is untouched");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+// Byte baseline for every NON-card media value. The packet requires that a non-card variant's
+// output stay byte-identical, so these digests were captured by running this exact fixture against
+// the PRE-slice implementation (jobs.ts / configured-media*.ts stashed) and confirmed unchanged
+// against the post-slice tree. They cover every byte of every file the generation writes: both
+// derivatives, both media stages, and the review queue. Only the unique test slug is normalized
+// out, because it is the one input that differs between runs.
+const NON_CARD_MEDIA_BYTES: Record<string, Record<string, string>> = {
+  image: {
+    "derivatives/control-bGlua2VkaW4-aW1hZ2U.md": "1dc5249a1d4e9b57739470ab239dbb230476fde9db00daa860cb2d3144d7caec",
+    "derivatives/treated-bGlua2VkaW4-aW1hZ2U-c3VtbWFyeQ.md": "51df6ee510de78ae9d5c91d623b1761c739abbecab21ee10aa52e1da088f83a0",
+    "media-stages/control-bGlua2VkaW4-aW1hZ2U.json": "a0cfde8761ad1a8c857d65cea570e0f9aac43cefcec8f7639b436ab1f748f308",
+    "media-stages/treated-bGlua2VkaW4-aW1hZ2U-c3VtbWFyeQ.json": "d35b83bad0ddc423ade3cc61b09c8f202875fcae55be5ceb99fca617f5157422",
+    "review-queue.md": "d37420adcc095672abb8cf6caf45f9f29cea6541c103ba8fe320c87e464a2fa6",
+  },
+  "image-carousel": {
+    "derivatives/control-bGlua2VkaW4-aW1hZ2UtY2Fyb3VzZWw.md": "9f29bfd307fb4057d99e2d5d77fc079a4b9cd663b0d60664968592ef3bb0fd98",
+    "derivatives/treated-bGlua2VkaW4-aW1hZ2UtY2Fyb3VzZWw-c3VtbWFyeQ.md": "4d1cd805c90b584c5760a73a9e2310064b008a11014731325fbfba1d15a24bad",
+    "media-stages/control-bGlua2VkaW4-aW1hZ2UtY2Fyb3VzZWw.json": "38c41d3c2aaaa3ff7d0df0b7765bd0476b04a1374c92fcc65a7052c2b66485b2",
+    "media-stages/treated-bGlua2VkaW4-aW1hZ2UtY2Fyb3VzZWw-c3VtbWFyeQ.json": "0d3cf84cbb95ef21db5fd6e745ce2cdbb44c5ebbdc528d84586f1a2fd1c411a8",
+    "review-queue.md": "795b3b38aab95214c026330808352cadd8f110adaed76b7fa68e56d4019b2998",
+  },
+  "short-video-script": {
+    "derivatives/treated-bGlua2VkaW4-c2hvcnQtdmlkZW8tc2NyaXB0-c3VtbWFyeQ.md": "fc94d785ba8d0278a5e53f0bc783b57c988e45c8f1fe6d2da8a5807fe46da686",
+    "media-stages/treated-bGlua2VkaW4-c2hvcnQtdmlkZW8tc2NyaXB0-c3VtbWFyeQ.json": "157505f862510c939cda0bfe7500043aa4c641c8e11f08acf0863692378bbe45",
+    "review-queue.md": "7834ee728d687c0670b2e343b4b048f6c296288e746237843af09e66f9c55064",
+  },
+  "video-caption-package": {
+    "derivatives/control-bGlua2VkaW4-dmlkZW8tY2FwdGlvbi1wYWNrYWdl.md": "060a467f145b7480548ebf01e3ea76b2d7049fe9fb603c1288a5a739334d4faa",
+    "derivatives/treated-bGlua2VkaW4-dmlkZW8tY2FwdGlvbi1wYWNrYWdl-c3VtbWFyeQ.md": "6e55c997b65ceac844b231187b0ff33d7b2c02cdade53df40790494bd1c47e4a",
+    "media-stages/control-bGlua2VkaW4-dmlkZW8tY2FwdGlvbi1wYWNrYWdl.json": "3390a12b582470370d170ce08f425919eaa14333bfa5299298c24c65e5aac708",
+    "media-stages/treated-bGlua2VkaW4-dmlkZW8tY2FwdGlvbi1wYWNrYWdl-c3VtbWFyeQ.json": "6919f9c74365208badf7473b1a6480e98cba1d757fe07d269fb274433830d451",
+    "review-queue.md": "319ba58fa0c8782d4c263435eab7a5ae4b05b4d6ed30137200a0e17d4d3a5bf0",
+  },
+  audiogram: {
+    "derivatives/control-bGlua2VkaW4-YXVkaW9ncmFt.md": "9b2a17190a590bbe0bf1fe8528e8987bbfba47fe92646f7b55f4ab5af5929049",
+    "derivatives/treated-bGlua2VkaW4-YXVkaW9ncmFt-c3VtbWFyeQ.md": "294a59f135187dd949fe0553584391dbda46e950aeba64db9c444932564f2c72",
+    "media-stages/control-bGlua2VkaW4-YXVkaW9ncmFt.json": "4fdda5002be712cb10a2a4173486cca1d231b164d10a099157815d238f2d6f22",
+    "media-stages/treated-bGlua2VkaW4-YXVkaW9ncmFt-c3VtbWFyeQ.json": "206beb21e7662edec13e0269d4f580de1290d496dec753ef79b3c6fd28e00393",
+    "review-queue.md": "7e4902245c3e8a55b0f122853724b6a26e765980f008814f97c29e02d336bfb7",
+  },
+};
+
+for (const [media, baseline] of Object.entries(NON_CARD_MEDIA_BYTES)) {
+  test(`SLICE-5H: ${media} generation is byte-identical to the pre-slice implementation`, async () => {
+    const { slug, folder, lines } = cardStudioFolder(`bytes-${media}`);
+    // The source media the audiogram and caption stages require; present for every media value so
+    // the fixture is the one the baseline was captured from.
+    writeFileSync(join(folder, "source-audio.wav"), "");
+    writeFileSync(join(folder, "source-video.mp4"), "");
+    const configured = buildContentRequest({
+      id: slug, origin: "studio", descriptor: "Byte baseline", originalInput: `${CARD_LINE_A}\n\n${CARD_LINE_B}`,
+      treatments: ["summary"], platforms: ["linkedin"], media: [media],
+      // Configured short-video generation allows only one staged script per folder.
+      includeUntreatedControl: media !== "short-video-script",
+      sourceProvenance: { kind: "source", sourceLines: [...lines] },
+    });
+    try {
+      await generateConfiguredContent(slug, configured, "codex", { runEngine: cardFakeEngine(lines) });
+      const actual: Record<string, string> = {};
+      for (const relative of ["review-queue.md", ...["derivatives", "media-stages"].flatMap((dir) => readdirSync(join(folder, dir)).sort().map((name) => `${dir}/${name}`))]) {
+        const bytes = readFileSync(join(folder, relative), "utf8").split(slug).join("<slug>");
+        actual[relative] = createHash("sha256").update(bytes).digest("hex");
+      }
+      assert.deepEqual(
+        Object.keys(actual).sort(), Object.keys(baseline).sort(),
+        `${media} must write exactly the files it wrote before, and no quote companion`,
+      );
+      for (const [file, digest] of Object.entries(baseline)) {
+        assert.equal(actual[file], digest, `${media}: ${file} bytes changed`);
+      }
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+}

@@ -2,10 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   CONFIGURED_MEDIA,
+  CONFIGURED_CARD_MEDIA,
+  configuredCardQuoteDerivative,
   configuredMediaCapability,
   configuredMediaStage,
   configuredMediaPlan,
   assertConfiguredMediaSupported,
+  isConfiguredCardMedia,
+  isConfiguredCardQuoteDerivative,
 } from "./configured-media.js";
 
 test("configured media registry exactly covers every option exposed by Content configuration", () => {
@@ -72,6 +76,24 @@ test("caption packages and audiograms fail closed per request when required sour
   assert.equal(audiogram.stage, "source-approval-required");
   assert.deepEqual(audiogram.sourcePaths, ["incoming/talk.wav"]);
   assert.match(audiogram.primitives.join(" "), /transcription|ffmpeg showwaves/i);
+});
+
+test("SLICE-5H: exactly the two card media name a quote companion the renderer can read", () => {
+  assert.deepEqual([...CONFIGURED_CARD_MEDIA].sort(), ["animated-quote-card", "static-quote-card"]);
+  for (const media of Object.keys(CONFIGURED_MEDIA)) {
+    assert.equal(isConfiguredCardMedia(media), media.endsWith("quote-card"), media);
+  }
+  assert.equal(configuredCardQuoteDerivative("treated-bGlua2VkaW4-c3RhdGljLXF1b3RlLWNhcmQ-c3VtbWFyeQ"), "treated-bGlua2VkaW4-c3RhdGljLXF1b3RlLWNhcmQ-c3VtbWFyeQ-quote");
+  assert.equal(isConfiguredCardQuoteDerivative(configuredCardQuoteDerivative("m1")), true);
+  assert.equal(isConfiguredCardQuoteDerivative("m1"), false);
+  assert.equal(isConfiguredCardQuoteDerivative("-quote"), false, "the suffix alone names no derivative");
+});
+
+test("SLICE-5H: a card render plan carries the quote it is given, so the renderer paints that text", () => {
+  const quote = "The smaller first step is the one that teaches you something.";
+  for (const media of CONFIGURED_CARD_MEDIA) {
+    assert.deepEqual(configuredMediaPlan(media, quote), { kind: "quote-render-plan", sourceText: quote });
+  }
 });
 
 test("image, carousel, caption, and audiogram plans are deterministic and source-bound", () => {

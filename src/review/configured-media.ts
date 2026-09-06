@@ -46,6 +46,29 @@ export const CONFIGURED_MEDIA = {
   },
 } as const;
 
+/** The two media values that paint a quote onto an image and therefore need a separate quote text. */
+export const CONFIGURED_CARD_MEDIA = ["static-quote-card", "animated-quote-card"] as const;
+
+export function isConfiguredCardMedia(media: string): boolean {
+  return (CONFIGURED_CARD_MEDIA as readonly string[]).includes(media);
+}
+
+/**
+ * The companion definition derivative that holds the short verbatim quote drawn ON a card, kept
+ * apart from `derivatives/<id>.md`, which stays the per-platform post text that frames it. One
+ * naming rule so generation, the stage record, and the renderer cannot drift onto two names.
+ */
+const CARD_QUOTE_SUFFIX = "-quote";
+
+export function configuredCardQuoteDerivative(id: string): string {
+  return `${id}${CARD_QUOTE_SUFFIX}`;
+}
+
+/** True for the quote companion itself, so the post-text rules are never applied to the quote. */
+export function isConfiguredCardQuoteDerivative(name: string): boolean {
+  return name.length > CARD_QUOTE_SUFFIX.length && name.endsWith(CARD_QUOTE_SUFFIX);
+}
+
 export type ConfiguredMedia = keyof typeof CONFIGURED_MEDIA;
 export type SupportedConfiguredMedia = {
   [K in ConfiguredMedia]: (typeof CONFIGURED_MEDIA)[K]["supported"] extends true ? K : never
@@ -94,7 +117,13 @@ export type ConfiguredMediaPlan =
   | { readonly kind: "carousel-slide-plan"; readonly slides: readonly string[]; readonly constraints: readonly string[] }
   | { readonly kind: "caption-source-plan" | "audiogram-source-plan"; readonly transcript: string };
 
-/** Deterministic, source-bound material a human can inspect before any renderer/provider runs. */
+/**
+ * Deterministic, source-bound material a human can inspect before any renderer/provider runs.
+ *
+ * For card media the `body` is the QUOTE that gets painted on the image (the companion
+ * `configuredCardQuoteDerivative` file's body), never the post text that frames it, because the
+ * plan's `sourceText` is what the renderer draws.
+ */
 export function configuredMediaPlan(media: string, body: string): ConfiguredMediaPlan {
   assertConfiguredMediaSupported(media);
   const source = body.trim();

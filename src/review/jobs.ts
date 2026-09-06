@@ -30,7 +30,7 @@ import { buildEngineSpawn, enginePrompt, ENGINE_COMMANDS, ENGINE_LABELS, type En
 import type { ContentOrigin, ContentRequest, ContentVariant } from "./content-request.js";
 import { assertReviewedMechanismGenerationAuthorization, containsPersonalBeliefReversal } from "./reviewed-mechanism-recommendations.js";
 import type { BrandId } from "../identity/brand.js";
-import { configuredMediaPlan, configuredMediaStage, type ConfiguredMediaPlan, type ConfiguredMediaSourceInputs, type ConfiguredMediaStage } from "./configured-media.js";
+import { CONFIGURED_CARD_MEDIA, configuredCardQuoteDerivative, configuredMediaPlan, configuredMediaStage, isConfiguredCardMedia, isConfiguredCardQuoteDerivative, type ConfiguredMediaPlan, type ConfiguredMediaSourceInputs, type ConfiguredMediaStage } from "./configured-media.js";
 import { acquireJobExecutionLease, readDurableJobs, recoverAbandonedJobs, removeDurableJobs, upsertDurableJob } from "../runtime/durable-jobs.js";
 import { processAlive, type FileLease } from "../runtime/file-lock.js";
 import { migrateLegacyDataDirectory } from "../runtime/data-root.js";
@@ -123,10 +123,31 @@ const REVISE_SCOPE = "edit this ONE post's body text in place";
 // anything" — indistinguishable from Claude simply not bothering. Now it's a real, specific reason.
 const REFUSAL_MARKER = "REFUSED:";
 
+// The ONE way the repo states what a card's post text is for, shared by the revise path and the
+// configured drafting prompt so a card caption is asked for in the same words wherever it is
+// drafted or edited. The quote itself lives in the card's companion definition derivative.
+export const CARD_CONTEXT_RULE =
+  "This is a quote-card CAPTION: it gives CONTEXT around the quote shown on the image. Give the setup, mechanism, or stakes around the quote. Do not restate the quote; keep it context-only.";
+
+// A configured Studio variant id encodes its media as a base64url part (content-request.ts
+// variantId), so the legacy `quote-card-N-<target>` regex can never match one. Without this a
+// Studio card's post text would silently fall through to the generic, quote-repeating path.
+const CONFIGURED_CARD_MEDIA_ID_PARTS = CONFIGURED_CARD_MEDIA.map((media) => Buffer.from(media, "utf8").toString("base64url"));
+
+export function isConfiguredCardVariantId(id: string): boolean {
+  // The card's own quote companion is a definition, not a variant, so it never takes the post rules.
+  if (!/^(?:control|treated)-/.test(id) || isConfiguredCardQuoteDerivative(id)) return false;
+  return CONFIGURED_CARD_MEDIA_ID_PARTS.some((part) => id.includes(`-${part}-`) || id.endsWith(`-${part}`));
+}
+
 // Build the instruction for a single-file, extraction-first revision. Kept explicit + exported so
 // the guardrails (edit only this file, keep frontmatter, stay traceable, voice.yaml) can't drift.
 export function revisePrompt(slug: string, id: string, platform: string, instruction: string): string {
-  const isCardCaption = /^quote-card-\d+-[a-z]+$/i.test(id);
+  // A card DEFINITION derivative (the quote itself) is not a caption: legacy `quote-card-N` carries
+  // `platform: quote-card`, and a configured card's quote companion is named <variant id>-quote.
+  const isCardDefinition = platform === "quote-card" || isConfiguredCardQuoteDerivative(id);
+  const isCardCaption = !isCardDefinition
+    && (/^quote-card-\d+-[a-z]+$/i.test(id) || isConfiguredCardVariantId(id));
   return [
     `Revise ONE content derivative in place for Muxin Li's content pipeline. Do not run shell commands; just edit the one file, then stop.`,
     ``,
@@ -146,9 +167,7 @@ export function revisePrompt(slug: string, id: string, platform: string, instruc
     `- Extraction-first: the body must stay traceable to Muxin's source at content/${slug}/source.md. If the derivative has spin: true you may re-angle within its config/platforms.yaml spin_angles guardrails, but NEVER invent a claim, statistic, metaphor, or worldview Muxin did not express.`,
     `- Follow config/voice.yaml: no em dashes, no AI tells, Muxin's plain PM voice.`,
     `- Respect the platform's max_chars in config/platforms.yaml.`,
-    isCardCaption
-      ? `- This is a quote-card CAPTION: it gives CONTEXT around the quote shown on the image. Do not restate the quote; keep it context-only.`
-      : ``,
+    isCardCaption ? `- ${CARD_CONTEXT_RULE}` : ``,
     `- Be surgical: apply the request, do not rewrite what was not asked.`,
   ]
     .filter(Boolean)
@@ -346,7 +365,11 @@ export function configuredSourceSegments(folder: string, refs: readonly (number 
   return refs.map((ref) => ({ source_line: ref, text: extractSourceLines(folder, [ref]) }));
 }
 
-function configuredTreatmentInstruction(treatment: string): string {
+// A card variant's drafted body is the POST TEXT that frames the quote, not the quote itself
+// (which is extracted verbatim into the card's companion definition derivative). Without the card
+// rule appended here, initial configured drafting gave a card variant no card-specific instruction
+// at all and drafted a post that repeated, or simply was, the quote.
+export function configuredTreatmentInstruction(treatment: string, media = ""): string {
   const instructions: Readonly<Record<string, string>> = {
     cta: "Build one compact point that earns a concrete invitation to read the essay.",
     "viral-rewrite": "Lead with the strongest surprising source-grounded claim, then supply only the context needed for it to land honestly.",
@@ -358,11 +381,71 @@ function configuredTreatmentInstruction(treatment: string): string {
     "hook-variants": "Use the strongest source-grounded opening, then complete the thought so the post works without prior context.",
     "belief-shift": "Use a first-person belief reversal only because the approved source lines explicitly contain both the old and current belief. Keep those old-belief and current-belief clauses verbatim. Do not invent a prior belief, a new belief, a conclusion beyond the approved lines, or a causal performance claim.",
   };
-  return instructions[treatment] ?? "Apply the named treatment as a source-grounded rewrite with one clear standalone point.";
+  const instruction = instructions[treatment] ?? "Apply the named treatment as a source-grounded rewrite with one clear standalone point.";
+  return isConfiguredCardMedia(media) ? `${instruction} ${CARD_CONTEXT_RULE}` : instruction;
 }
 
 function exactSourceSentences(text: string): string[] {
   return (text.match(/[^.!?]+(?:[.!?]+|$)/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean);
+}
+
+export interface ConfiguredCardQuote {
+  readonly body: string;
+  readonly sourceLines: (number | string)[];
+}
+
+/**
+ * The verbatim quote painted onto a configured card. It is EXTRACTION, never composition
+ * (CLAUDE.md rule 1): one exact sentence of the approved source, never a sentence of the treated
+ * post body, which the configured treatment is allowed to re-hook.
+ *
+ * Deterministic, so the same approved source always yields the same card: among the source
+ * sentences that fit the quote-card limit, take the longest (the most complete thought that fits),
+ * earliest on a tie. When every sentence overruns the limit, the first one is cut at a word
+ * boundary rather than written around, because trimming a verbatim line is allowed and composing a
+ * shorter one is not.
+ *
+ * `segments` are the variant's own approved source lines; `fallbackText` is the approved,
+ * human-reviewed authoritative body used by the scoped-exception origins that legitimately have no
+ * source.md line refs (Venture, Charles, fiction promotion), whose quote therefore carries no
+ * `source_lines`.
+ */
+export function configuredCardQuote(
+  segments: readonly ConfiguredSourceSegment[],
+  fallbackText: string,
+  maxChars: number,
+): ConfiguredCardQuote {
+  const candidates: { text: string; sourceLines: (number | string)[] }[] = segments.length
+    ? segments.flatMap((segment) => exactSourceSentences(segment.text).map((text) => ({ text, sourceLines: [segment.source_line] })))
+    : exactSourceSentences(fallbackText).map((text) => ({ text, sourceLines: [] }));
+  const fitting = candidates.filter((candidate) => candidate.text.length <= maxChars);
+  const chosen = fitting.length
+    ? fitting.reduce((best, candidate) => (candidate.text.length > best.text.length ? candidate : best))
+    : candidates[0];
+  if (!chosen) throw new Error("configured quote card has no approved source text to quote from");
+  const body = chosen.text.length <= maxChars ? chosen.text : trimToWordBoundary(chosen.text, maxChars);
+  if (!body) throw new Error("configured quote card could not extract a verbatim quote within its limit");
+  return { body, sourceLines: chosen.sourceLines };
+}
+
+/** The card limit is config/platforms.yaml's `quote-card` max_chars, the same value validate reads. */
+export function configuredCardQuoteLimit(): number {
+  return configuredPlatformLimit("quote-card") ?? 180;
+}
+
+/**
+ * The quote companion's file text. Frontmatter stays minimal on purpose: this is a render
+ * definition, not a posting row, and it is never spun.
+ */
+export function configuredCardQuoteText(quote: ConfiguredCardQuote): string {
+  const frontmatter = ["---", "platform: quote-card", `source_lines: ${JSON.stringify(quote.sourceLines)}`, "---", ""].join("\n");
+  return configuredDerivativeText(frontmatter, quote.body, false);
+}
+
+function trimToWordBoundary(text: string, maxChars: number): string {
+  const cut = text.slice(0, maxChars);
+  const boundary = cut.lastIndexOf(" ");
+  return (boundary > 0 ? cut.slice(0, boundary) : cut).trim();
 }
 
 function assertBeliefShiftBody(body: string, segments: readonly ConfiguredSourceSegment[], label: string): void {
@@ -410,7 +493,7 @@ export function configuredContentPrompt(request: ContentRequest, variants: reado
         platform: variant.platform,
         media: variant.media,
         treatments: variant.treatments,
-        treatment_instruction: configuredTreatmentInstruction(variant.treatments[0] ?? ""),
+        treatment_instruction: configuredTreatmentInstruction(variant.treatments[0] ?? "", variant.media),
         ...(approvedAngle ? { approved_angle: { audience: approvedAngle.audience, angle: approvedAngle.angle } } : {}),
       };
     })),
@@ -889,6 +972,7 @@ export interface ConfiguredMediaOutput {
     readonly status: "staged";
     readonly stage: ConfiguredMediaStage["stage"] | "draft-ready";
     readonly derivativePath: string;
+    readonly quoteDerivativePath?: string;
     readonly outputPath?: string;
     readonly approvalGate: string;
     readonly nextCommand?: readonly string[];
@@ -922,13 +1006,17 @@ export function buildConfiguredMediaOutputs(
       };
     }
     const staged = configuredMediaStage(variant.media, variant.identity.id, stagedInputs);
+    // A card renders from its quote companion, so both the file the renderer reads and the image it
+    // writes are named after that companion, not after the post text derivative.
+    const quoteName = configuredCardQuoteDerivative(variant.identity.id);
     return {
       id: variant.identity.id,
       queue: staged.queue,
       record: {
         version: "configured-media-stage-v1", id: variant.identity.id, platform: variant.platform,
         media: variant.media, status: "staged", stage: staged.stage, derivativePath,
-        ...(staged.stage === "render-required" ? { outputPath: variant.media === "static-quote-card" ? `images/${variant.identity.id}.png` : `images/${variant.identity.id}.mp4` } : {}),
+        ...(isConfiguredCardMedia(variant.media) ? { quoteDerivativePath: `derivatives/${quoteName}.md` } : {}),
+        ...(staged.stage === "render-required" ? { outputPath: variant.media === "static-quote-card" ? `images/${quoteName}.png` : `images/${quoteName}.mp4` } : {}),
         approvalGate: staged.stage === "storyboard-required"
           ? "the inspectable source-bound media plan must be explicitly approved before the storyboard-derived render runs"
           : staged.stage === "render-required"
@@ -959,6 +1047,46 @@ function configuredMediaSourceInputs(folder: string): ConfiguredMediaSourceInput
   };
 }
 
+/**
+ * Backfill the quote companion for a card whose generation predates it, so a card written under the
+ * old one-string contract is repairable instead of permanently unrenderable.
+ *
+ * The post derivative is NOT rewritten: its recorded `source_lines` are read back and the quote is
+ * extracted from those same approved lines, so the repair introduces no new authorization boundary.
+ * The companion is written with `wx`, so an existing one is never overwritten. The stage plan is
+ * re-pointed at the quote and its approval is dropped, because the render input genuinely changed
+ * and must be reviewed again. A stage that already rendered or is mid-promotion is left completely
+ * alone: its asset and approval digest are a finished audit record, not something to rewrite.
+ */
+export function repairConfiguredCardQuotes(
+  folder: string,
+  variants: readonly ContentVariant[],
+  fallbackText: () => string,
+): string[] {
+  const repaired: string[] = [];
+  for (const variant of variants) {
+    const id = variant.identity.id;
+    if (!isConfiguredCardMedia(variant.media)) continue;
+    const quotePath = join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`);
+    if (existsSync(quotePath)) continue;
+    const stagePath = join(folder, "media-stages", `${id}.json`);
+    const stage = JSON.parse(readFileSync(stagePath, "utf8")) as { status?: string; approval?: unknown };
+    if (stage.status === "rendered" || stage.status === "promotion-pending") continue;
+    const { fm } = splitFrontmatter(readFileSync(join(folder, "derivatives", `${id}.md`), "utf8"));
+    const refs = Array.isArray(fm.source_lines) ? (fm.source_lines as (number | string)[]) : [];
+    const quote = configuredCardQuote(
+      refs.length ? configuredSourceSegments(folder, refs) : [],
+      refs.length ? "" : fallbackText(),
+      configuredCardQuoteLimit(),
+    );
+    writeFileSync(quotePath, configuredCardQuoteText(quote), { flag: "wx" });
+    const { approval: _staleApproval, ...record } = stage;
+    writeFileSync(stagePath, JSON.stringify({ ...record, status: "staged", plan: configuredMediaPlan(variant.media, quote.body) }, null, 2) + "\n");
+    repaired.push(id);
+  }
+  return repaired;
+}
+
 /** Generate routed configured variants into the ordinary review queue; never approves or publishes. */
 export async function generateConfiguredContent(slug: string, request: ContentRequest, engine: Engine = "codex", deps: { runEngine?: typeof runClaudeSpawn } = {}): Promise<{ ids: string[]; existing?: boolean; engineExecution?: "disposable-injected" }> {
   const folder = safeFolder(slug);
@@ -978,17 +1106,26 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
   }
   const variants = request.variants.filter((variant) => routing.get(variant.platform)?.decision !== "skip");
   const existing = new Set(readQueue(folder).rows.map((row) => row.id));
+  const mediaById = new Map(request.variants.map((variant) => [variant.identity.id, variant.media]));
+  // A card's generation is complete only once its quote companion exists too: without it the
+  // renderer has nothing approved to paint, and reporting the set complete would strand the card
+  // with no way to repair it. The key is present only for card media, so every other variant's
+  // occupancy stays exactly the three-part row/file/stage state it has always been.
   const occupancyFor = (id: string) => ({
     row: existing.has(id),
     file: existsSync(join(folder, "derivatives", `${id}.md`)),
     stage: existsSync(join(folder, "media-stages", `${id}.json`)),
+    ...(isConfiguredCardMedia(mediaById.get(id) ?? "")
+      ? { quote: existsSync(join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`)) }
+      : {}),
   });
+  const occupancyComplete = (state: Record<string, boolean>) => Object.values(state).every(Boolean);
   if (!variants.length) {
     // A later routing change does not invalidate an already completed generation or delete
     // its reviewable artifacts. Previously skipped IDs can be wholly absent, but every occupied
-    // ID must have its complete row/file/stage set. Fresh and half-created requests still refuse.
-    const occupancy = requestedIds.map((id) => Object.values(occupancyFor(id)));
-    if (occupancy.some((state) => state.every(Boolean)) && occupancy.every((state) => state.every(Boolean) || state.every((present) => !present))) return { ids: [], existing: true };
+    // ID must have its complete artifact set. Fresh and half-created requests still refuse.
+    const occupancy = requestedIds.map(occupancyFor);
+    if (occupancy.some(occupancyComplete) && occupancy.every((state) => occupancyComplete(state) || Object.values(state).every((present) => !present))) return { ids: [], existing: true };
     throw new Error("no routable configured variants; routing.md skips every selected platform");
   }
   // Select whole platforms, preserving their complete control/treatment/media sets and IDs.
@@ -996,7 +1133,15 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
   const ids = variants.map((variant) => variant.identity.id);
   const mediaOutputs = buildConfiguredMediaOutputs(variants, configuredMediaSourceInputs(folder));
   const occupancy = ids.map(occupancyFor);
-  if (occupancy.every((state) => state.row && state.file && state.stage)) return { ids, existing: true };
+  if (occupancy.every(occupancyComplete)) return { ids, existing: true };
+  // Everything but a card's quote companion is present: a card generated before the companion
+  // existed. Repair it in place rather than reporting it done or refusing forever. Only the missing
+  // companion is written (a render definition, never a posting row) and only its own stage plan is
+  // re-pointed at the quote; the reviewed post text and every other variant are left untouched.
+  if (occupancy.every((state) => state.row && state.file && state.stage)) {
+    repairConfiguredCardQuotes(folder, variants, () => resolveConfiguredAuthoritative(folder, request)?.body ?? request.originalInput);
+    return { ids, existing: true };
+  }
   if (occupancy.some((state) => state.row || state.file || state.stage)) throw new Error("only some configured drafts or media stages exist; refusing to overwrite or duplicate them");
   const treated = variants.filter((variant) => variant.identity.kind === "treated");
   // This policy gate deliberately precedes runQueued and every mkdir/write/append: a refused
@@ -1152,9 +1297,27 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
     // The spin/angle stamped into each treated derivative's provenance below — the SAME values the
     // skeleton gate consumes, keyed by variant id so the write loop cannot drift from the gate.
     const spinById = new Map(gateCandidates.map((candidate, index) => [variants[index]!.identity.id, { spin: candidate.spin, angle: candidate.angle }]));
+    // SLICE-5H: a card variant's on-image quote, extracted verbatim from its OWN approved source
+    // lines (never from the treated post body). Computed here, before any write, so its quote-card
+    // character limit is gated with everything else and one overrun still aborts the whole set
+    // atomically. The limit comes from the same config/platforms.yaml table every other gate reads.
+    const cardQuoteLimit = configuredCardQuoteLimit();
+    const cardQuotes = new Map<string, ConfiguredCardQuote>();
+    variants.forEach((variant, index) => {
+      if (!isConfiguredCardMedia(variant.media)) return;
+      const quoteSourceLines = gateCandidates[index]!.sourceLines;
+      cardQuotes.set(variant.identity.id, configuredCardQuote(
+        quoteSourceLines.length ? configuredSourceSegments(folder, quoteSourceLines) : [],
+        authoritative?.body ?? request.originalInput,
+        cardQuoteLimit,
+      ));
+    });
     const gateViolations: string[] = [];
     for (const candidate of gateCandidates) {
       gateViolations.push(...checkPlatformLimits(candidate.file, candidate.platform, candidate.body, gatePlatforms));
+    }
+    for (const [id, quote] of cardQuotes) {
+      gateViolations.push(...checkPlatformLimits(`derivatives/${configuredCardQuoteDerivative(id)}.md`, "quote-card", quote.body, gatePlatforms));
     }
     if (gateSourceClass) {
       gateViolations.push(...checkSkeletonGate(gateCandidates.map(({ file, platform, spin, angle }) => ({ file, platform, spin, angle })), gateSourceClass));
@@ -1182,11 +1345,22 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
           : null;
         const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...configuredEditorFrontmatter(variant, editorStamp), ...(routing.get(variant.platform)?.confidence === "exploration" ? ["exploration_probe: true"] : []), ...triageFrontmatter, ...pillarFrontmatter, ...(spinById.get(id)?.spin ? ["spin: true", `angle: ${variant.platform}`] : []), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
         writeFileSync(path, configuredDerivativeText(frontmatter, body, variant.identity.kind === "control"), { flag: "wx" }); created.push(path);
+        // SLICE-5H: a card variant gets a SECOND derivative, the definition file holding the short
+        // verbatim quote drawn on the image. `derivatives/<id>.md` above stays the post text that
+        // frames it (what the review row shows and publish:cards ships as the caption), so the
+        // quote never ships alone, out of context.
+        const cardQuote = cardQuotes.get(id);
+        if (cardQuote) {
+          const quotePath = join(folder, "derivatives", `${configuredCardQuoteDerivative(id)}.md`);
+          writeFileSync(quotePath, configuredCardQuoteText(cardQuote), { flag: "wx" }); created.push(quotePath);
+        }
         const mediaOutput = mediaOutputs.find((output) => output.id === id)!;
         const stagePath = join(folder, "media-stages", `${id}.json`);
+        // The render plan carries the QUOTE for a card, so the renderer paints the quote and not
+        // the post text; every other medium still plans off the derivative body.
         const stagedRecord = variant.media === "none"
           ? mediaOutput.record
-          : { ...mediaOutput.record, plan: configuredMediaPlan(variant.media, body) };
+          : { ...mediaOutput.record, plan: configuredMediaPlan(variant.media, cardQuote ? cardQuote.body : body) };
         writeFileSync(stagePath, JSON.stringify(stagedRecord, null, 2) + "\n", { flag: "wx" }); created.push(stagePath);
         queueRows.push({ id, platform: variant.platform, format: mediaOutput.queue.format, asset: mediaOutput.queue.asset, status: "pending", notes: configuredQueueNote(request, variant.identity.kind, treatment), origin: "from GUI queue" });
       }
