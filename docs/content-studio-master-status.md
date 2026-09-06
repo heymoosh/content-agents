@@ -54,8 +54,13 @@
   unsupported result", but the configured-media row directly below it says "Postiz only; manual
   ready-to-paste when discovery reports no support". So an `/atomize` card has a Typefully image
   fallback and a Content-page card does not — and the Content page is the only place Muxin
-  publishes from. Postiz rate-limits at 90 creates/hour instance-wide. Not yet scoped as a slice;
-  note it before shipping (a). **Process note:** the false claim came from reading one selector in `cards.ts` and
+  publishes from. Postiz rate-limits at 90 creates/hour instance-wide. **DECIDED (Muxin,
+  2026-09-05): "Content page should be able to also use Typefully if Postiz doesn't work."** Postiz
+  stays first; Typefully is the backup. Typefully was never stripped out — it is still live for
+  text rows (`publishText`) and `/atomize` card rows (`publishCards`); configured-media rows are a
+  newer kind that was never wired to it, so the dispatch table's missing `media` case dead-ends at
+  manual ready-to-paste. Scoped as **`SLICE-5J.md`** (2026-09-05), running in parallel with 5I
+  (disjoint files). **Process note:** the false claim came from reading one selector in `cards.ts` and
   stopping, without asking what else selects that row — the same "read the list, not the code path"
   failure logged one entry below about the §5 archaeology table. Before filing a "cannot X" finding,
   trace the dispatcher, not one candidate handler.
