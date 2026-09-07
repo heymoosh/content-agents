@@ -66,7 +66,9 @@ or the GUI has no way to publish at all.
 
 ## Cited headings
 
-`none`
+`## Standing constraints` → "Design sanity check on every GUI slice", reproduced here so the worker does not open the master.
+
+Check rendered HTML: body type at least 1.125rem with line height at least 1.5; content first with backend IDs and folder slugs muted; a clear divider between thoughts; errors persist until read; scannable at arm's length without zoom.
 
 ## Acceptance
 
@@ -96,11 +98,13 @@ Run unsandboxed (tsx needs a socket under `$TMPDIR`).
 node --import tsx --test src/review/serve.test.ts src/review/page.test.ts
 ```
 
-Visual: `npm run review`, open `http://localhost:4600`, set a row to `approve` and confirm the
-Publishing view shows it as Pending with no provider call recorded in
-`~/.content-agents/content-agents-154a8dd69ae2/publishing-status.jsonl`. Do **not** click
-Schedule against a real row; a scheduled draft auto-fires. Screenshot to
-`$TMPDIR/slice-5s-publishing.png`.
+Visual: use a disposable fixture root, isolated HOME/operational ledger and a fake scheduler.
+Bind the fixture review server to a loopback port chosen for this session. Open it in the browser,
+approve a fixture row and confirm it appears in Publishing > Pending with zero publisher calls.
+Exercise one-row and selection Schedule against the fake scheduler only; capture the rendered
+Publishing view to `/private/tmp/slice-5s-evidence/publishing.png`. Never change a real review
+queue, use production credentials, or click Schedule against a real row. No authenticated
+publishing canary is authorized or needed for this slice.
 
 ## Observable result
 
@@ -111,8 +115,10 @@ under Pending, and decides when it goes out.
 
 Medium — audit required: **yes.** This is the publish trigger. The auditor checks from the diff
 and tests that no code path reaches a publisher from `/api/status`, and that the new endpoint
-cannot schedule a row that is not `approve`. Hold for Muxin's eyes on the Publishing view before
-merge: it is a page she uses.
+cannot schedule a row that is not `approve`. Coordinator and independent auditor verify the
+rendered Publishing view before integration. The user instructed autonomous engineering decisions
+and a stop only at acceptance or a major product-scope decision; a routine visual-approval pause
+is therefore not required.
 
 ## Families
 
@@ -120,9 +126,22 @@ merge: it is a page she uses.
 - Auditor: Codex (GPT), strong tier. Receives the diff, the changed-file list, the focused test
   output and this Acceptance list only.
 
+## Coordinator confirmation — 2026-09-07
+
+Dependency 5Q is accepted; 5R is accepted at `71f2df9`. Single Claude strong-tier builder,
+independent GPT strong-tier audit, then a frozen candidate and the full unsandboxed gate.
+Worker owns only the four implementation/test files above and disposable evidence outside the
+repository. Coordinator owns this packet and the master status update. Workers do not commit.
+The worker is not alone in the repository: preserve other sessions' edits; do not revert them.
+Read owned files and their narrowly necessary imports/test harness dependencies only after this
+packet; do not load general repository context. Report any additional required edit first.
+Do not run the repository-wide gate; coordinator runs it once after audit closure. Existing
+serial Node test-runner workaround from 5R may be used for the gate, explicitly recorded.
+Return the RESULT BLOCK in the final response; coordinator persists it here.
+
 ## Closeout
 
-No closeout tool in this repository. The coordinator records `PASS` or the leftover list here.
+No closeout tool in this repository. **NOT ACCEPTED**: implementation, focused checks, visual proof, cross-family audit and the frozen repository-wide gate remain pending; see `## Stopped`.
 
 ## RESULT BLOCK (worker fills this in and returns it)
 
@@ -131,3 +150,11 @@ No closeout tool in this repository. The coordinator records `PASS` or the lefto
 - Checks run and results:
 - Evidence locations:
 - Unresolved:
+
+## Stopped
+
+- Blocker: Claude session usage limit before implementation; CLI reports reset at 8:50 p.m. America/Chicago.
+- Verified: ordered protocol/START HERE/packet reads; 5Q and 5R dependencies accepted; clean isolated worker branch based on `71f2df9`; worktree setup exited 0. Worker exited 1 with `is_error: true` and no candidate diff. No focused checks, audit, visual proof or full gate ran.
+- Retained work: coordinator packet changes here and master START HERE/progress update; `/private/tmp/slice-5s-evidence/build-prompt.txt`, `build-result.json`, `audit-criteria.md`. Claude session `005d30e8-4fb0-4203-9fad-ac342ff83034`. No implementation files changed.
+- Next action: rerun this confirmed packet with the Claude builder after capacity returns, then continue the declared audit and verification sequence.
+- Hygiene disposition: rescue pass exited 1 solely for the four known tracked modifications; snapshot `refs/wip/content-agents` (`6ad9148`). This session created no untracked repository paths. The unused clean worktree and empty `slice-5s-approval` branch were removed. Existing local-only branches are preserved. Only this packet and the master update are committed. Pre-existing `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md` and `data/notes-spread-ledger.jsonl` are preserved.
