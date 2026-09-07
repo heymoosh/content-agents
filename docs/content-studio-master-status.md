@@ -25,6 +25,10 @@
   duplicate publishing — latent only because no per-brand brief exists yet; and a recovered task
   job that stranded the whole queue. Full RESULT BLOCK, including two recorded coverage limits and
   a defect the builder self-reported, in `docs/operations/launch-slices/SLICE-5N.md`.
+  **Trap for anyone touching the continue path: `canonicalPath` tolerates ENOENT deliberately** —
+  `--continue content/<slug>` names a folder `/atomize` is about to create, so a missing folder
+  resolves `ok` and dispatches. Any code or test that assumes "missing folder means no spawn" is
+  wrong for that reason; that assumption is what had SLICE-5N's test spawning real `claude` runs.
   **Two master-doc claims were corrected while scoping it, both verified in source first:**
   (i) item (c) says the brandId debt is "two call sites in `studio-scheduling.ts`" — it is **one**.
   SLICE-5K folded the pre-flight and the recovery call into a single function, `reuseGuardBlock`
@@ -216,7 +220,12 @@
   append `$0` rows to `data/cost-log.csv` (`outreach:draft`, `step`); untracked and harmless, but it
   is the same class. Most of the rest use fixture-specific names and are probably benign —
   "probably benign" is the claim to check, not to accept. **Measure before scoping**, same warning
-  as d3.
+  as d3. **Route suggested by SLICE-5N's builder, worth weighing here rather than in a test:** make
+  `logCost`'s destination respect a data root the way the briefs root now does. That fixes the
+  cost-log writes above and simultaneously unblocks the one layer SLICE-5N could not cover
+  (`runAgentSpawn`'s `buildEngineSpawn` → `runCommandSpawn` linkage, observable only with a real
+  process today) — without adding a second injection seam below `setSkillSpawn`, which is now the
+  only injection point for the three brand-scoped spawns.
 - **§5 is CLOSED** (2026-09-05, SLICE-5H). Five capabilities ported, three declined — the
   scoring/soft gate, the home-brand thread-check, and the strategy-brief directives — and
   quote-card post text shipped. **Item `3b`** (retire `/cycle`'s drafting step) is therefore
