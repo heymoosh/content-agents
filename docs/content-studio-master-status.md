@@ -2,6 +2,96 @@
 
 ## START HERE
 
+- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, ahead of `origin`, unpushed by standing order)
+- This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
+- Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
+- **Next slice: undecided, Muxin's call.** Two candidates, both scoped in `## Progress log` → 2026-09-07: (d3) the `rowEl`/`buildFormatArg` dead-code inventory, or a live dry run of the posting path end to end.
+- Last accepted: **SLICE-5O**, `docs/operations/launch-slices/SLICE-5O.md`, gate 4293/491/0, commit `540c065`.
+- **NEEDS MUXIN (1), not blocking:** whether to purge 404 test-fixture rows from `data/cost-log.csv` (92% of the file). Detail in `## Progress log` → 2026-09-07.
+- **NEEDS MUXIN (2), not blocking:** the `develop/SKILL.md` entry contract; `.claude/skills/**` is write-protected. Detail in `docs/operations/launch-slices/SLICE-5N.md`.
+- Open engineering debt, none blocking: `queue-view.ts:346` prints a stale ledger path to the user; `migrateLegacyDataDirectory` (`jobs.ts:70`) is still non-atomic.
+- Standing rule added 2026-09-07: **test overhead must never dominate a real resource.** See `## Standing constraints`.
+- Everything below this block is history. Do not read it unless a slice packet cites a heading.
+
+## Standing constraints
+
+These bind every slice and every worker here. They are product and safety rules, not engineering
+taste, and they are restated in full in `AGENTS.md` → `## Slice protocol` → Repo bindings so a
+worker holding only that section and its packet still has them.
+
+- **Extraction-first.** Never compose new claims, arguments, or worldview statements in Muxin's
+  voice. Text and image derivatives quote and trim verbatim and carry `source_lines`. The scoped
+  exceptions (Content Studio treatments, common hook templates, video scripts, Build 3 Venture,
+  Build 4 Charles) are enumerated in the root `CLAUDE.md` and never widen.
+- **Nothing publishes without Muxin's review** in `review-queue.md`. Committing generated content
+  is not publishing.
+- **Voice:** `config/voice.yaml` governs every word a human will read. No em dashes, no AI tells.
+- **Cost:** prefer subscription and free routes; every paid call is opt-in and logged to
+  `data/cost-log.csv`.
+- **Board writes go through `prose_kanban` only** — never edit `docs/content-agents-backlog.md`
+  as text.
+- **Test overhead must never dominate a real resource.** Added 2026-09-07 after 404 of 439 rows in
+  `data/cost-log.csv` (92%) turned out to be one test's synthetic row, accumulating since
+  2026-07-15 and drowning $0.708 of genuine spend. The rule generalizes past that file: whatever a
+  test consumes — durable rows, disk, wall-clock, or a coordinator's context window — it is
+  overhead, and overhead that outweighs the signal has stopped being verification. If a test's
+  footprint approaches the size of the thing it verifies, isolate it (a scratch path, a fixture
+  root, a bounded excerpt) rather than accepting the ratio.
+
+## Progress log
+
+Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-07 — session close: SLICE-5O accepted, START HERE compacted to pointers
+
+**Slice state.** SLICE-5O is ACCEPTED and committed (`540c065`), gate **4293/491/0**. Full
+RESULT BLOCK in `docs/operations/launch-slices/SLICE-5O.md`. No slice is open. This session
+stopped at the accepted branch of the protocol's completion sequence, not the blocked branch.
+
+**Verified live at closeout, on real data.** With `CONTENT_AGENTS_DATA_ROOT` pointed at a
+throwaway directory, `readLedger()` returned **54 claims**, oldest
+`2026-06-25 … building-an-innovation-nation/x`, newest
+`2026-07-11 … human-inference-defining-a-brand-in-an-ai-drench/x`. `data/publish-schedule.jsonl`
+hashed `3a1d30a6…` before and after, unchanged. Before SLICE-5O that read returned zero claims.
+
+**One thing the slice write-up did not know.** `~/.content-agents/` holds an *empty*
+`scheduler/publish-schedule.jsonl` plus an orphaned `.29875.tmp`, dated 2026-08-30 — but under
+`content-agents-master-status-a7dc8ea24f29`, a **worktree's** data root, not the main checkout's
+(`content-agents-154a8dd69ae2`, confirmed by calling `dataRoot()`). The main checkout has no
+`scheduler/` directory, so its migration path is clear. Had that empty file been the main
+checkout's, the helper's `existsSync(canonical)` fast path would have skipped the migration
+permanently and lost all 54 claims silently — the exact failure the audit predicted, sitting one
+directory away.
+
+**The cost log, in plain terms.** `src/outreach/draft.ts:370` calls `logCost` unconditionally,
+and the path was hardcoded, so every gate run since 2026-07-15 appended a synthetic
+`outreach:draft,"Acme Co",0.0000` row to Muxin's real spend ledger. Final tally: **404 of 439 rows
+are that fixture**; real spend is 35 rows totalling **$0.708**. Nothing was overcharged and nothing
+was lost — the file simply stopped being readable for its purpose. SLICE-5O stopped the growth. The
+existing rows were **deliberately left in place**: deleting entries from a financial record to tidy
+test noise is the owner's call. They are trivially identifiable by the `"Acme Co"` detail column.
+
+**Readiness for Human Inference, stated honestly.** The publishing freeze was lifted 2026-07-08, so
+nothing gates posting there. SLICE-5O removed a real blocker: the first live run would otherwise
+have started from an empty ledger and double-booked slots already used. But **no end-to-end run has
+been performed** — `/atomize` → review → `/publish` has not been exercised against a real piece
+with a Typefully draft observed at the end. Do not read "blocker removed" as "ready." The two
+candidates in START HERE differ on exactly this: d3 continues the dead-code cleanup, a live dry run
+answers the readiness question.
+
+**Not committed, deliberately.** `data/notes-spread-ledger.jsonl` carries two rows appended by a
+scheduled run at 2026-09-07T12:00:05Z (notes `c-331059283`, `c-331062953`). Genuine runtime
+output, outside this slice, left for the owner rather than folded into a doc commit.
+
+**Why START HERE shrank.** It had grown to 378 lines and was being read in full by every new
+session — the block whose whole job is to be cheap to read had become the most expensive thing in
+the document. It is now pointers only. The narrative it held is preserved verbatim below, not
+rewritten, and remains reachable by any packet that cites it.
+
+<details>
+<summary>START HERE narrative as it stood on 2026-09-07, moved here verbatim</summary>
+
+
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
@@ -378,27 +468,7 @@
 - Standing constraints: see `## Standing constraints` below. Do not read past this block unless a
   slice packet cites a heading; `## Progress log` is append-only archive, not a second status source.
 
-## Standing constraints
-
-These bind every slice and every worker here. They are product and safety rules, not engineering
-taste, and they are restated in full in `AGENTS.md` → `## Slice protocol` → Repo bindings so a
-worker holding only that section and its packet still has them.
-
-- **Extraction-first.** Never compose new claims, arguments, or worldview statements in Muxin's
-  voice. Text and image derivatives quote and trim verbatim and carry `source_lines`. The scoped
-  exceptions (Content Studio treatments, common hook templates, video scripts, Build 3 Venture,
-  Build 4 Charles) are enumerated in the root `CLAUDE.md` and never widen.
-- **Nothing publishes without Muxin's review** in `review-queue.md`. Committing generated content
-  is not publishing.
-- **Voice:** `config/voice.yaml` governs every word a human will read. No em dashes, no AI tells.
-- **Cost:** prefer subscription and free routes; every paid call is opt-in and logged to
-  `data/cost-log.csv`.
-- **Board writes go through `prose_kanban` only** — never edit `docs/content-agents-backlog.md`
-  as text.
-
-## Progress log
-
-Append-only. Newest first. Never rewrite a completed dated entry.
+</details>
 
 ### 2026-09-05 — SLICE-5H ACCEPTED: a card's quote and its post text are finally two things (§5 closed)
 
