@@ -1368,6 +1368,11 @@ const ENGINE_OPTIONS = '<option value="claude">Claude · Writing</option><option
 const OUTREACH_ENGINE_OPTIONS = '<option value="codex">ChatGPT</option><option value="grok">Grok</option>';
 let ENGINE_STATUS = {claude:true, grok:true, codex:true, "ollama-gpt-oss":false};
 function engineLabel(id){ return ENGINE_LABELS[id] || "Claude"; }
+// Mirrors BRAND_REGISTRY (src/identity/brand.ts). Unlike engineLabel there is NO fallback label:
+// a job that carries no brand (one persisted before jobs recorded it) shows no brand at all rather
+// than being labelled with an identity nobody chose.
+const BRAND_LABELS = {"human-inference":"Human Inference", charles:"Charles", fiction:"Fiction"};
+function brandLabel(id){ return BRAND_LABELS[id] || ""; }
 const ENGINE_PREFERENCE_KEY = "content-agents-preferred-engine";
 function preferredEngine(){
   try { const value = localStorage.getItem(ENGINE_PREFERENCE_KEY); return ENGINE_LABELS[value] ? value : "claude"; }
@@ -1712,7 +1717,7 @@ async function onAction(e, piece, row, el){
     e.target.disabled = true;
     const storyboardEngine = el.querySelector(".storyboard-control .engine-select");
     const engine = storyboardEngine ? storyboardEngine.value : "claude";
-    const r = await post("/api/video/generate",{slug:piece.slug,engine});
+    const r = await post("/api/video/generate",{slug:piece.slug,engine,brand:signalsBrand()});
     if(r.ok){ storyboardSlugs.add(piece.slug); flash("Queued with "+engineLabel(engine)+"; generating storyboard"); loadJobs(); }
     else { e.target.disabled = false; flash(r.error || "Could not queue /video"); }
     rerender();
@@ -3306,8 +3311,8 @@ $("#contentWizard").addEventListener("click", (e)=>{
   const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-set-pane],[data-config-all],[data-config-none],[data-config-save],[data-dev-start],[data-dev-reply],[data-dev-accept],[data-dev-dismiss],[data-cut-save],[data-cut-comment],[data-open-config]") : null;
   if(!t) return;
   if(t.dataset.openConfig!==undefined){ const cfg=cwEnsureConfig(); cfg.open=true; renderContentWizard(); cwLoadTreatment(); return; }
-  if(t.dataset.devStart!==undefined){ t.disabled=true; post('/api/develop/start',{slug:t.dataset.slug,engine:$('#studioEngine').value}).then(r=>{flash(r.ok?'Advisor started':r.error);loadJobs();}); return; }
-  if(t.dataset.devReply!==undefined){ const input=t.closest('.wb-reply').querySelector('.wb-reply-input'); const reply=input.value.trim(); if(!reply){flash('Type a reply first');return;} t.disabled=true; post('/api/develop/reply',{slug:t.dataset.slug,reply,engine:$('#studioEngine').value}).then(r=>{flash(r.ok?'Reply queued':r.error);loadJobs();}); return; }
+  if(t.dataset.devStart!==undefined){ t.disabled=true; post('/api/develop/start',{slug:t.dataset.slug,engine:$('#studioEngine').value,brand:signalsBrand()}).then(r=>{flash(r.ok?'Advisor started':r.error);loadJobs();}); return; }
+  if(t.dataset.devReply!==undefined){ const input=t.closest('.wb-reply').querySelector('.wb-reply-input'); const reply=input.value.trim(); if(!reply){flash('Type a reply first');return;} t.disabled=true; post('/api/develop/reply',{slug:t.dataset.slug,reply,engine:$('#studioEngine').value,brand:signalsBrand()}).then(r=>{flash(r.ok?'Reply queued':r.error);loadJobs();}); return; }
   if(t.dataset.devAccept!==undefined){ const lens=t.closest('.actions').querySelector('.dev-lens').value.trim(); post('/api/develop/accept',{slug:t.dataset.slug,cardId:t.dataset.card,lens}).then(async r=>{flash(r.ok?'Exact-source cut accepted':r.error);if(r.ok){CW.approvedLens=r.lens;await loadContent();}}); return; }
   if(t.dataset.devDismiss!==undefined){ post('/api/develop/dismiss',{slug:t.dataset.slug,cardId:t.dataset.card}).then(async r=>{flash(r.ok?'Dismissed':r.error);if(r.ok)await loadContent();}); return; }
   if(t.dataset.cutSave!==undefined){ const ta=t.closest('label').querySelector('[data-cut-body]'); post('/api/cut-save',{slug:CW.slug,lens:t.dataset.lens,body:ta.value}).then(async r=>{flash(r.ok?'Cut saved':r.error);if(r.ok)await loadContent();}); return; }
@@ -6562,7 +6567,8 @@ function renderJobs(){
     html += '<div class="jrow'+cls+'">'+
       '<div class="jrow-head"><span style="min-width:0">'+
         '<span class="jrow-rail" style="color:'+rail.color+'">'+esc(rail.text)+'</span>'+
-        '<span class="jrow-text">'+esc(j.label)+'</span><span class="src"> · '+esc(engineLabel(j.engine))+'</span></span>'+
+        '<span class="jrow-text">'+esc(j.label)+'</span><span class="src"> · '+esc(engineLabel(j.engine))+
+          (brandLabel(j.brand) ? ' · '+esc(brandLabel(j.brand)) : '')+'</span></span>'+
       '<span class="jrow-clock">'+esc(jobClock(j, jobsAhead(JOBS, j)))+'</span></div>'+
       (pct!=null ? '<div class="jrow-bar"><span style="width:'+pct+'%;background:'+rail.color+'"></span></div>' : "")+
       (dots.length ? '<div class="jsteps">'+stepsHtml(dots)+
@@ -6763,7 +6769,7 @@ async function addSource(){
   const engine = $("#studioEngine").value;
   setCaptureSubmitting(true);
   try {
-    const r = await post("/api/atomize",{source, engine});
+    const r = await post("/api/atomize",{source, engine, brand:signalsBrand()});
     if(r.ok){ ta.value=""; flash("Queued with "+engineLabel(engine)); loadJobs(); }
     else flash(r.error || "Could not queue");
   } finally { setCaptureSubmitting(false); }
@@ -6858,7 +6864,7 @@ function showCaptureVerdict(room, note){
 async function advanceCaptureSafely(room, text){
   if(room==="Content"){
     await Promise.resolve(setRoom("content"));
-    const r=await post("/api/captures/start",{text:text,engine:$("#studioEngine").value});
+    const r=await post("/api/captures/start",{text:text,engine:$("#studioEngine").value,brand:signalsBrand()});
     if(!r.ok) throw new Error(r.error||"Could not start the advisor");
     await loadCaptures(); loadJobs();
     return "Advisor started. It cannot approve or publish.";
@@ -6941,7 +6947,7 @@ function renderCaptureHandoff(){
       card.querySelector(".cap-start")?.addEventListener("click", async (event)=>{
         event.target.disabled=true;
         const capture=SERVER_CAPTURES.find(c=>c.id===card.dataset.captureId);
-        const r=await post("/api/captures/start",{text:capture&&capture.text,engine:$("#studioEngine").value});
+        const r=await post("/api/captures/start",{text:capture&&capture.text,engine:$("#studioEngine").value,brand:signalsBrand()});
         if(r.ok){ flash("Advisor started. It cannot approve or publish."); await loadCaptures(); renderCaptureHandoff(); loadJobs(); }
         else { event.target.disabled=false; flash(r.error||"Could not start the advisor"); }
       });
@@ -7014,8 +7020,12 @@ let notesShowDrafted = false;
 // checkbox (Muxin, 2026-07-16). A selection survives being filtered out of view; Draft selected
 // drafts everything in this set.
 const selectedNoteIdxs = new Set();
+// The brand is read from signalsBrand() HERE rather than passed in by the caller: the exported
+// pure mirror of this function (page-signals.ts, tested in page.test.ts) is deliberately DOM-free,
+// so the one piece of state that only the DOM holds is picked up inside the client copy. Same
+// canonical accessor every other room uses — never a second brand state (SLICE-5N trap 4).
 function notesPickRequest(indices, engine){
-  return {indices, engine:engine || "claude"};
+  return {indices, engine:engine || "claude", brand:signalsBrand()};
 }
 function noteMeta(n){
   const d = n.publishedAt ? n.publishedAt.slice(0,10) : "????-??-??";

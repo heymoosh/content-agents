@@ -9,7 +9,7 @@ import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
 import { checkReuse } from "../publish/reuse-guard.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
-import { assertProviderDispatch, resolveDeliveryIntent, resolveDeliveryPolicy, writeReadyToPaste, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
+import { assertProviderDispatch, resolveDeliveryIntent, resolveDeliveryPolicy, writeReadyToPaste, type DeliveryBrand, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { claimSlots, fmtLa, laDayKey, releaseClaims } from "../publish/slots.js";
 import {
@@ -427,10 +427,17 @@ const REUSE_GUARD_UNSPECIFIED = "not scheduled: blocked by the reuse guard (chec
  * explains a publisher that already skipped silently). Keying and wording therefore cannot drift
  * into two versions, and the Content page reads one message however the refusal was reached.
  */
-function reuseGuardBlock(folder: string, kind: ScheduleKind, row: QueueRow): string | null {
+function reuseGuardBlock(folder: string, kind: ScheduleKind, row: QueueRow, brand: DeliveryBrand | null): string | null {
   const platform = reuseGuardPlatform(kind, row);
   if (!platform) return null;
-  const reuse = checkReuse(basename(folder), platform);
+  // The brand comes from the delivery policy decision already in scope at both call sites, never
+  // from checkReuse's own `human-inference` default: reading Charles's rows against Human
+  // Inference's Placed log is the silent-substitution bug this parameter exists to close. A
+  // decision that resolved no brand fails CLOSED rather than falling back — every route that
+  // reaches the guard has already passed the policy's provider/account checks, so a null here is a
+  // caller bug, not a Muxin path.
+  if (!brand) return "not scheduled: the delivery policy resolved no brand, so the reuse guard has no Placed log to check";
+  const reuse = checkReuse(basename(folder), platform, undefined, brand);
   if (reuse.allowed) return null;
   // Machine-parseable shape: reconcile.ts's reuseGuardEligibility re-derives "eligible again in N
   // days" from this exact string, read back off the row's own notes days later with no fs/network
@@ -473,6 +480,12 @@ async function runPublisher(
   folder: string,
   row: QueueRow,
   kind: ScheduleKind,
+  // The identity the recovery guard reads placements under. Kept SEPARATE from `deliveryPolicy`,
+  // which is the publisher's authorization: at the non-Postiz tail below `deliveryPolicy` is the
+  // caller's optional override while the resolved policy — the one that actually named the brand —
+  // is a different value. Reading the brand off the override would drop it whenever no override
+  // was supplied, which is the common case.
+  brand: DeliveryBrand | null,
   deliveryPolicy?: DeliveryPolicyDecision,
 ): Promise<ScheduleOutcome> {
   try {
@@ -483,7 +496,7 @@ async function runPublisher(
       // publishCards): those publishers own their own guard call, so this branch is the only thing
       // that turns their silent skip into a reason. The Postiz pre-flight below does NOT make it
       // dead — a publisher can return [] for reasons the guard knows nothing about.
-      return { scheduled: null, scheduleError: reuseGuardBlock(folder, kind, row) ?? REUSE_GUARD_UNSPECIFIED };
+      return { scheduled: null, scheduleError: reuseGuardBlock(folder, kind, row, brand) ?? REUSE_GUARD_UNSPECIFIED };
     }
     return { scheduled: done[0], scheduleError: null };
   } catch (e) {
@@ -511,7 +524,7 @@ async function scheduleMediaViaTypefully(
   if (policy.mode === "blocked") return { scheduled: null, scheduleError: `delivery policy blocked: ${policy.reason}` };
   if (policy.mode === "manual") return { scheduled: writeReadyToPaste(folder, row, policy), scheduleError: null };
   if (!policy.providerAccountId) return { scheduled: null, scheduleError: "delivery policy blocked: provider account mapping is missing" };
-  return runPublisher(deps.publishCards, folder, row, "media", supplied);
+  return runPublisher(deps.publishCards, folder, row, "media", policy.brand, supplied);
 }
 
 export async function scheduleApproved(
@@ -524,6 +537,11 @@ export async function scheduleApproved(
   if (!kind) return { scheduled: null, scheduleError: null };
   // Outreach approval locks a message and never contacts a publishing provider.
   let selected: SelectedSchedulingProvider | undefined;
+  // Hoisted out of the block below so the tail dispatch reads the SAME resolved policy's brand the
+  // Postiz pre-flight does — one value, one source, so the two guard paths cannot drift apart.
+  // Stays null only for `outreach-lock`, the one kind reuseGuardPlatform never keys, so the guard
+  // returns before the brand is consulted at all.
+  let resolvedBrand: DeliveryBrand | null = null;
   if (kind !== "outreach-lock") {
     // Blocked/manual origin policy is provider-independent and must run before any capability
     // discovery. Besides being faster, this guarantees those origins make zero network calls.
@@ -558,6 +576,7 @@ export async function scheduleApproved(
     if (policy.mode === "blocked") return { scheduled: null, scheduleError: `delivery policy blocked: ${policy.reason}` };
     if (policy.mode === "manual") return { scheduled: writeReadyToPaste(folder, row, policy), scheduleError: null };
     if (!policy.providerAccountId) return { scheduled: null, scheduleError: "delivery policy blocked: provider account mapping is missing" };
+    resolvedBrand = policy.brand;
     if (provider === "postiz") {
       // PRE-FLIGHT reuse guard — Postiz is the sixth caller. typefully.ts, cards.ts, tiktok.ts,
       // youtube.ts and substack.ts each ask the guard before they create anything; the Postiz path
@@ -572,7 +591,7 @@ export async function scheduleApproved(
       //     block means do not place this row ANYWHERE, not try the other provider.
       // Non-Postiz routes are deliberately not gated here: their own publishers already check, and a
       // second check would be exactly the double-gating this dispatch must not add.
-      const reuseBlock = reuseGuardBlock(folder, kind, row);
+      const reuseBlock = reuseGuardBlock(folder, kind, row, resolvedBrand);
       if (reuseBlock) return { scheduled: null, scheduleError: reuseBlock };
       const capability = selected.postizCapability;
       if (!capability) return { scheduled: null, scheduleError: "configured Postiz capability was not retained for scheduling" };
@@ -605,5 +624,5 @@ export async function scheduleApproved(
     : kind === "substack" ? deps.publishSubstack
     : kind === "outreach-lock" ? deps.lockOutreachMessage
     : deps.publishShorts;
-  return runPublisher(fn, folder, row, kind, policyDecision);
+  return runPublisher(fn, folder, row, kind, resolvedBrand, policyDecision);
 }

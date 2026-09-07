@@ -1501,11 +1501,14 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           return;
         }
         if (room !== "Content") throw new Error(`Studio Start does not create a room item for ${room} yet`);
+        // Resolved BEFORE startCapture: a refused brand must not reserve a job id or persist a
+        // capture. The advisor round it starts runs a brand-scoped routing preview.
+        const captureBrand = requestBrand(b.brand);
         const result = startCapture("Content", String(b.text ?? ""), (jobId, capture) => {
           const dispatch = sourceDispatch(classifySource(capture.text), capture.text);
           if ("error" in dispatch) throw new Error(dispatch.error);
           if (dispatch.kind === "notes" || dispatch.kind === "continue" || dispatch.kind === "video") throw new Error("Content capture needs pasted text, a file path, or a URL");
-          return addDevelopJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText, requestEngine(b.engine), jobId);
+          return addDevelopJob(dispatch.kind, dispatch.arg, dispatch.label, captureBrand, dispatch.rawText, requestEngine(b.engine), jobId);
         });
         json(res, 200, { ok: true, capture: result.capture, ...(result.job ? { job: publicJob(result.job) } : {}), replayed: result.replayed });
       } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
@@ -1630,7 +1633,9 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       const b = await readBody(req); const slug = String(b.slug ?? "").trim();
       try {
         if (!slug) throw new Error("an existing Content source is required");
-        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop", requestEngine(b.engine))) });
+        // The advisor's Routing preview runs `npm run route -- --brand <brand>`, so a develop round
+        // is brand-scoped work too. Refused, not defaulted, on the same terms as atomize and video.
+        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, requestBrand(b.brand), "develop", requestEngine(b.engine))) });
       } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
       return;
     }
@@ -1638,9 +1643,11 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       const b = await readBody(req); const slug = String(b.slug ?? ""); const reply = String(b.reply ?? "").trim();
       if (!reply) { json(res, 400, { ok: false, error: "type a reply for the advisor first" }); return; }
       try {
+        // Brand first: a refused request must not persist the reply to develop/log.md either.
+        const replyBrand = requestBrand(b.brand);
         if (developJobInFlight(slug)) { json(res, 409, { ok: false, error: "the advisor is already working on this piece" }); return; }
         appendReplyBySlug(slug, reply);
-        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop-reply", requestEngine(b.engine))) });
+        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, replyBrand, "develop-reply", requestEngine(b.engine))) });
       } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
       return;
     }
@@ -1696,7 +1703,10 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     if (req.method === "POST" && url.pathname === "/api/video/generate") {
       const b = await readBody(req);
       try {
-        const job = addVideoJob(String(b.slug ?? ""), requestEngine(b.engine));
+        // requestBrand refuses a missing or unknown brand by name. No server-side default: /video's
+        // SKILL.md forbids a Human Inference fallback, and defaulting here would reinstate exactly
+        // that, invisibly.
+        const job = addVideoJob(String(b.slug ?? ""), requestBrand(b.brand), requestEngine(b.engine));
         json(res, 200, { ok: true, job: publicJob(job) });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1734,12 +1744,22 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         json(res, 400, { ok: false, error: "paste some text, a file path, or a URL first" });
         return;
       }
+      // Refused, not defaulted: /atomize's SKILL.md rejects a missing or unknown brand and forbids
+      // a Human Inference fallback, so the server must not quietly supply one. Unreachable in
+      // normal use — the browser always sends the selected brand — and that is the point.
+      let brand: BrandId;
+      try {
+        brand = requestBrand(b.brand);
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+        return;
+      }
       const dispatch = sourceDispatch(classifySource(source), source);
       if ("error" in dispatch) {
         json(res, 400, { ok: false, error: dispatch.error });
         return;
       }
-      const job = addJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText, requestEngine(b.engine));
+      const job = addJob(dispatch.kind, dispatch.arg, dispatch.label, brand, dispatch.rawText, requestEngine(b.engine));
       json(res, 200, { ok: true, job: publicJob(job) });
       return;
     }
@@ -1780,10 +1800,21 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         json(res, 400, { ok: false, error: "pick at least one note first" });
         return;
       }
+      // Trap 2 of SLICE-5N: these continue jobs run through runContinueJob -> runAtomizeJob, so
+      // they need the brand exactly as much as /api/atomize does. Validated BEFORE scaffoldPicked
+      // so a refused request writes no folders.
+      let notesBrand: BrandId;
+      try {
+        notesBrand = requestBrand(b.brand);
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+        return;
+      }
       const results = scaffoldPicked(indices);
       const queued = results
         .filter((r) => r.dir)
-        .map((r) => publicJob(addJob("continue", `--continue ${r.dir}`, `Note: ${r.title}`, undefined, requestEngine(b.engine))));
+        // `--continue ${r.dir}` is byte-for-byte what it was: the brand rides on the job, not on arg.
+        .map((r) => publicJob(addJob("continue", `--continue ${r.dir}`, `Note: ${r.title}`, notesBrand, undefined, requestEngine(b.engine))));
       json(res, 200, { ok: true, results, jobs: queued });
       return;
     }

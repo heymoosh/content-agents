@@ -29,7 +29,7 @@ import { logCost } from "../util/cost-log.js";
 import { buildEngineSpawn, enginePrompt, ENGINE_COMMANDS, ENGINE_LABELS, type Engine, type EngineSpawnOptions } from "./engines.js";
 import type { ContentOrigin, ContentRequest, ContentVariant } from "./content-request.js";
 import { assertReviewedMechanismGenerationAuthorization, containsPersonalBeliefReversal } from "./reviewed-mechanism-recommendations.js";
-import type { BrandId } from "../identity/brand.js";
+import { isBrandId, type BrandId } from "../identity/brand.js";
 import { CONFIGURED_CARD_MEDIA, configuredCardImagePath, configuredCardQuoteDerivative, configuredCardRenderDerivative, configuredCardSourceLine, configuredMediaPlan, configuredMediaStage, isConfiguredCardMedia, isConfiguredCardQuoteDerivative, type ConfiguredMediaPlan, type ConfiguredMediaSourceInputs, type ConfiguredMediaStage } from "./configured-media.js";
 import { acquireJobExecutionLease, readDurableJobs, recoverAbandonedJobs, removeDurableJobs, upsertDurableJob } from "../runtime/durable-jobs.js";
 import { processAlive, type FileLease } from "../runtime/file-lock.js";
@@ -1505,6 +1505,12 @@ interface Job {
   kind: JobKind;
   label: string;
   engine?: Engine; // selected CLI for this run; old callers default to Claude
+  // The canonical content identity this run belongs to (human-inference | charles | fiction).
+  // Its OWN field, never folded into `arg`: three consumers parse `arg` as data (runVideoJob's
+  // join/basename, resolveContinueArg's `--continue <folder>` grammar, addVideoJob's `j.arg ===
+  // arg` dedupe), so appending a flag there would corrupt all three. Optional only because job
+  // records persisted before this field existed have none — see the brandless guard in drain().
+  brand?: BrandId;
   arg: string; // atomize-family only: what the slash command receives (url, .inbox path, folder, "notes")
   status: JobStatus;
   slugs: string[]; // content folders touched — linked back so the Review tab can jump to them
@@ -1560,6 +1566,15 @@ function freshJobFields(): Pick<Job, "status" | "slugs" | "error" | "createdAt" 
     steps: [], stepTotal: null, step: 0, failedAtStep: null, retryable: false, ask: null, answer: null,
   };
 }
+// The ONE decoder for a brand read back off disk, used by BOTH rehydration paths: startup
+// (hydrateDurableJobs) and addDevelopJob's crash-recovery branch. Two decoders were one decoder too
+// many — the recovery branch spread the raw record and cast it, so a `null` or a junk string
+// survived there while startup normalized it away, and the two paths disagreed about what a
+// recovered job carried.
+function decodeJobBrand(value: unknown): BrandId | undefined {
+  return isBrandId(value) ? value : undefined;
+}
+
 function hydrateDurableJobs(): Job[] {
   const stored = readDurableJobs();
   const recovered = recoverAbandonedJobs(stored);
@@ -1568,6 +1583,9 @@ function hydrateDurableJobs(): Job[] {
     ...freshJobFields(), ...record,
     id: String(record.id), kind: record.kind as JobKind, label: String(record.label),
     arg: typeof record.arg === "string" ? record.arg : "", engine: (record.engine as Engine | undefined) ?? "claude",
+    // A record written before the brand existed (or one carrying junk) hydrates with no brand
+    // rather than a substituted one. It still loads and still renders; drain() refuses to spawn it.
+    brand: decodeJobBrand(record.brand),
     task: undefined, proc: undefined, discard: undefined,
   } as Job));
 }
@@ -1969,6 +1987,10 @@ export function jobElapsedMs(j: Pick<Job, "status" | "startedAt" | "finishedAt">
 export function publicJob(j: Job) {
   return {
     id: j.id, kind: j.kind, label: j.label, engine: j.engine ?? "claude", status: j.status, slugs: j.slugs,
+    // Explicitly serialized: a brand that travels invisibly is a brand Muxin cannot check. `null`
+    // for kinds that carry none (develop, the task jobs) and for a pre-brand persisted record —
+    // the Jobs list simply shows no brand chip there rather than naming a brand it does not know.
+    brand: j.brand ?? null,
     error: j.error, createdAt: j.createdAt, startedAt: j.startedAt, finishedAt: j.finishedAt,
     elapsedMs: jobElapsedMs(j), lastStdoutLine: j.lastStdoutLine,
     steps: j.steps, stepTotal: j.stepTotal, step: j.step, failedAtStep: j.failedAtStep,
@@ -2016,10 +2038,13 @@ function materializeInboxArg(kind: "text" | "file", rawArg: string, id: string, 
 // file sources are copied into .inbox (space-free names) via materializeInboxArg; urls and "notes"
 // pass straight through. "video" jobs pass their content-folder path straight through too (see
 // addVideoJob) — no materialization needed.
-export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, rawText?: string, engine: Engine = "claude"): Job {
+// `brand` sits ahead of the optional parameters because it is required: every atomize-family kind
+// dispatches a slash command whose skill rejects a missing brand outright, so there is no shape of
+// this call that legitimately has none.
+export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, brand: BrandId, rawText?: string, engine: Engine = "claude"): Job {
   const id = nextJobId();
   const arg = kind === "text" || kind === "file" ? materializeInboxArg(kind, rawArg, id, rawText) : rawArg;
-  const job: Job = { id, kind, label, arg, engine, ...freshJobFields() };
+  const job: Job = { id, kind, label, arg, brand, engine, ...freshJobFields() };
   jobs.push(job);
   persistJob(job);
   void drain();
@@ -2029,12 +2054,15 @@ export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, r
 // "Generate storyboard" (card 9e20a616): enqueue `/video <folder>` through the SAME queue atomize
 // jobs run through — no second queue. Idempotent against a double-click: if this folder already
 // has a video job queued/running, hand back that job instead of starting a redundant second /video.
-export function addVideoJob(slug: string, engine: Engine = "claude"): Job {
+export function addVideoJob(slug: string, brand: BrandId, engine: Engine = "claude"): Job {
   safeFolder(slug); // throws "no such queue" if slug isn't a real content folder
   const arg = join("content", slug);
-  const existing = jobs.find((j) => j.kind === "video" && j.arg === arg && (j.status === "queued" || j.status === "running"));
+  // The dedupe keys on the brand too: an in-flight run for a DIFFERENT identity is not this
+  // request, and handing it back would silently answer "make me a Charles short" with a Human
+  // Inference one.
+  const existing = jobs.find((j) => j.kind === "video" && j.arg === arg && j.brand === brand && (j.status === "queued" || j.status === "running"));
   if (existing) return existing;
-  return addJob("video", arg, `Generate storyboard: ${slug}`, undefined, engine);
+  return addJob("video", arg, `Generate storyboard: ${slug}`, brand, undefined, engine);
 }
 
 // ── Develop tab: the advisor stage ──────────────────────────────────────────────────────────────
@@ -2053,11 +2081,18 @@ export function developJobInFlight(slug: string): boolean {
   );
 }
 
+// Develop jobs DO need a brand, and reading only develop/SKILL.md's usage line is what hid that:
+// the line names no `--brand`, but the skill's own Routing preview card (develop/SKILL.md:57)
+// instructs the advisor to run `npm run route -- --brand <brand> --pillar <pillars>`. A develop
+// round therefore already contains a required brand-scoped operation, and until now it had no
+// brand to give it. The brand is threaded here on the same terms as atomize and video: required at
+// the constructor, refused at the route, sent by the client.
+//
 // Start an advisor round. `source` uses the same classify/materialize door as /api/atomize (url /
 // file / pasted text); an existing folder comes in as `{ slug }` instead. Reply rounds are
 // enqueued by addDevelopReplyJob AFTER serve.ts persisted the reply to develop/log.md — the spawn
 // argv stays a fixed `/develop content/<slug>`, no free text in it.
-export function addDevelopJob(kind: "url" | "file" | "text", rawArg: string, label: string, rawText?: string, engine: Engine = "claude", reservedId?: string): Job {
+export function addDevelopJob(kind: "url" | "file" | "text", rawArg: string, label: string, brand: BrandId, rawText?: string, engine: Engine = "claude", reservedId?: string): Job {
   const id = reservedId ?? nextJobId();
   const local = jobs.find((job) => job.id === id);
   const abandoned = (job: { status?: unknown; error?: unknown; ownerPid?: unknown }) => (
@@ -2068,27 +2103,32 @@ export function addDevelopJob(kind: "url" | "file" | "text", rawArg: string, lab
   if (local) jobs.splice(jobs.indexOf(local), 1);
   const durable = readDurableJobs().find((job) => job.id === id);
   if (durable && !abandoned(durable)) {
-    const recovered = { ...freshJobFields(), ...durable, id, kind: durable.kind as JobKind, label: String(durable.label), arg: typeof durable.arg === "string" ? durable.arg : "", engine: (durable.engine as Engine | undefined) ?? engine } as Job;
+    // Same decoder as startup rehydration: a recovered record's brand is normalized, never cast.
+    // A record from before this field existed recovers with none and is refused at dispatch rather
+    // than run under a substituted identity.
+    const recovered = { ...freshJobFields(), ...durable, id, kind: durable.kind as JobKind, label: String(durable.label), arg: typeof durable.arg === "string" ? durable.arg : "", brand: decodeJobBrand(durable.brand), engine: (durable.engine as Engine | undefined) ?? engine } as Job;
     jobs.push(recovered);
     return recovered;
   }
   const arg = kind === "url" ? rawArg : materializeInboxArg(kind, rawArg, id, rawText);
-  const job: Job = { id, kind: "develop", label: `Develop: ${label}`, arg, engine, ...freshJobFields() };
+  const job: Job = { id, kind: "develop", label: `Develop: ${label}`, arg, brand, engine, ...freshJobFields() };
   jobs.push(job);
   persistJob(job);
   void drain();
   return job;
 }
 
-export function addDevelopFolderJob(slug: string, kind: "develop" | "develop-reply" = "develop", engine: Engine = "claude"): Job {
+export function addDevelopFolderJob(slug: string, brand: BrandId, kind: "develop" | "develop-reply" = "develop", engine: Engine = "claude"): Job {
   safeFolder(slug); // throws "no such queue" if slug isn't a real content folder
   const arg = join("content", slug);
+  // Keys on the brand for the same reason addVideoJob does: an advisor round already running under
+  // a different identity is not this request.
   const existing = jobs.find(
-    (j) => (j.kind === "develop" || j.kind === "develop-reply") && j.arg === arg && (j.status === "queued" || j.status === "running"),
+    (j) => (j.kind === "develop" || j.kind === "develop-reply") && j.arg === arg && j.brand === brand && (j.status === "queued" || j.status === "running"),
   );
   if (existing) return existing; // idempotent against a double-click, like addVideoJob
   const label = kind === "develop-reply" ? `Advisor reply: ${slug}` : `Develop: ${slug}`;
-  const job: Job = { id: nextJobId(), kind, label, arg, engine, ...freshJobFields() };
+  const job: Job = { id: nextJobId(), kind, label, arg, brand, engine, ...freshJobFields() };
   jobs.push(job);
   persistJob(job);
   void drain();
@@ -2267,11 +2307,73 @@ interface AtomizeRunResult {
   enoent: boolean;
 }
 
+// Every one of these kinds spawns a brand-scoped skill. `/atomize` and `/video` both say, in
+// identical words, that a missing brand is rejected and that there is no Human Inference fallback.
+// `/develop` says it less visibly but needs one just as much: its Routing preview card runs
+// `npm run route -- --brand <brand> --pillar <pillars>` (develop/SKILL.md:57). So a job of any of
+// these kinds with no brand is refused rather than defaulted. The only way to hold one today is to
+// have been persisted before this field existed; drain() catches those before dispatch and this
+// assertion is the belt-and-braces behind it.
+export const BRANDLESS_JOB_ERROR =
+  "this run was queued before the Studio recorded which brand a job belongs to, so it has no brand to hand the skill. Start it again from the Content room.";
+const BRAND_SCOPED_KINDS: ReadonlySet<JobKind> = new Set<JobKind>([
+  "url", "file", "text", "notes", "continue", "video", "develop", "develop-reply",
+]);
+function requireJobBrand(job: Pick<Job, "brand">): BrandId {
+  if (!job.brand) throw new Error(BRANDLESS_JOB_ERROR);
+  return job.brand;
+}
+
+// The EXACT prompt each spawn hands the subprocess. Exported so a test can read the real composed
+// string instead of re-implementing it, and so the flag order stays pinned: `--brand <id>` comes
+// before the source, and `job.arg` goes through verbatim.
+type SpawnPromptJob = Pick<Job, "engine" | "brand" | "arg">;
+export function atomizeSpawnPrompt(job: SpawnPromptJob): string {
+  return enginePrompt(job.engine ?? "claude", "atomize", `/atomize --brand ${requireJobBrand(job)} ${job.arg}`);
+}
+export function videoSpawnPrompt(job: SpawnPromptJob): string {
+  return enginePrompt(job.engine ?? "claude", "video", `/video --brand ${requireJobBrand(job)} ${job.arg}`);
+}
+// `/develop` gets its brand as a NAMED INSTRUCTION, not as a leading flag, and the difference is
+// load-bearing. atomize/SKILL.md and video/SKILL.md both define `--brand <id>` at entry and reject a
+// missing one. develop/SKILL.md does NOT: its step 0 treats whatever follows the command as the
+// source folder/URL/file, so `/develop --brand charles content/foo` risks the skill reading
+// `--brand` itself as the source. Until that skill carries the same entry contract, the source stays
+// immediately after `/develop` where step 0 expects it, and the brand rides in prose that names the
+// one command inside the skill that actually needs it (the step 2 routing preview,
+// develop/SKILL.md:57). This is deliberately NOT the shape atomize and video use — see the RESULT
+// BLOCK's blocked item.
+export function developSpawnPrompt(job: SpawnPromptJob): string {
+  const brand = requireJobBrand(job);
+  return enginePrompt(job.engine ?? "claude", "develop", [
+    `/develop ${job.arg}`,
+    ``,
+    `Run this advisor round for the ${brand} brand. Every brand-scoped command in the skill takes`,
+    `that brand: step 2's routing preview is \`npm run route -- --brand ${brand} --pillar <pillars>\`.`,
+    `Do not fall back to human-inference if ${brand} is something else.`,
+  ].join("\n"));
+}
+
+// The dispatch seam for the three brand-scoped skill spawns. Production always runs the real
+// `runClaudeSpawn`; a test substitutes a recorder so the prompt a real run WOULD hand the
+// subprocess can be read without spawning `claude` — and without appending a row to the repository's
+// own data/cost-log.csv, which runAgentSpawn writes on every completed spawn. Injecting the spawn
+// is the pattern fiction-jobs.ts already uses (createFictionJobs takes `runClaudeSpawn` as a dep);
+// this is the same seam for the queue's own run functions.
+type SkillSpawn = (job: Job, prompt: string, opts: Parameters<typeof runClaudeSpawn>[2]) => Promise<CommandSpawnResult>;
+let skillSpawn: SkillSpawn = (job, prompt, opts) => runClaudeSpawn(job, prompt, opts);
+export function setSkillSpawn(fn: SkillSpawn | null): void {
+  skillSpawn = fn ?? ((job, prompt, opts) => runClaudeSpawn(job, prompt, opts));
+}
+
 // Spawn the real /atomize headlessly. ATOMIZE_ORIGIN=gui-queue tells the /atomize skill's step 8
 // to tag every row it appends "from GUI queue" instead of the default "from /cycle" — the origin
 // source-tag the review GUI renders per row (src/publish/queue.ts QUEUE_ORIGINS).
+// The `--brand <id>` flag goes FIRST, ahead of the source, matching the SKILL.md usage line
+// (`/atomize --brand <brand> <source>` and `/atomize --brand <brand> --continue <folder>`). It is
+// composed here, at the spawn, from `job.brand` — never appended to `job.arg`.
 async function runAtomizeJob(job: Job): Promise<AtomizeRunResult> {
-  const result = await runClaudeSpawn(job, enginePrompt(job.engine ?? "claude", "atomize", `/atomize ${job.arg}`), {
+  const result = await skillSpawn(job, atomizeSpawnPrompt(job), {
     timeoutMs: ATOMIZE_TIMEOUT_MS,
     permissionMode: ATOMIZE_PERMISSION_MODE,
     env: { ATOMIZE_ORIGIN: "gui-queue" },
@@ -2284,7 +2386,7 @@ async function runAtomizeJob(job: Job): Promise<AtomizeRunResult> {
 // Sets job.status/job.error/job.slugs itself (mirrors the atomize branch of drain() below).
 async function runVideoJob(job: Job): Promise<void> {
   const folderAbs = join(repoRoot, job.arg);
-  const result = await runClaudeSpawn(job, enginePrompt(job.engine ?? "claude", "video", `/video ${job.arg}`), {
+  const result = await skillSpawn(job, videoSpawnPrompt(job), {
     timeoutMs: ATOMIZE_TIMEOUT_MS,
     permissionMode: ATOMIZE_PERMISSION_MODE,
   });
@@ -2311,7 +2413,7 @@ async function runDevelopJob(job: Job): Promise<void> {
   const isFolderArg = job.arg.startsWith("content/");
   const beforeSlugs = isFolderArg ? null : new Set(listSlugs());
   const beforeRounds = isFolderArg ? roundCount(join(repoRoot, job.arg)) : 0;
-  const result = await runClaudeSpawn(job, enginePrompt(job.engine ?? "claude", "develop", `/develop ${job.arg}`), {
+  const result = await skillSpawn(job, developSpawnPrompt(job), {
     timeoutMs: DEVELOP_TIMEOUT_MS,
     permissionMode: ATOMIZE_PERMISSION_MODE,
   });
@@ -2476,22 +2578,16 @@ export function atomizeArtifactVerdict(failure: string | null, createdSlugs: num
   return !failure && createdSlugs > 0 ? "done" : "failed";
 }
 
-// Process the queue one job at a time — every kind (atomize-family AND task jobs) shares this one
-// `draining` mutex, so GUI-wide Claude concurrency is bounded no matter which button fired it.
-async function drain(): Promise<void> {
-  if (draining) return;
-  const job = jobs.find((j) => j.status === "queued" && (j.ownerPid === undefined || j.ownerPid === process.pid));
-  if (!job) return;
-  executionLease = acquireJobExecutionLease();
-  if (!executionLease) {
-    setTimeout(() => { void drain(); }, 100);
-    return;
-  }
-  draining = true;
-  job.status = "running";
-  job.startedAt = Date.now();
-  persistJob(job);
-
+// Every dispatch branch, with NO settle of its own: drain() below settles exactly once, whatever
+// happens in here. Splitting it out is the containment this needed. A branch that THREW used to
+// escape drain() altogether — and one really can: hydrateDurableJobs sets `task: undefined`, so a
+// recovered `strategy`/`revise` record that is later answered or retried arrives with no task and
+// no brand, misses the brandless guard (it is not a brand-scoped kind) and falls through to the
+// atomize tail, where requireJobBrand throws. The escaping exception left `draining` true, the
+// execution lease held and the job pinned at "running", so every job queued behind it hung until
+// the process was restarted. The rule now is absolute: no exception from any branch may leave the
+// lane held, the lease retained, or the job unsettled.
+async function dispatchJob(job: Job): Promise<void> {
   if (job.task) {
     // Generic task job (revise/brief-revise/insights/ask-insights/duplicate). The task itself
     // already resolved/rejected runQueued()'s caller-facing promise; this just finishes bookkeeping.
@@ -2501,37 +2597,40 @@ async function drain(): Promise<void> {
     } catch {
       job.status = "failed"; // job.error was already set inside runQueued()'s wrapper
     }
-    settleJob(job);
+    return;
+  }
+
+  // A record persisted before `Job` carried a brand still hydrates and still renders, but it cannot
+  // be dispatched: the skill it would spawn rejects a missing brand, and inventing one here is the
+  // exact silent Human Inference substitution this field exists to end.
+  if (BRAND_SCOPED_KINDS.has(job.kind) && !job.brand) {
+    job.status = "failed";
+    job.error = BRANDLESS_JOB_ERROR;
     return;
   }
 
   if (job.kind === "video") {
     await runVideoJob(job);
-    settleJob(job);
     return;
   }
 
   if (job.kind === "fiction-draft") {
     await fictionOrchestration.runFictionDraftJob(job as unknown as FictionJob);
-    settleJob(job);
     return;
   }
 
   if (job.kind === "fiction-continuity") {
     await fictionOrchestration.runFictionCheckJob(job as unknown as FictionJob);
-    settleJob(job);
     return;
   }
 
   if (job.kind === "develop" || job.kind === "develop-reply") {
     await runDevelopJob(job);
-    settleJob(job);
     return;
   }
 
   if (job.kind === "continue") {
     await runContinueJob(job);
-    settleJob(job);
     return;
   }
 
@@ -2566,6 +2665,32 @@ async function drain(): Promise<void> {
     // row renders, so it carries the product name, not the skill's name.
     job.error = failure ?? `Format for platforms finished but created no new content folder. Check the view-log link${logTailSuffix(job.id)}`;
   }
+}
+
+// Process the queue one job at a time — every kind (atomize-family AND task jobs) shares this one
+// `draining` mutex, so GUI-wide Claude concurrency is bounded no matter which button fired it.
+async function drain(): Promise<void> {
+  if (draining) return;
+  const job = jobs.find((j) => j.status === "queued" && (j.ownerPid === undefined || j.ownerPid === process.pid));
+  if (!job) return;
+  executionLease = acquireJobExecutionLease();
+  if (!executionLease) {
+    setTimeout(() => { void drain(); }, 100);
+    return;
+  }
+  draining = true;
+  job.status = "running";
+  job.startedAt = Date.now();
+  persistJob(job);
+
+  // One settle, always, whatever the dispatch did. A throwing branch is a failed job, never a
+  // dead queue: settleJob releases the lease, drops `draining` and kicks the next queued job.
+  try {
+    await dispatchJob(job);
+  } catch (e) {
+    job.status = "failed";
+    job.error = e instanceof Error ? e.message : String(e);
+  }
   settleJob(job);
 }
 
@@ -2595,6 +2720,8 @@ export function answerJob(id: string, answer: string): { error: string } | { job
     kind: original.kind,
     label: original.label,
     arg: original.arg,
+    // Same run, same identity. Dropping it here would restart a Charles job as a brandless one.
+    brand: original.brand,
     engine: original.engine ?? "claude",
     task: original.task,
     payload: original.payload,

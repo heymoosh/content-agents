@@ -12,8 +12,22 @@ import type { BrandId } from "../identity/brand.js";
 //   const result = checkReuse("2026-06-25-my-essay", "linkedin");
 //   if (!result.allowed) console.warn(result.reason);
 
+// Two test overrides, deliberately different shapes.
+//
+// CONTENT_AGENTS_TEST_BETS_PATH names ONE file and therefore collapses every brand onto it. That is
+// fine for a suite about one brand's window, which is what its existing users are, and it keeps
+// working here exactly as it did.
+//
+// CONTENT_AGENTS_TEST_BRIEFS_ROOT relocates the briefs ROOT instead, so `<root>/<brand>/bets.md`
+// still resolves per brand. A suite that has to tell two brands' Placed logs apart needs that:
+// under the per-file override both brands read one file, and the only alternative was writing
+// fixtures into the real `briefs/` tree — where a stray cleanup would delete Muxin's append-only
+// placement log, the record that stops duplicate publishing.
 function betsPath(brandId: BrandId): string {
-  return process.env.CONTENT_AGENTS_TEST_BETS_PATH ?? join(repoRoot, "briefs", brandId, "bets.md");
+  const perFile = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+  if (perFile !== undefined) return perFile; // `??` semantics, empty string included, exactly as before
+  const root = process.env.CONTENT_AGENTS_TEST_BRIEFS_ROOT?.trim();
+  return join(root || join(repoRoot, "briefs"), brandId, "bets.md");
 }
 const FALLBACK_MIN_DAYS = 30;
 

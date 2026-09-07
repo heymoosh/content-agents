@@ -40,7 +40,7 @@ test("restart after crash between durable enqueue and capture bind relaunches th
   const jobsUrl = pathToFileURL(join(process.cwd(), "src/review/jobs.ts")).href;
   const run = promisify(execFile), env = { ...process.env, CONTENT_AGENTS_TEST_JOB_STORE: store, CONTENT_AGENTS_DATA_ROOT: dataRoot };
   const crash = `import { startCapture } from ${JSON.stringify(capturesUrl)}; import { upsertDurableJob } from ${JSON.stringify(durableUrl)}; try { startCapture("Content", "https://example.com/source", id => { upsertDurableJob({ id, kind:"develop", label:"reserved", status:"queued", ownerPid:process.pid }); throw new Error("crash"); }, process.argv[1]); } catch {}`;
-  const restart = `import { startCapture } from ${JSON.stringify(capturesUrl)}; import { addDevelopJob } from ${JSON.stringify(jobsUrl)}; const result = startCapture("Content", "https://example.com/source", (id, c) => addDevelopJob("url", c.text, c.text, undefined, "claude", id), process.argv[1]); console.log(JSON.stringify({ jobId: result.capture.jobId, status: result.job?.status })); process.exit(0);`;
+  const restart = `import { startCapture } from ${JSON.stringify(capturesUrl)}; import { addDevelopJob } from ${JSON.stringify(jobsUrl)}; const result = startCapture("Content", "https://example.com/source", (id, c) => addDevelopJob("url", c.text, c.text, "human-inference", undefined, "claude", id), process.argv[1]); console.log(JSON.stringify({ jobId: result.capture.jobId, status: result.job?.status })); process.exit(0);`;
   try {
     await run(process.execPath, ["--import", "tsx", "--input-type=module", "--eval", crash, path], { env });
     assert.equal(listCaptures(path)[0]!.jobId, null, "crash happened before binding");

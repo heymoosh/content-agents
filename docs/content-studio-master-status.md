@@ -5,7 +5,37 @@
 - Repository root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- Current slice: none in flight. Last resolved: **SLICE-5M ACCEPTED** (2026-09-06) — item (d1), the
+- Next slice: **(d3)** — `rowEl` dead code (`page.ts:1466`) plus `buildFormatArg` (`jobs.ts:2100`).
+  Measure the blast radius before scoping; d3 is an inventory to *measure*, not a list to trust.
+- **ONE THING NEEDS MUXIN** (from SLICE-5N, does not block d3): `develop/SKILL.md` defines no
+  `--brand` at entry — step 0 reads the arg as the source, while line 57 of its body runs
+  `npm run route -- --brand <brand>`. `atomize` and `video` both carry the entry contract; develop
+  does not. `.claude/skills/**` is write-protected by Muxin's settings, so neither builder nor
+  coordinator may edit it and neither routed around it. Interim: `developSpawnPrompt` sends no
+  undefined flag — the source stays where step 0 expects it and the brand rides as a named
+  instruction, so nothing ships broken. To finish, someone who can write there gives develop
+  atomize's entry contract, then `developSpawnPrompt` flips to the flag form.
+- Last resolved: **SLICE-5N ACCEPTED** (2026-09-07) — item (d2) folded with item (c)'s brandId
+  debt, the ordering Muxin agreed to (d1 → d2+brandId → d3). Gate **4278/489/0**. The brand now
+  travels from the browser through the HTTP routes, onto the `Job`, through the durable store and
+  into the spawned prompt for `/atomize`, `/video` and `/develop`; `reuseGuardBlock` reads the
+  resolved `DeliveryPolicyDecision`'s brand instead of `checkReuse`'s `human-inference` default.
+  Two audit passes, two repair cycles (the protocol's bound). The audit caught a new suite that
+  would have destroyed `briefs/<brand>/bets.md` — the append-only placement log preventing
+  duplicate publishing — latent only because no per-brand brief exists yet; and a recovered task
+  job that stranded the whole queue. Full RESULT BLOCK, including two recorded coverage limits and
+  a defect the builder self-reported, in `docs/operations/launch-slices/SLICE-5N.md`.
+  **Two master-doc claims were corrected while scoping it, both verified in source first:**
+  (i) item (c) says the brandId debt is "two call sites in `studio-scheduling.ts`" — it is **one**.
+  SLICE-5K folded the pre-flight and the recovery call into a single function, `reuseGuardBlock`
+  (`studio-scheduling.ts:430`), whose lone `checkReuse` is at `:433`. The doc's worry that the two
+  would drift is now structurally impossible, and the fix is correspondingly smaller.
+  (ii) d2 is **not** a two-line change. The `Job` record (`jobs.ts:1503`) has no brand field at all,
+  so the brand has to be carried from the HTTP request through `addJob` onto the job and into the
+  prompt. A third entry point the doc never mentions also needs it: `runContinueJob` calls
+  `runAtomizeJob`, so the Notes picker (`serve.ts:1786`) spawns a brandless `/atomize --continue`
+  today — the path SLICE-5M just repaired and the one Muxin uses most.
+  Last resolved: **SLICE-5M ACCEPTED** (2026-09-06) — item (d1), the
   doubled `join` that made a successful Notes drafting job report failure. Gate **4260/488/0** (up
   from 4248; twelve new tests). Normalization landed at the **consumer**: `resolveContinueArg`
   (`jobs.ts:2205`) returns a three-way `ok`/`refused`/`unparseable`, and `settleContinueRun`
@@ -113,9 +143,14 @@
   provider route breaks that equivalence.** Pass the brand at BOTH call sites in the same change,
   or the guard will silently check Charles's rows under the Human Inference brand.
   **CONFIRMED by Muxin, 2026-09-06: "Brand id will be needed."** This is no longer debt to weigh —
-  it is required work. It does not have to wait for item (c): it is a two-call-site change in
+  it is required work. It does not have to wait for item (c): it is a change in
   `src/review/studio-scheduling.ts` plus tests, cheap and independently verifiable, and it can be
   taken as its own micro-slice at any point. If it is still unpaid when (c) is scoped, (c) pays it.
+  **CORRECTED 2026-09-06 while scoping SLICE-5N, verified in source:** this says "two call sites"
+  and there is **one**. SLICE-5K folded the Postiz pre-flight and `runPublisher`'s recovery into a
+  single function, `reuseGuardBlock` (`studio-scheduling.ts:430`); its lone brandless `checkReuse`
+  is at `:433`. The drift this paragraph warns about is now structurally impossible. **Being paid
+  by SLICE-5N**, alongside (d2), since both are the same unthreaded brand.
   **Muxin's stated priority, 2026-09-06: get Human Inference posting live first.** This item waits
   behind that. Do not start it until she says so.
   (d) **Three Content-room defects found by SLICE-5L, recorded and unfixed.** Read
@@ -130,12 +165,18 @@
   worked. `stampFolderEngine` (`jobs.ts:2237`) is in the same unreachable `done` branch and never
   runs. Reproduced empirically with the real parser, not reasoned about. The user-facing cost is
   that it teaches Muxin to distrust a feature that works.
-  **(d2) The GUI spawns `/atomize` and `/video` without `--brand`.** `runAtomizeJob`
-  (`jobs.ts:2150`) and `runVideoJob` (`jobs.ts:2163`) both omit it, while
-  `.claude/skills/atomize/SKILL.md:7-8` and `.claude/skills/video/SKILL.md:7-9` each require a
-  canonical brand and forbid a Human Inference fallback. `runDevelopJob` is unaffected —
-  `/develop` takes no brand. **Note the shape:** this is the same class of bug as item (c)'s
-  brandId debt — a brand that must be threaded through and is not. Worth fixing in one pass with it.
+  **(d2) DONE as SLICE-5N (accepted 2026-09-07), folded with item (c)'s brandId debt.** The GUI
+  spawned `/atomize` and `/video` with no brand; the `Job` record had no brand field at all; and a
+  third entry point this doc never listed — the Notes picker, via `runContinueJob` → `runAtomizeJob`
+  — spawned a brandless `/atomize --continue`. All threaded now, plus `/develop`. One leftover
+  needs Muxin: `develop/SKILL.md`'s missing entry contract, in START HERE above.
+  **This item's own text was wrong and is left here as the record of how.** It read
+  "`runDevelopJob` is unaffected — `/develop` takes no brand", taken from the skill's usage line.
+  `develop/SKILL.md:57` runs `npm run route -- --brand <brand>` in its body. That false claim was
+  copied into the SLICE-5N packet, and the builder reproduced it rather than re-deriving it, because
+  a packet claim reads as settled fact. The audit caught it. **Second false packet claim in two
+  slices, same cause both times: a usage line or heading trusted over the body.** Verify against
+  the body before writing anything into a packet.
   **(d3) `rowEl` (`page.ts:1466`) is dead code.** Zero callers; the live row renderer is
   `reviewScanRowEl` (`page.ts:1595`, called at `:1807`). The "Generate storyboard" button lives
   there, which is why `/cycle` keeps the `/video` offer. `onAction` is wired only at `page.ts:1590`,
@@ -154,6 +195,28 @@
   resolution SLICE-5M fixed, which is why it was left alone there. **Calibrate before scoping:** as
   with 5M's containment work, check what actually reaches `row.asset` before treating this as a
   security boundary rather than correctness hygiene. It is a queue-row field this codebase writes.
+  **(f) Test suites write into real repository trees — found by SLICE-5N's closure audit, recorded,
+  unfixed.** Pre-existing and never checked by anything. The hazard is not "a test writes a file";
+  it is that a cleanup step deletes or overwrites something the system treats as durable state.
+  SLICE-5N's own new suite would have destroyed `briefs/<brand>/bets.md`, the append-only placement
+  log that prevents duplicate publishing — caught only by the audit, and latent only because no
+  per-brand brief exists yet. The same shape may sit in these (auditor-confirmed locations,
+  unverified by me): `briefs/` — `publish/cards.test.ts:43,56,75`. `content/` —
+  `review/jobs.test.ts:1736`, `serve.test.ts:265`, `content-spin-gate.test.ts:97`,
+  `content-pillar-tag.test.ts:35`, `content-source-triage.test.ts:45`,
+  `content-validate-gate.test.ts:75`, `content-generation.test.ts:54,69`. `data/` —
+  `config/load.test.ts:13,37`, `publish/queue-view.test.ts:24,38`, `publish/slots.test.ts` (six
+  sites), `db/tag-source.test.ts:62,101,151`, `cron/ledger.test.ts:16,37,101`,
+  `strategy/spin-control.test.ts:118,133`, `strategy/exploration.test.ts:129,145`. No unredirected
+  `stories/` writer found. **Worst first: `slots.test.ts` overwrites `data/publish-schedule.jsonl`
+  and restores a snapshot.** That is the shared slot ledger every scheduled channel claims against,
+  and snapshot-restore is exactly the pattern that looks safe and loses a concurrent write — if the
+  review server claims a slot while the suite holds its snapshot, the restore reverts the claim and
+  two posts can land in one slot. Verify that before anything else here. Separately, some tests
+  append `$0` rows to `data/cost-log.csv` (`outreach:draft`, `step`); untracked and harmless, but it
+  is the same class. Most of the rest use fixture-specific names and are probably benign —
+  "probably benign" is the claim to check, not to accept. **Measure before scoping**, same warning
+  as d3.
 - **§5 is CLOSED** (2026-09-05, SLICE-5H). Five capabilities ported, three declined — the
   scoring/soft gate, the home-brand thread-check, and the strategy-brief directives — and
   quote-card post text shipped. **Item `3b`** (retire `/cycle`'s drafting step) is therefore

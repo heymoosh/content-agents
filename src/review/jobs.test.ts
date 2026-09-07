@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, configuredPlatformLimit, type GitState } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addJob, addVideoJob, addDevelopFolderJob, atomizeSpawnPrompt, videoSpawnPrompt, developSpawnPrompt, setSkillSpawn, BRANDLESS_JOB_ERROR, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, configuredPlatformLimit, type GitState } from "./jobs.js";
 // SLICE-5H: the configured card path — one drafted string no longer does both jobs.
 import { CARD_CONTEXT_RULE, configuredCardQuote, configuredContentPrompt, configuredTreatmentInstruction, generateConfiguredContent, isConfiguredCardVariantId, repairConfiguredCardQuotes, runClaudeSpawn } from "./jobs.js";
 import { configuredCardQuoteDerivative, configuredCardRenderDerivative, configuredCardSourceLine, isConfiguredCardRenderName } from "./configured-media.js";
@@ -568,7 +568,7 @@ test("enqueueDirectedDraft carries the selected engine into the queued draft spa
 // runs before any job is even created: a bogus slug must throw, not silently queue nothing.
 
 test("addVideoJob refuses a slug that isn't a real content folder", () => {
-  assert.throws(() => addVideoJob("definitely-not-a-real-content-folder-xyz"), /no such queue/);
+  assert.throws(() => addVideoJob("definitely-not-a-real-content-folder-xyz", "charles"), /no such queue/);
 });
 
 // ── Job id uniqueness across a server restart (GUI job logs mixing content from unrelated old
@@ -2115,3 +2115,230 @@ for (const [media, baseline] of Object.entries(NON_CARD_MEDIA_BYTES)) {
     }
   });
 }
+
+// ── SLICE-5N: the brand travels from the room to the subprocess ─────────────────────────────────
+// `.claude/skills/atomize/SKILL.md` and `.claude/skills/video/SKILL.md` each say, in identical
+// words: "Require one canonical brand at entry: human-inference, charles, or fiction. Reject a
+// missing or unknown brand. There is no Human Inference fallback." Both then scope their brief
+// reads to briefs/<brand>/. Before this slice the GUI spawned `/atomize <arg>` and `/video <arg>`
+// with no brand at all, so every Content-room job asked a skill to do brand-scoped work while
+// withholding the brand — and the skill's only recourse was a fallback it is forbidden to have.
+
+test("SLICE-5N: the spawned prompt names the brand ahead of the source, and never touches job.arg", () => {
+  // The exact strings the subprocess receives. Flag first, then the source, matching each SKILL.md
+  // usage line (`/atomize --brand <brand> <source>`, `/video --brand <brand> <folder>`).
+  assert.equal(
+    atomizeSpawnPrompt({ engine: "claude", brand: "charles", arg: "https://muxin.example/notes/1" }),
+    "/atomize --brand charles https://muxin.example/notes/1",
+  );
+  assert.equal(
+    videoSpawnPrompt({ engine: "claude", brand: "fiction", arg: "content/2026-09-01-chapter" }),
+    "/video --brand fiction content/2026-09-01-chapter",
+  );
+  // Trap 1 + trap 2 together: the continue arg is a GRAMMAR three consumers parse (join/basename,
+  // resolveContinueArg, the addVideoJob dedupe). `--brand` is composed around it, never into it.
+  assert.equal(
+    atomizeSpawnPrompt({ engine: "claude", brand: "charles", arg: "--continue content/2026-09-01-note --cut extract" }),
+    "/atomize --brand charles --continue content/2026-09-01-note --cut extract",
+  );
+  // A non-Claude engine still gets the identical request line, wrapped in its skill preamble.
+  assert.match(
+    atomizeSpawnPrompt({ engine: "codex", brand: "human-inference", arg: "notes" }),
+    /\/atomize --brand human-inference notes$/,
+  );
+  // Refused, never defaulted: a job with no brand cannot compose a prompt at all.
+  assert.throws(() => atomizeSpawnPrompt({ engine: "claude", brand: undefined, arg: "notes" }), /no brand to hand the skill/);
+  assert.throws(() => videoSpawnPrompt({ engine: "claude", brand: undefined, arg: "content/x" }), /no brand to hand the skill/);
+});
+
+test("SLICE-5N: a notes-picker continue job carries its brand through the real queue, and a pre-brand job is refused", async () => {
+  jobs.length = 0;
+  // The stub goes in BEFORE anything can queue, and the try opens with it so no setup line can
+  // throw between install and restore. Without it this test spawned a REAL `claude`: canonicalPath
+  // tolerates ENOENT on purpose ("the folder does not exist yet"), so `--continue content/<missing>`
+  // resolves `ok` and dispatches rather than being refused.
+  const spawned: string[] = [];
+  setSkillSpawn(async (_job, prompt) => {
+    spawned.push(prompt);
+    return { code: 0, timedOut: false, enoent: false, stdout: "" };
+  });
+  try {
+  // A record of the shape persisted before this field existed: no brand, still queued. It must not
+  // crash the queue and it must not be dispatched under a brand nobody chose.
+  const legacy = {
+    id: "slice5n-legacy", kind: "continue" as const, label: "Note: legacy", arg: "--continue content/slice5n-legacy",
+    status: "queued" as const, slugs: [], error: null, createdAt: Date.now(), startedAt: null, finishedAt: null,
+    lastStdoutLine: null, steps: [], stepTotal: null, step: 0, failedAtStep: null, retryable: false,
+    ask: null, answer: null, engine: "claude" as const,
+  };
+  jobs.push(legacy as unknown as (typeof jobs)[number]);
+
+  // Exactly what serve.ts POST /api/notes/pick builds, now with the picked brand alongside it.
+  const arg = "--continue content/slice5n-not-a-real-folder";
+  const job = addJob("continue", arg, "Note: a Charles note", "charles");
+  assert.equal(job.arg, arg, "job.arg is byte-for-byte the notes picker's string");
+  assert.equal(job.brand, "charles");
+
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline && (legacy.status === "queued" || job.status === "queued" || job.status === "running")) {
+    await new Promise((r) => setTimeout(r, 25));
+  }
+
+  // The pre-brand job failed with a readable reason rather than spawning a brandless /atomize.
+  assert.equal(legacy.status, "failed");
+  assert.equal(legacy.error, BRANDLESS_JOB_ERROR);
+  // The Charles job ran the real continue path and reached the dispatch carrying its brand.
+  assert.equal(job.brand, "charles", "the brand survived the queue, the drain and the settle");
+  assert.equal(atomizeSpawnPrompt(job), `/atomize --brand charles ${arg}`);
+  // And it is visible: publicJob is an explicit allowlist, so the Jobs list can show it.
+  assert.equal(publicJob(job).brand, "charles");
+  assert.equal(publicJob(legacy as unknown as (typeof jobs)[number]).brand, null, "a pre-brand job reports no brand rather than a substituted one");
+    // The brandless job never reached a subprocess; the Charles one did, carrying its brand.
+    assert.deepEqual(spawned, [`/atomize --brand charles ${arg}`]);
+  } finally {
+    setSkillSpawn(null);
+    jobs.length = 0;
+  }
+});
+
+// ── SLICE-5N R5/R5b: what the SUBPROCESS is handed, and what its argv actually becomes ──────────
+// Two layers, both real. First the queue: addJob/addDevelopFolderJob -> drain -> runAtomizeJob /
+// runDevelopJob / runContinueJob -> the dispatch seam, with a recorder standing in for `claude`.
+// Then the layer BELOW the seam: the recorded prompt is pushed through the real buildEngineSpawn
+// (which calls the real buildClaudeSpawnArgs shape) and the resulting argv ARRAY is asserted whole.
+// Asserting only the prompt would pass even if command construction dropped the brand on the floor.
+test("SLICE-5N: the real queue hands the subprocess a branded prompt, and the brand survives into argv", async () => {
+  jobs.length = 0;
+  const spawned: { kind: string; prompt: string }[] = [];
+  // Installed first, and the try opens with it: no setup line runs outside the restore window, so a
+  // throw in setup can never leak a stubbed spawn into every later test in this process.
+  setSkillSpawn(async (job, prompt) => {
+    spawned.push({ kind: job.kind, prompt });
+    return { code: 0, timedOut: false, enoent: false, stdout: "" };
+  });
+  const slug = `.slice5n-spawn-${process.pid}-${Date.now()}`;
+  const folder = join(process.cwd(), "content", slug);
+  try {
+    // A real content folder: `--continue` resolves against content/ and addDevelopFolderJob's
+    // safeFolder refuses a slug that is not one. Dot-prefixed and removed in the finally, like the
+    // attach-reviewed fixture in serve.test.ts.
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, "review-queue.md"), "| id | platform | format | asset | status | notes |\n|---|---|---|---|---|---|\n");
+
+    const settle = async (job: { status: string }) => {
+      const deadline = Date.now() + 20_000;
+      while (Date.now() < deadline && (job.status === "queued" || job.status === "running")) {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    };
+
+    const url = addJob("url", "https://muxin.example/essay", "An essay", "charles");
+    await settle(url);
+    const cont = addJob("continue", `--continue content/${slug}`, "Note: a Charles note", "charles");
+    await settle(cont);
+    const dev = addDevelopFolderJob(slug, "fiction");
+    await settle(dev);
+
+    assert.deepEqual(spawned.map((s) => s.kind), ["url", "continue", "develop"], "all three dispatches reached the subprocess seam");
+    assert.equal(spawned[0].prompt, "/atomize --brand charles https://muxin.example/essay");
+    assert.equal(spawned[1].prompt, `/atomize --brand charles --continue content/${slug}`);
+    // /develop carries its brand as a named instruction, not a leading flag — develop/SKILL.md
+    // defines no `--brand` at entry and its step 0 would read one as the source. See
+    // developSpawnPrompt's comment.
+    assert.match(spawned[2].prompt, new RegExp(`^/develop content/${slug}\\n`), "the source stays immediately after /develop, where step 0 looks for it");
+    assert.match(spawned[2].prompt, /Run this advisor round for the fiction brand\./);
+    assert.match(spawned[2].prompt, /npm run route -- --brand fiction --pillar <pillars>/);
+
+    // The arg the queue holds is byte-for-byte what the caller supplied — the brand rode beside it,
+    // never inside it.
+    assert.equal(url.arg, "https://muxin.example/essay");
+    assert.equal(cont.arg, `--continue content/${slug}`);
+    assert.equal(dev.arg, join("content", slug));
+
+    // ── R5b: the last transformation before a process. Real buildEngineSpawn, real argv array. ────
+    // ATOMIZE_PERMISSION_MODE defaults to "acceptEdits"; DEVELOP uses the same constant.
+    const argvFor = (prompt: string) => buildEngineSpawn("claude", prompt, { timeoutMs: 1, permissionMode: "acceptEdits" });
+
+    assert.deepEqual(argvFor(spawned[0].prompt), {
+      command: "claude",
+      args: ["-p", "/atomize --brand charles https://muxin.example/essay", "--permission-mode", "acceptEdits"],
+    });
+    assert.deepEqual(argvFor(spawned[1].prompt), {
+      command: "claude",
+      args: ["-p", `/atomize --brand charles --continue content/${slug}`, "--permission-mode", "acceptEdits"],
+    });
+    // The develop argv, whole: the brand is inside the single `-p` element, and the source folder is
+    // still the token straight after the command.
+    const developArgv = argvFor(spawned[2].prompt);
+    assert.equal(developArgv.command, "claude");
+    assert.equal(developArgv.args.length, 4);
+    assert.equal(developArgv.args[0], "-p");
+    assert.equal(developArgv.args[1], spawned[2].prompt);
+    assert.deepEqual(developArgv.args.slice(2), ["--permission-mode", "acceptEdits"]);
+    // Every kind: the brand is present in the argv the process would receive, not merely in the
+    // prompt the seam saw. Dropping it during command construction fails here.
+    for (const argv of [argvFor(spawned[0].prompt), argvFor(spawned[1].prompt), developArgv]) {
+      assert.ok(argv.args.some((a) => /--brand (charles|fiction)/.test(a)), `argv lost the brand: ${JSON.stringify(argv.args)}`);
+    }
+    // The non-Claude route puts the prompt in argv too (codex appends it last), so the brand
+    // survives an engine switch rather than only the default one.
+    const codexArgv = buildEngineSpawn("codex", spawned[0].prompt, { timeoutMs: 1, permissionMode: "acceptEdits" });
+    assert.equal(codexArgv.command, "codex");
+    assert.equal(codexArgv.args[codexArgv.args.length - 1], spawned[0].prompt);
+    assert.ok(codexArgv.args[codexArgv.args.length - 1].includes("--brand charles"));
+  } finally {
+    setSkillSpawn(null);
+    rmSync(folder, { recursive: true, force: true });
+    jobs.length = 0;
+  }
+});
+
+// ── SLICE-5N R2: a throwing dispatch must not strand the queue ──────────────────────────────────
+// hydrateDurableJobs sets `task: undefined`, so a recovered task record (`strategy`, `revise`) that
+// is later answered or retried arrives with no task and no brand. It is not a brand-scoped kind, so
+// the brandless guard does not catch it, and it falls through to the atomize tail where
+// requireJobBrand throws. Before the containment that exception escaped drain(): `draining` stayed
+// true, the execution lease stayed held, the job stayed "running", and every job behind it hung.
+test("SLICE-5N: a dispatch that throws fails its own job and still lets the next one run", async () => {
+  jobs.length = 0;
+  const spawned: string[] = [];
+  // Install, then open the try immediately: nothing between them can throw and leave the stub in
+  // place for the rest of the process.
+  setSkillSpawn(async (job, prompt) => {
+    spawned.push(prompt);
+    return { code: 0, timedOut: false, enoent: false, stdout: "" };
+  });
+  // Exactly the shape a restart leaves behind: a task kind whose closure did not survive.
+  const stranded = {
+    id: "slice5n-recovered-task", kind: "strategy" as const, label: "Refresh brief", arg: "",
+    status: "queued" as const, slugs: [], error: null, createdAt: Date.now(), startedAt: null, finishedAt: null,
+    lastStdoutLine: null, steps: [], stepTotal: null, step: 0, failedAtStep: null, retryable: false,
+    ask: null, answer: null, engine: "claude" as const, task: undefined,
+  };
+  try {
+    jobs.push(stranded as unknown as (typeof jobs)[number]);
+    // Queued BEHIND the stranded job. If the throw escapes, this one never starts.
+    const next = addJob("url", "https://muxin.example/after-the-throw", "Queued behind it", "human-inference");
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline && (stranded.status === "queued" || stranded.status === "running" || next.status === "queued" || next.status === "running")) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+
+    assert.equal(stranded.status, "failed", "the throwing dispatch settled its own job");
+    assert.match(String(stranded.error), /no brand to hand the skill/);
+    assert.ok(stranded.finishedAt, "it was settled, not left pinned at running");
+    // The lane was released: the job behind it ran, reached the subprocess, and finished.
+    assert.deepEqual(spawned, ["/atomize --brand human-inference https://muxin.example/after-the-throw"]);
+    assert.ok(next.status === "done" || next.status === "failed", `the next job settled, got ${next.status}`);
+    // And a third job still drains afterwards — the lease was not retained.
+    const third = addJob("url", "https://muxin.example/third", "Third", "human-inference");
+    const deadline2 = Date.now() + 20_000;
+    while (Date.now() < deadline2 && (third.status === "queued" || third.status === "running")) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    assert.equal(spawned.length, 2, "the queue is still draining after the throw");
+  } finally {
+    setSkillSpawn(null);
+    jobs.length = 0;
+  }
+});

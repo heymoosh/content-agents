@@ -1087,3 +1087,66 @@ test("appendLeadContact creates ## Contacts before ## Decision log and appends w
   assert.match(twice, /- Jamie R\. \| community lead\n- Annika L\.\n/);
   assert.throws(() => appendLeadContact(twice, "jamie r.", "any"), /already a contact/);
 });
+
+// ── SLICE-5N: the three brand-scoped Content-room routes refuse a request with no valid brand ────
+// atomize/SKILL.md and video/SKILL.md both say a missing or unknown brand is rejected and that
+// "There is no Human Inference fallback." A server-side default would reinstate exactly that,
+// invisibly, so these routes refuse instead. The refusal is unreachable in normal use — the browser
+// always sends the selected brand — and that is the point.
+
+async function postJson(path: string, body: unknown): Promise<{ status: number; body: { ok?: boolean; error?: string } }> {
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}${path}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    });
+    return { status: response.status, body: await response.json() as { ok?: boolean; error?: string } };
+  } finally {
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+  }
+}
+
+// `/develop` is on this list because develop/SKILL.md's Routing preview card (line 57) runs
+// `npm run route -- --brand <brand> --pillar <pillars>`. Its USAGE line names no --brand, which is
+// exactly how this was missed: reading the usage line and stopping is not checking the skill.
+for (const route of [
+  { path: "/api/atomize", valid: { source: "https://muxin.example/essay" } },
+  { path: "/api/video/generate", valid: { slug: "some-folder" } },
+  { path: "/api/notes/pick", valid: { indices: [1] } },
+  { path: "/api/develop/start", valid: { slug: "some-folder" } },
+  { path: "/api/develop/reply", valid: { slug: "some-folder", reply: "try the other angle" } },
+  { path: "/api/captures/start", valid: { room: "Content", text: "https://muxin.example/essay" } },
+]) {
+  test(`SLICE-5N: POST ${route.path} refuses a missing or unknown brand and names the three`, async () => {
+    const queuedBefore = jobStore.length;
+    for (const brand of [undefined, "", "human_inference", "Human Inference", "venture"]) {
+      const { status, body } = await postJson(route.path, { ...route.valid, ...(brand === undefined ? {} : { brand }) });
+      assert.equal(status, 400, `${route.path} with brand ${JSON.stringify(brand)} must be refused`);
+      assert.equal(body.ok, false);
+      assert.equal(body.error, "brand must be one of human-inference, charles, fiction");
+    }
+    // The observable outcome of a refusal: nothing was enqueued for any of those attempts.
+    assert.equal(jobStore.length, queuedBefore, "a refused request must not queue a job");
+  });
+}
+
+test("SLICE-5N: the Content room sends the selected brand, and the Jobs list shows it", () => {
+  const page = readFileSync(new URL("./page.ts", import.meta.url), "utf8");
+  // All three brand-scoped Content-room requests carry the brand, read through the ONE canonical
+  // accessor the Signals sheet's <select> feeds — never a second brand state (trap 4).
+  assert.match(page, /post\("\/api\/atomize",\{source, engine, brand:signalsBrand\(\)\}\)/);
+  assert.match(page, /post\('\/api\/develop\/start',\{slug:t\.dataset\.slug,engine:\$\('#studioEngine'\)\.value,brand:signalsBrand\(\)\}\)/);
+  assert.match(page, /post\('\/api\/develop\/reply',\{slug:t\.dataset\.slug,reply,engine:\$\('#studioEngine'\)\.value,brand:signalsBrand\(\)\}\)/);
+  assert.equal((page.match(/post\("\/api\/captures\/start",\{text:[^}]*brand:signalsBrand\(\)\}\)/g) ?? []).length, 2, "both Content capture calls carry the brand");
+  assert.match(page, /post\("\/api\/video\/generate",\{slug:piece\.slug,engine,brand:signalsBrand\(\)\}\)/);
+  assert.match(page, /function notesPickRequest\(indices, engine\)\{\s*\n\s*return \{indices, engine:engine \|\| "claude", brand:signalsBrand\(\)\};/);
+  // One accessor, not two.
+  assert.equal((page.match(/function signalsBrand\(\)\{/g) ?? []).length, 1);
+  // The Jobs list renders the brand beside the engine, and has no fallback label: a job carrying no
+  // brand shows none rather than being labelled with an identity nobody chose.
+  assert.match(page, /brandLabel\(j\.brand\) \? ' · '\+esc\(brandLabel\(j\.brand\)\) : ''/);
+  assert.match(page, /function brandLabel\(id\)\{ return BRAND_LABELS\[id\] \|\| ""; \}/);
+});
