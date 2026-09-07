@@ -5,11 +5,13 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, ahead of `origin`, unpushed by standing order)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- **Next slice: SLICE-5P**, `docs/operations/launch-slices/SLICE-5P.md` — the live posting dry run, chosen by Muxin 2026-09-07 over (d3). Not started. It needs her to approve exactly one `review-queue.md` row mid-run; a worker may not perform that step.
+- **Next slices, parallel-safe: SLICE-5Q** (queue page puts content first) and **SLICE-5R** (X carries building and technical pieces only), both under `docs/operations/launch-slices/`. Then in order: **SLICE-5S** (approve no longer publishes; the Publishing room does), a repair slice restoring an unscheduled draft path on the unified publish route (not yet written; `src/publish/typefully.ts:480-484` throws on `--no-schedule`), then rerun **SLICE-5P**, then a `brand_id` backfill slice for `data/analytics.db` (not yet written; every X, LinkedIn and Substack row is NULL).
+- **SLICE-5P closed NOT ACCEPTED 2026-09-07.** Nothing reached Typefully. The GUI approve path dispatched three real publish attempts that failed on Postiz discovery. Stage 5 is unsatisfiable against shipped code. Full leftover and defect list in the packet's Closeout.
+- **SAFETY, Muxin only:** `x-1` sits at `approve` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md:31`. Until 5S lands, a retry from the GUI can create an auto-firing post. Set it to `pending`.
 - Last accepted: **SLICE-5O**, `docs/operations/launch-slices/SLICE-5O.md`, gate 4293/491/0, commit `540c065`.
 - Cost log purged 2026-09-07 on Muxin's instruction: 404 fixture rows gone, 35 real rows and $0.708 intact. The file is **gitignored** (`.gitignore:14`) — git is not a recovery path for it.
-- **NEEDS MUXIN (2), not blocking:** the `develop/SKILL.md` entry contract; `.claude/skills/**` is write-protected. Detail in `docs/operations/launch-slices/SLICE-5N.md`.
-- Open engineering debt, none blocking: `queue-view.ts:346` prints a stale ledger path to the user; `migrateLegacyDataDirectory` (`jobs.ts:70`) is still non-atomic.
+- **NEEDS MUXIN (3), not blocking:** the `develop/SKILL.md` entry contract (SLICE-5N); `.claude/skills/atomize/SKILL.md:169` bare `tsx` and `:451-453` stale caption platform list (SLICE-5P). `.claude/skills/**` is write-protected.
+- Open engineering debt, none blocking: `queue-view.ts:346` stale ledger path; `migrateLegacyDataDirectory` (`jobs.ts:70`) non-atomic; `new-content` collides with an existing folder for the same essay (`content/2026-09-02-the-world-s-broken-what-do-we-do/`); Postiz capability discovery `fetch failed` blocks the unified publish path.
 - Standing rule added 2026-09-07: **test overhead must never dominate a real resource.** See `## Standing constraints`.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
 
@@ -41,6 +43,32 @@ worker holding only that section and its packet still has them.
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-07 — SLICE-5P stopped before the live call; four slices queued from what it found
+
+Muxin chose `https://humaninference.ai/essays/the-worlds-broken-what-do-we-do` (human-inference).
+Stages 1 to 4 ran clean: 14 derivatives, routing included all six platforms (Bluesky on data,
+the rest cold start), baselines identical before and after. She approved `x-1` in the review GUI.
+
+The worker stopped before stage 5 on three findings, none repaired. First, the GUI's approve
+handler (`serve.ts:1141-1163`) fires the real publish on approve, so her three clicks were three
+real publish attempts; each failed before any provider request because Postiz capability
+discovery got `fetch failed`. That failure was the error that flashed too fast to read. Second,
+`publishAt: null` is unreachable: `typefully.ts:480-484` throws on `--no-schedule`, and the unified
+path has no unscheduled option, so the dry run as written cannot be run. Third, the permission
+classifier blocked the worker's publish command, and it rightly did not script around it. The
+ledger migration fired for the first time, from Muxin's review session: 54 claims readable at the
+new path, legacy file byte-identical. Nothing posted.
+
+Muxin's decisions from the session. Approve means approved to be published; the Publishing
+room owns scheduling, batch scheduling, rescheduling and pending versus published (SLICE-5S).
+X carries building and technical pieces only, meaning the claude-code and builder pillars; it
+comes off civic-tech, human-ai and other (SLICE-5R). She looked at the numbers first: 264 X
+posts, every pillar at roughly one interaction per post, so X earns no pillar on data and the
+call is hers about who is there. The review queue page puts generated content first (SLICE-5Q,
+six asks). Two more slices are named but not yet written: an unscheduled draft path on the
+unified route, and a `brand_id` backfill, because only Bluesky rows carry a brand and a
+brand-filtered routing run therefore sees no X history at all.
 
 ### 2026-09-07 — session close: SLICE-5O accepted, START HERE compacted to pointers
 
