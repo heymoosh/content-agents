@@ -33,7 +33,8 @@ test("configured routing gates the complete fake-model generation before draftin
     { name: "skip", routing: routingMd(["career-work"], career), platforms: ["linkedin", "bluesky"], included: ["linkedin"] },
     { name: "skipped-media", routing: routingMd(["career-work"], career), platforms: ["linkedin", "bluesky"], included: ["linkedin"], unsupportedSkippedMedia: true },
     { name: "experiment", routing: routingMd(["career-work"], career), platforms: ["linkedin", "bluesky"], included: ["linkedin"], experiment: true },
-    { name: "cold-start", routing: routingMd(["human-ai"], decisions("human-ai")), platforms: ["x", "linkedin", "bluesky"], included: ["x", "linkedin", "bluesky"] },
+    // X remains requested so the hard never rule proves it is filtered before generation.
+    { name: "cold-start", routing: routingMd(["human-ai"], decisions("human-ai")), platforms: ["x", "linkedin", "bluesky"], included: ["linkedin", "bluesky"] },
     { name: "exploration", routing: routingMd(["career-work"], applyExplorationOverride(career, "career-work", "bluesky")), platforms: ["linkedin", "bluesky"], included: ["linkedin", "bluesky"], probe: "bluesky" },
     { name: "origin-block", routing: routingMd(["human-ai"], applyOriginBlock(decisions("human-ai"), "https://www.linkedin.com/posts/example")), platforms: ["linkedin", "bluesky"], included: ["bluesky"] },
     { name: "triage-veto", routing: routingMd(["human-ai"], applyExplorationOverride(applySourceTriage(decisions("human-ai"), ["linkedin", "x"]), "human-ai", "linkedin")), platforms: ["linkedin", "bluesky"], included: ["bluesky"] },
@@ -118,10 +119,15 @@ test("configured routing gates the complete fake-model generation before draftin
           const queueBefore = readFileSync(join(folder, "review-queue.md"), "utf8");
           writeFileSync(join(folder, "routing.md"), routingMd(["career-work"], career));
           const rerun = await generateConfiguredContent(slug, configured);
-          assert.deepEqual(rerun, { ids: configured.variants.filter((variant) => variant.platform !== "bluesky").map((variant) => variant.identity.id), existing: true });
+          // Career-work rerouting includes LinkedIn; the requested X variants remain hard-vetoed before drafting.
+          assert.deepEqual(rerun, { ids: configured.variants.filter((variant) => variant.platform === "linkedin").map((variant) => variant.identity.id), existing: true });
           assert.equal(readFileSync(join(folder, "review-queue.md"), "utf8"), queueBefore, "narrower routing never deletes or rewrites old review rows");
           writeFileSync(join(folder, "routing.md"), routingMd(["career-work"], career.map((decision) => ({ ...decision, decision: "skip" }))));
-          assert.deepEqual(await generateConfiguredContent(slug, configured), { ids: [], existing: true }, "all-skipped reruns acknowledge an already complete request without reselecting skipped IDs");
+          await assert.rejects(
+            generateConfiguredContent(slug, configured),
+            /no routable configured variants/i,
+            "all-skipped reruns refuse the partial hard-vetoed X identity rather than treating it as complete",
+          );
           assert.equal(readFileSync(join(folder, "review-queue.md"), "utf8"), queueBefore);
         }
       } finally { rmSync(folder, { recursive: true, force: true }); }

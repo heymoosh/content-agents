@@ -17,16 +17,25 @@
 # has something to work with.
 
 defaults:                 # platforms to include per pillar while data is INSUFFICIENT (cold start)
-  human-ai:    [x, linkedin, bluesky, mastodon, threads]
+  human-ai:    [linkedin, bluesky, mastodon, threads]
   claude-code: [x, linkedin, bluesky, mastodon, threads]
-  civic-tech:  [bluesky, x, mastodon, threads, community:democratic-resilience]
-  career-work: [linkedin, x, mastodon, threads]   # LinkedIn-led: it's the top-engaging theme there. X to gather signal.
+  civic-tech:  [bluesky, mastodon, threads, community:democratic-resilience]
+  career-work: [linkedin, mastodon, threads]   # LinkedIn-led: it's the top-engaging theme there.
   builder:     [x, linkedin, mastodon, threads]   # build-in-public lands on LinkedIn; PM craft does well on X.
-  other:       [x, mastodon, threads]
+  other:       [mastodon, threads]
 
 rules:                    # hard overrides applied AFTER the data decision
+  # X policy, 2026-09-07: "I'd stop doing career-work on X. ONLY technical stuff goes on X cause that's the only thing that platform seems to respect these days."
+  # Think very silicon valley monoculture, if it fits that paradigm, it can go in X.
+  human-ai:
+    never: [x]
   civic-tech:
     always: [community:democratic-resilience]   # voting tool's strongest room — always route here
+    never: [x]
+  career-work:
+    never: [x]
+  other:
+    never: [x]
   # claude-code:
   #   never: [community:lennys]                  # example: never auto-route claude-code there
 

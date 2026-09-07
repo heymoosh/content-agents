@@ -4,13 +4,13 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, unpushed by standing order).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
-- Current slice: none running. **SLICE-5Q ACCEPTED 2026-09-07**, `docs/operations/launch-slices/SLICE-5Q.md`.
-- Blocked on: nothing. Last gate: 4302 tests / 491 suites / 0 failures; serial runner workaround and default-runner hang recorded in 5Q Closeout.
-- Next dependency-ready: **SLICE-5R**, `docs/operations/launch-slices/SLICE-5R.md` (X carries technical pieces only). Then **SLICE-5S**, `docs/operations/launch-slices/SLICE-5S.md` (approve never publishes).
-- Then unwritten: unscheduled-draft repair on the unified route, rerun 5P, `brand_id` backfill for `data/analytics.db`.
-- Last decision (Muxin, 2026-09-07): only technical, Silicon Valley monoculture pieces go on X; career-work comes off. Approve means approved to publish, nothing more.
-- **SAFETY, Muxin only:** until 5S, retrying `x-1`/`x-2` can publish once Postiz answers. Set both to `pending` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`; 5Q did not change either row.
-- Design sanity rule: `## Standing constraints`. Nonblocking 5Q leftovers: existing Clear queue dismissal, 5P server question, desk-wide transient toasts.
+- Current slice: none running. **SLICE-5R ACCEPTED 2026-09-07**, `docs/operations/launch-slices/SLICE-5R.md`.
+- Blocked on: nothing. Last gate: 4304 tests / 492 suites / 0 failures; serial runner limitation recorded in 5R Closeout.
+- Next dependency-ready: **SLICE-5S**, `docs/operations/launch-slices/SLICE-5S.md` (approve never publishes).
+- Then unwritten: unscheduled-draft repair on unified route, rerun 5P, durable per-piece X opt-in (5R A6), analytics `brand_id` backfill.
+- Last decision (Muxin, 2026-09-07): X only for building/technical pieces; four nontechnical pillars now excluded. Approve means approved to publish, nothing more.
+- **SAFETY, Muxin only:** until 5S, retrying `x-1`/`x-2` can publish once Postiz answers. Set both to `pending` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`; 5R did not change either row.
+- Design sanity rule: `## Standing constraints`. Mixed-tag veto and manual-override limitation: 5R Closeout.
 - Needs Muxin, not blocking: `.claude/skills/**` edits named in 5N and 5P. Engineering debt: `## Progress log`.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
 
@@ -1295,6 +1295,34 @@ Packet: `docs/operations/launch-slices/SLICE-5Q.md`. Claude implemented the two 
 Focused verification: 386 passed. Full local `npm run check`: typecheck plus 4302 tests, 491 suites, zero failures, exit 0 with serial test-file execution. The default Node v22.14.0 runner hung with CPU spin and was interrupted; the advisor-recommended temporary PATH shim added only `--test-concurrency=1`, independently reviewed as preserving the full inventory. This does not establish default-concurrency stability. Evidence is under `/private/tmp/slice-5q-evidence/`; no tracked runner configuration changed.
 
 The stale failed job is dismissible through existing Clear queue. Its operational record was not changed. The original 5P server write/error question remains unverified; other rooms' transient toasts are outside scope. The live `x-1`/`x-2` safety warning remains: until 5S lands, a GUI retry can publish once Postiz answers; Muxin alone may set both to pending. This session preserved the pre-existing review-queue and notes-spread-ledger modifications. Next: 5R, then 5S. No push.
+
+### 2026-09-07 — SLICE-5R accepted: X routing restricted to technical pillars
+
+Codex worker removed X defaults and added hard vetoes for human-ai, civic-tech, career-work,
+and other, preserving builder and claude-code. The existing merge veto wins even when a
+piece also carries builder. No precedence or production engine change was needed.
+
+The isolated named-essay fixture (source checksum and recorded civic-tech + human-ai pillars)
+excluded X with a rule reason while keeping Bluesky and democratic-resilience. Read-only
+`--all` confirmed all six pillar assignments. Focused routing and affected regression tests
+passed: 138 tests. Claude Opus provided cross-family source review and closure. The initial
+full gate exposed stale live-config test expectations; those were repaired without removing
+requested-X coverage or queue preservation assertions. The new frozen candidate passed the
+complete unsandboxed `npm run check`: exit 0, 4304 tests / 492 suites / zero failures, cancelled,
+skipped, or todo. Serial Node execution used the documented 5Q workaround; default parallel
+runner stability remains unverified. Evidence: `/private/tmp/slice-5r-evidence/`.
+
+A6 used its explicit follow-up allowance: manual includes are honored by consumers but not
+durable across `/atomize --continue`, which reruns routing and overwrites the file
+(`.claude/skills/atomize/references/continue-mode.md:5-8`,
+`.claude/skills/atomize/SKILL.md:195-196`, `src/strategy/route.ts:608`). `--explore` also respects
+hard vetoes. No misleading override instruction ships. A durable deliberate per-piece X
+exception remains follow-up work; protected skills were not edited.
+
+No generated routing, live queue, database, or publishing state was changed. The pre-existing
+review-queue and notes-spread-ledger modifications were preserved. Coordinator owns the local
+commit and integration; nothing pushed. Packet: `docs/operations/launch-slices/SLICE-5R.md`.
+Next dependency-ready: 5S, approve never publishes.
 
 ## Current handoff — 2026-09-02
 

@@ -10,8 +10,10 @@ import {
   applySubstackRepost,
   CONTROL_RUN_SOURCE,
   CORE_TEXT,
+  computeFit,
   decideForPillar,
   loadData,
+  loadConfig,
   mergeDecisions,
   originPlatform,
   type Decision,
@@ -81,6 +83,47 @@ describe("decideForPillar: decision is ALWAYS defaults-driven, score never overr
     assert.equal(x.confidence, "rule");
     assert.equal(li.decision, "include");
     assert.equal(li.confidence, "rule");
+  });
+});
+
+describe("X editorial assignment: technical and building pillars only", () => {
+  const highScoreData: LoadedData = {
+    cells: new Map([
+      ["x|civic-tech", { n: 10, avg_eng: 10 }],
+      ["x|human-ai", { n: 10, avg_eng: 10 }],
+      ["x|career-work", { n: 10, avg_eng: 10 }],
+      ["x|other", { n: 10, avg_eng: 10 }],
+      ["x|builder", { n: 10, avg_eng: 10 }],
+      ["x|claude-code", { n: 10, avg_eng: 10 }],
+    ]),
+    weeks: new Map([["x", 8]]),
+    baselines: new Map([["x", 1]]),
+  };
+
+  test("hard-vetoes X for civic-tech, human-ai, career-work, and other even with a score above the skip floor", () => {
+    const c = loadConfig();
+
+    for (const pillar of ["civic-tech", "human-ai", "career-work", "other"]) {
+      const fit = computeFit("x", pillar, c, highScoreData);
+      assert.ok(fit.score !== null && fit.score > c.thresholds.skip_below_score);
+      const x = decideForPillar(pillar, c, highScoreData).find((d) => d.platform === "x");
+      assert.ok(x, `router output must contain an x row for ${pillar}`);
+      assert.equal(x.decision, "skip");
+      assert.equal(x.confidence, "rule");
+      assert.match(x.rationale, /never route here/);
+    }
+  });
+
+  test("keeps X included for builder and claude-code", () => {
+    const c = loadConfig();
+
+    for (const pillar of ["builder", "claude-code"]) {
+      const x = decideForPillar(pillar, c, highScoreData).find((d) => d.platform === "x");
+      assert.ok(x, `router output must contain an x row for ${pillar}`);
+      assert.equal(x.decision, "include");
+      assert.equal(x.confidence, "data");
+      assert.ok(x.score !== null && x.score > c.thresholds.skip_below_score);
+    }
   });
 });
 

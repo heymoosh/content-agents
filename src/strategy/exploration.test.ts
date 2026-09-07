@@ -53,12 +53,13 @@ describe("untestedPillars: derived live from config/routing.yaml's defaults, nev
     assert.deepEqual(untestedPillars("linkedin", c, PILLARS_FIXTURE), PILLARS_FIXTURE);
   });
 
-  test("against the LIVE config/routing.yaml: LinkedIn misses civic-tech + other, Bluesky misses career-work + builder + other (today's editorial defaults)", () => {
+  test("against the LIVE config/routing.yaml: X misses the four nontechnical pillars after the editorial reassignment", () => {
     const live = loadConfig();
     assert.deepEqual(untestedPillars("linkedin", live, PILLARS_FIXTURE), ["civic-tech", "other"]);
     assert.deepEqual(untestedPillars("bluesky", live, PILLARS_FIXTURE), ["career-work", "builder", "other"]);
-    // X gets all 6 pillars by default today — no gap to explore, which is why it's excluded below.
-    assert.deepEqual(untestedPillars("x", live, PILLARS_FIXTURE), []);
+    assert.deepEqual(untestedPillars("x", live, PILLARS_FIXTURE), ["human-ai", "civic-tech", "career-work", "other"]);
+    assert.ok(live.defaults["claude-code"].includes("x"));
+    assert.ok(live.defaults.builder.includes("x"));
     assert.deepEqual(EXPLORATION_PLATFORMS, ["linkedin", "bluesky"]);
   });
 });
