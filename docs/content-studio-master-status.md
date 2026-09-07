@@ -2,16 +2,16 @@
 
 ## START HERE
 
-- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, ahead of `origin`, unpushed by standing order)
-- This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`. Read that first.
-- Current slice: none running. **SLICE-5P** closed NOT ACCEPTED 2026-09-07, `docs/operations/launch-slices/SLICE-5P.md` (leftovers in its Closeout).
-- Next, parallel-safe: **SLICE-5Q** (queue page, design pass) and **SLICE-5R** (X carries technical pieces only). Then **SLICE-5S** (approve never publishes; the Publishing room does). Then unwritten, in order: unscheduled-draft repair on the unified route, rerun 5P, `brand_id` backfill for `data/analytics.db`.
-- Blocked on: nothing.
+- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, unpushed by standing order).
+- This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
+- Current slice: none running. **SLICE-5Q ACCEPTED 2026-09-07**, `docs/operations/launch-slices/SLICE-5Q.md`.
+- Blocked on: nothing. Last gate: 4302 tests / 491 suites / 0 failures; serial runner workaround and default-runner hang recorded in 5Q Closeout.
+- Next dependency-ready: **SLICE-5R**, `docs/operations/launch-slices/SLICE-5R.md` (X carries technical pieces only). Then **SLICE-5S**, `docs/operations/launch-slices/SLICE-5S.md` (approve never publishes).
+- Then unwritten: unscheduled-draft repair on the unified route, rerun 5P, `brand_id` backfill for `data/analytics.db`.
 - Last decision (Muxin, 2026-09-07): only technical, Silicon Valley monoculture pieces go on X; career-work comes off. Approve means approved to publish, nothing more.
-- Last accepted: **SLICE-5O**, `docs/operations/launch-slices/SLICE-5O.md`, commit `540c065`, gate 4293/491/0.
-- **SAFETY, Muxin only:** `x-1` and `x-2` sit at `approve` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md:31-32`. Until 5S lands, a GUI retry is a real publish once Postiz answers. Set both to `pending`.
-- Standing constraints (`## Standing constraints`) now include the **design sanity check** for every GUI slice, added 2026-09-07.
-- Needs Muxin, not blocking: `.claude/skills/**` edits named in the 5N and 5P packets. Engineering debt: the two 2026-09-07 Progress log entries.
+- **SAFETY, Muxin only:** until 5S, retrying `x-1`/`x-2` can publish once Postiz answers. Set both to `pending` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`; 5Q did not change either row.
+- Design sanity rule: `## Standing constraints`. Nonblocking 5Q leftovers: existing Clear queue dismissal, 5P server question, desk-wide transient toasts.
+- Needs Muxin, not blocking: `.claude/skills/**` edits named in 5N and 5P. Engineering debt: `## Progress log`.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
 
 ## Standing constraints`.
@@ -1287,6 +1287,14 @@ media upload. Rescheduling (single row and batch by pillar/slug/platform) is imp
 deterministically tested; its first live use will be an ordinary Studio move, not a canary.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
+
+### 2026-09-07 — SLICE-5Q accepted: queue content first
+
+Packet: `docs/operations/launch-slices/SLICE-5Q.md`. Claude implemented the two owned page files; Codex independently audited the frozen candidate. One repair cycle closed bulk-error persistence, informational toasts replacing errors, and the source-height heuristic. Full original inputs now divide folders; readable complete post bodies lead each row; status errors remain until dismissed or a successful action. All five design checks passed with browser evidence and intercepted status requests. No publishing or operational content changes.
+
+Focused verification: 386 passed. Full local `npm run check`: typecheck plus 4302 tests, 491 suites, zero failures, exit 0 with serial test-file execution. The default Node v22.14.0 runner hung with CPU spin and was interrupted; the advisor-recommended temporary PATH shim added only `--test-concurrency=1`, independently reviewed as preserving the full inventory. This does not establish default-concurrency stability. Evidence is under `/private/tmp/slice-5q-evidence/`; no tracked runner configuration changed.
+
+The stale failed job is dismissible through existing Clear queue. Its operational record was not changed. The original 5P server write/error question remains unverified; other rooms' transient toasts are outside scope. The live `x-1`/`x-2` safety warning remains: until 5S lands, a GUI retry can publish once Postiz answers; Muxin alone may set both to pending. This session preserved the pre-existing review-queue and notes-spread-ledger modifications. Next: 5R, then 5S. No push.
 
 ## Current handoff — 2026-09-02
 

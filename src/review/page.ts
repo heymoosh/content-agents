@@ -294,9 +294,30 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .session-margin { border-left:1px solid #efe7d6; padding:44px 26px 36px 24px; background:#faf7f0;
     display:flex; flex-direction:column; gap:16px; min-height:100%; }
   .room-rail { position:sticky; top:78px; align-self:start; max-height:calc(100vh - 96px); overflow:auto; }
-  .scan-row { width:100%; display:grid; grid-template-columns:32px minmax(150px,190px) minmax(260px,1fr) auto auto; gap:14px; align-items:center; text-align:left;
-    padding:13px 4px; border:0; border-top:1px solid var(--line); border-radius:0; background:none; }
+  /* Muxin's content leads the row (design sanity check, 2026-09-07): the body column comes first
+     and carries the largest, darkest type; the backend row id, platform and treatment sit beside
+     it as muted metadata. align-items:start because a full post is now taller than one line. */
+  .scan-row { width:100%; display:grid; grid-template-columns:32px minmax(320px,1fr) minmax(130px,170px) auto auto; gap:14px; align-items:start; text-align:left;
+    padding:16px 4px; border:0; border-top:1px solid var(--line); border-radius:0; background:none; }
   .scan-row:hover { background:#faf7f0; }
+  .scan-main { min-width:0; }
+  /* 1.125rem/1.6 is the floor the design sanity check sets for body copy she reads at arm's length. */
+  .scan-body { font:400 1.125rem/1.6 Georgia,"Times New Roman",serif; color:var(--ink);
+    white-space:pre-wrap; overflow-wrap:anywhere; }
+  /* Only a body past the readable-in-place limit gets a scroll window; a short post has no
+     max-height at all, so it renders whole with no scrollbar. */
+  .scan-body.scroll { max-height:17em; overflow-y:auto; padding-right:10px; }
+  .scan-id { display:block; margin-top:7px; font-size:11px; color:var(--muted); }
+  .scan-meta { display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-width:0; }
+  /* The folder divider: the original input itself is the thing that separates one thought from the
+     next, so it gets body type and the blue rule; title and folder slug are one muted subtitle. */
+  /* The 40vh window is unconditional, never chosen by character count: how tall a given input
+     renders depends on the viewport and the column, so a "short" 699-character input still
+     overflowed a 600px-tall window. Content that fits shows no scrollbar of its own accord. */
+  .piece-source { font:400 1.2rem/1.6 Georgia,"Times New Roman",serif; color:var(--ink);
+    white-space:pre-wrap; overflow-wrap:anywhere; padding:14px 18px; background:var(--paper);
+    border:1px solid var(--line); border-left:3px solid var(--blue); border-radius:0 8px 8px 0;
+    max-height:40vh; overflow-y:auto; }
   .focus-backdrop { position:fixed; inset:0; z-index:80; background:rgba(28,26,23,.42); display:grid; place-items:center; padding:28px; }
   .focus-backdrop[hidden] { display:none; }
   .focus-dialog { width:min(880px,100%); max-height:calc(100vh - 56px); overflow:auto; background:var(--paper);
@@ -514,6 +535,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .piece { margin:26px 0 8px; }
   .piece > h2 { font:600 15px/1.3 Georgia,serif; margin:0 0 2px; }
   .piece > .slug { color:var(--muted); font-size:12px; margin-bottom:12px; }
+  .piece > .piece-sub { color:var(--muted); font-size:12.5px; line-height:1.5; margin:8px 0 4px; }
   .row { background:var(--card); border:1px solid var(--line); border-radius:11px;
     padding:14px 16px; margin:10px 0; box-shadow:0 1px 0 rgba(0,0,0,.02); }
   .row.decided { opacity:.62; }
@@ -895,10 +917,19 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .team-action { font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em;
     color:var(--amber); border-bottom:1px solid #e0cfa4; width:fit-content; margin-top:2px; }
   .team-row.urgent .team-line { color:var(--amber); font-weight:600; }
+  /* Above .focus-backdrop (z-index 80): an approve inside Focus Mode can fail, and its error was
+     painted UNDER the modal backdrop, unreadable and unclickable. */
   .flash { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--accent);
     color:var(--paper); padding:9px 16px; border-radius:8px; font-size:13px; opacity:0;
-    transition:.2s; pointer-events:none; }
+    transition:.2s; pointer-events:none; z-index:90; }
   .flash.show { opacity:1; }
+  /* An action error never auto-hides (design sanity check, 2026-09-07): it is readable type, it
+     takes pointer events so its Dismiss button works, and it stays until dismissed or replaced. */
+  .flash.error { background:var(--red-bg); color:var(--red); border:1px solid var(--red);
+    font-size:15px; line-height:1.5; padding:13px 16px; max-width:min(680px,calc(100vw - 40px));
+    display:flex; align-items:flex-start; gap:14px; pointer-events:auto; }
+  .flash.error .flash-dismiss { flex:none; background:none; border:1px solid var(--red);
+    color:var(--red); font-size:13px; padding:3px 10px; }
   .connection-state { margin:0 40px; padding:10px 14px; border:1px solid #e8d5a8; border-radius:7px;
     background:#fdf8ec; color:#6b531c; font-size:13px; line-height:1.5; }
   .worktree-banner { background:var(--red-bg); color:var(--red); font-size:12.5px; font-weight:600;
@@ -1347,7 +1378,35 @@ const dupPending = new Map();      // row id -> target platform, for an in-fligh
 const dupEngine = new Map();       // row id -> selected engine while the run is in flight
 const storyboardSlugs = new Set(); // piece slugs with an in-flight storyboard (video) job
 
-function flash(msg){ const f=$("#flash"); f.textContent=msg; f.classList.add("show"); setTimeout(()=>f.classList.remove("show"),1400); }
+// Three toasts, deliberately different, because they answer three different questions.
+//   flash(msg)      — this action WORKED. Auto-hides, and clears a standing error: a success is
+//                     the one thing besides Dismiss that ends an error's stay on screen.
+//   flashNote(msg)  — an aside that is not an action's result (Request changes explaining where to
+//                     edit, a "type something first" nudge). It never overwrites an unread error.
+//   flashError(msg) — this action FAILED. It does NOT auto-hide: Muxin approved a row, the error
+//                     flashed past in 1400 ms, and all she could tell afterwards was that
+//                     "something happened" (SLICE-5P canary, 2026-09-07).
+// flashSeq exists because a success's pending auto-hide must never take a LATER toast off screen:
+// the timer fires only while its own toast is still the one displayed.
+let flashTimer=null;
+let flashSeq=0;
+let flashStanding=false; // an error is on screen and has not been read
+function flashCancelTimer(){ if(flashTimer){ clearTimeout(flashTimer); flashTimer=null; } }
+function flashClear(){ const f=$("#flash"); if(!f) return; flashCancelTimer(); flashSeq++; flashStanding=false; f.className="flash"; f.textContent=""; }
+function flash(msg){
+  const f=$("#flash"); flashCancelTimer(); const mine=++flashSeq; flashStanding=false;
+  f.className="flash show"; f.textContent=msg;
+  flashTimer=setTimeout(()=>{ if(flashSeq!==mine) return; f.classList.remove("show"); flashTimer=null; },1400);
+}
+function flashNote(msg){ if(flashStanding) return; flash(msg); }
+function flashError(msg){
+  const f=$("#flash"); flashCancelTimer(); flashSeq++; flashStanding=true;
+  f.className="flash show error"; f.textContent="";
+  const text=document.createElement("span"); text.textContent="⚠ "+msg;
+  const dismiss=document.createElement("button"); dismiss.type="button"; dismiss.className="flash-dismiss"; dismiss.textContent="Dismiss";
+  dismiss.addEventListener("click",flashClear);
+  f.append(text,dismiss);
+}
 function connectionState(message){
   const box=$("#connectionState");
   if(!box) return;
@@ -1597,13 +1656,24 @@ function rowEl(piece, row){
 }
 let reviewFocusReturn = null;
 function reviewSelectionKey(requestId,variantId){ return JSON.stringify([requestId,variantId]); }
+// Read-in-place limit for a draft body in the list. 300 characters clears every X post (280) with
+// room to spare, so a short post is never hidden behind a scrollbar or a click.
+const READ_IN_PLACE_CHARS=300;
 function reviewScanRowEl(piece,row){
   const button=document.createElement("div");
   const selectionKey=reviewSelectionKey(piece.slug,row.id);
   button.className="scan-row"; button.dataset.reviewKey=selectionKey;
-  const lead=String(row.body||row.notes||"No generated asset yet").replace(/\\s+/g," ").slice(0,150);
+  // The post itself, whole and unclipped — no .slice(). A body at or under READ_IN_PLACE_CHARS
+  // (every X post fits) renders in full with no scroll window; only a longer one gets one, and it
+  // scrolls inside the row rather than sending her to Focus Mode to read a short post.
+  const body=String(row.body||row.notes||"No generated asset yet");
+  const scrolls=body.length>READ_IN_PLACE_CHARS;
   const treatment=row.control===true||row.variantKind==="control" ? "Untreated control" : esc(row.treatment||row.angle||"Treated variant");
-  button.innerHTML='<label aria-label="Select '+esc(row.id)+'"><input type="checkbox" class="review-check"'+(reviewSelected.has(selectionKey)?" checked":"")+'></label><span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span class="src" style="display:block;margin-top:4px">'+esc(row.media||row.format||row.kind||"content")+' · '+treatment+'</span></span><span style="min-width:0"><strong>'+esc(row.id)+'</strong><span class="src" style="display:block;margin-top:3px;max-height:4.5em;overflow:auto">'+esc(lead)+'</span></span><span class="pill '+pillClass(row.status)+'">'+esc(reviewStateLabel(row.status))+'</span><button type="button" class="cw-back review-open">Open Focus Mode</button>';
+  // row.id is a backend tag, never the row's title. It stays reachable as data-id, as the row's
+  // title attribute, and as one muted line under the body, for anyone who needs to name a row.
+  button.title=row.id;
+  button.dataset.id=row.id;
+  button.innerHTML='<label aria-label="Select '+esc(row.id)+'"><input type="checkbox" class="review-check"'+(reviewSelected.has(selectionKey)?" checked":"")+'></label><div class="scan-main"><div class="scan-body'+(scrolls?" scroll":"")+'" data-body-text>'+esc(body)+'</div><span class="scan-id">'+esc(row.id)+'</span></div><div class="scan-meta"><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span class="src">'+esc(row.media||row.format||row.kind||"content")+' · '+treatment+'</span></div><span class="pill '+pillClass(row.status)+'">'+esc(reviewStateLabel(row.status))+'</span><button type="button" class="cw-back review-open">Open Focus Mode</button>';
   button.querySelector(".review-check").addEventListener("change",e=>{ if(e.target.checked) reviewSelected.add(selectionKey); else reviewSelected.delete(selectionKey); });
   button.querySelector(".review-open").addEventListener("click",()=>openReviewFocus(piece,row,button.querySelector(".review-open")));
   return button;
@@ -1645,8 +1715,8 @@ function openReviewFocus(piece,row,returnTo){
   $("#reviewFocusTitle").textContent=piece.title+" · "+row.platform;
   $("#reviewFocus").hidden=false; $("#reviewFocus .focus-dialog").focus();
   const editor=$("#reviewFocusEditor"); if(row.editable) editor.focus();
-  $("#reviewFocusSave").addEventListener("click",async ()=>{ const result=await post("/api/derivative",{slug:piece.slug,id:row.id,body:editor.value}); if(result.ok===false){flash(result.error||"Could not save");return;} row.body=editor.value.trim(); flash("Saved"); closeReviewFocus(); rerender(); });
-  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flash("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flash(result.error||"Could not update status");return;} if(act==="approve"){ const view=approvalResultView(row.kind,result); row.status=view.status; row.scheduledWhen=view.scheduledWhen; row.manualComment=view.manualComment||""; flash(view.message); } else { row.status=act; flash("Discarded"); } closeReviewFocus(); rerender(); }));
+  $("#reviewFocusSave").addEventListener("click",async ()=>{ const result=await post("/api/derivative",{slug:piece.slug,id:row.id,body:editor.value}); if(result.ok===false){flashError(result.error||"Could not save");return;} row.body=editor.value.trim(); flash("Saved"); closeReviewFocus(); rerender(); });
+  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flashNote("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flashError(result.error||"Could not update status");return;} if(act==="approve"){ const view=approvalResultView(row.kind,result); row.status=view.status; row.scheduledWhen=view.scheduledWhen; row.manualComment=view.manualComment||""; flash(view.message); } else { row.status=act; flash("Discarded"); } closeReviewFocus(); rerender(); }));
 }
 function closeReviewFocus(){
   $("#reviewFocus").hidden=true; $("#reviewFocusBody").innerHTML="";
@@ -1663,7 +1733,7 @@ async function onAction(e, piece, row, el){
     e.target.disabled = true;
     const r = await post("/api/status",{slug:piece.slug,id:row.id,status:act});
     if (act === "approve"){
-      if (r.ok === false){ flash(r.error || "Approve blocked"); }
+      if (r.ok === false){ flashError(r.error || "Approve blocked"); }
       else if (row.kind === "outreach-message" && r.scheduled){
         // Outreach Phase 2: Approve here calls lock.ts, not a real scheduler — nothing sends,
         // nothing schedules (CLAUDE.md rule 2 analog). Never say "Scheduled" for this row kind.
@@ -1675,13 +1745,19 @@ async function onAction(e, piece, row, el){
         row.status=view.status; row.scheduledWhen=view.scheduledWhen; row.manualComment=view.manualComment||"";
         flash(view.message);
       }
+    } else if (r.ok === false){
+      // A refused discard used to be invisible: the row was recoloured "discard" locally while the
+      // file on disk still said otherwise. Report it, and leave the row showing its real status.
+      e.target.disabled = false; flashError(r.error || "Could not discard it");
     } else { row.status="discard"; flash("Discarded"); }
     rerender();
   } else if (act === "revise"){
     el.querySelector(".revisebox").classList.toggle("show");
   } else if (act === "save-note"){
     const note = el.querySelector(".revisebox input").value;
-    await post("/api/status",{slug:piece.slug,id:row.id,status:"revise",notes:note});
+    const r = await post("/api/status",{slug:piece.slug,id:row.id,status:"revise",notes:note});
+    // Same rule as approve and discard: a refused write never gets reported as "Marked revise".
+    if (r.ok === false){ flashError(r.error || "Could not save the note"); rerender(); return; }
     row.status="revise"; row.notes=note; flash("Marked revise"); rerender();
   } else if (act === "edit"){
     const bodyEl = el.querySelector("[data-body]"); if(!bodyEl) return;
@@ -1699,7 +1775,7 @@ async function onAction(e, piece, row, el){
   } else if (act === "ai-send"){
     if(aiPending.has(row.id)) return; // already in flight — don't fire a second real spawn (card fbfea28b)
     const inp = el.querySelector(".aibox input"); const instruction = inp ? inp.value.trim() : "";
-    if(!instruction){ flash("Type what you want changed first"); return; }
+    if(!instruction){ flashNote("Type what you want changed first"); return; }
     const engineSelect = el.querySelector(".aibox .engine-select");
     const engine = engineSelect ? engineSelect.value : "claude";
     row.aiError = null;
@@ -1807,8 +1883,12 @@ function render(){
     if (!rows.length) continue;
     shown += rows.length;
     const sec = document.createElement("section"); sec.className = "piece";
-    const source=String(piece.originalInput||piece.sourceBody||piece.title||"").replace(/\\s+/g," ").split(" ").slice(0,75).join(" ");
-    sec.innerHTML = (piece.sample?'<div class="cw-rail t-amber">SAMPLE DATA · LAYOUT ONLY</div><div class="src">Nothing in this sample is added to your request list.</div>':'')+'<h3>'+esc(piece.descriptor||piece.title)+'</h3><div class="slug">Descriptor · '+esc(piece.descriptor||piece.title)+' · '+esc(piece.slug)+'</div><details><summary class="cw-back">Original input</summary><div class="src" style="max-width:680px;margin-top:8px">'+esc(source)+(source.split(" ").length>=75?"…":"")+'</div></details>';
+    // The divider between one thought and the next is the original input itself, open by default
+    // and complete: no 75-word cut, no collapsed "Original input" toggle, no "Descriptor" line. A long
+    // input scrolls in its own 40vh window so it divides the list without swallowing it. The essay
+    // title and the folder slug are one muted subtitle underneath.
+    const source=String(piece.originalInput||piece.sourceBody||piece.title||"").replace(/\\s+/g," ").trim();
+    sec.innerHTML = (piece.sample?'<div class="cw-rail t-amber">SAMPLE DATA · LAYOUT ONLY</div><div class="src">Nothing in this sample is added to your request list.</div>':'')+'<div class="piece-source" data-original-input>'+esc(source)+'</div><div class="piece-sub">'+esc(piece.title||piece.descriptor||"")+' · '+esc(piece.slug)+'</div>';
     for (const row of rows) sec.appendChild(reviewScanRowEl(piece, row));
     main.appendChild(sec);
   }
@@ -1971,7 +2051,10 @@ async function approveReviewSelection(){
   const failures=[];
   for(const {piece,row} of targets){ const result=await post("/api/status",{slug:piece.slug,id:row.id,status:"approve"}); if(result&&result.ok===false) failures.push(result.error||"Approve blocked"); else if(result&&result.scheduleError) failures.push(result.scheduleError); }
   reviewSelected.clear(); await load();
-  flash(failures.length?"Some approvals need attention: "+failures.join(" · "):"Approved and handed to publishing");
+  // A bulk approve is the easiest place to lose a failure: the list repaints, the toast goes, and
+  // nothing on screen says which rows did not make it. Failures stay up until they are read.
+  if(failures.length) flashError("Some approvals need attention: "+failures.join(" · "));
+  else flash("Approved and handed to publishing");
 }
 
 // ── rooms ──
@@ -2718,11 +2801,11 @@ async function outreachLock(dir, file){
     const r = await post("/api/status", {slug, id, status:"approve"});
     // /api/status answers ok:true with a scheduleError when the lock itself failed (or when the
     // in-flight guard tripped) — the row is still a draft, so never flash "Locked" over that.
-    if(r.ok === false) flash(r.error || "Could not lock it");
-    else if(r.scheduleError) flash(r.scheduleError);
+    if(r.ok === false) flashError(r.error || "Could not lock it");
+    else if(r.scheduleError) flashError(r.scheduleError);
     else flash("Locked. Copy it, send it yourself, then tell the page it has gone.");
   } catch (e) {
-    flash(e instanceof Error ? e.message : String(e));
+    flashError(e instanceof Error ? e.message : String(e));
   } finally {
     lockPending.delete(dir);
     await loadOutreach();

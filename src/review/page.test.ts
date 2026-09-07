@@ -380,6 +380,7 @@ test("renderInsightsMeta: singular '1 untagged post', not 'posts'", () => {
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseHTML } from "linkedom";
 import { renderPage } from "./page.js";
 import * as pageModule from "./page.js";
 import { repoRoot } from "../db/db.js";
@@ -3883,4 +3884,313 @@ test("Venture learning loop reads evaluations and keeps decisions and experiment
   assert.match(script, /does not mutate Venture automatically|normal Experiment approval queue/);
   assert.match(script, /minimumSample|availablePublishingUnits/);
   assert.match(script, /Never auto-apply|never.*winner|never selects a winner/i);
+});
+
+// ── SLICE-5Q: the queue page leads with the generated content ────────────────────────────────
+// These tests run the emitted client code against a real DOM (linkedom) and assert on the HTML it
+// produces, not on the arguments it was handed: what Muxin reads is the only thing under test.
+
+function scanRowMirror(): (piece: Record<string, unknown>, row: Record<string, unknown>) => HTMLElement {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function reviewSelectionKey(");
+  const end = script.indexOf("// ── begin the Content approval-result mirror ──", start);
+  const src = script.slice(start, end);
+  const { document } = parseHTML("<!doctype html><html><body></body></html>");
+  return new Function(
+    "document", "esc", "pillClass", "reviewSelected", "openReviewFocus",
+    src + "\nreturn reviewScanRowEl;",
+  )(
+    document,
+    (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string)),
+    () => "needs",
+    new Set(),
+    () => {},
+  ) as (piece: Record<string, unknown>, row: Record<string, unknown>) => HTMLElement;
+}
+
+test("a queue row leads with the post body and never titles itself with the backend row id", () => {
+  const rowEl = scanRowMirror()(
+    { slug: "2026-09-07-a-folder" },
+    { id: "x-1", platform: "x", format: "post", status: "pending", body: "A short post that fits on X and must be readable without opening anything." },
+  );
+  const html = rowEl.innerHTML;
+  assert.ok(html.includes("A short post that fits on X and must be readable without opening anything."),
+    "the whole body is in the row");
+  assert.ok(!/<strong>[^<]*x-1/.test(html) && !/<h[1-6][^>]*>[^<]*x-1/.test(html),
+    "the row id is not a heading or a bold title");
+  const body = rowEl.querySelector("[data-body-text]")!;
+  const idLine = rowEl.querySelector(".scan-id")!;
+  assert.ok(body.className.includes("scan-body"));
+  assert.equal(idLine.textContent, "x-1", "the id survives as a muted line under the body");
+  assert.ok(rowEl.innerHTML.indexOf("scan-body") < rowEl.innerHTML.indexOf("scan-id"),
+    "the body comes before the id");
+  assert.equal(rowEl.getAttribute("title"), "x-1");
+  assert.equal((rowEl as HTMLElement).dataset.id, "x-1");
+  // A5: the row keeps its controls.
+  assert.ok(rowEl.querySelector("input.review-check"), "the select checkbox survives");
+  assert.ok(rowEl.querySelector(".badge"), "the platform pill survives");
+  assert.ok(rowEl.querySelector(".pill"), "the status badge survives");
+  assert.ok(rowEl.querySelector(".review-open"), "Open Focus Mode survives");
+});
+
+test("a short body renders whole and unscrolled; only a long one gets a scroll window", () => {
+  const mirror = scanRowMirror();
+  const short = "x".repeat(300);
+  const long = "y".repeat(301);
+  const shortBody = mirror({ slug: "s" }, { id: "x-1", platform: "x", status: "pending", body: short }).querySelector("[data-body-text]")!;
+  assert.equal(shortBody.textContent, short, "a 300-character body is rendered in full");
+  assert.ok(!shortBody.className.includes("scroll"), "a body that fits gets no scroll window");
+  const longBody = mirror({ slug: "s" }, { id: "linkedin-1", platform: "linkedin", status: "pending", body: long }).querySelector("[data-body-text]")!;
+  assert.equal(longBody.textContent, long, "a long body is not truncated either, it scrolls");
+  assert.ok(longBody.className.includes("scroll"), "a body past the limit scrolls inside the row");
+  const script = emittedScripts().join("\n");
+  const fn = script.slice(script.indexOf("function reviewScanRowEl("), script.indexOf("function reviewStateLabel("));
+  assert.ok(!fn.includes(".slice(0,150)") && !fn.includes(".slice(0, 150)"), "no fixed-length preview cut");
+});
+
+test("the folder divider is the original input itself, open, with title and slug demoted", () => {
+  const script = emittedScripts().join("\n");
+  const src = script.slice(script.indexOf("function render(){"), script.indexOf("function renderReviewFilters(){"));
+  const { document } = parseHTML("<!doctype html><html><body><div id=\"reviewMain\"></div></body></html>");
+  const count = { textContent: "", hidden: false };
+  const main = document.querySelector("#reviewMain")!;
+  const pieces = [
+    { slug: "2026-09-07-a-folder", title: "The world's broken, what do we do", descriptor: "A descriptor nobody needs", originalInput: "Short original input.", rows: [{ id: "x-1", status: "pending" }] },
+    { slug: "2026-09-07-long", title: "A long one", originalInput: "L".repeat(1200), rows: [{ id: "x-2", status: "pending" }] },
+  ];
+  const render = new Function(
+    "$", "document", "DATA", "DECIDED", "esc", "reviewVisiblePieces", "reviewScanRowEl",
+    "renderReviewFilters", "renderPublished", "refreshEngineControls",
+    src + "\nreturn render;",
+  )(
+    (sel: string) => (sel === "#reviewMain" ? main : sel === "#count" ? count : undefined),
+    document,
+    { pieces },
+    new Set(["published", "discard", "locked"]),
+    (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string)),
+    () => pieces,
+    () => document.createElement("div"),
+    () => {}, () => {}, () => {},
+  ) as () => void;
+  render();
+  const html = main.innerHTML;
+  assert.ok(html.includes("Short original input."), "the original input body is rendered, not hidden behind a toggle");
+  assert.ok(!html.includes("<details"), "no collapsed Original input toggle");
+  assert.ok(!html.includes("Descriptor ·"), "the Descriptor line is gone");
+  assert.ok(!/<h3/.test(html), "the essay title is no longer the page's largest heading");
+  const sources = Array.from(main.querySelectorAll("[data-original-input]"));
+  assert.equal(sources.length, 2);
+  // Every source block gets the same bounded window. Nothing decides by character count how tall
+  // a block will be: a 699-character input still overflows a 600px-tall viewport.
+  assert.deepEqual(sources.map((el) => el.className), ["piece-source", "piece-source"],
+    "no per-length scroll variant: the 40vh window is unconditional");
+  assert.equal(sources[1].textContent, "L".repeat(1200), "the long input is complete, not cut at 75 words");
+  const subs = Array.from(main.querySelectorAll(".piece-sub")).map((el) => el.textContent);
+  assert.equal(subs[0], "The world's broken, what do we do · 2026-09-07-a-folder");
+  assert.ok(main.innerHTML.indexOf("piece-source") < main.innerHTML.indexOf("piece-sub"),
+    "the input leads, the source line follows as a subtitle");
+});
+
+test("an action error stays on screen until it is dismissed or the next action succeeds", () => {
+  const script = emittedScripts().join("\n");
+  const src = script.slice(script.indexOf("let flashTimer=null;"), script.indexOf("function connectionState("));
+  const { document } = parseHTML("<!doctype html><html><body><div class=\"flash\" id=\"flash\"></div></body></html>");
+  const node = document.querySelector("#flash")!;
+  const timers: (() => void)[] = [];
+  const api = new Function(
+    "$", "document", "setTimeout", "clearTimeout",
+    src + "\nreturn { flash, flashNote, flashError, flashClear };",
+  )(
+    () => node,
+    document,
+    (fn: () => void) => { timers.push(fn); return timers.length; },
+    () => {},
+  ) as { flash: (m: string) => void; flashNote: (m: string) => void; flashError: (m: string) => void; flashClear: () => void };
+
+  api.flashError("Postiz capability discovery failed");
+  assert.ok(node.className.includes("show") && node.className.includes("error"));
+  assert.ok(node.textContent!.includes("Postiz capability discovery failed"));
+  assert.equal(timers.length, 0, "an error schedules no auto-hide at all");
+
+  // Dismissing it is the reader's decision, not a timeout's.
+  const dismiss = node.querySelector(".flash-dismiss") as HTMLElement;
+  assert.ok(dismiss, "an error carries a Dismiss control");
+  dismiss.dispatchEvent(new (document.defaultView as unknown as { Event: typeof Event }).Event("click"));
+  assert.ok(!node.className.includes("show"), "dismissing clears the error");
+
+  // The next successful action replaces it, and that confirmation may still auto-hide.
+  api.flashError("Approve blocked");
+  api.flash("Scheduled");
+  assert.ok(!node.className.includes("error"), "a success replaces the standing error");
+  assert.equal(node.textContent, "Scheduled");
+  assert.equal(timers.length, 1, "only the success confirmation is on a timer");
+  timers[0]();
+  assert.ok(!node.className.includes("show"), "the success confirmation auto-hides");
+});
+
+test("an informational toast never takes an unread error off the screen", () => {
+  const script = emittedScripts().join("\n");
+  const src = script.slice(script.indexOf("let flashTimer=null;"), script.indexOf("function connectionState("));
+  const { document } = parseHTML("<!doctype html><html><body><div class=\"flash\" id=\"flash\"></div></body></html>");
+  const node = document.querySelector("#flash")!;
+  const timers: (() => void)[] = [];
+  const api = new Function(
+    "$", "document", "setTimeout", "clearTimeout",
+    src + "\nreturn { flash, flashNote, flashError, flashClear };",
+  )(
+    () => node,
+    document,
+    (fn: () => void) => { timers.push(fn); return timers.length; },
+    () => {},
+  ) as { flash: (m: string) => void; flashNote: (m: string) => void; flashError: (m: string) => void; flashClear: () => void };
+
+  // Request changes reopens the editor and explains where to type. That is not an action result,
+  // so it must not overwrite the failure Muxin has not read yet.
+  api.flashError("Approve blocked: provider selection failed");
+  api.flashNote("Edit the draft directly, or use Revise with an engine from the draft list");
+  assert.ok(node.className.includes("error"), "the error is still the thing on screen");
+  assert.ok(node.textContent!.includes("Approve blocked: provider selection failed"));
+  assert.equal(timers.length, 0, "the suppressed note schedules nothing that could hide the error");
+
+  // Once the error is gone, the same informational call shows normally.
+  api.flashClear();
+  api.flashNote("Edit the draft directly, or use Revise with an engine from the draft list");
+  assert.equal(node.textContent, "Edit the draft directly, or use Revise with an engine from the draft list");
+  assert.equal(timers.length, 1, "an informational toast still auto-hides");
+
+  // A success's pending auto-hide belongs to that success. Firing late, it must not strip a newer
+  // error off the screen.
+  api.flash("Scheduled");
+  const staleHide = timers[timers.length - 1];
+  api.flashError("Second approve failed");
+  staleHide();
+  assert.ok(node.className.includes("show") && node.className.includes("error"),
+    "a stale success timer cannot clear the error that replaced it");
+  assert.ok(node.textContent!.includes("Second approve failed"));
+});
+
+// onAction is the per-row action handler; only the branches under test are evaluated, so the
+// remaining client globals it names never have to exist here.
+function onActionMirror(post: (path: string, body: unknown) => Promise<Record<string, unknown>>) {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("async function onAction(e, piece, row, el){");
+  const body = script.slice(start, script.indexOf("\nlet rerenderScheduled=false;", start));
+  const flashed: string[] = [];
+  const errors: string[] = [];
+  const onAction = new Function(
+    "post", "flash", "flashError", "flashNote", "rerender",
+    body + "\nreturn onAction;",
+  )(
+    post,
+    (m: string) => flashed.push(m),
+    (m: string) => errors.push(m),
+    (m: string) => flashed.push(m),
+    () => {},
+  ) as (e: unknown, piece: unknown, row: unknown, el: unknown) => Promise<void>;
+  return { onAction, flashed, errors };
+}
+
+test("a refused status write never reports success and never recolours the row", async () => {
+  const refuse = async () => ({ ok: false, error: "review-queue.md changed under this approval" });
+
+  const discardRow = { id: "x-1", status: "pending" };
+  const discard = onActionMirror(refuse);
+  await discard.onAction(
+    { target: { dataset: { act: "discard" }, disabled: false } },
+    { slug: "folder" }, discardRow, null,
+  );
+  assert.deepEqual(discard.errors, ["review-queue.md changed under this approval"],
+    "a refused discard is reported as a standing error");
+  assert.deepEqual(discard.flashed, [], "and never as a confirmation");
+  assert.equal(discardRow.status, "pending", "the row keeps the status the server actually holds");
+
+  const noteRow = { id: "x-1", status: "pending", notes: "" };
+  const note = onActionMirror(refuse);
+  await note.onAction(
+    { target: { dataset: { act: "save-note" } } },
+    { slug: "folder" }, noteRow,
+    { querySelector: () => ({ querySelector: () => ({ value: "tighten the opening" }) }) },
+  );
+  assert.deepEqual(note.errors, ["review-queue.md changed under this approval"],
+    "a refused note is reported, not swallowed");
+  assert.ok(!note.flashed.includes("Marked revise"), "nothing claims the note was saved");
+  assert.equal(noteRow.status, "pending");
+  assert.equal(noteRow.notes, "", "the unsaved note is not written into the row");
+
+  // The accepting server still gets the ordinary confirmation.
+  const okRow = { id: "x-1", status: "pending" };
+  const accepted = onActionMirror(async () => ({ ok: true }));
+  await accepted.onAction(
+    { target: { dataset: { act: "discard" }, disabled: false } },
+    { slug: "folder" }, okRow, null,
+  );
+  assert.deepEqual(accepted.errors, []);
+  assert.deepEqual(accepted.flashed, ["Discarded"]);
+  assert.equal(okRow.status, "discard");
+});
+
+test("bulk approve reports its failures as a standing error, not a passing toast", async () => {
+  const script = emittedScripts().join("\n");
+  const src = script.slice(script.indexOf("async function approveReviewSelection(){"), script.indexOf("\n// ── rooms ──"));
+  const pieces = [{ slug: "folder", rows: [{ id: "x-1", status: "pending" }, { id: "x-2", status: "pending" }] }];
+  const build = (responder: (body: { id: string }) => Record<string, unknown>) => {
+    const flashed: string[] = [];
+    const errors: string[] = [];
+    const posted: { id: string }[] = [];
+    const selected = new Set(pieces[0].rows.map((r) => JSON.stringify(["folder", r.id])));
+    const fn = new Function(
+      "post", "flash", "flashError", "load", "DATA", "DECIDED", "reviewSelected", "reviewSelectionKey",
+      src + "\nreturn approveReviewSelection;",
+    )(
+      async (_path: string, body: { id: string }) => { posted.push(body); return responder(body); },
+      (m: string) => flashed.push(m),
+      (m: string) => errors.push(m),
+      async () => {},
+      { pieces },
+      new Set(["published", "discard", "locked"]),
+      selected,
+      (slug: string, id: string) => JSON.stringify([slug, id]),
+    ) as () => Promise<void>;
+    return { fn, flashed, errors, posted, selected };
+  };
+
+  const failing = build((body) => (body.id === "x-2" ? { ok: false, error: "Approve blocked: no provider" } : { ok: true }));
+  await failing.fn();
+  assert.equal(failing.posted.length, 2, "both selected rows were attempted");
+  assert.deepEqual(failing.errors, ["Some approvals need attention: Approve blocked: no provider"],
+    "the failure stays on screen until it is read");
+  assert.deepEqual(failing.flashed, [], "a partly failed bulk approve is not a success toast");
+
+  const clean = build(() => ({ ok: true }));
+  await clean.fn();
+  assert.deepEqual(clean.errors, []);
+  assert.deepEqual(clean.flashed, ["Approved and handed to publishing"]);
+  assert.equal(clean.selected.size, 0, "the selection is cleared after a clean run");
+});
+
+test("every /api/status caller shows a refusal as a standing error", () => {
+  const script = emittedScripts().join("\n");
+  const callers = script.split('post("/api/status"').length - 1;
+  assert.equal(callers, 5, "the set of /api/status callers is fixed; a new one must be classified here");
+  // outreachLock's own failure branches, the last transient ones, now hold the screen too.
+  const lock = script.slice(script.indexOf("async function outreachLock("), script.indexOf("async function outreachSaveNote("));
+  assert.ok(lock.includes('flashError(r.error || "Could not lock it")'));
+  assert.ok(lock.includes("flashError(r.scheduleError)"));
+  assert.ok(lock.includes("flashError(e instanceof Error"));
+  assert.ok(lock.includes('flash("Locked. Copy it'), "a real lock is still an ordinary confirmation");
+});
+
+test("the queue list is set in readable body type with muted metadata", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  assert.match(css, /\.scan-body \{ font:400 1\.125rem\/1\.6 [^;]*; color:var\(--ink\)/,
+    "body copy is at least 1.125rem with line height 1.5 or more, in the darkest ink");
+  assert.match(css, /\.scan-id \{[^}]*color:var\(--muted\)/, "the row id is muted");
+  assert.match(css, /\.piece-source \{ font:400 1\.2rem\/1\.6[^}]*color:var\(--ink\)/,
+    "the original input is set no smaller than the row body");
+  assert.match(css, /\.piece-source \{[^}]*max-height:40vh; overflow-y:auto;/,
+    "every original input is bounded to 40vh, not only the ones a length test called long");
+  assert.ok(!css.includes(".piece-source.scroll"), "no character-count scroll variant survives");
+  assert.match(css, /\.piece > \.piece-sub \{ color:var\(--muted\)/, "title and slug are a muted subtitle");
+  assert.match(css, /\.flash\.error \{[^}]*pointer-events:auto/, "a standing error can be clicked to dismiss");
 });
