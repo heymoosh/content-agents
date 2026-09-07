@@ -5,9 +5,9 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, ahead of `origin`, unpushed by standing order)
 - This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- **Next slice: undecided, Muxin's call.** Two candidates, both scoped in `## Progress log` → 2026-09-07: (d3) the `rowEl`/`buildFormatArg` dead-code inventory, or a live dry run of the posting path end to end.
+- **Next slice: SLICE-5P**, `docs/operations/launch-slices/SLICE-5P.md` — the live posting dry run, chosen by Muxin 2026-09-07 over (d3). Not started. It needs her to approve exactly one `review-queue.md` row mid-run; a worker may not perform that step.
 - Last accepted: **SLICE-5O**, `docs/operations/launch-slices/SLICE-5O.md`, gate 4293/491/0, commit `540c065`.
-- **NEEDS MUXIN (1), not blocking:** whether to purge 404 test-fixture rows from `data/cost-log.csv` (92% of the file). Detail in `## Progress log` → 2026-09-07.
+- Cost log purged 2026-09-07 on Muxin's instruction: 404 fixture rows gone, 35 real rows and $0.708 intact. The file is **gitignored** (`.gitignore:14`) — git is not a recovery path for it.
 - **NEEDS MUXIN (2), not blocking:** the `develop/SKILL.md` entry contract; `.claude/skills/**` is write-protected. Detail in `docs/operations/launch-slices/SLICE-5N.md`.
 - Open engineering debt, none blocking: `queue-view.ts:346` prints a stale ledger path to the user; `migrateLegacyDataDirectory` (`jobs.ts:70`) is still non-atomic.
 - Standing rule added 2026-09-07: **test overhead must never dominate a real resource.** See `## Standing constraints`.
@@ -78,6 +78,34 @@ been performed** — `/atomize` → review → `/publish` has not been exercised
 with a Typefully draft observed at the end. Do not read "blocker removed" as "ready." The two
 candidates in START HERE differ on exactly this: d3 continues the dead-code cleanup, a live dry run
 answers the readiness question.
+
+**Decisions taken at the very end of the session.** Muxin authorized the cost-log purge and chose
+the dry run over d3.
+
+The purge removed exactly the 404 rows matching `outreach:draft,"Acme Co",0.0000` and nothing else,
+verified by `cmp` against a filtered copy of the pre-purge file (`dc3c71d2…`, 439 rows). The file
+now holds 35 rows; the 5 genuinely paid rows still total **$0.708**. Note for anyone tempted to
+treat git as the undo: **`data/cost-log.csv` is gitignored** (`.gitignore:14`) and was never
+tracked, so the only pre-purge copy was an ephemeral scratchpad file. Nothing of value was in the
+deleted rows — 404 byte-identical zero-cost fixtures — but the *next* destructive edit to an
+untracked operational file deserves a durable backup first.
+
+Eight rows were deliberately **left in place** despite looking synthetic: six
+`agent:claude,"Note: a Charles note"` and two `agent:codex,"Note: refused"`, all from
+2026-09-06/07, all zero-cost. `src/util/cost-log.ts:18` names the Charles row as test noise, but the
+authorization covered the 404 Acme rows, and widening a delete on a financial record because rows
+"look like" fixtures is exactly the move that should require asking. Worth a decision later, not a
+worker's initiative.
+
+**SLICE-5P is written and not started.** The design turns on a property verified in source before
+the packet was drafted: `typefully.ts:136-144` — a null `publishAt` makes Typefully save an
+**unscheduled** draft that will not auto-post. So the full live path, real auth and real API call,
+can run while its output is structurally incapable of publishing, and `cancelDraft` removes it
+afterwards. That is a genuine dry run rather than a rehearsal, and it does not weaken rule 2:
+nothing reaches Typefully until Muxin approves a row. The run is also the first chance to watch
+SLICE-5O's ledger migration fire in production. Budget is fixed at one authenticated canary and one
+retry, with no retry around `createDraft` at all (`typefully.ts:166-167`: a 5xx can arrive after the
+draft was created, so a retry risks a duplicate).
 
 **Not committed, deliberately.** `data/notes-spread-ledger.jsonl` carries two rows appended by a
 scheduled run at 2026-09-07T12:00:05Z (notes `c-331059283`, `c-331062953`). Genuine runtime
