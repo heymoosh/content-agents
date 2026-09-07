@@ -6,10 +6,10 @@
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
 - Current slice: **SLICE-5S NOT ACCEPTED**, `docs/operations/launch-slices/SLICE-5S.md` → `## Stopped`.
 - Blocked on: Claude session usage limit; CLI reports reset at 8:50 p.m. America/Chicago. No implementation changes.
-- Next dependency-ready: resume **SLICE-5S** (approve never publishes) when Claude capacity returns.
+- Next dependency-ready: resume **SLICE-5S** (approve never publishes) when Claude capacity returns; Grok audits the candidate.
 - Last accepted: **SLICE-5R**, `71f2df9`, packet `docs/operations/launch-slices/SLICE-5R.md`; gate 4304 tests / 0 failures.
 - Then unwritten: unscheduled-draft repair on unified route, rerun 5P, durable per-piece X opt-in (5R A6), analytics `brand_id` backfill.
-- Last decision (Muxin, 2026-09-07): X only for building/technical pieces; approve means approved to publish, nothing more.
+- Last decision (Muxin, 2026-09-07): use Grok for the 5S audit; product decisions remain in the packet and prior progress entries.
 - **SAFETY, Muxin only:** until 5S, retrying `x-1`/`x-2` can publish once Postiz answers. Set both to `pending` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`; this session did not change either row.
 - Design sanity rule: `## Standing constraints`. Needs Muxin, not blocking: `.claude/skills/**` edits named in 5N and 5P.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
@@ -1337,6 +1337,10 @@ Evidence: `/private/tmp/slice-5s-evidence/build-result.json`; retained worker pr
 criteria are in the same directory. Next action: rerun the confirmed 5S packet with the Claude
 builder after capacity returns, then obtain independent GPT audit before the frozen gate.
 The pre-existing review queue and notes-spread ledger modifications remain untouched. No push.
+
+### 2026-09-07 — SLICE-5S auditor changed to Grok; not accepted
+
+Muxin requested Grok for the independent audit. Updated the packet routing from GPT to Grok. The Claude builder stopped before implementation, so no candidate diff or focused-check evidence exists to audit. No Grok call was launched. The next action remains resuming the Claude builder when capacity returns, followed by the Grok audit and the existing verification sequence. No product scope changed.
 
 ## Current handoff — 2026-09-02
 

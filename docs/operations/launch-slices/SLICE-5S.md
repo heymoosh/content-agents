@@ -123,13 +123,13 @@ is therefore not required.
 ## Families
 
 - Builder: Claude, strong tier.
-- Auditor: Codex (GPT), strong tier. Receives the diff, the changed-file list, the focused test
+- Auditor: Grok, strong tier (Muxin requested this route on 2026-09-07). Receives the diff, the changed-file list, the focused test
   output and this Acceptance list only.
 
 ## Coordinator confirmation — 2026-09-07
 
 Dependency 5Q is accepted; 5R is accepted at `71f2df9`. Single Claude strong-tier builder,
-independent GPT strong-tier audit, then a frozen candidate and the full unsandboxed gate.
+independent Grok strong-tier audit, then a frozen candidate and the full unsandboxed gate.
 Worker owns only the four implementation/test files above and disposable evidence outside the
 repository. Coordinator owns this packet and the master status update. Workers do not commit.
 The worker is not alone in the repository: preserve other sessions' edits; do not revert them.
@@ -156,5 +156,6 @@ No closeout tool in this repository. **NOT ACCEPTED**: implementation, focused c
 - Blocker: Claude session usage limit before implementation; CLI reports reset at 8:50 p.m. America/Chicago.
 - Verified: ordered protocol/START HERE/packet reads; 5Q and 5R dependencies accepted; clean isolated worker branch based on `71f2df9`; worktree setup exited 0. Worker exited 1 with `is_error: true` and no candidate diff. No focused checks, audit, visual proof or full gate ran.
 - Retained work: coordinator packet changes here and master START HERE/progress update; `/private/tmp/slice-5s-evidence/build-prompt.txt`, `build-result.json`, `audit-criteria.md`. Claude session `005d30e8-4fb0-4203-9fad-ac342ff83034`. No implementation files changed.
-- Next action: rerun this confirmed packet with the Claude builder after capacity returns, then continue the declared audit and verification sequence.
+- Next action: rerun this confirmed packet with the Claude builder after capacity returns, then obtain the Grok audit and continue the declared verification sequence.
+- Audit routing update, 2026-09-07: Muxin requested Grok instead. Grok is the designated independent auditor. No audit was launched because the builder produced no implementation candidate or focused-check evidence; changing the auditor does not clear the builder usage-limit blocker.
 - Hygiene disposition: rescue pass exited 1 solely for the four known tracked modifications; snapshot `refs/wip/content-agents` (`6ad9148`). This session created no untracked repository paths. The unused clean worktree and empty `slice-5s-approval` branch were removed. Existing local-only branches are preserved. Only this packet and the master update are committed. Pre-existing `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md` and `data/notes-spread-ledger.jsonl` are preserved.
