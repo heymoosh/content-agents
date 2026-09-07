@@ -9,7 +9,7 @@ import { tryAcquireFileLease } from "../runtime/file-lock.js";
 import { configuredCardImagePath, configuredCardRenderDerivative, configuredCardSourceLine } from "./configured-media.js";
 import { readQueue } from "../publish/queue.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { repoRoot } from "../db/db.js";
+import { costLogPath } from "../util/cost-log.js";
 
 const IMAGE_BYTES = {
   png: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]),
@@ -146,7 +146,13 @@ function cardRequestFolder(
  */
 function fakeRenderer(
   folder: string,
-  options: { readonly bytes?: string; readonly fail?: boolean; readonly produce?: boolean; readonly log?: string } = {},
+  options: {
+    readonly bytes?: string; readonly fail?: boolean; readonly produce?: boolean; readonly log?: string;
+    // A separate file (never the call log, which other tests parse) the renderer writes its
+    // inherited CONTENT_AGENTS_TEST_COST_LOG into. Lets a test observe what the CHILD resolves
+    // rather than reading the spawn call and inferring it.
+    readonly envProbe?: string;
+  } = {},
 ): { dir: string; log: string; calls: () => string[][] } {
   const dir = mkdtempSync(join(tmpdir(), "fake-npm-"));
   const log = options.log ?? join(dir, "calls.log");
@@ -159,6 +165,7 @@ function fakeRenderer(
   writeFileSync(join(dir, "npm"), [
     "#!/bin/sh",
     `printf '%s\\n' "$*" >> ${JSON.stringify(log)}`,
+    options.envProbe ? `printf '%s\\n' "$CONTENT_AGENTS_TEST_COST_LOG" >> ${JSON.stringify(options.envProbe)}` : "",
     'for a in "$@"; do last="$a"; done',
     ...writes,
     options.fail ? "exit 1" : "",
@@ -177,16 +184,33 @@ async function withFakeNpm<T>(dir: string, task: () => Promise<T>): Promise<T> {
   try { return await task(); } finally { process.env.PATH = previous; }
 }
 
+function restoreCostLogEnv(previous: string | undefined): void {
+  if (previous === undefined) delete process.env.CONTENT_AGENTS_TEST_COST_LOG;
+  else process.env.CONTENT_AGENTS_TEST_COST_LOG = previous;
+}
+
 test("SLICE-5I: two platforms whose card is identical render once and both rows promote to that one file", async () => {
   const quote = "Careful teams ship the smaller first step.";
   const { folder, names } = cardRequestFolder([
     { id: "linkedin-card", platform: "linkedin", media: "static-quote-card", quote },
     { id: "bluesky-card", platform: "bluesky", media: "static-quote-card", quote },
   ]);
-  const npm = fakeRenderer(folder);
-  const costLog = join(repoRoot, "data", "cost-log.csv");
-  const costBefore = existsSync(costLog) ? readFileSync(costLog, "utf8") : null;
+  // One cost log shared by this process AND the spawned renderer, so "appends nothing" covers both
+  // sides of the spawn. A render is a subprocess (execFileSync in configured-media-runtime.ts), and
+  // with no explicit override a Node child computes its OWN throwaway data root -- parent and child
+  // would resolve to two different files and a child-side row would be invisible from here. An
+  // explicit path is inherited through the environment (that spawn passes no `env` option), which
+  // the envProbe assertion below proves rather than assumes. It is a scratch file, never Muxin's
+  // real data/cost-log.csv.
+  const scratch = mkdtempSync(join(tmpdir(), "configured-media-cost-log-"));
+  const costLog = join(scratch, "cost-log.csv");
+  const envProbe = join(scratch, "child-cost-log-env.txt");
+  const npm = fakeRenderer(folder, { envProbe });
+  const savedCostLogEnv = process.env.CONTENT_AGENTS_TEST_COST_LOG;
+  process.env.CONTENT_AGENTS_TEST_COST_LOG = costLog;
   try {
+    assert.equal(costLogPath(), costLog, "logCost in this process resolves to the shared scratch log");
+    const costBefore = existsSync(costLog) ? readFileSync(costLog, "utf8") : null;
     // The render inputs, not the variant id or the platform, decide the name.
     assert.equal(names.get("linkedin-card"), names.get("bluesky-card"));
     const shared = names.get("linkedin-card")!;
@@ -225,11 +249,20 @@ test("SLICE-5I: two platforms whose card is identical render once and both rows 
     // Extraction-first: the shared render paints the approved quote and nothing else.
     assert.equal(splitFrontmatter(readFileSync(join(folder, "derivatives", `${shared}.md`), "utf8")).body.trim(), quote);
 
-    // A free local render logs no cost row, so sharing one adds none.
+    // The spawned renderer resolved the SAME log this assertion reads. Without this, a child-side
+    // row would land in the child's own throwaway root and "appends nothing" would be unfalsifiable
+    // from here.
+    const childSaw = readFileSync(envProbe, "utf8").split("\n").filter(Boolean);
+    assert.equal(childSaw.length, 1, "the one spawned renderer wrote one probe line");
+    assert.deepEqual(childSaw, [costLog], "the renderer subprocess inherited the shared cost-log path");
+
+    // A free local render logs no cost row, so sharing one adds none -- on either side of the spawn.
     assert.equal(existsSync(costLog) ? readFileSync(costLog, "utf8") : null, costBefore, "a shared card render appends no cost row");
   } finally {
+    restoreCostLogEnv(savedCostLogEnv);
     rmSync(folder, { recursive: true, force: true });
     rmSync(npm.dir, { recursive: true, force: true });
+    rmSync(scratch, { recursive: true, force: true });
   }
 });
 

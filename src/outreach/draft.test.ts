@@ -8,6 +8,8 @@ import {
   fenceSafeDirection, findUnauthorizedOutreachClaims, DIRECTION_FENCE_OPEN, DIRECTION_FENCE_CLOSE,
 } from "./draft.js";
 import type { EvidenceItem } from "./qualify.js";
+import { costLogPath } from "../util/cost-log.js";
+import { repoRoot } from "../db/db.js";
 
 const GREENFIELD_ITEM: EvidenceItem = {
   id: "E1",
@@ -462,6 +464,29 @@ describe("runDraft guard clauses (no subprocess reached)", () => {
       assert.ok(promptSeen.includes("Acme Co"), "the real prompt reached the injected callClaude");
       const written = readFileSync(result.messageFile, "utf8");
       assert.match(written, /the injected draft body/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // SLICE-5O: this test file is the one that used to append "Acme Co" rows to Muxin's real
+  // data/cost-log.csv on every gate run -- runDraft calls logCost unconditionally. It now lands in
+  // the per-process throwaway log, which also makes the row observable: assert the row, not the
+  // call.
+  test("a completed draft appends exactly one cost row, to the isolated log and not the real one", async () => {
+    const dir = makeLeadDir(leadFixture());
+    writeFileSync(
+      join(dir, "review-queue.md"),
+      `| id | platform | format | asset | native | brand | cta | status | notes |\n|---|---|---|---|---|---|---|---|---|\n`,
+    );
+    const costLog = costLogPath();
+    assert.notEqual(costLog, join(repoRoot, "data", "cost-log.csv"), "the suite never writes the real ledger");
+    const before = existsSync(costLog) ? readFileSync(costLog, "utf8") : "";
+    try {
+      await runDraft(dir, { callClaude: async () => "the injected draft body" });
+      const added = readFileSync(costLog, "utf8").slice(before.length).trimEnd().split("\n").filter(Boolean);
+      assert.equal(added.length, 1, "one draft, one row");
+      assert.match(added[0]!, /,outreach:draft,"Acme Co",0\.0000,claude$/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

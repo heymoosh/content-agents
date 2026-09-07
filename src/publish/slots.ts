@@ -1,15 +1,18 @@
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, renameSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { loadPlatforms } from "../config/platforms.js";
-import { dataPath } from "../runtime/data-root.js";
+import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
 
 // The shared cadence scheduler — one source of truth for WHEN every post goes out, used by both
 // text (Typefully) and quote cards (image relays). It extends main's per-run cadence (config/
 // platforms.yaml posts_per_week + slot_days + slot_time_pst, DST-aware PT) with a persistent slot
-// ledger (data/publish-schedule.jsonl) so claims survive across /publish runs AND across streams.
+// ledger so claims survive across /publish runs AND across streams. The ledger lives at
+// <dataRoot()>/scheduler/publish-schedule.jsonl (see ledgerPath() below); it used to live in the
+// checkout at data/publish-schedule.jsonl, and those pre-move claims are carried forward on first
+// read. Comments elsewhere that still name data/publish-schedule.jsonl mean that old location.
 // That closes the "Phase 2" gap main flagged: a platform never exceeds its per-day slot cap (default
 // 1, raised via a platform's `max_slots_per_day`) on the same LA day, whether posts come from text,
 // cards, or a separate run.
@@ -153,11 +156,29 @@ export function fmtLa(d: Date): string {
 
 // --- ledger (append-only JSONL of every claimed (platform, LA day)) ---
 
+// Canonical location, under dataRoot(). Unchanged by the migration below.
+const LEDGER_PARTS = ["scheduler", "publish-schedule.jsonl"] as const;
+
+// Where the ledger sat before operational state moved out of the checkout. Every other store that
+// moved calls migrateLegacyDataFile to carry its pre-move file forward; this one did not, so a
+// publish run after the move started from an empty ledger and every claim Muxin had already placed
+// was invisible to it — the exact failure the ledger exists to prevent. Note the shapes differ: the
+// legacy file has no `scheduler/` segment, which is why the migration is given explicit legacy parts.
+// The env override exists only so a test can exercise the migration against a fixture instead of
+// reading Muxin's real file.
+function legacyLedgerPath(): string {
+  return process.env.CONTENT_AGENTS_TEST_LEGACY_LEDGER ?? join(repoRoot, "data", "publish-schedule.jsonl");
+}
+
 // Resolved lazily (not a top-level const) so tests can point it at an isolated file via
 // CONTENT_AGENTS_TEST_LEDGER before exercising claimSlots/pruneLedger/releaseClaims, instead of
-// racing each other against the real, shared data/publish-schedule.jsonl.
+// racing each other against the real, shared ledger. The migration runs here, on first read, rather
+// than at module scope: importing this file must not copy anything anywhere on its own.
 export function ledgerPath(): string {
-  return process.env.CONTENT_AGENTS_TEST_LEDGER ?? dataPath("scheduler", "publish-schedule.jsonl");
+  const override = process.env.CONTENT_AGENTS_TEST_LEDGER;
+  if (override) return override;
+  const legacy = legacyLedgerPath();
+  return migrateLegacyDataFile(LEDGER_PARTS, dirname(legacy), [basename(legacy)]);
 }
 
 function withLedgerLock<T>(fn: () => T): T { return withFileLock(`${ledgerPath()}.lock`, fn); }

@@ -7,6 +7,15 @@
 - Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
 - Next slice: **(d3)** — `rowEl` dead code (`page.ts:1466`) plus `buildFormatArg` (`jobs.ts:2100`).
   Measure the blast radius before scoping; d3 is an inventory to *measure*, not a list to trust.
+  SLICE-5O just demonstrated why that warning is worth obeying: item (f)'s inherited list of
+  fourteen suspect sites was twelve-thirteenths wrong, and the real defect was somewhere the item
+  never looked.
+- **NEEDS MUXIN, not blocking anything: 92% of `data/cost-log.csv` is test fixtures.** 404 of its
+  439 rows are `outreach:draft,"Acme Co",0.0000`, accumulating since 2026-07-15 because
+  `src/outreach/draft.ts:370` calls `logCost` unconditionally and the path was hardcoded. Real spend
+  is 34 rows totalling $0.708. SLICE-5O stopped the bleeding; the existing rows were deliberately
+  **left in place** — deleting entries from a cost log to tidy test noise is her call, not a
+  worker's. They are trivially identifiable if she wants them gone.
 - **ONE THING NEEDS MUXIN** (from SLICE-5N, does not block d3): `develop/SKILL.md` defines no
   `--brand` at entry — step 0 reads the arg as the source, while line 57 of its body runs
   `npm run route -- --brand <brand>`. `atomize` and `video` both carry the entry contract; develop
@@ -15,7 +24,31 @@
   undefined flag — the source stays where step 0 expects it and the brand rides as a named
   instruction, so nothing ships broken. To finish, someone who can write there gives develop
   atomize's entry contract, then `developSpawnPrompt` flips to the flag form.
-- Last resolved: **SLICE-5N ACCEPTED** (2026-09-07) — item (d2) folded with item (c)'s brandId
+- Last resolved: **SLICE-5O ACCEPTED** (2026-09-07) — item (f), which turned out to be mostly a
+  false alarm wrapped around one real production bug. Gate **4293/491/0**. Full RESULT BLOCK in
+  `docs/operations/launch-slices/SLICE-5O.md`.
+  **The bug: the slot ledger's history was orphaned by the data-root move.** Operational state now
+  lives under `dataRoot()` (`~/.content-agents/<basename>-<fingerprint>/`) and eleven stores call
+  `migrateLegacyDataFile` to carry their pre-move file forward. The ledger did not — `slots.ts:160`
+  resolved a bare `dataPath("scheduler", "publish-schedule.jsonl")`. Verified on disk: that
+  directory did not exist, while `data/publish-schedule.jsonl` held 54 real July claims. The next
+  publish run would have started from an empty ledger with every prior claim invisible to it, which
+  is the exact duplicate-placement failure the ledger exists to prevent. Latent only because
+  nothing has published since the July freeze — it bites on the **first run after Muxin goes live**,
+  her stated next priority.
+  **The audit then found the fix had the same shape as the bug.** `migrateLegacyDataFile` copied
+  straight onto the canonical path, and its own fast-path guard skips the migration lock once that
+  file exists — so a process killed mid-copy left a truncated file that suppressed the migration
+  forever, silently. Now staged into a sibling and installed with `renameSync` under the lock,
+  which fixes the other eleven callers too. **`migrateLegacyDataDirectory` still has it via
+  `cpSync`** (`jobs.ts:70` is the only caller) — fix that before anything durable moves onto it.
+  **Two standing lessons.** (i) *A stale comment is how a defect survives*: `slots.test.ts:5`
+  asserted "the ledger path is hardcoded" while the override it denied existed two lines away in
+  production and the same file's second block already used it. (ii) *Ask whether a change removed
+  coverage, not only whether it added a defect* — Lane B's temp-root isolation silently destroyed
+  the child-side reach of an existing assertion, invisible to both builders and to the acceptance
+  criteria until an auditor compared before against after.
+- Before that: **SLICE-5N ACCEPTED** (2026-09-07) — item (d2) folded with item (c)'s brandId
   debt, the ordering Muxin agreed to (d1 → d2+brandId → d3). Gate **4278/489/0**. The brand now
   travels from the browser through the HTTP routes, onto the `Job`, through the durable store and
   into the spawned prompt for `/atomize`, `/video` and `/develop`; `reuseGuardBlock` reads the
@@ -199,8 +232,22 @@
   resolution SLICE-5M fixed, which is why it was left alone there. **Calibrate before scoping:** as
   with 5M's containment work, check what actually reaches `row.asset` before treating this as a
   security boundary rather than correctness hygiene. It is a queue-row field this codebase writes.
-  **(f) Test suites write into real repository trees — found by SLICE-5N's closure audit, recorded,
-  unfixed.** Pre-existing and never checked by anything. The hazard is not "a test writes a file";
+  **(f) DONE as SLICE-5O (accepted 2026-09-07) — and this item's own framing was wrong, which is
+  the part worth keeping.** The list below was inherited from an audit that marked it
+  "auditor-confirmed, unverified by me." It was measured before the packet was written: **every one
+  of the fourteen sites is benign** (uniquely-named fixtures, self-scoped cleanup) and
+  `content-generation.test.ts:69` is not a write at all. The reason is that `dataRoot()`
+  (`runtime/data-root.ts:15-19`) already hands every test process a throwaway `mkdtemp` root under
+  `NODE_TEST_CONTEXT`, so most suites were never at risk. **The "worst first" call below was also
+  wrong**: `slots.test.ts` was indeed writing a real file, but not the live ledger — production had
+  already moved to `dataRoot()`, and the file it truncates is the orphaned legacy copy. The
+  concurrent-slot-loss scenario described below cannot happen for that reason. What *was* real is
+  recorded in START HERE: the legacy file held the only copy of 54 real claims and nothing migrated
+  it forward. **Two files were ever at risk, and the more valuable defect was a production bug this
+  item never mentioned.** Also corrected: the stray cost rows called "untracked and harmless" below
+  were 404 of 439 rows. See START HERE.
+  *Original text preserved below as the record of how a list becomes a belief.*
+  Pre-existing and never checked by anything. The hazard is not "a test writes a file";
   it is that a cleanup step deletes or overwrites something the system treats as durable state.
   SLICE-5N's own new suite would have destroyed `briefs/<brand>/bets.md`, the append-only placement
   log that prevents duplicate publishing — caught only by the audit, and latent only because no

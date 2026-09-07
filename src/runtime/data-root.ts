@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { repoRoot } from "../db/db.js";
 import { withFileLock } from "./file-lock.js";
@@ -41,15 +41,48 @@ export function configuredDataPathOrLegacy(...parts: string[]): string {
   return throwaway ? join(throwaway, ...parts) : join(homedir(), ".content-agents", ...parts);
 }
 
-/** Old releases kept mutable state inside the checkout. Copy it forward once, without deleting it. */
-export function migrateLegacyDataFile(parts: readonly string[], legacyDataRoot = join(repoRoot, "data")): string {
+/**
+ * Old releases kept mutable state inside the checkout. Copy it forward once, without deleting it.
+ *
+ * `legacyParts` defaults to `parts`, which is the shape every caller but one needs: the file sat at
+ * the same relative path under the old root as it does under the new one. The slot ledger does not
+ * fit that shape — it lives at `<root>/scheduler/publish-schedule.jsonl` today but sat at
+ * `data/publish-schedule.jsonl` before the move, with no `scheduler/` segment — so it passes its own
+ * legacy parts. Omitting the argument reproduces the previous behaviour exactly.
+ *
+ * The copy stages into a private sibling file and is installed with a same-directory renameSync,
+ * which is atomic on one filesystem. It used to copyFileSync straight onto the canonical path, and
+ * copyFileSync makes no atomicity promise, so the destination was visible while still partial. Two
+ * things went wrong with that. A second process's fast-path `existsSync(canonical)` guard skips the
+ * migration lock entirely, so it could read a half-copied store, act on it, and have its own write
+ * overwritten when the first copy finished. Worse and needing no concurrency at all: a process
+ * killed mid-copy left a truncated canonical file, and that same guard then suppressed the
+ * migration forever, so the rest of the real data was silently gone. Staging makes both impossible
+ * — the canonical path either does not exist or holds the complete file, never anything between.
+ *
+ * `deps` exists only so a test can inject a copy that fails partway and prove no partial canonical
+ * file survives; production callers never pass it. Same convention as writeLedgerAtomic's `deps`.
+ */
+export function migrateLegacyDataFile(
+  parts: readonly string[],
+  legacyDataRoot = join(repoRoot, "data"),
+  legacyParts: readonly string[] = parts,
+  deps: { copyFileSync: typeof copyFileSync; renameSync: typeof renameSync } = { copyFileSync, renameSync }
+): string {
   const canonical = dataPath(...parts);
-  const legacy = join(legacyDataRoot, ...parts);
+  const legacy = join(legacyDataRoot, ...legacyParts);
   if (existsSync(canonical) || !existsSync(legacy) || canonical === legacy) return canonical;
   return withFileLock(`${canonical}.migration.lock`, () => {
     if (!existsSync(canonical) && existsSync(legacy)) {
       mkdirSync(dirname(canonical), { recursive: true, mode: 0o700 });
-      copyFileSync(legacy, canonical);
+      const staging = `${canonical}.${process.pid}.migrating`;
+      try {
+        deps.copyFileSync(legacy, staging);
+        deps.renameSync(staging, canonical);
+      } finally {
+        // After a successful rename there is nothing here; after a failure this is the partial copy.
+        rmSync(staging, { force: true });
+      }
     }
     return canonical;
   });
