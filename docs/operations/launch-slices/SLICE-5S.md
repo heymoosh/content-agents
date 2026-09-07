@@ -84,6 +84,9 @@ or the GUI has no way to publish at all.
 - [ ] A6 — The header comment at `serve.ts:5-13` describes the new behaviour.
 - [ ] A7 — Every existing `serve.test.ts` and `page.test.ts` case still passes.
 - [ ] A8 — No em dashes introduced in any user-visible string.
+- [ ] A9 — The design sanity check passes for the Publishing view: `docs/content-studio-master-status.md`
+      → `## Standing constraints` → "Design sanity check on every GUI slice". Record each of the
+      five in the RESULT BLOCK with the CSS or HTML that satisfies it.
 
 ## Verify
 

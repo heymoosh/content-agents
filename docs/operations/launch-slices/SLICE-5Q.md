@@ -88,6 +88,12 @@ same test file; two workers would edit the same lines.
       folder slug appear once, as a single muted subtitle line below or above it, not as the
       page's largest heading. The "Descriptor · …" line is gone. Covered by a `page.test.ts`
       assertion on rendered HTML.
+- [ ] A9 — The design sanity check passes: `docs/content-studio-master-status.md` →
+      `## Standing constraints` → "Design sanity check on every GUI slice" (the five points).
+      Record each of the five in the RESULT BLOCK with the CSS or HTML that satisfies it. Also
+      remove or let Muxin dismiss the stale job card at the top of the Content room ("Create
+      configured drafts: probe-atomic-63507-1788629180763", queued before brand tracking); if
+      that needs a server change, record `file:line` under Unresolved instead.
 
 ## Verify
 

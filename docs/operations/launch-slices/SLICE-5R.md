@@ -25,14 +25,15 @@ Demonstrably true when done: only building and technical pieces auto-route to X,
 documented, one-step way to put any other piece on X on purpose (for example promoting the voting
 tool).
 
-## Decision recorded, and one assumption the owner may overturn
+## Decision recorded
 
 - **X stays on `claude-code` and `builder`.** Decided. (Muxin: "claude code only isn't a
   category but building and technical stuff is." The two pillars together are that category.)
-- **X comes off `civic-tech`, `human-ai` and `other`: remove `x` from each default and add
-  `rules.<pillar>.never: [x]` for each.** Decided.
-- Assumption: `career-work` is not "building and tech stuff" and comes off X too. If Muxin wants
-  it kept, that is a one-line revert in the same file.
+- **X comes off `civic-tech`, `human-ai`, `other` and `career-work`: remove `x` from each
+  default and add `rules.<pillar>.never: [x]` for each.** Decided, 2026-09-07, in her words:
+  "I'd stop doing career-work on X. ONLY technical stuff goes on X cause that's the only thing
+  that platform seems to respect these days. Think very silicon valley monoculture, if it fits
+  that paradigm, it can go in X." Use that sentence, dated, as the comment in `routing.yaml`.
 
 A piece tagged **both** civic-tech and human-ai (as the 5P essay was) now has X excluded by both
 tags. A piece tagged civic-tech and builder is routed per pillar, so the builder tag may still

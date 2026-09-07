@@ -3,16 +3,18 @@
 ## START HERE
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, ahead of `origin`, unpushed by standing order)
-- This document: `docs/content-studio-master-status.md` — single source of truth for status and decisions
-- Protocol: `AGENTS.md` → `## Slice protocol`. Read that before anything else.
-- **Next slices, parallel-safe: SLICE-5Q** (queue page puts content first) and **SLICE-5R** (X carries building and technical pieces only), both under `docs/operations/launch-slices/`. Then in order: **SLICE-5S** (approve no longer publishes; the Publishing room does), a repair slice restoring an unscheduled draft path on the unified publish route (not yet written; `src/publish/typefully.ts:480-484` throws on `--no-schedule`), then rerun **SLICE-5P**, then a `brand_id` backfill slice for `data/analytics.db` (not yet written; every X, LinkedIn and Substack row is NULL).
-- **SLICE-5P closed NOT ACCEPTED 2026-09-07.** Nothing reached Typefully. The GUI approve path dispatched three real publish attempts that failed on Postiz discovery. Stage 5 is unsatisfiable against shipped code. Full leftover and defect list in the packet's Closeout.
-- **SAFETY, Muxin only:** `x-1` sits at `approve` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md:31`. Until 5S lands, a retry from the GUI can create an auto-firing post. Set it to `pending`.
-- Last accepted: **SLICE-5O**, `docs/operations/launch-slices/SLICE-5O.md`, gate 4293/491/0, commit `540c065`.
-- Cost log purged 2026-09-07 on Muxin's instruction: 404 fixture rows gone, 35 real rows and $0.708 intact. The file is **gitignored** (`.gitignore:14`) — git is not a recovery path for it.
-- **NEEDS MUXIN (3), not blocking:** the `develop/SKILL.md` entry contract (SLICE-5N); `.claude/skills/atomize/SKILL.md:169` bare `tsx` and `:451-453` stale caption platform list (SLICE-5P). `.claude/skills/**` is write-protected.
-- Open engineering debt, none blocking: `queue-view.ts:346` stale ledger path; `migrateLegacyDataDirectory` (`jobs.ts:70`) non-atomic; `new-content` collides with an existing folder for the same essay (`content/2026-09-02-the-world-s-broken-what-do-we-do/`); Postiz capability discovery `fetch failed` blocks the unified publish path.
-- Standing rule added 2026-09-07: **test overhead must never dominate a real resource.** See `## Standing constraints`.
+- This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`. Read that first.
+- Current slice: none running. **SLICE-5P** closed NOT ACCEPTED 2026-09-07, `docs/operations/launch-slices/SLICE-5P.md` (leftovers in its Closeout).
+- Next, parallel-safe: **SLICE-5Q** (queue page, design pass) and **SLICE-5R** (X carries technical pieces only). Then **SLICE-5S** (approve never publishes; the Publishing room does). Then unwritten, in order: unscheduled-draft repair on the unified route, rerun 5P, `brand_id` backfill for `data/analytics.db`.
+- Blocked on: nothing.
+- Last decision (Muxin, 2026-09-07): only technical, Silicon Valley monoculture pieces go on X; career-work comes off. Approve means approved to publish, nothing more.
+- Last accepted: **SLICE-5O**, `docs/operations/launch-slices/SLICE-5O.md`, commit `540c065`, gate 4293/491/0.
+- **SAFETY, Muxin only:** `x-1` and `x-2` sit at `approve` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md:31-32`. Until 5S lands, a GUI retry is a real publish once Postiz answers. Set both to `pending`.
+- Standing constraints (`## Standing constraints`) now include the **design sanity check** for every GUI slice, added 2026-09-07.
+- Needs Muxin, not blocking: `.claude/skills/**` edits named in the 5N and 5P packets. Engineering debt: the two 2026-09-07 Progress log entries.
+- Everything below this block is history. Do not read it unless a slice packet cites a heading.
+
+## Standing constraints`.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
 
 ## Standing constraints
@@ -39,10 +41,44 @@ worker holding only that section and its packet still has them.
   overhead, and overhead that outweighs the signal has stopped being verification. If a test's
   footprint approaches the size of the thing it verifies, isolate it (a scratch path, a fixture
   root, a bounded excerpt) rather than accepting the ratio.
+- **Design sanity check on every GUI slice.** Added 2026-09-07 after Muxin reviewed the desk and
+  called its design "VERY odd": text too small, hard to read and scan through. Any slice that
+  touches a page she reads ends with a check, recorded in its RESULT BLOCK and confirmed by the
+  auditor from rendered HTML, not intent: body type at least 1.125rem with line height 1.5 or
+  more; her content first, with backend ids and folder slugs demoted to muted lines; one clear
+  divider between one thought and the next; errors that stay on screen until read; and the page
+  scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
 
 Append-only. Newest first. Never rewrite a completed dated entry.
+
+### 2026-09-07 — session close: Muxin's approve test, the design sanity rule, X decision final
+
+Muxin tested the desk herself after SLICE-5P closed. She found `x-1` already at `approve` and
+asked whether it approved itself: it did not. That was the canary approval from the 5P run,
+which the closeout asked her to reset and which was still in place. She then approved `x-2`;
+the GUI fired the real publish on the click, as `serve.ts:1141-1163` does until SLICE-5S
+lands, and it failed the same way `x-1` had: provider selection failed before dispatch because
+Postiz capability discovery got `fetch failed`. The Publishing view now shows both rows as
+"Needs attention, no planned time recorded". Nothing left the machine. Both rows remain at
+`approve` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`
+lines 31 and 32; only she edits that file.
+
+A stale job card, "Create configured drafts: probe-atomic-63507-1788629180763", sits at the
+top of the Content room with "this run was queued before the Studio recorded which brand a job
+belongs to". It is a probe job from before SLICE-5N's brand change, not this session's, and
+"Try it again" cannot succeed. Clearing it is part of the queue page's design pass (SLICE-5Q).
+
+Two decisions recorded. First, a **design sanity check** is now a standing constraint for every
+GUI slice (see `## Standing constraints`), and SLICE-5Q and SLICE-5S each carry it as an
+acceptance line. Second, the SLICE-5R assumption is resolved: career-work comes off X. In her
+words, "ONLY technical stuff goes on X cause that's the only thing that platform seems to
+respect these days. Think very silicon valley monoculture, if it fits that paradigm, it can go
+in X." The packet now records this as decided; X stays on claude-code and builder only.
+
+Session close was docs only: this document, the three packets, nothing under `src/`. The
+review server on port 4600 was left running for her.
 
 ### 2026-09-07 — SLICE-5P stopped before the live call; four slices queued from what it found
 
