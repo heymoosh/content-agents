@@ -53,10 +53,12 @@ or the GUI has no way to publish at all.
   approve control in the queue view no longer shows scheduling results. Reuse the existing
   publishing state helpers (`page.ts:1840` `publishingState`, `page.ts:1852` `publishingProvider`).
 - `src/review/serve.test.ts` and `src/review/page.test.ts` — see Acceptance.
+- `src/review/publishing-status.ts` — proposed explicit-scheduling intent adjustment for `scheduleApprovedOnce` / `publishingRetryBlock`, currently BLOCKED by automatic approval review; see `## Stopped`. Do not apply the rejected exception.
+- `src/review/publishing-status.test.ts` — focused regressions for the explicit intent exception and unchanged persisted-attempt/default-caller guards.
 
 ## Do not touch
 
-- `src/review/studio-scheduling.ts`, `src/review/publishing-status.ts`, `src/publish/**` — the
+- `src/review/studio-scheduling.ts`, `src/publish/**` — the
   publishers and the ledger are not in scope. The endpoint moves; the calls behind it do not change.
 - `/api/cancel`, `/api/publishing/reschedule`, `/api/publishing/batch-reschedule`,
   `/api/publishing/resolve`.
@@ -95,7 +97,7 @@ Check rendered HTML: body type at least 1.125rem with line height at least 1.5; 
 Run unsandboxed (tsx needs a socket under `$TMPDIR`).
 
 ```
-node --import tsx --test src/review/serve.test.ts src/review/page.test.ts
+node --import tsx --test src/review/serve.test.ts src/review/page.test.ts src/review/publishing-status.test.ts
 ```
 
 Visual: use a disposable fixture root, isolated HOME/operational ledger and a fake scheduler.
@@ -122,15 +124,15 @@ is therefore not required.
 
 ## Families
 
-- Builder: Claude, strong tier.
+- Builder: OpenAI Codex, `gpt-5.6-terra`, medium effort (Muxin authorized a non-highest-tier Codex route on 2026-09-07).
 - Auditor: Grok, strong tier (Muxin requested this route on 2026-09-07). Receives the diff, the changed-file list, the focused test
   output and this Acceptance list only.
 
 ## Coordinator confirmation — 2026-09-07
 
-Dependency 5Q is accepted; 5R is accepted at `71f2df9`. Single Claude strong-tier builder,
+Dependency 5Q is accepted; 5R is accepted at `71f2df9`. Single Codex `gpt-5.6-terra` medium-effort builder,
 independent Grok strong-tier audit, then a frozen candidate and the full unsandboxed gate.
-Worker owns only the four implementation/test files above and disposable evidence outside the
+Worker owns only the implementation/test files above and disposable evidence outside the
 repository. Coordinator owns this packet and the master status update. Workers do not commit.
 The worker is not alone in the repository: preserve other sessions' edits; do not revert them.
 Read owned files and their narrowly necessary imports/test harness dependencies only after this
@@ -151,7 +153,7 @@ No closeout tool in this repository. **NOT ACCEPTED**: implementation, focused c
 - Evidence locations:
 - Unresolved:
 
-## Stopped
+## Previous stop — superseded by Codex resume on 2026-09-07
 
 - Blocker: Claude session usage limit before implementation; CLI reports reset at 8:50 p.m. America/Chicago.
 - Verified: ordered protocol/START HERE/packet reads; 5Q and 5R dependencies accepted; clean isolated worker branch based on `71f2df9`; worktree setup exited 0. Worker exited 1 with `is_error: true` and no candidate diff. No focused checks, audit, visual proof or full gate ran.
@@ -159,3 +161,23 @@ No closeout tool in this repository. **NOT ACCEPTED**: implementation, focused c
 - Next action: rerun this confirmed packet with the Claude builder after capacity returns, then obtain the Grok audit and continue the declared verification sequence.
 - Audit routing update, 2026-09-07: Muxin requested Grok instead. Grok is the designated independent auditor. No audit was launched because the builder produced no implementation candidate or focused-check evidence; changing the auditor does not clear the builder usage-limit blocker.
 - Hygiene disposition: rescue pass exited 1 solely for the four known tracked modifications; snapshot `refs/wip/content-agents` (`6ad9148`). This session created no untracked repository paths. The unused clean worktree and empty `slice-5s-approval` branch were removed. Existing local-only branches are preserved. Only this packet and the master update are committed. Pre-existing `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md` and `data/notes-spread-ledger.jsonl` are preserved.
+
+## Resume — 2026-09-07
+
+Muxin authorized proceeding without Claude using a suitable non-highest-tier Codex model. The bounded server/UI change uses `gpt-5.6-terra` at medium effort; Grok remains independent auditor. Scope and acceptance criteria are unchanged. The prior Claude capacity blocker is superseded for this run.
+
+## Engineering clarification — explicit scheduling intent
+
+The old status route passed a pre-approval row to `scheduleApprovedOnce`; the new endpoint necessarily reads an approved row. The legacy no-attempt approval guard would reject it. Coordinator proposed the narrow helper option above, but automatic approval review REJECTED it. It is not authorized to execute without a materially safer design or informed user approval; no bypass or patch artifact was applied. Any eventual design must preserve legacy missing-history and recorded uncertain-attempt protection while permitting demonstrably new approvals to schedule. `/api/status` also drops publishing eligibility prechecks so approval is solely a status update. This changes no product scope.
+
+## Stopped
+
+- Blockers: automatic approval review rejected the explicit-scheduling retry-guard exception; Grok read-only tooling failed before review because its sandbox cannot resolve `/var/run/docker.sock` (symlink).
+- Risk requiring informed approval: a legacy approved row with missing publishing history may already have been sent; allowing explicit Schedule without reconciliation could duplicate it even while recorded uncertain attempts remain blocked. No bypass or indirect workaround is authorized by this packet.
+- Verified: Codex `gpt-5.6-terra`, medium effort, implemented a partial candidate. Focused checks returned 398 pass / 3 fail (incomplete endpoint and stale assertions); one assertion was subsequently updated without rerun. No visual proof, Grok assessment, acceptance audit, or full gate completed.
+- Retained work: branch `slice-5s-codex`, checkout `/private/tmp/content-agents-slice-5s-codex`, uncommitted changes to `src/review/serve.ts`, `src/review/page.ts`, `src/review/serve.test.ts`. Approval dispatch removed; Pending UI added, but its endpoint is absent. Do not integrate this incomplete candidate.
+- Evidence: `/private/tmp/slice-5s-evidence/codex-focused.log`, `codex-worker-packet.md`; bounded Grok assessment inputs `/private/tmp/slice-5s-audit/acceptance.md`, `guard-excerpts.txt`. Grok refused startup; no assessment result exists.
+- Next action: resolve the rejected guard design through a materially safer proposal or informed user approval, then complete the endpoint/tests and restore Grok read-only tooling before independent audit and frozen gate.
+- Closeout: NOT ACCEPTED. No candidate commit or push. Coordinator commits only this packet and master status. Worker checkout retained; no untracked repository paths created by the worker.
+
+- Hygiene disposition for this stop: exit 1 for the two dirty checkouts only; rescue refs `refs/wip/content-agents` (`8e7a431`) and `refs/wip/content-agents-slice-5s-codex` (`7cd058c`). No untracked repository paths. Retain worker edits and all local-only branches. Main pre-existing `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md` and `data/notes-spread-ledger.jsonl` remain untouched.
