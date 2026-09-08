@@ -4,12 +4,13 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
-- Current / next: **SLICE-5Z**, `docs/operations/launch-slices/SLICE-5Z.md` (prepared, unassigned).
-- Last accepted: **5Y**, `docs/operations/launch-slices/SLICE-5Y.md` (atomic job-log directory migration).
-- Blocked on: none; start 5Z with its bounded current-coverage inventory.
-- Last decision: fix future partial-directory publication; preserve existing canonical and legacy trees.
-- Proof: 5Y Grok PASS; frozen local gate 4342/4342 exit 0; nine protected fingerprints unchanged.
-- Next outcome: verify the job-to-child-process execution chain from 5O's recorded coverage gap.
+- Current: **SLICE-5Z**, `docs/operations/launch-slices/SLICE-5Z.md` (**not accepted**, stopped).
+- Blocked on: Grok closure audit returned 402, usage balance exhausted; final candidate has no cross-family closure.
+- Last accepted: **5Y**, `docs/operations/launch-slices/SLICE-5Y.md`.
+- Next dependency-ready action: resume 5Z closure audit after Grok balance is available, then frozen gate.
+- Last decision: test-only full job-spawn proof; close cleanup gaps before integration.
+- Retained candidate: `/private/tmp/content-agents-5z-build`; frozen snapshot: `/private/tmp/content-agents-5z-verify`.
+- Proof: final 5Z scoped 3/3 exit 0; independent verifier PASS; V1 Grok PASS does not cover final repairs.
 - Preserve provider/scheduler state and validated 5X backup; do not rerun 5P.
 - Everything below is history; read only packet-cited headings.
 
@@ -1523,6 +1524,25 @@ The missing next-step handoff was reconstructed from bounded sequence and later-
 5H's historical card-routing recommendation was already covered by 5J/5K. Next is prepared
 `docs/operations/launch-slices/SLICE-5Z.md`: first verify current coverage of the job-spawn chain
 identified by 5O, then close only an established gap. No 5Z worker or implementation started.
+
+### 2026-09-08 — 5Z stopped before acceptance: Grok closure balance exhausted
+
+5Z's bounded inventory confirmed the historical job-spawn coverage gap. Codex Terra added
+fixture-only tests for the real queue → engine builder → child runner chain: Claude/Codex success,
+nonzero exit, timeout, observable child artifacts/logs/cost rows, and isolated environments.
+No production source was changed or integrated. V1 focused checks passed 138 tests and Grok passed.
+Independent review nevertheless established cleanup gaps against the packet's unconditional-cleanup
+requirement. Terra effort was raised xhigh → max; cleanup repairs and failure-injection controls
+were independently closed on final test SHA `7764497b1716182b158001efb86cf4c023aba8f12479421b28e6d2f418d722db`.
+Final scoped raw proof is 3/3 exit 0. Full focused 140/typecheck 0 were worker-reported for R1;
+raw R1 output was not retained, so the final full gate is still required.
+
+Grok's final closure attempt exited 1 with API 402, “Grok Build usage balance exhausted”; no verdict
+was produced. Per Slice protocol usage-limit and stopping rules, the slice is **not accepted**.
+No full gate was run and no candidate source was integrated. Rescue snapshots retain it. Resume from the packet's `## Stopped`
+section after Grok balance is available. Candidate and audit prompt/evidence are retained in the
+packet-named temporary worktrees/evidence root. Only packet/master stopping records are committed.
+
 
 ## Current handoff — 2026-09-02
 
