@@ -22,7 +22,7 @@ first-attempt protection), 5T accepted at e78d2a9 (unified unscheduled draft mod
 
 ## Owned files
 
-Parallel-safe: no — one sequential live canary against one account and one durable attempt.
+One worker owns CLI/ledger evidence; coordinator browser preparation ran independently in separate scratch paths. The create → exact-ID readback → deletion → absence steps are serialized because each consumes the preceding observed provider result. A second preparation worker would duplicate the bounded existing-source check without a useful independent deliverable.
 
 ### Lane A — preflight, bounded run and evidence
 
@@ -65,27 +65,27 @@ No master archive heading. Bounded read inputs:
 
 ## Acceptance
 
-- [ ] A1 — Existing real source and atomization/routing evidence identified. The prior run used
+- [x] A1 — Existing real source and atomization/routing evidence identified. The prior run used
   https://humaninference.ai/essays/the-worlds-broken-what-do-we-do, human-inference, 14 derivatives,
   all six platforms included (Bluesky data; others cold start). Verify retained evidence.
-- [ ] A2 — Exactly one eligible Muxin-approved Typefully text row is selected by the actual CLI;
+- [x] A2 — Exactly one eligible Muxin-approved Typefully text row is selected by the actual CLI;
   current approval and dispatch history satisfy shipped safeguards (fresh provenance or the existing
   known-safe prior-failure/reconciliation path).
   If neither current provenance nor supported known-safe retry history establishes eligibility,
   stop without an external call and state
   the supported next action. Never synthesize Muxin approval or bypass the unified route.
-- [ ] A3 — Production CLI creates exactly one live draft; retain returned providerObjectId and
+- [x] A3 — Production CLI creates exactly one live draft; retain returned providerObjectId and
   local private event, no plannedFor. There is no retry around createDraft.
-- [ ] A4 — Live readback of that exact ID confirms draft/unscheduled state and no scheduled_date
+- [x] A4 — Live readback of that exact ID confirms draft/unscheduled state and no scheduled_date
   or other scheduled publication time. Local state and scheduled-only --list are insufficient.
-- [ ] A5 — Scheduler claims are unchanged before/after. Migration already ran with 54 claims in
+- [x] A5 — Scheduler claims are unchanged before/after. Migration already ran with 54 claims in
   the prior run; do not demand a new migration or a 55th claim. Draft mode consumes no slot.
-- [ ] A6 — Legacy ledger and unrelated operational records are byte-identical before/after;
+- [x] A6 — Legacy ledger and unrelated operational records are byte-identical before/after;
   cost log unchanged, review queue unchanged. Preserve all legitimate durable canary events.
-- [ ] A7 — Delete only the returned canary ID with the existing cancelDraft helper; live readback
+- [x] A7 — Delete only the returned canary ID with the existing cancelDraft helper; live readback
   verifies absence. Retain ID and output before cleanup. Do not erase local attempt history.
-- [ ] A8 — Every established defect has path:line and reproduction; no production repair here.
-- [ ] A9 — Grok preflight safety audit and final evidence audit closed; final frozen gate exit 0.
+- [x] A8 — Every established defect has path:line and reproduction; no production repair here.
+- [x] A9 — Grok preflight safety audit and final evidence audit closed; final frozen gate exit 0.
 
 ## Verify
 
@@ -106,7 +106,7 @@ After accepted 5U, --only-id x-1 selects exactly that approved text row. Do not 
 establishes its eligibility and no changes invalidate that proof immediately before run. Without
 --only-id the command processes all approved text rows; that default is outside this canary budget.
 Production credentials may be used only in this released phase; never print or export them to
-an auditor. Live draft readback may use authenticated Chrome UI or an existing exact-ID provider
+an auditor. Live draft readback may use an authenticated browser UI or an existing exact-ID provider
 read interface. --list is scheduled-only. Observe unscheduled state before deletion, then absence.
 On an ambiguous create result, preserve evidence and stop; do not retry or guess an object ID.
 On cleanup failure, preserve exact ID and report the unresolved live object immediately.
@@ -145,7 +145,7 @@ optional hardening. A read-only preflight followed by audited release bounds ext
 ## Closeout
 
 No separate tool. Record PASS or actionable leftovers here; coordinator commits. Not accepted
-until A1–A9 are observed. Current phase: stopped before live call on unavailable Chrome readback; 5V retry repair accepted.
+until A1–A9 are observed. PASS: A1–A9 observed. SLICE-5P ACCEPTED; no retained live canary draft.
 
 ## Previous run — diagnostic history, superseded requirements
 
@@ -160,32 +160,80 @@ slice. Write-protected atomize skill bare-tsx/caption-list corrections still nee
 require fresh atomization here. Prior evidence: /tmp/claude-501/slice-5p-transcript.md. Git history
 retains the full previous packet; current requirements above replace the retired assertions.
 
-## Stopped
+## Live evidence — 2026-09-08
 
-2026-09-08 resumed after 5U: NOT ACCEPTED. Current x-1 selection and eligibility pass,
-but the then-current createDraft could repeat POSTs on 429 or errors containing processing.
-That blocker is retired by accepted SLICE-5V; the final frozen gate passed 4327/0.
-Chrome currently exposes no connected browser, so exact unscheduled readback is also unavailable.
-No live create, delete, scheduling or publishing occurred.
+The earlier browser blocker is retired: Playwright connected and the owner signed in. The old
+5V create-retry blocker remains closed. Current preflight matched HEAD 5d829cd and accepted
+5V source/focused evidence (39/0, six single-POST fake outcomes); no production changes.
 
-Verified: A1 real source/routing and 14 queued derivatives; A2 unique approved x-1 selected by
---only-id, supported prior pre-dispatch failed history, no active claim, retryBlock null.
-Missing newer journal does not invalidate those known-safe failed retries. Both x-1 and x-2
-approvals are preserved. Focused fake-provider check: 20 tests passed, exit 0. All protected hashes
-unchanged; scheduler still 54 records. Grok audit and source-gap closure HOLD, both exit 0; source review confirmed the outer
-processing loop can retry ambiguous 5xx/network errors. Selector and eligibility evidence closed. The earlier folder-wide selection blocker is retired by accepted 5U.
+Read-only API discovery returned exactly one social set, 314868 Muxin Li. Authenticated browser
+settings showed #314868, X @heymoosh and Human Inference-linked accounts. Grok's first review
+released discovery only and held creation for evidence; closure review accepted this observed
+identity binding and actual numbered source/ledger excerpts, then RELEASED one canary, exit 0.
+For this run only, both create and cleanup used process-local
+CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID=human-inference/typefully and TYPEFULLY_SOCIAL_SET_ID=314868.
+No .env changes or new approval were made.
 
-Retained work: `/private/tmp/slice-5p-rerun-evidence/current-20260908/` contains preflight,
-actual source excerpts, focused check metadata/outcome, safe procedure and Grok findings.
-Single next action: reconnect Chrome, then recheck eligibility before releasing
-one live draft/readback/delete. No costly repository-wide gate for this verification stop.
+One actual --no-schedule --only-id x-1 CLI invocation succeeded, exit 0, returning draft
+10682647. The local ledger appended uncertain then private; final event
+a31fa1ab-6aad-491b-a53f-1761f77eebc2 retains providerObjectId 10682647 with no plannedFor.
+Authenticated browser Drafts response matched that exact ID/title/account and showed status 0,
+scheduled_date null, scheduled_natural_posting_time_enabled false and universal_published_on null.
+Only X was enabled. Existing cancelDraft(10682647) then succeeded once, exit 0.
+A fresh complete browser Drafts response returned the original four IDs, no 10682647.
+No retry, scheduling, publishing, paid generation, or other draft deletion occurred.
+
+Scheduler remains 54 claims. All protected repo bytes, both approvals and the unrelated x-2 row
+are unchanged. The legitimate local publishing ledger now has seven events; its private record
+is retained even after remote deletion, so repeat dispatch stays blocked. Do not clear history.
+
+Evidence directories:
+
+- Worker: /private/tmp/slice-5p-rerun-evidence/browser-20260908/ (preflight, actual source bodies,
+  operator procedure, create-result.md, cleanup-result.md).
+- Coordinator: /private/tmp/slice-5p-rerun-evidence/browser-coordinator-20260908/ (account match,
+  live-readback.json, live-absence.json, before-hashes.json and Grok verdicts).
+- Prior diagnostic evidence: /private/tmp/slice-5p-rerun-evidence/current-20260908/.
 
 ## RESULT BLOCK
 
-- Changed paths: this packet's status; coordinator also owns 5V packet and master updates.
-- Outcome: NOT ACCEPTED; no provider call. Creation retry repair delegated as 5V.
-- Checks run and results: real read-only eligibility predicates pass; focused Typefully tests
-  20/20, exit 0; protected hashes and scheduler counts unchanged. The pre-repair Grok HOLD
-  identified the retry defect; accepted 5V closes it. Chrome readback and live proof remain pending.
-- Evidence locations: `/private/tmp/slice-5p-rerun-evidence/current-20260908/`.
-- Unresolved: connected Chrome, then live A3–A7 and final audit/gate. 5V is accepted.
+- Changed paths: this packet and coordinator-owned master status only; no production changes.
+- Outcome: ACCEPTED; A1–A9 observed.
+- Checks: one CLI create and one exact-ID helper deletion exit 0; authenticated browser verifies
+  unscheduled draft then absence; all protected hashes match and scheduler is 54.
+- Evidence: directories above; Grok preflight closure RELEASE and final evidence PASS, both exit 0.
+- Final frozen unsandboxed npm run check: exit 0, 4327 tests passed, 493 suites, zero failures;
+  559.879 seconds wall time. setup ran once, exit 0.
+- Unresolved: no slice blocker. Unrelated work is preserved as listed in Accepted closeout.
+
+## Accepted closeout
+
+2026-09-08: PASS. Grok final evidence audit found no established defects or material gaps.
+The audited frozen candidate at base 5d829cd passed the single unsandboxed repository gate:
+4327/4327 tests, 493 suites, no failure/skip/cancel, exit 0. No production edits or extra live
+canary. Builder/operator was Codex Terra xhigh; coordinator handled browser verification and
+integration; xAI Grok 4.5 supplied independent audits with --sandbox workspace and no edits.
+
+The temporary detached checkout /private/tmp/content-agents-5p-browser-frozen was removed only
+after matching its exact reviewed patch; no branch was created. Its patch, source hash, setup and
+gate outputs remain in coordinator evidence. Four bounded browser snapshots moved there; six
+transient navigation snapshots and four console logs were deleted, then empty .playwright-mcp/
+was removed. Every individual source path/disposition is in browser-artifact-cleanup.json.
+No session-created untracked repository path remains. Scratch evidence remains outside the repo.
+
+Unrelated edits preserved and excluded from this commit:
+
+- AGENTS.md
+- docs/operations/launch-slices/SLICE-TEMPLATE.md
+- content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md
+- data/notes-spread-ledger.jsonl
+
+Hygiene --rescue returned 1 because it lists the candidate and preserved unrelated work;
+rescue snapshot 7756d4b protects the precommit state. No prunable worktrees or untracked repo
+paths remain. Existing branches slice-5q-queue and slice-5r-routing are left intact, as are local
+work branches agent/cs2-jobs-outreach-charles-extract, agent/cs2-page-room-pure-helpers,
+agent/cs2-serve-walled-room-routes, agent/cs3-studio-durable-handoff and
+agent/cs6-parallel-safe-ui-completion. These belong to other work, not a 5P blocker.
+Exact hygiene output is retained in coordinator evidence.
+Do not push or restart this canary; its local private history is deliberately retained after deletion.
+Next plan work: durable per-piece X opt-in (5R A6), then analytics brand_id backfill.

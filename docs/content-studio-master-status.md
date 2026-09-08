@@ -4,15 +4,15 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
-- Current/last accepted: **SLICE-5V ACCEPTED**, `docs/operations/launch-slices/SLICE-5V.md` → `## Accepted closeout`.
-- Blocked on: nothing for 5V. Grok PASS; frozen unsandboxed gate 4327/0, exit 0.
-- Next dependency-ready: `docs/operations/launch-slices/SLICE-5P.md`; reconnect Chrome, then current eligibility preflight and one live draft/readback/delete.
-- 5P NOT ACCEPTED: no connected browser; exact unscheduled readback unavailable. No live provider call in this session.
-- Last decision: every Typefully create invocation makes at most one POST; ambiguous attempts retain duplicate protection.
-- Live command: 5P packet → `## Verify`, --no-schedule --only-id x-1; preserve both approvals and all durable history.
-- 5S/5T/5U remain accepted: approval separate from dispatch, unscheduled draft state, exact row selector.
-- Evidence: `/private/tmp/slice-5v-evidence/`; 5P preflight under `/private/tmp/slice-5p-rerun-evidence/current-20260908/`.
-- Then: durable per-piece X opt-in (5R A6), analytics brand_id backfill.
+- Current/last accepted: **SLICE-5P ACCEPTED**, `docs/operations/launch-slices/SLICE-5P.md` → `## Accepted closeout`.
+- Blocked on: nothing for 5P. Grok PASS; frozen unsandboxed gate 4327/0, exit 0.
+- Observed: draft 10682647 unscheduled in authenticated Playwright, then exact-ID deletion and browser absence.
+- Last decision: verified set 314868 Muxin Li binds Human Inference for this canary using process-local account settings.
+- Preserve: both approvals, all durable history, 54 scheduler claims and unrelated work; do not rerun this canary.
+- 5S/5T/5U/5V remain accepted: approval separate from dispatch, private drafts, exact selection and one-attempt create.
+- Evidence: `/private/tmp/slice-5p-rerun-evidence/browser-20260908/` and `browser-coordinator-20260908/`.
+- Next dependency-ready: durable per-piece X opt-in, `docs/operations/launch-slices/SLICE-5R.md` → A6; packet needed for remaining work.
+- Then: analytics brand_id backfill.
 - Everything below this block is history; read only packet-cited headings.
 
 ## Standing constraints`.
@@ -1417,6 +1417,26 @@ Grok PASS, no material findings; focused 39/0, typecheck 0; frozen unsandboxed f
 exit 0. Coordinator integrates the verified candidate locally; no push or operational mutations.
 Evidence and cleanup disposition: `docs/operations/launch-slices/SLICE-5V.md` → `## Accepted closeout`.
 Next: reconnect Chrome and resume 5P's exact-ID live verification with a fresh eligibility check.
+
+
+### 2026-09-08 — SLICE-5P accepted: real unscheduled draft and verified cleanup
+
+Playwright provided the authenticated Typefully browser when the CUA Chrome/Edge/in-app routes
+were unavailable. Read-only API discovery and UI settings matched social set 314868, Muxin Li,
+with Human Inference accounts. Grok cleared the process-local account binding and one-canary
+release after receiving actual source/ledger excerpts. No .env edit or new approval was needed.
+
+The production CLI selected approved x-1 only and created draft 10682647 once, unscheduled.
+Authenticated browser readback confirmed the exact ID, no scheduled date or published date.
+Existing cancelDraft deleted only that ID; fresh complete browser readback showed its absence
+and all four prior drafts intact. Both approvals, all protected operational bytes and 54 scheduler
+claims remain unchanged. The legitimate uncertain/private events remain in local history.
+
+Grok final evidence audit PASS, exit 0; frozen unsandboxed npm run check passed 4327 tests with
+zero failures, exit 0, 559.879 seconds. No production changes, scheduling, publishing, paid model
+generation or push. Temporary checkout/browser files were settled; unrelated AGENTS/template,
+review-queue and notes-ledger edits were preserved. Evidence and exact hygiene disposition:
+`docs/operations/launch-slices/SLICE-5P.md` → `## Accepted closeout`.
 
 
 ## Current handoff — 2026-09-02
