@@ -4,13 +4,12 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, unpushed by standing order).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
-- Current slice: **SLICE-5S NOT ACCEPTED**, `docs/operations/launch-slices/SLICE-5S.md` → `## Stopped`.
-- Blocked on: no browser connected; rendered Publishing/A9 proof, then frozen full gate.
-- Next dependency-ready: finish **SLICE-5S** from `/private/tmp/content-agents-slice-5s-codex`; source audit clear, affected checks 418/0, caller regression 176/0.
-- Last accepted: **SLICE-5R**, `71f2df9`; gate 4304 tests / 0 failures.
-- Then unwritten: unscheduled-draft repair on unified route, rerun 5P, durable per-piece X opt-in (5R A6), analytics `brand_id` backfill.
-- Last decision (Muxin, 2026-09-07): duplicate-safe first-attempt handling, no risk exception. Terra xhigh repair; Grok workspace no-edit audit closure PASS.
-- **SAFETY, Muxin only:** main is still pre-5S; retrying `x-1`/`x-2` can publish. Set both to `pending` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`; unchanged here.
+- Current/last accepted: **SLICE-5S ACCEPTED**, `docs/operations/launch-slices/SLICE-5S.md` → `## Accepted closeout`.
+- Blocked on: nothing for 5S. Grok source/behavior and rendered audits PASS; frozen unsandboxed gate 4321/0, exit0.
+- Next dependency-ready: write the bounded unscheduled-draft repair packet on the unified route, then rerun 5P.
+- Then: durable per-piece X opt-in (5R A6), analytics `brand_id` backfill.
+- Last decision: Approve records review only; Publishing Schedule consumes a durable first-attempt claim. Legacy unknown history remains blocked.
+- Browser proof: approve zero provider callbacks; single + mixed selection two fake callbacks, durable fences first; persistent refusals.
 - Design sanity rule: `## Standing constraints`. Needs Muxin, not blocking: `.claude/skills/**` edits named in 5N and 5P.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
 
@@ -1357,6 +1356,11 @@ Automatic approval review rejected the proposed explicit-scheduling guard except
 ### 2026-09-07 — Grok workspace audit completed; 5S not accepted
 
 User-authorized `grok --sandbox workspace` audit completed with exit 0. Review confirms the missing Schedule endpoint and runtime verification gaps; approved-row duplicate-post guard conflict remains unresolved. Bounded findings, evidence and coordinator dispositions are in SLICE-5S → Grok candidate audit. No implementation integrated or pushed.
+
+### 2026-09-07 — SLICE-5S accepted after connected-Chrome verification
+
+Approve is status-only; explicit Publishing Schedule uses the audited durable first-attempt claim, strict history checks and conservative uncertain/legacy refusal. Terra xhigh implementation, independent Grok source/behavior closure and rendered closure PASS. Chrome fixture showed approval callbacks0, single/mixed selection callbacks2 with durable fence+uncertain evidence before both fake callbacks; legacy refusal persisted. Pending typography18px/1.6 and all five rendered design checks PASS. Full frozen unsandboxed `npm run check`:4321 passed/0failed/exit0, using established serial shim; source hashes unchanged. Packet `docs/operations/launch-slices/SLICE-5S.md`; bounded evidence `/private/tmp/slice-5s-evidence/`. No real publishing, operational queue edits, or push. Fixture stopped; coordinator integrates only nine implementation files plus packet/master and closes this slice.
+
 
 ## Current handoff — 2026-09-02
 

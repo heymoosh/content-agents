@@ -1,10 +1,10 @@
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
-import type { QueueRow } from "../publish/queue.js";
+import { readQueue, type QueueRow } from "../publish/queue.js";
+import { approvalDispatchDisposition, claimPublishingAttempt, clearPublishingClaim, markDispatchStarted, publishingClaimIsActive, resolveDispatchFence } from "./approval-provenance.js";
 import { scheduleApproved, scheduleKind, selectConfiguredProvider, type ScheduleKind, type SchedulerDeps } from "./studio-scheduling.js";
 import { postizRateLimitRetryAt } from "../publish/postiz.js";
 import { resolveDeliveryPolicy, type DeliveryBrand, type DeliveryMode, type DeliveryProvider as PolicyDeliveryProvider } from "../publish/delivery-policy.js";
@@ -79,44 +79,6 @@ export function disposableProviderOutcome(
 export const PUBLISHING_STATUS_PATH = migrateLegacyDataFile(["publishing-status.jsonl"]);
 export function publishingKey(slug: string, rowId: string): string { return `${slug}/${rowId}`; }
 
-function claimPath(slug: string, rowId: string, ledgerPath: string): string {
-  const digest = createHash("sha256").update(publishingKey(slug, rowId)).digest("hex");
-  return join(dirname(ledgerPath), ".publishing-claims", `${digest}.lock`);
-}
-
-function claimPublishingAttempt(slug: string, rowId: string, ledgerPath: string): () => void {
-  const target = claimPath(slug, rowId, ledgerPath);
-  mkdirSync(dirname(target), { recursive: true });
-  let fd: number;
-  try { fd = openSync(target, "wx", 0o600); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error("another Studio process already claimed this publishing attempt; reconcile it before retrying");
-    throw error;
-  }
-  try { writeFileSync(fd, JSON.stringify({ slug, rowId, claimedAt: new Date().toISOString(), pid: process.pid }) + "\n"); }
-  finally { closeSync(fd); }
-  return () => { try { unlinkSync(target); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; } };
-}
-
-function clearPublishingClaim(slug: string, rowId: string, ledgerPath: string): void {
-  try { unlinkSync(claimPath(slug, rowId, ledgerPath)); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-}
-
-function publishingClaimIsActive(slug: string, rowId: string, ledgerPath: string): boolean {
-  const target = claimPath(slug, rowId, ledgerPath);
-  if (!existsSync(target)) return false;
-  try {
-    const claim = JSON.parse(readFileSync(target, "utf8")) as { pid?: unknown; claimedAt?: unknown };
-    const claimedAt = typeof claim.claimedAt === "string" ? Date.parse(claim.claimedAt) : Number.NaN;
-    if (Number.isInteger(claim.pid)) {
-      try { process.kill(Number(claim.pid), 0); return true; }
-      catch (error) { return (error as NodeJS.ErrnoException).code !== "ESRCH"; }
-    }
-    return Number.isNaN(claimedAt) || Date.now() - claimedAt <= 30 * 60_000;
-  } catch { return true; }
-}
-
 export function providerForKind(kind: ScheduleKind): PolicyDeliveryProvider {
   if (kind === "text" || kind === "card") return "typefully";
   if (kind === "tiktok") return "postpeer";
@@ -137,7 +99,22 @@ export function appendPublishingStatus(status: PublishingStatus, path: string = 
       if (current.length > 0 && !current.endsWith("\n")) appendFileSync(path, "\n", { encoding: "utf8", mode: 0o600 });
     }
     appendFileSync(path, JSON.stringify(event) + "\n", { encoding: "utf8", mode: 0o600 });
+    const fd = openSync(path, "r");
+    try { fsyncSync(fd); } finally { closeSync(fd); }
+    const directory = openSync(dirname(path), "r");
+    try { fsyncSync(directory); } finally { closeSync(directory); }
   });
+}
+
+/** Scheduling treats every ledger line as security-relevant; the display reader stays tolerant. */
+function strictPublishingLedgerError(path: string): string | null {
+  if (!existsSync(path)) return null;
+  for (const [index, line] of readFileSync(path, "utf8").split("\n").entries()) {
+    if (!line.trim()) continue;
+    try { if (!parseDeliveryEvent(JSON.parse(line))) return `publishing ledger is malformed at line ${index + 1}`; }
+    catch { return `publishing ledger is malformed at line ${index + 1}`; }
+  }
+  return null;
 }
 
 export function readPublishingHistory(path: string = PUBLISHING_STATUS_PATH): DeliveryEvent[] {
@@ -187,11 +164,10 @@ export function resolvePublishingAttempt(
   details: { ref?: string; plannedFor?: string; provider?: PublishingProvider } = {},
   path: string = PUBLISHING_STATUS_PATH,
 ): PublishingStatus {
-  const hadClaim = existsSync(claimPath(slug, rowId, path));
-  if (hadClaim) {
-    if (publishingClaimIsActive(slug, rowId, path)) throw new Error("this provider call is still active in another Studio process");
-    clearPublishingClaim(slug, rowId, path);
-  }
+  if (publishingClaimIsActive(slug, rowId, path)) throw new Error("this provider call is still active in another Studio process");
+  // A dead retained claim means the prior callback may have completed while its terminal ledger
+  // write failed. Resolution is the only path allowed to retire that claim.
+  clearPublishingClaim(slug, rowId, path);
   // Acquire the SAME row lock used by scheduling, then re-read. If scheduling finishes first,
   // its latest `scheduled` event wins and resolution is refused; if it is still running, the
   // active claim above/refused wx acquisition wins. There is no check-then-append gap.
@@ -214,6 +190,7 @@ export function resolvePublishingAttempt(
           error: "Muxin checked the provider and confirmed that nothing was created; retry is allowed",
         };
     appendPublishingStatus(status, path);
+    resolveDispatchFence(slug, rowId, resolution, path);
     return status;
   } finally {
     releaseClaim();
@@ -291,32 +268,29 @@ export async function scheduleApprovedOnce(
   path: string = PUBLISHING_STATUS_PATH,
   selectionDeps?: Pick<SchedulerDeps, "fetchPostizRegistry" | "postizEnv">,
 ): Promise<{ scheduled: unknown; scheduleError: string | null; publishing: PublishingStatus }> {
-  const kind = scheduleKind(row);
-  if (!kind) throw new Error("no publishing provider owns this row");
   const releaseClaim = claimPublishingAttempt(slug, row.id, path);
+  let releaseAfterAttempt = true;
   try {
-    // Re-check after the atomic claim: another process may have completed between the caller's
-    // UI read and this process acquiring the lock.
-    const blocked = publishingRetryBlock(slug, row, path);
-    if (blocked) throw new Error(blocked);
-    const injected = disposableProviderOutcome(row);
-    if (injected) {
-      const audit = {
-        policyVersion: "delivery-policy-v1" as const, origin: "human-inference" as const,
-        brand: "human-inference" as const, deliveryMode: "provider" as const,
-        providerAccountId: "e2e/typefully", policyReason: "disposable browser provider outcome",
-      };
-      appendPublishingStatus({ slug, rowId: row.id, provider: injected.provider, state: "uncertain", at: new Date().toISOString(), ...audit }, path);
-      const status: PublishingStatus = injected.scheduleError
-        ? { slug, rowId: row.id, provider: injected.provider, state: "uncertain", at: new Date().toISOString(), error: injected.scheduleError, ...audit }
-        : { slug, rowId: row.id, provider: injected.provider, state: "planned", at: new Date().toISOString(), ...audit, ...details(injected.provider, injected.scheduled) };
-      appendPublishingStatus(status, path);
-      return { scheduled: injected.scheduled, scheduleError: injected.scheduleError, publishing: status };
+    // The argument was read before an async click or drain pass. Under the SAME claim used for
+    // the external call, re-read the queue and all strict safety evidence instead of trusting it.
+    const liveRow = readQueue(folder).rows.find((item) => item.id === row.id);
+    if (!liveRow || liveRow.status !== "approve") throw new Error("this row is no longer currently approved");
+    const kind = scheduleKind(liveRow);
+    if (!kind) throw new Error("no publishing provider owns this row");
+    const ledgerError = strictPublishingLedgerError(path);
+    if (ledgerError) throw new Error(`${ledgerError}; reconcile it before scheduling`);
+    const prior = readPublishingStatuses(path)[publishingKey(slug, liveRow.id)];
+    const disposition = approvalDispatchDisposition(folder, slug, liveRow, path);
+    if (disposition.kind === "blocked") throw new Error(disposition.reason);
+    const retryBlocked = publishingRetryBlock(slug, liveRow, path);
+    if (prior && retryBlocked) throw new Error(retryBlocked);
+    if (!prior && disposition.kind !== "fresh" && disposition.kind !== "reconciled-not-created") {
+      throw new Error(retryBlocked ?? "this row has no verifiable creation and approval provenance; reconcile it before scheduling");
     }
     let provider: PublishingProvider;
     try {
       provider = (schedule === scheduleApproved || selectionDeps) && kind !== "outreach-lock"
-        ? (await selectConfiguredProvider(row, selectionDeps)).provider
+        ? (await selectConfiguredProvider(liveRow, selectionDeps)).provider
         : providerForKind(kind);
     } catch (error) {
       // Provider discovery happens before dispatch. Persist that exact boundary so an approved row
@@ -324,7 +298,7 @@ export async function scheduleApprovedOnce(
       // have happened yet, so `failed` truthfully permits another explicit approval attempt.
       const message = `provider selection failed before dispatch; no provider request was made: ${error instanceof Error ? error.message : String(error)}`;
       const status: PublishingStatus = {
-        slug, rowId: row.id, provider: providerForKind(kind), state: "failed",
+        slug, rowId: liveRow.id, provider: providerForKind(kind), state: "failed",
         at: new Date().toISOString(), error: message,
       };
       appendPublishingStatus(status, path);
@@ -338,15 +312,36 @@ export async function scheduleApprovedOnce(
       deliveryMode: policy.mode, providerAccountId: policy.providerAccountId, policyReason: policy.reason,
     };
     if (policy.mode === "blocked") {
-      const status: PublishingStatus = { slug, rowId: row.id, provider, state: "blocked", at: new Date().toISOString(), error: `delivery policy blocked: ${policy.reason}`, ...audit };
+      const status: PublishingStatus = { slug, rowId: liveRow.id, provider, state: "blocked", at: new Date().toISOString(), error: `delivery policy blocked: ${policy.reason}`, ...audit };
       appendPublishingStatus(status, path);
       return { scheduled: null, scheduleError: status.error ?? null, publishing: status };
     }
-    appendPublishingStatus({ slug, rowId: row.id, provider, state: "uncertain", at: new Date().toISOString(), ...audit }, path);
-    const result = await schedule(folder, row, undefined, policy);
+    const fencedAttempt = disposition.kind === "fresh" || disposition.kind === "reconciled-not-created"
+      ? markDispatchStarted(folder, slug, liveRow, path)
+      : null;
+    // This fsynced uncertain event is the pre-callback fence for known-safe retries. For fresh
+    // rows the stricter dispatch_started journal entry above is already permanent as well.
+    try {
+      appendPublishingStatus({ slug, rowId: liveRow.id, provider, state: "uncertain", at: new Date().toISOString(), ...audit }, path);
+    } catch (error) {
+      // No provider callback has happened yet. An exact durable no-effect event permits recovery
+      // only if it also succeeds; otherwise keep the claim and the dispatch fence for review.
+      if (fencedAttempt) {
+        try { resolveDispatchFence(slug, liveRow.id, "not-created", path); }
+        catch { releaseAfterAttempt = false; }
+      }
+      throw error;
+    }
+    // Once this callback begins, a thrown callback or failed terminal write must retain the
+    // durable claim. A future process has to reconcile the exact fenced attempt first.
+    releaseAfterAttempt = false;
+    const injected = disposableProviderOutcome(liveRow);
+    const result = injected
+      ? { scheduled: injected.scheduled, scheduleError: injected.scheduleError }
+      : await schedule(folder, liveRow, undefined, policy);
     const status: PublishingStatus = result.scheduleError
       ? {
-          slug, rowId: row.id, provider,
+          slug, rowId: liveRow.id, provider,
           // A Postiz 429 comes from the throttler guard ahead of the controller: nothing was created,
           // so `failed` is truthful and keeps the row retry-eligible for the background drainer.
           // Any other failure stays `uncertain` because the provider may have accepted the call.
@@ -358,11 +353,16 @@ export async function scheduleApprovedOnce(
       : (() => {
           const normalized = normalizeProviderStatus(provider, result.scheduled);
           const observedState = normalized.state === "uncertain" ? acceptedState(result.scheduled) : normalized.state;
-          return { slug, rowId: row.id, provider, state: observedState, at: new Date().toISOString(), ...audit, ...details(provider, result.scheduled) };
+          return { slug, rowId: liveRow.id, provider, state: observedState, at: new Date().toISOString(), ...audit, ...details(provider, result.scheduled) };
         })();
     appendPublishingStatus(status, path);
+    if (fencedAttempt && postizRateLimitRetryAt(result.scheduleError)) {
+      // Postiz's documented throttle response proves this exact call created nothing.
+      resolveDispatchFence(slug, liveRow.id, "not-created", path);
+    }
+    releaseAfterAttempt = true;
     return { ...result, publishing: status };
   } finally {
-    releaseClaim();
+    if (releaseAfterAttempt) releaseClaim();
   }
 }

@@ -41,13 +41,16 @@ import {
   sendLockedOutreachEmail,
   reconcileLockedOutreachEmail,
   reviewRequestHandler,
+  setReviewSchedulingDepsForTest,
 } from "./serve.js";
 import { listFictionSeries } from "./fiction.js";
 import { listIdeas } from "../fiction/idea-inbox.js";
 import { jobs as jobStore } from "./jobs.js";
 import type { LiveProviderState } from "./reconcile.js";
-import type { QueueRow } from "../publish/queue.js";
+import { appendRows, type QueueRow } from "../publish/queue.js";
 import { approveConfiguredMediaStage } from "./configured-media-runtime.js";
+import { journalPathForLedger } from "./approval-provenance.js";
+import { PUBLISHING_STATUS_PATH, readPublishingHistory, scheduleApprovedOnce } from "./publishing-status.js";
 
 test("strategy brief lookup is brand-scoped and leaves top-level legacy briefs unassigned", () => {
   const root = mkdtempSync(join(tmpdir(), "strategy-brand-briefs-"));
@@ -355,14 +358,196 @@ test("the initial GUI Content save derives source authority on the server", () =
   assert.doesNotMatch(route, /:\s*input\s*;/, "fresh client input must not be persisted as source authority");
 });
 
-test("approval dispatches through the existing reviewed platform schedulers", () => {
+test("approval writes status without dispatching through a scheduler", () => {
   const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
   const start = source.indexOf('url.pathname === "/api/status"');
-  const end = source.indexOf('url.pathname === "/api/cancel"', start);
+  const end = source.indexOf('url.pathname === "/api/publishing/schedule"', start);
   const route = source.slice(start, end);
-  assert.match(route, /await scheduleApproved/);
-  assert.match(route, /schedulingInFlight/);
-  assert.doesNotMatch(route, /provider: "postiz"/);
+  assert.match(route, /commitReviewStatus\(statusFolder, slug, id, status/);
+  assert.doesNotMatch(route, /scheduleApproved/);
+  assert.doesNotMatch(route, /scheduleApprovedOnce/);
+  assert.doesNotMatch(route, /schedulingInFlight/);
+});
+
+test("POST /api/status approves a row without a publishing attempt", async () => {
+  const slug = `.test-status-only-${process.pid}-${Date.now()}`;
+  const folder = join(process.cwd(), "content", slug);
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, "review-queue.md"), "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | from GUI queue |\n");
+  const attemptsBefore = readPublishingHistory(PUBLISHING_STATUS_PATH).length;
+  let schedulerCalls = 0;
+  const restoreSchedulers = setReviewSchedulingDepsForTest({
+    scheduleApproved: async () => { schedulerCalls++; throw new Error("status must not schedule"); },
+    scheduleApprovedOnce: async () => { schedulerCalls++; throw new Error("status must not schedule"); },
+  });
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/status`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug, id: "x-1", status: "approve" }),
+    });
+    const body = await response.json() as { ok?: boolean; scheduled?: unknown; scheduleError?: unknown };
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal("scheduled" in body, false, "a status response never reports a scheduler result");
+    assert.equal("scheduleError" in body, false, "a status response never reports a scheduler result");
+    assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /\| x-1 \| x \| text \| derivatives\/x-1\.md \| — \| — \| — \| approve \|/);
+    assert.equal(readPublishingHistory(PUBLISHING_STATUS_PATH).length, attemptsBefore,
+      "approving must not append a publishing attempt or invoke its scheduler path");
+    assert.equal(schedulerCalls, 0, "the injected scheduler dependency is never invoked by a status-only approval");
+  } finally {
+    restoreSchedulers();
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("Publishing Schedule calls only eligible rows, reports skipped rows, and keeps the no-provider fallback inert", async () => {
+  const slug = `test-publishing-schedule-${process.pid}-${Date.now()}`;
+  const folder = join(process.cwd(), "content", slug);
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, "review-queue.md"),
+    "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n" +
+    "|---|---|---|---|---|---|---|---|---|---|\n" +
+    "| x-1 | x | text | derivatives/x-1.md | — | — | — | approve | | from GUI queue |\n" +
+    "| pending-1 | x | text | derivatives/pending-1.md | — | — | — | pending | | from GUI queue |\n" +
+    "| scheduled-1 | x | text | derivatives/scheduled-1.md | — | — | — | approve | | from GUI queue |\n" +
+    "| storyboard-1 | video-script | storyboard | derivatives/storyboard-1.md | — | — | — | approve | | from GUI queue |\n");
+  let providerCalls = 0;
+  let fallbackCalls = 0;
+  const restoreSchedulers = setReviewSchedulingDepsForTest({
+    scheduleApprovedOnce: async (_folder, receivedSlug, receivedRow) => {
+      providerCalls++;
+      return { scheduled: { draftId: `fake-${receivedRow.id}` }, scheduleError: null, publishing: { slug: receivedSlug, rowId: receivedRow.id, provider: "typefully", state: "planned", at: "2026-09-07T00:00:00.000Z" } };
+    },
+    scheduleApproved: async () => { fallbackCalls++; return { scheduled: null, scheduleError: null }; },
+    readPublishingStatuses: () => ({
+      [`${slug}/scheduled-1`]: { slug, rowId: "scheduled-1", provider: "typefully", state: "planned", at: "2026-09-07T00:00:00.000Z" },
+    }),
+  });
+  const httpServer = createServer(reviewRequestHandler);
+  const request = async (body: unknown): Promise<{ ok?: boolean; results?: Array<{ id: string; reason?: string; scheduled?: unknown }> }> => {
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/publishing/schedule`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 200);
+    return await response.json() as { ok?: boolean; results?: Array<{ id: string; reason?: string; scheduled?: unknown }> };
+  };
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const one = await request({ slug, id: "x-1" });
+    assert.equal(one.ok, true);
+    assert.deepEqual(one.results?.map((item) => item.id), ["x-1"]);
+    assert.deepEqual(one.results?.[0]?.scheduled, { draftId: "fake-x-1" });
+    assert.equal(providerCalls, 1);
+
+    const pending = await request({ slug, id: "pending-1" });
+    assert.match(pending.results?.[0]?.reason ?? "", /not approve/);
+    const scheduled = await request({ slug, id: "scheduled-1" });
+    assert.match(scheduled.results?.[0]?.reason ?? "", /already has a planned/);
+    assert.equal(providerCalls, 1, "refused rows never enter the provider scheduler");
+
+    const fallback = await request({ slug, id: "storyboard-1" });
+    assert.equal(fallbackCalls, 1);
+    assert.equal(providerCalls, 1, "a row with no scheduling kind never enters the provider scheduler");
+
+    const selection = await request({ selection: { ids: [`${slug}/pending-1`, `${slug}/scheduled-1`, `${slug}/storyboard-1`] } });
+    assert.deepEqual(selection.results?.map((item) => item.id), ["pending-1", "scheduled-1", "storyboard-1"]);
+    assert.match(selection.results?.[0]?.reason ?? "", /not approve/);
+    assert.match(selection.results?.[1]?.reason ?? "", /already has a planned/);
+    assert.equal(fallbackCalls, 2, "selection applies the same inert fallback only to its eligible row");
+    assert.equal(providerCalls, 1);
+  } finally {
+    restoreSchedulers();
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("HTTP approval and Schedule consume one fresh fenced dispatch through the actual scheduler", async (t) => {
+  const slug = `slice-5s-http-${process.pid}-${Date.now()}`;
+  const folder = join(process.cwd(), "content", slug);
+  const isolated = mkdtempSync(join(tmpdir(), "slice-5s-http-ledger-"));
+  const ledger = join(isolated, "publishing-status.jsonl");
+  const journal = journalPathForLedger(ledger);
+  const priorTypefullyAccount = process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+  process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = "human-inference/typefully";
+  mkdirSync(join(folder, "derivatives"), { recursive: true });
+  writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+  writeFileSync(join(folder, "derivatives", "x-1.md"), "---\nplatform: x\n---\n\nA verified pending draft.\n");
+  writeFileSync(join(folder, "review-queue.md"), "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n");
+  appendRows(folder, [{ id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", origin: "from GUI queue" }], journal);
+
+  let providerCalls = 0;
+  const restoreSchedulers = setReviewSchedulingDepsForTest({
+    publishingStatusPath: ledger,
+    scheduleApprovedOnce: (receivedFolder, receivedSlug, receivedRow) => scheduleApprovedOnce(receivedFolder, receivedSlug, receivedRow, async () => {
+      providerCalls++;
+      assert.equal(readPublishingHistory(ledger).at(-1)?.state, "uncertain", "the durable uncertain ledger fence precedes the provider callback");
+      const events = readFileSync(journal, "utf8");
+      assert.match(events, /"kind":"dispatch_started"/, "the strict dispatch fence precedes the provider callback");
+      return { scheduled: { draftId: "http-real-once" }, scheduleError: null };
+    }, ledger),
+  });
+  const httpServer = createServer(reviewRequestHandler);
+  const request = async (path: string, body: unknown): Promise<{ ok?: boolean; results?: Array<{ id: string; reason?: string; scheduled?: unknown }> }> => {
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}${path}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 200);
+    return await response.json() as { ok?: boolean; results?: Array<{ id: string; reason?: string; scheduled?: unknown }> };
+  };
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const schedule = async () => request("/api/publishing/schedule", { slug, id: "x-1" });
+    const status = async (value: string) => request("/api/status", { slug, id: "x-1", status: value });
+
+    const pending = await schedule();
+    assert.match(pending.results?.[0]?.reason ?? "", /not approve/);
+    assert.equal(providerCalls, 0);
+
+    const revised = await status("revise");
+    assert.equal(revised.ok, true);
+    assert.match((await schedule()).results?.[0]?.reason ?? "", /not approve/);
+    assert.equal(providerCalls, 0, "revision must refuse dispatch");
+
+    const discarded = await status("discard");
+    assert.equal(discarded.ok, true);
+    assert.match((await schedule()).results?.[0]?.reason ?? "", /not approve/);
+    assert.equal(providerCalls, 0, "discard must refuse dispatch");
+
+    const approved = await status("approve");
+    assert.equal(approved.ok, true);
+    assert.equal(providerCalls, 0, "approval only records review state");
+    assert.deepEqual(readPublishingHistory(ledger), [], "approval does not create a publishing attempt");
+
+    const first = await schedule();
+    assert.deepEqual(first.results?.[0]?.scheduled, { draftId: "http-real-once" });
+    assert.equal(providerCalls, 1);
+    assert.deepEqual(readPublishingHistory(ledger).map((event) => event.state), ["uncertain", "planned"]);
+
+    const repeated = await schedule();
+    assert.match(repeated.results?.[0]?.reason ?? "", /already has a planned/);
+    assert.equal(providerCalls, 1, "a repeated HTTP Schedule call cannot reach the provider again");
+    t.diagnostic(JSON.stringify({
+      pending, revised, discarded, approved, first, repeated, providerCalls,
+      publishingStates: readPublishingHistory(ledger).map((event) => event.state),
+    }));
+  } finally {
+    restoreSchedulers();
+    if (priorTypefullyAccount === undefined) delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+    else process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = priorTypefullyAccount;
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+    rmSync(folder, { recursive: true, force: true });
+    rmSync(isolated, { recursive: true, force: true });
+  }
 });
 
 test("Venture handoff refuses concurrent duplicate Content writes", () => {

@@ -1244,16 +1244,16 @@ test("Studio and Venture chrome use the simplified product language", () => {
   assert.ok(html.includes('id="notesBtn">Pull Substack Notes</button>'));
 });
 
-test("Content separates request-grouped draft approval from publishing status", () => {
+test("Content separates request-grouped draft approval from publishing", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   assert.ok(html.includes("<h2>Approve Drafts</h2>"));
   assert.ok(html.includes('id="publishedMain"'));
-  assert.ok(html.includes("<h2>Publishing status</h2>"));
+  assert.ok(html.includes("<h2>Publishing</h2>"));
   assert.ok(html.includes("Select all"));
-  assert.ok(html.includes("Approve selected and attempt scheduling"));
-  assert.ok(html.includes("Each approval immediately attempts scheduling when that destination has a provider"));
-  assert.ok(html.includes("Approve and attempt scheduling"));
-  assert.ok(html.includes("A scheduling problem does not erase your approval"));
+  assert.ok(html.includes("Approve selected"));
+  assert.ok(html.includes("Approval records your decision"));
+  assert.ok(html.includes("Open Publishing when you are ready to schedule it"));
+  assert.ok(html.includes("Approved drafts wait in Pending until you choose Schedule"));
   assert.ok(html.includes("Open Focus Mode"));
   assert.ok(html.includes("Typefully"));
   assert.ok(html.includes("PostPeer"));
@@ -4164,8 +4164,19 @@ test("bulk approve reports its failures as a standing error, not a passing toast
   const clean = build(() => ({ ok: true }));
   await clean.fn();
   assert.deepEqual(clean.errors, []);
-  assert.deepEqual(clean.flashed, ["Approved and handed to publishing"]);
+  assert.deepEqual(clean.flashed, ["Approved. Open Publishing to schedule."]);
   assert.equal(clean.selected.size, 0, "the selection is cleared after a clean run");
+});
+
+test("Publishing Pending keeps the draft content first and reports skipped scheduling rows", () => {
+  const script = emittedScripts().join("\n");
+  const published = script.slice(script.indexOf("function renderPublished()"), script.indexOf("async function moveRow("));
+  assert.match(published, /publishingSelected\.clear\(\)/, "a rerender cannot retain an unseen selection");
+  assert.match(published, /row\.body\|\|row\.format\|\|row\.kind/, "Pending leads with readable draft content");
+  assert.match(published, /<span class="scan-body"><label><input type="checkbox" data-publishing-select/,
+    "Pending draft text inherits the readable scan body size rather than the 15px shell default");
+  assert.match(published, /row\.format\|\|row\.kind\|\|"content"\)\+' · '\+esc\(row\.id\)/, "the backend id remains muted metadata");
+  assert.match(published, /item\.scheduleError\|\|item\.reason/, "a skipped row remains a standing scheduling error");
 });
 
 test("every /api/status caller shows a refusal as a standing error", () => {

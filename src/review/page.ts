@@ -1061,9 +1061,9 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <h2>Approve Drafts</h2>
         <span class="grow"></span>
         <button type="button" class="cw-back" id="reviewSelectAll">Select all</button>
-        <button type="button" class="primary" id="reviewApproveSelected">Approve selected and attempt scheduling</button>
+        <button type="button" class="primary" id="reviewApproveSelected">Approve selected</button>
       </div>
-      <div class="sheet-sub">Review related outputs together by input request. Each approval immediately attempts scheduling when that destination has a provider. Approval is still recorded if scheduling needs attention; it never claims that a provider accepted or published the work.</div>
+      <div class="sheet-sub">Review related outputs together by input request. Approval records your decision. Schedule approved drafts from Publishing when you are ready.</div>
       <div class="cw-tabs" aria-label="Draft filters">
         <label style="flex-basis:100%">Input request <input class="request-search" id="reviewRequestFilter" list="reviewRequestOptions" type="search" placeholder="Search or choose an input request" autocomplete="off"><datalist id="reviewRequestOptions"></datalist></label>
         <label>Media <select id="reviewMediaFilter"><option value="">All</option></select></label>
@@ -1074,8 +1074,8 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
     <div class="sheet" id="publishedSheet" hidden>
       <div class="cw-steps" id="publishedSteps"></div>
-      <div class="sheet-head"><h2>Publishing status</h2><span class="grow"></span></div>
-      <div class="sheet-sub">Scheduling and publication status by input request. Text and cards go through Typefully, TikTok through PostPeer, Shorts through YouTube, and Notes through Substack. A provider is only shown as complete after its recorded result can be read back.</div>
+      <div class="sheet-head"><h2>Publishing</h2><span class="grow"></span></div>
+      <div class="sheet-sub">Approved drafts wait in Pending until you choose Schedule. Text and cards go through Typefully, TikTok through PostPeer, Shorts through YouTube, and Notes through Substack. A provider is only shown as complete after its recorded result can be read back.</div>
       <div class="sheet-sub" id="batchMovePanel" style="border:1px solid var(--line,#ccc);border-radius:6px;padding:10px">
         <strong>Move a batch</strong>
         <div class="cw-tabs" style="margin-top:8px">
@@ -1709,14 +1709,14 @@ function openReviewFocus(piece,row,returnTo){
   body.innerHTML='<div class="rowhead"><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span class="fmt">'+esc(row.format||row.kind||"content")+' · '+esc(row.id)+'</span><span class="pill '+pillClass(row.status)+'">'+esc(reviewStateLabel(row.status))+'</span></div>'+
     '<label class="wb-label" for="reviewFocusEditor" style="display:block;margin-top:18px">EDIT THE DRAFT DIRECTLY</label>'+
     '<textarea id="reviewFocusEditor" class="review-focus-editor">'+esc(row.body||"")+'</textarea>'+
-    '<div class="actions"><button type="button" id="reviewFocusSave"'+(row.editable?'':' disabled')+'>Save edit</button><button type="button" class="approve" data-focus-act="approve">Approve and attempt scheduling</button><button type="button" class="revise" data-focus-act="revise">Request changes</button><button type="button" class="discard" data-focus-act="discard">Discard</button></div>'+
-    '<div class="src">Approval immediately attempts scheduling when this destination has a provider. A scheduling problem does not erase your approval, and provider acceptance is reported separately.</div>'+
+    '<div class="actions"><button type="button" id="reviewFocusSave"'+(row.editable?'':' disabled')+'>Save edit</button><button type="button" class="approve" data-focus-act="approve">Approve</button><button type="button" class="revise" data-focus-act="revise">Request changes</button><button type="button" class="discard" data-focus-act="discard">Discard</button></div>'+
+    '<div class="src">Approval records your review decision. Open Publishing when you are ready to schedule it.</div>'+
     (row.editable?'':'<div class="src">This asset is not text-editable here.</div>');
   $("#reviewFocusTitle").textContent=piece.title+" · "+row.platform;
   $("#reviewFocus").hidden=false; $("#reviewFocus .focus-dialog").focus();
   const editor=$("#reviewFocusEditor"); if(row.editable) editor.focus();
   $("#reviewFocusSave").addEventListener("click",async ()=>{ const result=await post("/api/derivative",{slug:piece.slug,id:row.id,body:editor.value}); if(result.ok===false){flashError(result.error||"Could not save");return;} row.body=editor.value.trim(); flash("Saved"); closeReviewFocus(); rerender(); });
-  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flashNote("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flashError(result.error||"Could not update status");return;} if(act==="approve"){ const view=approvalResultView(row.kind,result); row.status=view.status; row.scheduledWhen=view.scheduledWhen; row.manualComment=view.manualComment||""; flash(view.message); } else { row.status=act; flash("Discarded"); } closeReviewFocus(); rerender(); }));
+  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flashNote("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flashError(result.error||"Could not update status");return;} if(act==="approve"){ row.status="approve"; flash("Approved. Ready in Publishing."); } else { row.status=act; flash("Discarded"); } closeReviewFocus(); rerender(); }));
 }
 function closeReviewFocus(){
   $("#reviewFocus").hidden=true; $("#reviewFocusBody").innerHTML="";
@@ -1734,17 +1734,7 @@ async function onAction(e, piece, row, el){
     const r = await post("/api/status",{slug:piece.slug,id:row.id,status:act});
     if (act === "approve"){
       if (r.ok === false){ flashError(r.error || "Approve blocked"); }
-      else if (row.kind === "outreach-message" && r.scheduled){
-        // Outreach Phase 2: Approve here calls lock.ts, not a real scheduler — nothing sends,
-        // nothing schedules (CLAUDE.md rule 2 analog). Never say "Scheduled" for this row kind.
-        row.status="locked";
-        flash("Locked");
-      }
-      else {
-        const view=approvalResultView(row.kind,r);
-        row.status=view.status; row.scheduledWhen=view.scheduledWhen; row.manualComment=view.manualComment||"";
-        flash(view.message);
-      }
+      else { row.status="approve"; flash("Approved. Ready in Publishing."); }
     } else if (r.ok === false){
       // A refused discard used to be invisible: the row was recoloured "discard" locally while the
       // file on disk still said otherwise. Report it, and leave the row showing its real status.
@@ -1939,10 +1929,30 @@ function publishingProvider(row){
   if(platform==="substack") return "Substack";
   return "No provider assigned";
 }
+const publishingSelected=new Set();
+function publishingKeyFor(slug,id){ return JSON.stringify([slug,id]); }
+function hasLiveSchedule(row){
+  const state=row.publishingStatus&&row.publishingStatus.state;
+  return Boolean(row.scheduledWhen||(row.reconciled&&row.reconciled.state==="scheduled")||state==="scheduling"||state==="scheduled"||state==="planned"||state==="private"||state==="uncertain"||row.status==="published"||row.status==="locked");
+}
+function pendingPublishingRow(row){ return row.status==="approve"&&!hasLiveSchedule(row); }
 function renderPublished(){
-  const main=$("#publishedMain"); if(!main) return; main.innerHTML=""; let shown=0;
+  const main=$("#publishedMain"); if(!main) return; main.innerHTML=""; publishingSelected.clear(); let shown=0;
+  const pending=[];
+  for(const piece of contentRequestPieces(DATA.pieces)) for(const row of piece.rows||[]) if(pendingPublishingRow(row)) pending.push({piece,row});
+  if(pending.length){
+    const sec=document.createElement("section"); sec.className="piece pending-publishing";
+    sec.innerHTML='<h3>Pending</h3><div class="slug">Approved drafts wait here until you choose when to send them to a publisher.</div><div class="actions"><button type="button" class="primary" data-schedule-selection>Schedule selected</button></div><div class="publish-row head"><span>Draft</span><span>Destination</span><span>Planned / sent</span><span>Provider status</span></div>';
+    for(const {piece,row} of pending){
+      const item=document.createElement("div"); item.className="publish-row";
+      const error=(row.publishingStatus&&row.publishingStatus.error)||row.scheduleError||"";
+      item.innerHTML='<span class="scan-body"><label><input type="checkbox" data-publishing-select data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'"> <strong>'+esc((row.body||row.format||row.kind||"Draft").slice(0,180))+'</strong></label><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+' · '+esc(row.id)+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">Pending</span><span class="src" style="display:block">No planned time recorded</span></span><span class="src"><strong>'+esc(publishingProvider(row))+'</strong><br>'+(error?esc(error):'Approved and waiting for Schedule.')+' <button type="button" class="link-btn" data-schedule-slug="'+esc(piece.slug)+'" data-schedule-id="'+esc(row.id)+'">Schedule</button></span>';
+      sec.appendChild(item); shown++;
+    }
+    main.appendChild(sec);
+  }
   for(const piece of contentRequestPieces(DATA.pieces)){
-    const rows=(piece.rows||[]).filter(r=>r.status==="approve"||r.status==="published"||r.status==="locked"||r.scheduleError);
+    const rows=(piece.rows||[]).filter(r=>(r.status==="approve"||r.status==="published"||r.status==="locked"||r.scheduleError)&&!pendingPublishingRow(r));
     if(!rows.length) continue; shown+=rows.length;
     const sec=document.createElement("section"); sec.className="piece";
     sec.innerHTML='<h3>'+esc(piece.descriptor||piece.title)+'</h3><div class="slug">Input request · '+esc(piece.slug)+'</div><div class="publish-row head"><span>Draft</span><span>Destination</span><span>Planned / sent</span><span>Provider status</span></div>';
@@ -1962,7 +1972,21 @@ function renderPublished(){
   }
   main.querySelectorAll("[data-publish-resolve]").forEach(button=>button.addEventListener("click",()=>resolvePublishing(button.dataset.slug,button.dataset.id,button.dataset.publishResolve,button)));
   main.querySelectorAll("[data-move-slug]").forEach(button=>button.addEventListener("click",()=>moveRow(button.dataset.moveSlug,button.dataset.moveId,button)));
+  main.querySelectorAll("[data-publishing-select]").forEach(box=>box.addEventListener("change",()=>{ const key=publishingKeyFor(box.dataset.slug,box.dataset.id); if(box.checked) publishingSelected.add(key); else publishingSelected.delete(key); }));
+  main.querySelectorAll("[data-schedule-slug]").forEach(button=>button.addEventListener("click",()=>schedulePublishing({slug:button.dataset.scheduleSlug,id:button.dataset.scheduleId},button)));
+  main.querySelectorAll("[data-schedule-selection]").forEach(button=>button.addEventListener("click",()=>schedulePublishing({selection:{ids:[...publishingSelected].map(key=>{const [slug,id]=JSON.parse(key); return slug+"/"+id;})}},button)));
   if(!shown) main.innerHTML='<div class="empty">Nothing has entered publishing yet.</div>';
+}
+async function schedulePublishing(body,button){
+  if(body.selection&&!body.selection.ids.length){ flash("Select at least one pending draft"); return; }
+  button.disabled=true;
+  const result=await post("/api/publishing/schedule",body);
+  if(!result.ok){ button.disabled=false; flashError(result.error||"Could not schedule"); return; }
+  const results=result.results||[];
+  const failures=results.filter(item=>item.scheduleError||item.reason);
+  if(failures.length) flashError(failures.map(item=>item.id+": "+(item.scheduleError||item.reason)).join(" · "));
+  else flash(results.length>1?"Selected drafts handed to publishing":"Draft handed to publishing");
+  publishingSelected.clear(); await load();
 }
 async function moveRow(slug,id,button){
   const entered=prompt("New date/time (or \\"after <date>\\" for the first free slot on/after that date)","");
@@ -2049,12 +2073,12 @@ async function approveReviewSelection(){
   const targets=[];
   for(const piece of DATA.pieces||[]) for(const row of piece.rows||[]) if(reviewSelected.has(reviewSelectionKey(piece.slug,row.id))&&!DECIDED.has(row.status)) targets.push({piece,row});
   const failures=[];
-  for(const {piece,row} of targets){ const result=await post("/api/status",{slug:piece.slug,id:row.id,status:"approve"}); if(result&&result.ok===false) failures.push(result.error||"Approve blocked"); else if(result&&result.scheduleError) failures.push(result.scheduleError); }
+  for(const {piece,row} of targets){ const result=await post("/api/status",{slug:piece.slug,id:row.id,status:"approve"}); if(result&&result.ok===false) failures.push(result.error||"Approve blocked"); }
   reviewSelected.clear(); await load();
   // A bulk approve is the easiest place to lose a failure: the list repaints, the toast goes, and
   // nothing on screen says which rows did not make it. Failures stay up until they are read.
   if(failures.length) flashError("Some approvals need attention: "+failures.join(" · "));
-  else flash("Approved and handed to publishing");
+  else flash("Approved. Open Publishing to schedule.");
 }
 
 // ── rooms ──

@@ -84,21 +84,21 @@ Check rendered HTML: body type at least 1.125rem with line height at least 1.5; 
 
 ## Acceptance
 
-- [ ] A1 — `POST /api/status` with `status: "approve"` writes the status and makes no call into
+- [x] A1 — `POST /api/status` with `status: "approve"` writes the status and makes no call into
       `scheduleApproved` or `scheduleApprovedOnce`. A test asserts the scheduler dependency is
       never invoked.
-- [ ] A2 — `POST /api/publishing/schedule` on an `approve` row calls the same scheduler the old
+- [x] A2 — `POST /api/publishing/schedule` on an `approve` row calls the same scheduler the old
       approve path called, under the same in-flight key, and returns its result per row.
-- [ ] A3 — The same endpoint refuses a `pending`, `revise`, `discard` or already-scheduled row
+- [x] A3 — The same endpoint refuses a `pending`, `revise`, `discard` or already-scheduled row
       with a reason and calls nothing.
-- [ ] A4 — A selection (slug / pillar / platform / ids, the `batch-reschedule` shape) schedules
+- [x] A4 — A selection (slug / pillar / platform / ids, the `batch-reschedule` shape) schedules
       only the eligible rows and reports the rest as skipped.
-- [ ] A5 — The Publishing view renders approved-unscheduled rows in a Pending group with a
+- [x] A5 — The Publishing view renders approved-unscheduled rows in a Pending group with a
       Schedule control; scheduled and published rows render where they do today.
-- [ ] A6 — The header comment at `serve.ts:5-13` describes the new behaviour.
-- [ ] A7 — Every existing `serve.test.ts` and `page.test.ts` case still passes.
-- [ ] A8 — No em dashes introduced in any user-visible string.
-- [ ] A9 — The design sanity check passes for the Publishing view: `docs/content-studio-master-status.md`
+- [x] A6 — The header comment at `serve.ts:5-13` describes the new behaviour.
+- [x] A7 — Every existing `serve.test.ts` and `page.test.ts` case still passes.
+- [x] A8 — No em dashes introduced in any user-visible string.
+- [x] A9 — The design sanity check passes for the Publishing view: `docs/content-studio-master-status.md`
       → `## Standing constraints` → "Design sanity check on every GUI slice". Record each of the
       five in the RESULT BLOCK with the CSS or HTML that satisfies it.
 
@@ -153,7 +153,7 @@ Return the RESULT BLOCK in the final response; coordinator persists it here.
 
 ## Closeout
 
-No closeout tool in this repository. **NOT ACCEPTED**: safer scheduling repair and source audit closure pass; rendered visual proof and the subsequent frozen repository-wide gate remain pending. See `## Stopped`.
+No closeout tool in this repository. **PASS / ACCEPTED**: A1–A9 verified, independent Grok source/behavior and rendered closure PASS, frozen unsandboxed repository gate 4321/4321 tests, zero failures, exit0. See `## Accepted closeout` below.
 
 ## RESULT BLOCK (worker fills this in and returns it)
 
@@ -221,7 +221,7 @@ Muxin chose duplicate-safe scheduling instead of accepting the rejected empty-hi
 
 Before implementation, obtain advisor guidance on durable pre-dispatch fencing and every relevant dispatch entry point. Authorize the smallest necessary owned-file expansion here after the proposal. Preserve uncertain and legacy unknown attempts; do not automatically retry them. A durable claim must precede every external side effect that uses fresh eligibility, and failure or restart after a claim must not restore fresh eligibility. Test concurrent dispatch, failed persistence before dispatch, provider success followed by failed local confirmation, restart and status cycling. The retained four-file candidate is the starting point; builder remains Terra high effort, auditor remains Grok. No real publishing canary.
 
-Resume plan completed through source audit closure; current status and single next action are in `## Stopped`.
+Resume plan completed through source and rendered audit closure; current acceptance is in `## Accepted closeout`.
 
 ## Approved safe-dispatch design — 2026-09-07
 
@@ -280,7 +280,7 @@ Affected tests 418/418, fail 0, exit 0; typecheck exit 0; diff check exit 0. Log
 
 Grok continuation audit exited 0; subsequent incremental closure also exited 0. Source defect closed, HTTP fence/revise/discard gaps closed, no new established defects. A1–A8 PASS; A9 source PASS, rendered unverified. Caller regression 176/176 is correctly limited to regression coverage. Closure `/private/tmp/slice-5s-evidence/grok-safe-closure-result.txt`; full findings `/private/tmp/slice-5s-evidence/grok-safe-audit-continuation-result.txt`. Final audited diff SHA256 `07f2d394f56ac5d2819f4776cdac71dcfd0edbb8f430a1d138ce995066e0fbde`, saved as `safe-candidate-final.patch` in that evidence directory. Verified audit snapshot exactly matched retained candidate after Grok; removed only this session's disposable audit worktree.
 
-## Stopped
+## Previous stop — superseded by connected-Chrome resume
 
 - Blocker: no browser connected to CUA (initial check and final recheck returned apps=[] and browsers=[]); required rendered Publishing/A9 check cannot run. 5S is NOT ACCEPTED. This is a verification-environment blocker, not a request to accept duplicate-schedule risk.
 - Verified: final affected suite 418/418, zero failures, exit 0; prior caller regression 176/176; typecheck and diff check exit 0. Real HTTP wrapper proof: approve zero provider callbacks, first Schedule one callback after durable fence+uncertain ledger, repeated Schedule no extra callback. Grok independent source/behavior audit closure exit 0; no new established defects. No screenshot, authenticated publishing, full repository gate, implementation commit, or push.
@@ -289,3 +289,22 @@ Grok continuation audit exited 0; subsequent incremental closure also exited 0. 
 - Closeout: NOT ACCEPTED. Legacy unknown-history approvals remain conservatively blocked; no provenance-only bypass was approved. No further user decision about duplicate risk is required. Hygiene disposition follows.
 
 Hygiene closeout: rescue exited 1 solely for two intentionally retained dirty checkouts. Saved main state to `refs/wip/content-agents` (`b6a7af0`) and candidate including both new provenance files to `refs/wip/content-agents-slice-5s-codex` (`d57ccbd`). Per stopping rule, leave candidate uncommitted/unintegrated; these two new files remain on disk and are recoverable in rescue ref and final patch. Main pre-existing `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md` and `data/notes-spread-ledger.jsonl` are preserved. No other untracked repository paths from this session. Identified and stopped this session's remaining port4675 `fixture-server.ts` process; no real provider server touched. Retained local-only branches unchanged. Coordinator commits only packet/master edits.
+
+## Connected-Chrome verification
+
+Muxin connected Chrome and authorized proceeding. CUA still reported no browser, but the available Playwright Chrome connector worked. Coordinator exercised the real rendered GUI against the isolated copied fixture with actual scheduleApprovedOnce and a fake provider callback. Fixture-only metadata was corrected to a valid content request; no candidate source changes.
+
+- Approve selected fresh-alpha and fresh-beta: both become approve and appear in Publishing > Pending, callback count 0 and publishing ledger empty.
+- Schedule fresh-alpha singly, then mixed selection fresh-beta + legacy-approved: callback count 2 total, both callbacks observe dispatch_started and uncertain before invocation; fresh rows render Scheduled, legacy unknown-history stays Pending with a persistent refusal and Dismiss control.
+- Rendered A9 PASS for the changed Pending view: computed draft body 18px/28.8px (1.6), content first, metadata muted rgb(122,114,102), 1px row dividers, refusal survives rerender and about40seconds, readable at viewport1103x532/scale1. Existing scheduled-row presentation is retained per A5.
+- Evidence `/private/tmp/slice-5s-evidence/`: `publishing.png`, `publishing-refusal.png`, `publishing-final.yml`, `browser-after-approve.json`, `browser-after-schedule.json`, `browser-visual-observations.json`.
+- Grok 4.5 independent visual audit used CLI workspace sandbox and no file edits, exit0. `grok-visual-result.txt`: all five rendered A9 criteria PASS, no established defects/gaps in changed Pending scope. Scheduled-row ID-first display and missing spacing are optional existing presentation improvements, outside this slice.
+- Frozen candidate `/private/tmp/content-agents-5s-final-gate`, detached from main4378493; all nine implementation paths byte-identical to source-audited final patch, recorded in `frozen-source-hashes.json`. Setup exit0. Final unsandboxed `npm run check` completed with existing serial Node shim `/private/tmp/slice-5q-gate-bin/node`: 4321 tests passed, zero failures/skips, exit0, test duration1012.4s; output `final-gate.txt`, recorded result `final-gate-result.json`. No real publishing or push.
+
+## Accepted closeout
+
+Coordinator accepts SLICE-5S. A1–A9 PASS; source/behavior Grok closure and independent rendered Grok closure PASS; final frozen repository gate PASS, 4321 tests/0 failures/exit0. Audited nine source paths remained byte-identical after the gate and are integrated with this packet/master update. Unsupported creation paths and legacy unknown-history approvals remain conservatively refused; this slice does not migrate old rows or run a real provider canary.
+
+Fixture process stopped; only copied fixture app/home bulk removed. Keep bounded counter/journal/ledger/screenshots and audit/gate evidence under `/private/tmp/slice-5s-evidence/`. Browser-generated `.playwright-mcp/` moved there as `chrome-tool-artifacts/`, not committed. New repository paths from the candidate are exactly `src/review/approval-provenance.ts` and `src/review/approval-provenance.test.ts`, both included in the acceptance commit. Pre-existing real review-queue and notes-spread ledger edits remain untouched and excluded. Hygiene and worktree cleanup disposition follows.
+
+Hygiene disposition: rescue exit1 enumerated only the accepted candidate in main/two worktrees, the two pre-existing operational edits, and existing local-only branches. Saved refs: main `f2c6607`, frozen gate `7a5f9af`, builder `0c59c44`. Commit the two new provenance source/test paths with the accepted candidate; preserve both operational edits and unrelated branches. After commit, remove only the two byte-verified 5S worktrees and merged `slice-5s-codex` branch; all source is retained on main and rescue refs. No other session-created untracked repository paths remain.

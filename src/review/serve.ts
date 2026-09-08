@@ -6,11 +6,11 @@
 //
 // It READS through the same readQueue() the publish step uses and WRITES status back through the
 // same writeCell() setStatus() also targets, so an "approve" here starts from the same place an
-// "approve" typed by hand would. For rows a scheduler owns (text/card/tiktok/video — see
-// scheduleApproved below), approving here ALSO immediately fires the real publish call — the same
-// thing a manual `/publish` run would do, just triggered by the approve click instead of a
-// separate step. Rows no scheduler owns just get the plain approve status, still gated by
-// CLAUDE.md rule 2 (Muxin approved it; nothing publishes without that).
+// "approve" typed by hand would. Approval records Muxin's review decision only; it never calls a
+// publisher. The Publishing room lists approved rows and has the separate Schedule action that
+// can create a provider draft, upload, or scheduled post. Rows no scheduler owns remain approved
+// without a publishing action, still gated by CLAUDE.md rule 2 (Muxin approved it; nothing
+// publishes without that).
 //
 //   npm run review            # http://localhost:4600
 //   REVIEW_PORT=5000 npm run review
@@ -25,7 +25,7 @@ import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { repoRoot, openDb } from "../db/db.js";
 import { measurementAccountForBrand } from "../config/brand-accounts.js";
-import { readQueue, type QueueRow } from "../publish/queue.js";
+import { readQueue, writeCell, type QueueRow } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { fetchNotesList, humanInferenceSubstackMeasurementBinding, scaffoldPicked } from "../atomize/new-notes.js";
 import { scaffoldContentFolder } from "../atomize/new-content.js";
@@ -41,7 +41,6 @@ import type { GmailSendRequest, GmailSendResult } from "../providers/email/gmail
 import {
   enrich,
   listPieces,
-  updateRow,
   saveDerivative,
   approveBlockReason,
   replyToMentionBlockReason,
@@ -93,8 +92,9 @@ import { readTreatment } from "./treatment.js";
 import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts, saveIntakeSectionDraft, readIntakeSections, clearIntakeDrafts } from "./intake-draft.js";
 import { enqueueVentureStep } from "./venture-runner.js";
 import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
-import { providerForKind, publishingRetryBlock, resolvePublishingAttempt, scheduleApprovedOnce, type PublishingResolution } from "./publishing-status.js";
-import { batchReschedule, listBatchCandidates, rescheduleRow, type BatchPlan, type BatchSelection } from "./reschedule.js";
+import { providerForKind, PUBLISHING_STATUS_PATH, publishingKey, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce, type PublishingResolution } from "./publishing-status.js";
+import { commitReviewStatus } from "./approval-provenance.js";
+import { batchReschedule, listBatchCandidates, readPillar, rescheduleRow, rowDestination, type BatchPlan, type BatchSelection } from "./reschedule.js";
 import { handleFictionRoute } from "./serve-fiction.js";
 import { handleCharlesRoute } from "./serve-charles.js";
 import { handleSignalsRoute, prepareLiveExperimentInterpretation } from "./serve-signals.js";
@@ -271,10 +271,24 @@ const IS_DEV_WORKTREE = repoRoot.includes("/.claude/worktrees/");
 // rather than a promise about the client.
 const FIXTURES_ON = fixturesEnabled();
 
-// Rows (keyed `${slug}/${id}`) currently mid-schedule — see the in-flight guard in the /api/status
-// handler below, which prevents a double-click/retry from firing a duplicate real provider call.
+// Rows (keyed `${slug}/${id}`) currently mid-schedule. Publishing actions share this guard so a
+// double-click or an overlapping schedule/move/cancel cannot fire duplicate provider calls.
 const schedulingInFlight = new Set<string>();
 const ventureHandoffsInFlight = new Set<string>();
+type ReviewSchedulingDeps = {
+  scheduleApproved: typeof scheduleApproved;
+  scheduleApprovedOnce: typeof scheduleApprovedOnce;
+  readPublishingStatuses: typeof readPublishingStatuses;
+  publishingStatusPath: string;
+};
+let reviewSchedulingDeps: ReviewSchedulingDeps = { scheduleApproved, scheduleApprovedOnce, readPublishingStatuses, publishingStatusPath: PUBLISHING_STATUS_PATH };
+
+/** Test seam for proving status-only writes cannot reach a scheduling dependency. */
+export function setReviewSchedulingDepsForTest(deps: Partial<ReviewSchedulingDeps>): () => void {
+  const previous = reviewSchedulingDeps;
+  reviewSchedulingDeps = { ...reviewSchedulingDeps, ...deps };
+  return () => { reviewSchedulingDeps = previous; };
+}
 
 // A separate execFileP instance from jobs.ts's own (that one backs reviseDerivative/reviseBrief) —
 // this one just backs the read-only report/insights calls below. Stateless (promisify(execFile) is
@@ -1115,9 +1129,10 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       // row on the next load, defeating the guard entirely.
       const status = b.status === undefined ? undefined : String(b.status).trim().toLowerCase();
       const notes = b.notes === undefined ? undefined : String(b.notes);
-      // One lookup, reused by both the block-check and the schedule-check below — updateRow()
-      // only ever touches the status/notes cells, so platform/format stay valid across the write.
-      const approveFolder = status === "approve" ? safeFolder(slug) : undefined;
+      // One lookup for the approval block-check — updateRow() only ever touches the status/notes
+      // cells, so platform/format stay valid across the write.
+      const statusFolder = safeFolder(slug);
+      const approveFolder = status === "approve" ? statusFolder : undefined;
       const approveRow = approveFolder ? readQueue(approveFolder).rows.find((r) => r.id === id) : undefined;
       if (approveFolder && approveRow) {
         const blocked = approveBlockReason(approveFolder, approveRow);
@@ -1125,44 +1140,91 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           json(res, 200, { ok: false, error: blocked });
           return;
         }
-        if (scheduleKind(approveRow)) {
-          const retryBlocked = publishingRetryBlock(slug, approveRow);
-          if (retryBlocked) {
-            json(res, 200, { ok: false, error: retryBlocked });
-            return;
-          }
-        }
       }
-      const ok = updateRow(slug, id, status, notes);
+      const ok = commitReviewStatus(statusFolder, slug, id, status, () => writeCell(statusFolder, id, { status, notes }), reviewSchedulingDeps.publishingStatusPath);
       if (!ok) {
         json(res, 404, { ok: false });
         return;
       }
-      // Approval is the explicit human gate. Once it is recorded, dispatch the one approved row
-      // through the publisher that already owns its platform. Every publisher creates a scheduled
-      // draft/upload, never an instant unreviewed post. A failure leaves the row approved and is
-      // returned for the Publishing view instead of being mistaken for success.
-      let scheduled: unknown = null;
-      let scheduleError: string | null = null;
-      let publishing: unknown = null;
-      if (approveFolder && approveRow) {
-        const inFlightKey = `${slug}/${id}`;
+      json(res, 200, { ok: true });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/publishing/schedule") {
+      const b = await readBody(req);
+      const directSlug = typeof b.slug === "string" ? b.slug : "";
+      const directId = typeof b.id === "string" ? b.id : "";
+      const rawSelection = (b.selection && typeof b.selection === "object" ? b.selection : null) as Record<string, unknown> | null;
+      const list = (value: unknown): string[] | undefined => {
+        if (value === undefined) return undefined;
+        if (!Array.isArray(value) || !value.every((item) => typeof item === "string" && item.trim())) throw new Error("selection fields must be arrays of non-empty strings");
+        return value.map((item) => item.trim());
+      };
+      type ScheduleTarget = { slug: string; folder: string; row: QueueRow };
+      let targets: ScheduleTarget[];
+      try {
+        if (directSlug || directId) {
+          if (!directSlug || !directId || rawSelection) throw new Error("provide one slug and id, or one selection");
+          const folder = safeFolder(directSlug);
+          const row = readQueue(folder).rows.find((item) => item.id === directId);
+          if (!row) throw new Error("no such row");
+          targets = [{ slug: directSlug, folder, row }];
+        } else {
+          if (!rawSelection) throw new Error("provide one slug and id, or a selection");
+          const selection: BatchSelection = {
+            slugs: list(rawSelection.slugs), pillars: list(rawSelection.pillars),
+            platforms: list(rawSelection.platforms), ids: list(rawSelection.ids),
+          };
+          if (!Object.values(selection).some((values) => values?.length)) throw new Error("select at least one pillar, slug, platform, or id; an empty selection would schedule every approved draft");
+          targets = [];
+          for (const piece of await listPieces()) {
+            const folder = safeFolder(piece.slug);
+            const pillar = readPillar(folder);
+            for (const row of readQueue(folder).rows) {
+              const key = `${piece.slug}/${row.id}`;
+              const wanted = (values: string[] | undefined, value: string | null): boolean => !values?.length || (value !== null && values.includes(value));
+              if (!wanted(selection.ids, key) || !wanted(selection.slugs, piece.slug)
+                  || !wanted(selection.pillars, pillar) || !wanted(selection.platforms, rowDestination(row))) continue;
+              targets.push({ slug: piece.slug, folder, row });
+            }
+          }
+        }
+      } catch (error) {
+        json(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+      const results: Array<{ id: string; slug: string; scheduled: unknown; scheduleError: string | null; publishing: unknown; reason?: string }> = [];
+      for (const target of targets) {
+        const { slug, folder, row } = target;
+        if (row.status !== "approve") {
+          results.push({ slug, id: row.id, scheduled: null, scheduleError: null, publishing: null, reason: `row status is ${row.status || "pending"}, not approve` });
+          continue;
+        }
+        const existing = reviewSchedulingDeps.readPublishingStatuses(reviewSchedulingDeps.publishingStatusPath)[publishingKey(slug, row.id)];
+        if (existing && ["scheduling", "scheduled", "planned", "delivered", "live", "private", "uncertain"].includes(existing.state)) {
+          results.push({ slug, id: row.id, scheduled: null, scheduleError: null, publishing: existing, reason: `row already has a ${existing.state} publishing attempt` });
+          continue;
+        }
+        const inFlightKey = `${slug}/${row.id}`;
         if (schedulingInFlight.has(inFlightKey)) {
-          json(res, 200, { ok: true, scheduled: null, scheduleError: "already scheduling this row. Try again in a moment" });
-          return;
+          results.push({ slug, id: row.id, scheduled: null, scheduleError: null, publishing: null, reason: "already scheduling this row. Try again in a moment" });
+          continue;
         }
         schedulingInFlight.add(inFlightKey);
         try {
-          if (scheduleKind(approveRow)) {
-            ({ scheduled, scheduleError, publishing } = await scheduleApprovedOnce(approveFolder, slug, approveRow));
+          if (scheduleKind(row)) {
+            const result = await reviewSchedulingDeps.scheduleApprovedOnce(folder, slug, row);
+            results.push({ slug, id: row.id, ...result });
           } else {
-            ({ scheduled, scheduleError } = await scheduleApproved(approveFolder, approveRow));
+            const result = await reviewSchedulingDeps.scheduleApproved(folder, row);
+            results.push({ slug, id: row.id, ...result, publishing: null });
           }
+        } catch (error) {
+          results.push({ slug, id: row.id, scheduled: null, scheduleError: error instanceof Error ? error.message : String(error), publishing: null });
         } finally {
           schedulingInFlight.delete(inFlightKey);
         }
       }
-      json(res, 200, { ok: true, scheduled, scheduleError, publishing });
+      json(res, 200, { ok: true, results });
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/cancel") {

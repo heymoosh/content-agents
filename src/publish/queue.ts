@@ -3,6 +3,7 @@ import { join, basename, dirname } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { readFileSync as readText } from "node:fs";
 import { brandForOrigin, type BrandId } from "../identity/brand.js";
+import { recordNewQueueRows } from "../review/approval-provenance.js";
 
 // Parse and update the review-queue.md markdown table.
 // Columns: | id | platform | format | asset | native | brand | cta | status | notes | origin |
@@ -147,9 +148,17 @@ export function appendRow(folder: string, row: NewQueueRow): void {
 }
 
 /** Append a validated batch with one queue-file write so configured variants cannot land partially. */
-export function appendRows(folder: string, rows: readonly NewQueueRow[]): void {
+export function appendRows(folder: string, rows: readonly NewQueueRow[], journalPath?: string): void {
   const path = join(folder, "review-queue.md");
   const text = readFileSync(path, "utf8").replace(/\n*$/, "\n");
+  const existingIds = new Set(readQueue(folder).rows.map((row) => row.id));
+  const requestedIds = new Set<string>();
+  for (const row of rows) {
+    if (!row.id.trim() || existingIds.has(row.id) || requestedIds.has(row.id)) {
+      throw new Error(`queue identity ${row.id || "(empty)"} already exists or is invalid`);
+    }
+    requestedIds.add(row.id);
+  }
   const lines = rows.map((row) => {
     const cells = [
       row.id, row.platform, row.format, row.asset,
@@ -159,6 +168,9 @@ export function appendRows(folder: string, rows: readonly NewQueueRow[]): void {
     return "|" + cells.join("|") + "|";
   });
   writeFileSync(path, text + (lines.length ? lines.join("\n") + "\n" : ""));
+  // The queue write comes first: a crash before the strict journal entry leaves an untrusted
+  // row, never a row that can be scheduled through the fresh-capability path.
+  recordNewQueueRows(folder, rows, journalPath);
 }
 
 // Status of the (at most one) storyboard row in folder's review-queue.md — the render gate
