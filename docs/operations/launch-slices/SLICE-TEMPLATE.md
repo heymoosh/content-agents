@@ -47,6 +47,17 @@ Parallel-safe: <yes — all three conditions hold | no — lanes run one at a ti
 
 ## Verify
 
+Classification and applicable gate: <documentation only | low-risk copy/mechanical | meaningful
+behavior/high risk | feature/experience completion; reason and required checks>
+
+For UI changes: <affected journey and error/recovery paths; viewports; feature flags; fixture
+versus live backend; observable assertions; existing browser coverage or missing experiment>
+Retain candidate/build identity, commands, exits, pass/fail/skip counts and reasons, and necessary
+screenshots/traces/print proof. Flags-OFF skips are not feature proof; controlled responses are
+not live integration proof. Static/local-only journeys mark live integration not applicable.
+Documentation-only changes use scoped review/diff checks and record the result in the packet,
+not application builds or runtime closeout commands.
+
 ```
 <exact command>
 ```
@@ -57,14 +68,21 @@ Parallel-safe: <yes — all three conditions hold | no — lanes run one at a ti
 
 ## Risk
 
-<low | medium | high> — audit required: <yes | no>
+<low | medium | high> — audit required: <yes | no; evidence-based reason>
+Review boundary: <this candidate | named batch before integration | coordinator documentation review>
+Review scope/budget: <unanswered questions and bounded inputs; ordinary effort unless justified>
+Prior accepted evidence: <candidate/input hashes and dispositions retained; what would reopen them>
+On reviewer outage: <blocked candidate, retry condition, independent authorized work; no integration
+of a candidate whose required review is pending>
 
 ## Families
 
 - Builder: <family and tier> — one per lane above
-- Auditor: <different family and tier, or `not required`>
+- Auditor: <different family, model and effort with reason, or `not required`; preserve explicit owner choice>
 
 ## Closeout
+
+Documentation only: record the scoped review/diff result in this packet. Otherwise:
 
 ```
 <closeout gate command from AGENTS.md bindings>

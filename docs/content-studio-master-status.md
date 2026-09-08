@@ -3,7 +3,7 @@
 ## START HERE
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
-- This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
+- This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`, including `### Audit scope and proportional verification` (2026-09-08 progress breadcrumb).
 - Current: **SLICE-5Z**, `docs/operations/launch-slices/SLICE-5Z.md` (**not accepted**, stopped).
 - Blocked on: Grok closure audit returned 402, usage balance exhausted; final candidate has no cross-family closure.
 - Last accepted: **5Y**, `docs/operations/launch-slices/SLICE-5Y.md`.
@@ -1543,6 +1543,14 @@ No full gate was run and no candidate source was integrated. Rescue snapshots re
 section after Grok balance is available. Candidate and audit prompt/evidence are retained in the
 packet-named temporary worktrees/evidence root. Only packet/master stopping records are committed.
 
+### 2026-09-08 — Audit-efficiency policy
+
+Owner-directed documentation update: `AGENTS.md` → `### Audit scope and proportional verification`
+sets risk-based review, scoped prose checks, bounded/delta audits, and provider-specific quota
+checkpoints. Agents own UI journey proof before design review; fixture/live and skipped-feature
+evidence stay distinct. Required independent closure, explicit reviewer choices, security/privacy,
+authenticated-canary budgets, and release gates remain in force. Current product acceptance and
+blockers are unchanged. Policy verification uses coordinator review and whitespace/diff checks.
 
 ## Current handoff — 2026-09-02
 

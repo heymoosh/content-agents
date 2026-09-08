@@ -16,7 +16,8 @@ use `AGENTS.md` so any agent can discover them consistently.
   backlog, SimpleKanban, conductor, or related orchestration workflows unless Muxin explicitly
   requests that workflow by name. Do not read or modify the backlog merely because a task could
   become a card. Repository architecture and safety rules still apply.
-- Inner loop: verify every change with `npm run check` (typecheck + unit tests).
+- Inner loop: verify runtime/tooling changes with `npm run check` (typecheck + unit tests);
+  documentation-only changes use the scoped exception in the Slice protocol.
 - Local-first merge gate: the recorded local `npm run check` result is the
   ordinary merge proof. Do not push solely to obtain a hosted test result, and
   do not wait on the manual CI workflow for routine changes.
@@ -190,10 +191,10 @@ it is repository-neutral.
 | Master document | `docs/content-studio-master-status.md` |
 | Slice packets | `docs/operations/launch-slices/SLICE-<ID>.md` |
 | Packet template | `docs/operations/launch-slices/SLICE-TEMPLATE.md` |
-| Repository-wide gate | `npm run check` (typecheck + unit tests). Run it unsandboxed — under the sandbox it reports roughly 196 phantom venture failures. In a fresh worktree run `npm run worktree:setup` once first, or every command fails on missing `node_modules`. |
+| Repository-wide gate | Documentation-only exception below; otherwise `npm run check` (typecheck + unit tests). Run it unsandboxed — under the sandbox it reports roughly 196 phantom venture failures. In a fresh worktree run `npm run worktree:setup` once first, or every command fails on missing `node_modules`. |
 | Hygiene command | `bash scripts/repo-hygiene.sh --rescue` |
 | Closeout gate | none — record `PASS` or the leftover list in the slice packet |
-| Integration rule | one coordinator, one reviewed commit at a time, a passing gate on the candidate before each integration commit |
+| Integration rule | one coordinator, one reviewed commit at a time, a passing applicable gate on the candidate before each integration commit |
 | Delivery boundary | branch `main`, remote `origin` (`heymoosh/content-agents`). Merge is local-first: the recorded local gate result is the merge proof. Hosted CI is a manual diagnostic — never push merely to obtain a CI result. |
 | Non-negotiable product rules | Extraction-first: never compose new claims, arguments, or worldview statements in Muxin's voice; text and image derivatives quote and trim verbatim and carry `source_lines`. The scoped exceptions (Content Studio treatments, common hook templates, video scripts, Build 3 Venture, Build 4 Charles) are enumerated in the root `CLAUDE.md` and never widen. Nothing publishes without Muxin's review in `review-queue.md`; committing generated content is not publishing. Generated copy follows `config/voice.yaml` — no em dashes, no AI tells. Prefer subscription and free model routes; every paid call is opt-in and logged to `data/cost-log.csv`. Never edit `docs/content-agents-backlog.md` as text — board writes go through `prose_kanban` only. |
 | Live or authenticated model slices | Fix the verification budget before starting: normally one authenticated canary per workflow and at most one retry. Isolate Git, operational data, secrets, ports, and model permissions in a disposable harness. Preserve successful model output when later validation fails. |
@@ -224,7 +225,8 @@ output, plus any file the current slice packet names as owned or cited. Reading 
 review this protocol requires, not a departure from it.
 
 A bigger sibling of the builder is not independent review. Never silently substitute a
-same-family audit; if cross-family tooling is unavailable, say so and stop.
+same-family audit. If required cross-family tooling is unavailable, mark the candidate
+review-blocked and follow the usage-limit checkpoint; do not integrate it.
 
 ### Slice packet contract
 
@@ -268,6 +270,42 @@ Draft the packet from those, then proceed. Stop for the owner only when the slic
 acceptance criteria are genuinely undecided. Permission to read a named input is not a decision
 and must not be escalated as one; the owner decides scope, not method.
 
+### Audit scope and proportional verification
+
+Classify the candidate in the packet before work; record the reason, applicable checks and
+review boundary. Changed behavior and risk determine the class, not file count.
+
+- **Documentation only:** status, planning, prose and owner-directed procedure changes that do
+  not alter executable inputs need coordinator review for accuracy, links and rule consistency,
+  plus a whitespace/diff check. No external-model audit, application build or UI E2E is required.
+  This is the documentation-only exception to the repository-wide gate, runtime closeout
+  command, and detached runtime checkout requirement; record the scoped result in the packet
+  (or the master progress entry for a separately scoped policy update). Review a frozen diff
+  and commit only those documentation hunks. Files consumed as executable configuration,
+  generated inputs or runtime prompts are not exempt.
+- **Low-risk copy/mechanical:** focused checks and coordinator diff review; no standalone
+  maximum-effort audit. Where independent review is required, batch related changes into one
+  named capability-boundary audit before integration. Runtime gates still apply, including
+  UI journey checks for user-visible copy. Do not use this class to waive a material finding's
+  independent closure or to disguise a behavior, privacy, security or data-integrity change.
+- **Meaningful behavior or high risk:** focused outcome/regression proof and bounded cross-family
+  review before integration. Supply exact changed evidence and affected invariants; use broader
+  review only when the change or a demonstrated blind spot warrants it.
+- **Feature/experience completion:** reconcile requirements with source and actual end-to-end
+  browser evidence. A full review is appropriate at this boundary or when explicitly requested
+  by the owner. This does not require repeating it for every small follow-up repair.
+
+Plan one bounded review of a ready candidate, then delta reviews of unresolved material findings
+and changed evidence. Retain accepted dispositions with their candidate/input hashes; reopen
+only when changed behavior, dependencies or new evidence invalidates them. Do not re-send the
+whole repository, re-audit unchanged settled decisions, or create duplicate reports. Record
+established defects, verification gaps and optional improvements separately. Verification gaps
+need the missing experiment; more model opinion does not close them.
+
+Existing packets and templates inherit these rules; preserve explicit owner-selected reviewers
+and security, privacy, authenticated-canary budgets, and release gates. A documentation exception
+does not waive validation of executable configuration, generated inputs, or runtime prompts.
+
 ### Model routing
 
 Start each kind of work on the model that is best at that kind of work *in one shot*, not the
@@ -279,8 +317,19 @@ counting missed requirements, retries, audits, and repairs — not the price of 
 - Difficult or high-stakes implementation: strong model.
 - Claude for frontend and Codex for backend are defaults, not rules.
 
-Usage limits override every routing preference. When one hits, record status in the master
-document first, then stop.
+Choose audit effort from the change's risk and unanswered questions, not the strongest available
+setting by default. Routine bounded reviews use a capable reviewer at ordinary effort; reserve
+high/max effort for difficult, high-stakes, or broad experience reviews. Record the requested
+model/effort and the actual result; a failed startup is not a completed audit.
+
+At a usage limit, record the affected lane, evidence, blocker and next retry condition in the
+packet and master first. Pause that provider; do not repeatedly probe quota or silently change a
+user-required reviewer. Continue dependency-ready work within authorized scope when ownership
+and inputs are independent: browser verification, evidence preparation, other repairs, or a
+separately accepted documentation change. Required review remains an integration gate for the
+blocked candidate. When ending work on that candidate without an independently accepted
+deliverable, use the stopping-without-acceptance branch. Separately scoped, accepted changes use
+the accepted closeout; keep blocked candidates and their status separate from that commit.
 
 ### Worker contract
 
@@ -290,8 +339,9 @@ and do not re-summarize the plan; cite section headings instead.
 
 ### Completion sequence
 
-Run in this order. Do not start an expensive repository-wide gate while known audit or repair
-work remains.
+Run in this order for runtime/tooling candidates; documentation-only changes use their scoped
+gate above. Do not start an expensive repository-wide gate while known audit or repair work
+remains for that candidate. Independent focused browser work may proceed during review outages.
 
 1. Implement only the assigned slice.
 2. Run the packet's declared acceptance checks and the relevant regression checks.
@@ -299,8 +349,10 @@ work remains.
 4. Obtain the cross-family audit when the slice requires one.
 5. Reproduce and repair established findings, rerun affected checks, and obtain independent
    closure of material findings.
-6. Freeze the audit-cleared candidate on a detached checkout — never review the live tree.
-7. Run the repository-wide gate from the bindings table. It is the one gate; run it once, last.
+6. Freeze the audit-cleared candidate on a detached checkout; review immutable evidence, never
+   a changing live tree. A review-blocked runtime candidate cannot pass this integration step.
+7. Run the repository-wide gate from the bindings table. Run required UI journeys on the frozen
+   candidate, then the full check once, last; repeat only after a relevant change or failure.
 8. Close the slice through the mandatory closeout gate (below).
 9. The coordinator reviews the final diff and commits only after acceptance, audit closure, and
    a passing gate, keeping the master document current in the same commit.
@@ -347,6 +399,26 @@ never a reduced request.
 
 A test that asserts an argument was passed proves nothing about the process that ran. Assert the
 observable outcome.
+
+For frontend work, agents own functional QA before asking the owner for design judgment. Use the
+repo's Playwright CLI/test runner or declared browser equivalent to exercise actual user
+journeys, not only components. Each UI packet names the affected journey and error/recovery
+paths, viewport(s), feature-flag state, fixture versus live backend, and observable assertions.
+Reuse relevant tests; add coverage where a required outcome is absent, not tests that mirror code.
+
+Retain the candidate/build identity, command, exit code, passed/failed/skipped counts and reasons,
+and screenshots/traces or print output where needed to prove visibility or layout. A passing
+flags-OFF suite that skips the feature is not feature proof: run the affected journey with the
+feature enabled in an isolated local test instance, without changing production flags or the
+owner's preview. Mocked responses establish controlled UI behavior, not live backend integration.
+
+Before claiming a frontend complete, cover its required journey matrix, including responsive,
+theme, loading/error, persistence, accessibility interactions and print states where applicable;
+compare the required prototype experience and run a bounded live-backend journey where the
+feature has a backend, within existing authorization and canary budgets. Static or entirely local
+journeys record that live integration is not applicable and prove their real local behavior
+instead. Report blocked live steps separately and continue independent controlled/browser coverage. The owner reviews
+subtle visual choices and product decisions; they are not the first functional smoke tester.
 
 ### Stopping without acceptance
 
