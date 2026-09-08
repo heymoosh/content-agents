@@ -5,11 +5,11 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, unpushed by standing order).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
 - Current slice: **SLICE-5S NOT ACCEPTED**, `docs/operations/launch-slices/SLICE-5S.md` → `## Stopped`.
-- Blocked on: rejected retry-guard exception and incomplete endpoint/tests; Grok workspace audit completed, repairs remain.
-- Next dependency-ready: finish **SLICE-5S** after guard design/approval and audit repairs; retained candidate at `/private/tmp/content-agents-slice-5s-codex`.
+- Blocked on: automatic review rejected creation-provenance/empty-history scheduling; informed approval or materially safer design required.
+- Next dependency-ready: finish **SLICE-5S** after guard resolution; candidate at `/private/tmp/content-agents-slice-5s-codex`, focused checks 402/0.
 - Last accepted: **SLICE-5R**, `71f2df9`; gate 4304 tests / 0 failures.
 - Then unwritten: unscheduled-draft repair on unified route, rerun 5P, durable per-piece X opt-in (5R A6), analytics `brand_id` backfill.
-- Last decision (Muxin, 2026-09-07): use a suitable non-highest-tier Codex builder without waiting for Claude; retain Grok audit. Selected `gpt-5.6-terra`, medium effort. Grok workspace sandbox authorized for no-edit audit.
+- Last decision (Muxin, 2026-09-07): use a suitable non-highest-tier Codex builder without waiting for Claude; retain Grok audit. Repair raised to `gpt-5.6-terra`, high effort. Grok workspace sandbox authorized for no-edit audit.
 - **SAFETY, Muxin only:** until 5S, retrying `x-1`/`x-2` can publish once Postiz answers. Set both to `pending` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`; this session did not change either row.
 - Design sanity rule: `## Standing constraints`. Needs Muxin, not blocking: `.claude/skills/**` edits named in 5N and 5P.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
@@ -2362,3 +2362,13 @@ Before changing a status in this file:
 6. Update any stale source named above or leave an explicit historical label.
 7. Add only the actionable gap to the backlog through `prose_kanban`; keep the full explanation
    here and use the backlog as an index.
+
+### 2026-09-07 — Grok launch guidance and higher-effort 5S repair
+
+Muxin requested the working Grok invocation in every AGENTS.md across eight named active checkouts. Added the workspace-sandbox command, Docker socket symlink explanation, no-edit audit prompt, bounded evidence requirements and diff/exit/verdict verification to 11 files. Seven external checkouts received AGENTS-only commits: launch-design-review `2ed7d0704`, wt-OD22-FLEET `05c0c48`, alignment-vocabulary `35b49a84b`, elicitation-v2 `63fe2f5bc`, public-concern-monitoring `9766da897`, state-local-election-phase8 `df8ab1e24`, consumer_champion `fb149ac`. Existing work preserved; nothing pushed. Content-agents owns four guidance edits.
+
+5S resumed on the retained candidate with `gpt-5.6-terra` raised from medium to high effort, per Muxin. Grok stays independent. Legacy unknown-history and uncertain-attempt protection remain mandatory; the rejected explicit-intent bypass is not authorized. Worker is resolving provenance safety with architectural guidance before finishing the audit checklist.
+
+### 2026-09-07 — High-effort 5S repair stopped, not accepted
+
+The same Codex model at high effort added the Schedule route and repaired focused assertions; worker reports 402 tests / 0 failures and focused A1 HTTP/source regressions 2 / 0. Four tracked candidate files remain in the retained worktree. Architectural guidance established that approval transitions alone cannot prove fresh history. A bounded creation-provenance expansion was approved as engineering scope, but automatic approval review rejected its scheduling integration for possible duplicate schedules when provider history is empty. No rejected provenance code or untracked artifact remains. Fresh approved rows therefore remain refused. No visual proof, fresh independent closure, or full gate ran. Exact rejection and required informed decision are in SLICE-5S → Stopped. The slice remains unaccepted; candidate not committed, nothing pushed.

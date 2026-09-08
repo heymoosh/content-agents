@@ -53,12 +53,22 @@ or the GUI has no way to publish at all.
   approve control in the queue view no longer shows scheduling results. Reuse the existing
   publishing state helpers (`page.ts:1840` `publishingState`, `page.ts:1852` `publishingProvider`).
 - `src/review/serve.test.ts` and `src/review/page.test.ts` — see Acceptance.
-- `src/review/publishing-status.ts` — proposed explicit-scheduling intent adjustment for `scheduleApprovedOnce` / `publishingRetryBlock`, currently BLOCKED by automatic approval review; see `## Stopped`. Do not apply the rejected exception.
-- `src/review/publishing-status.test.ts` — focused regressions for the explicit intent exception and unchanged persisted-attempt/default-caller guards.
+- `src/review/publishing-status.ts` — implement a materially safer provenance design for new status-only approvals while preserving legacy missing-history and uncertain-attempt guards. Do not apply the rejected explicit-schedule bypass.
+- `src/review/publishing-status.test.ts` — focused regressions for new-approval provenance and unchanged legacy missing-history, persisted-attempt and default-caller guards.
+
+### Approved repair ownership expansion — 2026-09-07
+
+Coordinator authorizes these engineering changes to establish positive creation provenance, after advisor review found that status alone cannot prove history absence:
+
+- New `src/review/approval-provenance.ts` and `.test.ts`: durable provenance and taint, fail closed on malformed/incomplete records; bind canonical queue identity and dispatch fingerprint. No production operational data edits.
+- `src/publish/queue.ts` and its focused test file: canonical `appendRows` stamps only demonstrably newly appended rows after successful creation; pre-existing or reused IDs never gain fresh trusted provenance.
+- `src/review/jobs.ts` and its focused test file: stamp initial rows only in newly created GUI atomize folders after validated creation. Never stamp pre-existing folders or relabel unknown-history rows.
+
+All other publisher implementation remains out of scope. Expand focused verification to the changed helpers and callers. This authorizes provenance plumbing, not the rejected missing-history bypass. Existing legacy unknown-history rows retain refusal with a persistent, clear reason; recorded uncertain attempts remain refused. Prove failure ordering, restart, status cycling, ID reuse, and concurrent status/schedule cannot manufacture eligibility. Rows created through unsupported paths remain conservatively untrusted; document this limitation explicitly for acceptance review.
 
 ## Do not touch
 
-- `src/review/studio-scheduling.ts`, `src/publish/**` — the
+- `src/review/studio-scheduling.ts`, `src/publish/**` except the approved queue provenance expansion above — the
   publishers and the ledger are not in scope. The endpoint moves; the calls behind it do not change.
 - `/api/cancel`, `/api/publishing/reschedule`, `/api/publishing/batch-reschedule`,
   `/api/publishing/resolve`.
@@ -124,7 +134,7 @@ is therefore not required.
 
 ## Families
 
-- Builder: OpenAI Codex, `gpt-5.6-terra`, medium effort (Muxin authorized a non-highest-tier Codex route on 2026-09-07).
+- Builder: OpenAI Codex, `gpt-5.6-terra`, high effort (Muxin authorized a non-highest-tier Codex route on 2026-09-07).
 - Auditor: Grok, strong tier (Muxin requested this route on 2026-09-07). Receives the diff, the changed-file list, the focused test
   output and this Acceptance list only.
 
@@ -143,7 +153,7 @@ Return the RESULT BLOCK in the final response; coordinator persists it here.
 
 ## Closeout
 
-No closeout tool in this repository. **NOT ACCEPTED**: implementation, focused checks, visual proof, cross-family audit and the frozen repository-wide gate remain pending; see `## Stopped`.
+No closeout tool in this repository. **NOT ACCEPTED**: focused checks pass after the high-effort repair, but scheduling eligibility, visual proof, independent closure and the frozen repository-wide gate remain pending; see `## Stopped`.
 
 ## RESULT BLOCK (worker fills this in and returns it)
 
@@ -172,15 +182,12 @@ The old status route passed a pre-approval row to `scheduleApprovedOnce`; the ne
 
 ## Stopped
 
-- Blocker: automatic approval review rejected the explicit-scheduling retry-guard exception; implementation remains incomplete. Grok tooling blocker resolved by the user-authorized workspace-sandbox audit below.
-- Risk requiring informed approval: a legacy approved row with missing publishing history may already have been sent; allowing explicit Schedule without reconciliation could duplicate it even while recorded uncertain attempts remain blocked. No bypass or indirect workaround is authorized by this packet.
-- Verified: Codex `gpt-5.6-terra`, medium effort, implemented a partial candidate. Focused checks returned 398 pass / 3 fail (incomplete endpoint and stale assertions); one assertion was subsequently updated without rerun. Grok candidate audit now completed (below); no visual proof, acceptance closure or full gate completed.
-- Retained work: branch `slice-5s-codex`, checkout `/private/tmp/content-agents-slice-5s-codex`, uncommitted changes to `src/review/serve.ts`, `src/review/page.ts`, `src/review/serve.test.ts`. Approval dispatch removed; Pending UI added, but its endpoint is absent. Do not integrate this incomplete candidate.
-- Evidence: `/private/tmp/slice-5s-evidence/codex-focused.log`, `codex-worker-packet.md`; bounded Grok assessment inputs `/private/tmp/slice-5s-audit/acceptance.md`, `guard-excerpts.txt`. Initial read-only Grok attempt refused startup; successful workspace audit evidence is recorded below.
-- Next action: resolve the rejected guard design through a materially safer proposal or informed user approval, then complete the endpoint/tests and obtain independent audit closure using the user-authorized Grok workspace sandbox before the frozen gate.
-- Closeout: NOT ACCEPTED. No candidate commit or push. Coordinator commits only this packet and master status. Worker checkout retained; no untracked repository paths created by the worker.
-
-- Hygiene disposition for this stop: exit 1 for the two dirty checkouts only; rescue refs `refs/wip/content-agents` (`11dcbd4`) and `refs/wip/content-agents-slice-5s-codex` (`9a3febb`). No untracked repository paths. Retain worker edits and all local-only branches. Main pre-existing `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md` and `data/notes-spread-ledger.jsonl` remain untouched.
+- Blocker: automatic approval review rejected the higher-effort creation-provenance integration into the empty-history scheduling guard. 5S is NOT ACCEPTED.
+- Exact rejection: “This patch bypasses the existing publishing retry guard whenever local provenance exists but the provider ledger is empty, which can re-dispatch after a provider call whose ledger write failed and create duplicate external schedules; the task does not specifically authorize this unsafe exception.”
+- Verified: `gpt-5.6-terra` high-effort repair reports the declared focused suite PASS, 402 tests / 0 failures; focused approval HTTP/source checks PASS, 2 / 0; coordinator `git diff --check` PASS. No current browser fixture, rendered screenshot, new audit closure or full gate.
+- Retained work: `/private/tmp/content-agents-slice-5s-codex`, branch `slice-5s-codex`; four tracked modified paths `src/review/serve.ts`, `src/review/page.ts`, `src/review/serve.test.ts`, `src/review/page.test.ts`. Schedule route now exists, but fresh approvals remain refused by the unchanged legacy empty-history guard. No rejected provenance code or untracked artifact remains. No implementation commit or push.
+- Next action: obtain informed approval for scheduling rows with durable creation and committed-approval provenance but an empty provider ledger, acknowledging the stated duplicate-schedule risk, or establish a materially safer design without that exception. Then complete A2–A4 and independent/visual/full-gate verification.
+- Closeout: NOT ACCEPTED. Existing operational changes in the primary checkout are preserved; hygiene disposition follows below.
 
 ## Grok candidate audit — 2026-09-07
 
@@ -195,3 +202,15 @@ Coordinator dispositions / repair checklist:
 - Provisional observations only: removed outreach lock handling needs bounded tracing; the Content source assertion failure requires reproduction before attributing a regression. Grok's repeated missing-endpoint findings are one blocker, not several independent defects. Removing dispatch guards from status-only approval is intentional; protections belong on the explicit scheduling path.
 
 Result: NOT ACCEPTED. Grok audit ran successfully; no candidate files changed in this audit session. Next action remains resolution of the rejected guard design, followed by implementation repairs and independent closure.
+
+## Repair resume — 2026-09-07
+
+Muxin requested closing Grok findings and raising the previous builder one tier. Use the same `gpt-5.6-terra` model at **high** effort (previous medium); Grok remains independent. Resume the retained candidate. The rejected bypass is still prohibited: design durable evidence distinguishing demonstrably new status-only approvals from legacy unknown-history approvals, with conservative behavior after failures/restarts and unchanged uncertain-attempt protection. Legacy approve→pending→approve cycling, fingerprint changes, concurrency and restart must not launder unknown history into trusted fresh provenance; add explicit regression evidence. If required persistence changes lie outside owned files, return a bounded proposal before editing them. This is an engineering repair, not authorization to schedule legacy unknown-history rows.
+
+Complete every checklist item in the Grok audit section, focused tests and disposable visual/behavior evidence. Do not run the full gate or commit. If the guard design remains technically difficult after reasonable investigation, use `sol_advisor` for guidance rather than guessing. Return a RESULT BLOCK including the exact safety invariant and evidence.
+
+## High-effort repair result — 2026-09-07
+
+Worker `/root/repair_5s_high` used the same `gpt-5.6-terra` model at high effort, escalating one notch from medium as requested. Four retained changed paths are listed in Stopped. Added the Schedule route and corrected stale UI assertions; focused suite 402/0 and A1 HTTP/source cases 2/0. The HTTP test observes no publishing-ledger growth, but the exact dependency-call assertion still needs independent acceptance review. Advisor rejected transition-only provenance because legacy status cycling can manufacture it. Coordinator approved a bounded creation-provenance ownership expansion; automatic approval review rejected its integration with the empty-history guard. Worker removed unintegrated provenance changes; no rejected artifact remains. All original publisher helpers remain unchanged. No browser fixture or fresh Grok closure was run because the known integration blocker remains.
+
+Hygiene for high-effort stop: exit 1 solely for two intentionally retained dirty checkouts. Rescue refs: `refs/wip/content-agents` (`60a4d57`), `refs/wip/content-agents-slice-5s-codex` (`624881e`). No untracked repository paths created or left by this session. Preserve the pre-existing review queue and notes-spread ledger edits, candidate worktree, and existing local-only branches. Coordinator commits only AGENTS guidance plus packet/master documentation.

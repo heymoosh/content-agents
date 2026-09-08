@@ -1,5 +1,28 @@
 # Build 3 — Venture (composed business content, walled off)
 
+## Grok CLI on this Mac
+
+Docker Desktop makes `/var/run/docker.sock` a symlink. Grok `--sandbox read-only`
+refuses to start on this machine. Use `--sandbox workspace` for Grok calls, including
+audits; do not call `grok_spawn_readonly`. If a plugin is required, use
+`grok_spawn_worker` only when it supports an explicit `sandbox=workspace` argument.
+
+For a bounded audit, run from the intended checkout or disposable audit directory:
+
+```sh
+grok --sandbox workspace --no-subagents --disable-web-search --max-turns 3 --model grok-4.5 --prompt-file /absolute/path/audit-prompt.txt
+```
+
+The prompt must say: "Audit against the supplied requirements. Do not modify files.
+Cite path:line. Separate established defects, verification gaps, and optional improvements."
+Supply the acceptance criteria, candidate diff, changed-file list and focused check output;
+request bounded excerpts for missing evidence. Workspace sandbox is not read-only enforcement:
+inspect the diff afterward and never treat the sandbox choice as permission to edit.
+Keep the input bounded; if Grok offloads a long prompt, allow enough turns to read it and
+finish the audit. Verify exit status and an actual verdict before reporting audit completion.
+This launch fix does not expand repository-export or implementation authorization.
+
+
 Build 3 is the **opposite** of extraction-first: `/venture` *composes* original business-testing
 content. Muxin is the founder and the decider — the venture, the audience, and every locked choice
 are hers; Claude drafts candidates and holds the evidence trail. This composition is allowed
