@@ -3,17 +3,17 @@
 ## START HERE
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
-- This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
-- Current/last accepted: **SLICE-5W ACCEPTED**, `docs/operations/launch-slices/SLICE-5W.md` → `## Accepted closeout`.
-- Blocked on: nothing for 5W. Grok PASS; frozen gate 4332/4332, exit 0.
-- Delivered: explicit per-piece X opt-in/revoke survives rerouting; see router `--help`.
-- Last decision: X defaults stay technical; explicit per-piece exception preserves source/origin safety and approval gates.
-- Parallel work: independent verifier preparation ran beside implementation; actual verification used frozen handoffs.
-- Preserve: unrelated edits, approvals, durable provider history and scheduler claims.
-- 5P stays accepted: do not rerun its deleted canary or erase its local provider history.
-- Evidence: `/private/tmp/slice-5w-evidence/`; packet records focused, CLI, Grok, gate and hygiene proof.
-- Next dependency-ready: analytics brand_id backfill, `docs/operations/launch-slices/SLICE-5R.md` → `## Known data gap, not this slice's`; packet needed.
-- Everything below this block is history; read only packet-cited headings.
+- This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
+- Current: **SLICE-5X NOT ACCEPTED**, `docs/operations/launch-slices/SLICE-5X.md` → `## Stopped`.
+- Blocked on: source-account attestation for legacy exports plus one missing LinkedIn source/mapping.
+- Last accepted: **5W**, commit `cfaa766`; packet `docs/operations/launch-slices/SLICE-5W.md`.
+- 5W proof: follow-up Grok workspace audit PASS; prior frozen gate 4332/4332 exit 0.
+- Last decision: recovered export IDs establish row links, not brand ownership; no guessed backfill.
+- 5X measured: X 264/264, LinkedIn 74/100, Substack 13/13 source-post joins; Notes 32 unresolved.
+- Next dependency-ready action: acquire checksum-pinned account provenance, then freeze 5X implementation lanes.
+- Evidence: `/private/tmp/slice-5x-evidence/preparation/contract.md`; audit logs in sibling coordinator directory.
+- Preserve: unrelated edits, database, approvals, provider history and scheduler claims; do not rerun 5P.
+- Everything below is history; read only packet-cited headings.
 
 
 ## Standing constraints`.
@@ -1455,6 +1455,26 @@ were independently closed before integration. Grok PASS; focused 46/46; real CLI
 single frozen unsandboxed gate 4332/4332, exit 0. Packet/evidence: SLICE-5W.md and
 /private/tmp/slice-5w-evidence/. Three temporary worktrees removed after exact patch checks.
 Next work is the analytics brand_id backfill documented in 5R's known data gap.
+
+
+### 2026-09-08 — 5W follow-up audit PASS; 5X awaiting source-account provenance
+
+Grok 4.5 ran with --sandbox workspace, no edits, and returned PASS on accepted 5W A1–A7
+and audit A8, exit 0. Prior symlink and generated-header findings remain closed; no new material
+defect. Source/unrelated hashes remained unchanged. Evidence: `/private/tmp/slice-5x-evidence/coordinator/`.
+
+Prepared SLICE-5X while that independent audit ran. Read-only SQLite and exact checksum-pinned
+processed exports recovered post-ID coverage for X 264/264, LinkedIn 74/100, and Substack 13/13.
+Legacy unbound total remains 409 posts/2981 metrics, including 32 Substack Note posts. A first
+preparation script's loose config substring matching was rejected during review; Terra effort was
+raised high → xhigh with paused ownership reassignment. Corrected evidence finds no explicit
+public-source-account binding in configuration. Export joins must not be presented as brand proof.
+
+5X is not accepted: owner source-account attestation and one missing LinkedIn source/alternate
+mapping are required before freezing implementation. No source or operational data changed.
+879 older Bluesky child metrics are optional integrity work with no measured current routing
+change; they were not substituted for the requested missing platform history. The packet's Stopped
+section retains the sourcing requirement and exact evidence pointers. No push.
 
 
 ## Current handoff — 2026-09-02
