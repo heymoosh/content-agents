@@ -15,12 +15,87 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDraftPayload, buildPosts, fetchScheduledDrafts, cancelDraft, parseTypefullyCliInvocation, runTypefullyCli } from "./typefully.js";
+import { buildDraftPayload, buildPosts, cancelDraft, createDraft, fetchScheduledDrafts, parseTypefullyCliInvocation, runTypefullyCli } from "./typefully.js";
 import { readQueue, writeCell } from "./queue.js";
 import { commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "../review/approval-provenance.js";
 import { appendPublishingStatus, readPublishingStatuses } from "../review/publishing-status.js";
 
 const POSTS = [{ text: "Verbatim note text spread to a text channel." }];
+
+test("createDraft makes exactly one POST for success and every ambiguous or malformed outcome", async () => {
+  const oldFetch = globalThis.fetch;
+  const oldKey = process.env.TYPEFULLY_API_KEY;
+  const outcomes: Array<{ case: string; outcome: "draft" | "failure"; postCount: number }> = [];
+  const cases: Array<{
+    name: string;
+    respond: () => Promise<Response>;
+    result?: { id: string };
+    error?: RegExp;
+  }> = [
+    {
+      name: "success",
+      respond: async () => new Response(JSON.stringify({ id: "draft-success" }), { status: 200 }),
+      result: { id: "draft-success" },
+    },
+    {
+      name: "429 with processing in the body",
+      respond: async () => new Response("still processing", { status: 429 }),
+      error: /429.*processing/i,
+    },
+    {
+      name: "5xx with processing in the body",
+      respond: async () => new Response("still processing", { status: 503 }),
+      error: /503.*processing/i,
+    },
+    {
+      name: "network exception with processing in the message",
+      respond: async () => { throw new Error("media processing connection reset"); },
+      error: /processing/i,
+    },
+    {
+      name: "ordinary 5xx",
+      respond: async () => new Response("upstream failed", { status: 500 }),
+      error: /500.*upstream failed/i,
+    },
+    {
+      name: "malformed successful response",
+      respond: async () => new Response("not-json", { status: 200 }),
+      error: /JSON|Unexpected token/i,
+    },
+  ];
+
+  try {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    for (const scenario of cases) {
+      const requests: Array<{ url: string; method: string }> = [];
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({ url: String(input), method: init?.method ?? "GET" });
+        return scenario.respond();
+      }) as typeof fetch;
+
+      if (scenario.result) {
+        assert.deepEqual(await createDraft("test-set", { draft_title: scenario.name }), scenario.result);
+        outcomes.push({ case: scenario.name, outcome: "draft", postCount: requests.length });
+      } else {
+        const expectedError = scenario.error;
+        if (!expectedError) throw new Error(`${scenario.name} must define an expected failure`);
+        await assert.rejects(() => createDraft("test-set", { draft_title: scenario.name }), expectedError);
+        outcomes.push({ case: scenario.name, outcome: "failure", postCount: requests.length });
+      }
+      assert.deepEqual(
+        requests,
+        [{ url: "https://api.typefully.com/v2/social-sets/test-set/drafts", method: "POST" }],
+        `${scenario.name} must make exactly one create POST`
+      );
+    }
+    const evidencePath = process.env.SLICE_5V_EVIDENCE_PATH;
+    if (evidencePath) writeFileSync(evidencePath, JSON.stringify({ outcomes }, null, 2) + "\n");
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldKey === undefined) delete process.env.TYPEFULLY_API_KEY;
+    else process.env.TYPEFULLY_API_KEY = oldKey;
+  }
+});
 
 test("the production Typefully CLI selects one approved text row for a fake-network private draft through the unified route", async () => {
   const root = mkdtempSync(join(tmpdir(), "slice-5u-typefully-cli-"));
@@ -56,7 +131,11 @@ test("the production Typefully CLI selects one approved text row for a fake-netw
     process.env.CONTENT_AGENTS_TEST_LEDGER = slotPath;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       preCallbackFence = readFileSync(journal, "utf8").includes("\"dispatch_started\"");
-      requests.push({ url: String(input), method: init?.method ?? "GET", payload: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown> });
+      const request = { url: String(input), method: init?.method ?? "GET", payload: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown> };
+      requests.push(request);
+      if (request.payload.draft_title === "x-legacy (content-agents)") {
+        return new Response("media still processing after an ambiguous provider failure", { status: 503 });
+      }
       return new Response(JSON.stringify({ id: `draft-fixture-${requests.length}` }), { status: 200 });
     }) as typeof fetch;
 
@@ -97,13 +176,24 @@ test("the production Typefully CLI selects one approved text row for a fake-netw
     }
     assert.equal(requests.length, 1, "invalid selected rows have zero provider effects");
 
-    await runTypefullyCli(["node", "src/publish/typefully.ts", folder, "--no-schedule", "--only-id", "x-legacy"], {}, { publishingStatusPath: statusPath });
-    assert.equal(requests.length, 2, "the known-safe failed pre-dispatch retry creates once");
+    await assert.rejects(
+      () => runTypefullyCli(["node", "src/publish/typefully.ts", folder, "--no-schedule", "--only-id", "x-legacy"], {}, { publishingStatusPath: statusPath }),
+      /503.*processing/i,
+      "an ambiguous create failure must surface after its only POST"
+    );
+    assert.equal(requests.length, 2, "the ambiguous x-legacy create makes one POST after x-1");
     assert.equal(requests[1]?.payload.draft_title, "x-legacy (content-agents)");
+    assert.equal(readPublishingStatuses(statusPath)["piece/x-legacy"]?.state, "uncertain", "the ambiguous create is durable before a retry can run");
+    await assert.rejects(
+      () => runTypefullyCli(["node", "src/publish/typefully.ts", folder, "--no-schedule", "--only-id", "x-legacy"], {}, { publishingStatusPath: statusPath }),
+      /already has a uncertain publishing attempt; reconcile/i,
+      "a repeated ambiguous create must be blocked pending reconciliation"
+    );
+    assert.equal(requests.length, 2, "the repeated ambiguous x-legacy CLI call has zero provider effects");
     const dispatchRows = readFileSync(journal, "utf8").split("\n").filter(Boolean)
       .map((line) => JSON.parse(line) as { kind?: string; rowId?: string })
       .filter((event) => event.kind === "dispatch_started").map((event) => event.rowId);
-    assert.deepEqual(dispatchRows, ["x-1"], "unselected x-2 and the known-safe legacy retry do not create a fresh dispatch fence");
+    assert.deepEqual(dispatchRows, ["x-1"], "unselected x-2 and the retained legacy approval do not create a fresh dispatch fence");
 
     const evidencePath = process.env.SLICE_5U_EVIDENCE_PATH ?? process.env.SLICE_5T_EVIDENCE_PATH;
     if (evidencePath) {

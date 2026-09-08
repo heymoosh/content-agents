@@ -18,7 +18,7 @@ Hard — live account access, exact single-row selection, durable provenance and
 ## Depends on
 
 5O accepted (migration), 5S accepted at 7c6815f (approval separated from dispatch and durable
-first-attempt protection), 5T accepted at e78d2a9 (unified unscheduled draft mode); 5U must be accepted for explicit row selection.
+first-attempt protection), 5T accepted at e78d2a9 (unified unscheduled draft mode); 5U accepted at 5a442f3 (explicit row selection); 5V accepted (single-attempt creation).
 
 ## Owned files
 
@@ -145,7 +145,7 @@ optional hardening. A read-only preflight followed by audited release bounds ext
 ## Closeout
 
 No separate tool. Record PASS or actionable leftovers here; coordinator commits. Not accepted
-until A1–A9 are observed. Current phase: stopped before live call pending 5U selector repair.
+until A1–A9 are observed. Current phase: stopped before live call on unavailable Chrome readback; 5V retry repair accepted.
 
 ## Previous run — diagnostic history, superseded requirements
 
@@ -162,29 +162,30 @@ retains the full previous packet; current requirements above replace the retired
 
 ## Stopped
 
-2026-09-08: NOT ACCEPTED. The folder-wide CLI selects two approved text rows (x-1 and x-2),
-violating this slice's one-draft budget; no live call was made. Repair is SLICE-5U, not an owner
-scope decision. Do not change either approval to work around selection.
+2026-09-08 resumed after 5U: NOT ACCEPTED. Current x-1 selection and eligibility pass,
+but the then-current createDraft could repeat POSTs on 429 or errors containing processing.
+That blocker is retired by accepted SLICE-5V; the final frozen gate passed 4327/0.
+Chrome currently exposes no connected browser, so exact unscheduled readback is also unavailable.
+No live create, delete, scheduling or publishing occurred.
 
-Verified: existing source/14 derivatives/routing evidence; two selected rows; five recorded
-pre-dispatch failed events with no provider request (x-1 four, x-2 one); no active claims;
-54 scheduler claims and protected-file baseline hashes. Missing newer approval journal alone
-does not block these known-safe failed retries: publishing-status.ts:291-298 permits prior failed
-history, and :330-352 writes the durable uncertain fence before the callback. An initial contrary
-preflight inference was corrected by coordinator source review. No fresh identity/reapproval needed.
+Verified: A1 real source/routing and 14 queued derivatives; A2 unique approved x-1 selected by
+--only-id, supported prior pre-dispatch failed history, no active claim, retryBlock null.
+Missing newer journal does not invalidate those known-safe failed retries. Both x-1 and x-2
+approvals are preserved. Focused fake-provider check: 20 tests passed, exit 0. All protected hashes
+unchanged; scheduler still 54 records. Grok audit and source-gap closure HOLD, both exit 0; source review confirmed the outer
+processing loop can retry ambiguous 5xx/network errors. Selector and eligibility evidence closed. The earlier folder-wide selection blocker is retired by accepted 5U.
 
-Retained work: this refreshed packet and /private/tmp/slice-5p-rerun-evidence/preflight.md,
-source-excerpts.txt, packet.diff and Grok audit output. Production and operational files unchanged.
-Single next action: accept 5U, then repeat current eligibility preflight with --only-id x-1 before
-releasing the bounded live draft/readback/delete sequence. No full gate run for this docs-only stop.
+Retained work: `/private/tmp/slice-5p-rerun-evidence/current-20260908/` contains preflight,
+actual source excerpts, focused check metadata/outcome, safe procedure and Grok findings.
+Single next action: reconnect Chrome, then recheck eligibility before releasing
+one live draft/readback/delete. No costly repository-wide gate for this verification stop.
 
 ## RESULT BLOCK
 
-- Changed paths: this packet only; coordinator also creates 5U packet and updates master.
-- Outcome: NOT ACCEPTED; no Typefully call. Bounded selector repair delegated separately.
-- Checks run and results: read-only selection found two approved text rows; known failed retry
-  path confirmed in source; operational baseline captured and all eight hashes unchanged after preflight. Grok preflight audit
-  and three requested excerpt gaps closed, both exit 0. A1 supported; A2 selection blocked;
-  live A3–A7 not attempted. No source repair in 5P.
-- Evidence locations: /private/tmp/slice-5p-rerun-evidence/.
-- Unresolved: 5U, then live readback/cleanup and final verification.
+- Changed paths: this packet's status; coordinator also owns 5V packet and master updates.
+- Outcome: NOT ACCEPTED; no provider call. Creation retry repair delegated as 5V.
+- Checks run and results: real read-only eligibility predicates pass; focused Typefully tests
+  20/20, exit 0; protected hashes and scheduler counts unchanged. The pre-repair Grok HOLD
+  identified the retry defect; accepted 5V closes it. Chrome readback and live proof remain pending.
+- Evidence locations: `/private/tmp/slice-5p-rerun-evidence/current-20260908/`.
+- Unresolved: connected Chrome, then live A3–A7 and final audit/gate. 5V is accepted.

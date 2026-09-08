@@ -4,15 +4,15 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
-- Current/last accepted: **SLICE-5U ACCEPTED**, `docs/operations/launch-slices/SLICE-5U.md` → `## Accepted closeout`.
-- Blocked on: nothing for 5U. Grok PASS; frozen unsandboxed gate 4326/0, exit 0.
-- Next dependency-ready: `docs/operations/launch-slices/SLICE-5P.md`, repeat current eligibility preflight then one live unscheduled draft/readback/delete with --only-id x-1.
-- Last decision: preserve x-1 and x-2 approvals; explicit selector uses the existing guarded CLI path, consumes no draft slot.
-- History finding: recorded pre-dispatch failed retries are supported despite absent newer approval journal; unknown history remains blocked.
-- 5P is NOT ACCEPTED; no live provider call in this rerun. Evidence: 5P packet → `## Stopped` and 5U operator procedure.
-- 5S/5T remain accepted: approval separate from dispatch; unified unscheduled draft and durable duplicate protection.
+- Current/last accepted: **SLICE-5V ACCEPTED**, `docs/operations/launch-slices/SLICE-5V.md` → `## Accepted closeout`.
+- Blocked on: nothing for 5V. Grok PASS; frozen unsandboxed gate 4327/0, exit 0.
+- Next dependency-ready: `docs/operations/launch-slices/SLICE-5P.md`; reconnect Chrome, then current eligibility preflight and one live draft/readback/delete.
+- 5P NOT ACCEPTED: no connected browser; exact unscheduled readback unavailable. No live provider call in this session.
+- Last decision: every Typefully create invocation makes at most one POST; ambiguous attempts retain duplicate protection.
+- Live command: 5P packet → `## Verify`, --no-schedule --only-id x-1; preserve both approvals and all durable history.
+- 5S/5T/5U remain accepted: approval separate from dispatch, unscheduled draft state, exact row selector.
+- Evidence: `/private/tmp/slice-5v-evidence/`; 5P preflight under `/private/tmp/slice-5p-rerun-evidence/current-20260908/`.
 - Then: durable per-piece X opt-in (5R A6), analytics brand_id backfill.
-- Design sanity: `## Standing constraints`. Needs Muxin, not blocking: .claude/skills fixes named in 5N/5P.
 - Everything below this block is history; read only packet-cited headings.
 
 ## Standing constraints`.
@@ -1401,6 +1401,23 @@ Accepted source/test and packet/master changes are committed locally on main, no
 review-queue and notes-spread-ledger edits remain outside the commit. Next is refreshed 5P with
 --no-schedule --only-id x-1: recheck current eligibility, observe the real unscheduled draft, delete
 that exact ID and verify absence. No live 5P acceptance is claimed here.
+
+### 2026-09-08 — SLICE-5V accepted: one-attempt Typefully creation
+
+5P preflight after 5U confirmed x-1 eligibility and unchanged operational hashes, but Grok source
+review established an outer processing-message loop could repeat an ambiguous 5xx/network create;
+429 also exceeded the fixed attempt budget. Chrome was disconnected, so no live call occurred.
+5P stays NOT ACCEPTED; its earlier selector blocker is retired.
+
+Codex Terra xhigh repaired only createDraft and its tests in 5V. Every create outcome now makes
+one POST. Six fake transport cases pass; the actual CLI retains uncertain state after an ambiguous
+503 and blocks a repeated invocation without another POST. Shared retry defaults and scheduling
+payloads are unchanged. Media processing failures surface for review instead of automatic re-POST.
+Grok PASS, no material findings; focused 39/0, typecheck 0; frozen unsandboxed full gate 4327/0,
+exit 0. Coordinator integrates the verified candidate locally; no push or operational mutations.
+Evidence and cleanup disposition: `docs/operations/launch-slices/SLICE-5V.md` → `## Accepted closeout`.
+Next: reconnect Chrome and resume 5P's exact-ID live verification with a fresh eligibility check.
+
 
 ## Current handoff — 2026-09-02
 

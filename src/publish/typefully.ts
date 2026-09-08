@@ -152,33 +152,19 @@ export function buildDraftPayload(opts: {
   return payload;
 }
 
-// Create a Typefully draft, retrying on "processing" (an uploaded video/image can still be
-// transcoding for a few seconds after uploadMedia returns). Exported so cards.ts (native
-// quote-card image posts) retries identically instead of drifting from publishText's behavior.
+// Create a Typefully draft exactly once. A network or 5xx outcome can follow persistence, so every
+// create outcome, including 429 or a media-processing response, follows the one-attempt policy.
+// Callers must surface that failure for review.
+// Exported so cards.ts (native quote-card image posts) uses the same one-attempt rule.
 export async function createDraft(
   setId: string,
   payload: Record<string, unknown>
 ): Promise<{ id?: string | number; share_url?: string }> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return (await api(
-        `/social-sets/${setId}/drafts`,
-        { method: "POST", body: JSON.stringify(payload) },
-        // Creates a real scheduled draft — a lost-response network error OR a 5xx must not
-        // retry this and risk a duplicate scheduled post landing later (a 5xx can arrive after
-        // Typefully already committed the draft). Only 429 still retries (an explicit
-        // rejection, never processed).
-        { retryOnNetworkError: false }
-      )) as { id?: string | number; share_url?: string };
-    } catch (e) {
-      if (attempt < 12 && /processing/i.test((e as Error).message)) {
-        if (attempt === 0) console.log(`  ↳ media still transcoding, waiting…`);
-        await new Promise((r) => setTimeout(r, 5000));
-        continue;
-      }
-      throw e;
-    }
-  }
+  return (await api(
+    `/social-sets/${setId}/drafts`,
+    { method: "POST", body: JSON.stringify(payload) },
+    { retries: 0, retryOnNetworkError: false }
+  )) as { id?: string | number; share_url?: string };
 }
 
 // The draft title publishText gives every row it schedules — the ONE identifier that ties a live
