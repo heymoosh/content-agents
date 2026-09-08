@@ -134,7 +134,7 @@ is therefore not required.
 
 ## Families
 
-- Builder: OpenAI Codex, `gpt-5.6-terra`, high effort (Muxin authorized a non-highest-tier Codex route on 2026-09-07).
+- Builder: OpenAI Codex, `gpt-5.6-terra`, xhigh effort after protocol escalation for omitted checks (Muxin authorized a non-highest-tier Codex route on 2026-09-07).
 - Auditor: Grok, strong tier (Muxin requested this route on 2026-09-07). Receives the diff, the changed-file list, the focused test
   output and this Acceptance list only.
 
@@ -153,7 +153,7 @@ Return the RESULT BLOCK in the final response; coordinator persists it here.
 
 ## Closeout
 
-No closeout tool in this repository. **NOT ACCEPTED**: focused checks pass after the high-effort repair, but scheduling eligibility, visual proof, independent closure and the frozen repository-wide gate remain pending; see `## Stopped`.
+No closeout tool in this repository. **NOT ACCEPTED**: safer scheduling repair and source audit closure pass; rendered visual proof and the subsequent frozen repository-wide gate remain pending. See `## Stopped`.
 
 ## RESULT BLOCK (worker fills this in and returns it)
 
@@ -180,7 +180,7 @@ Muxin authorized proceeding without Claude using a suitable non-highest-tier Cod
 
 The old status route passed a pre-approval row to `scheduleApprovedOnce`; the new endpoint necessarily reads an approved row. The legacy no-attempt approval guard would reject it. Coordinator proposed the narrow helper option above, but automatic approval review REJECTED it. It is not authorized to execute without a materially safer design or informed user approval; no bypass or patch artifact was applied. Any eventual design must preserve legacy missing-history and recorded uncertain-attempt protection while permitting demonstrably new approvals to schedule. `/api/status` also drops publishing eligibility prechecks so approval is solely a status update. This changes no product scope.
 
-## Stopped
+## Previous stop — superseded by safer-design resume
 
 - Blocker: automatic approval review rejected the higher-effort creation-provenance integration into the empty-history scheduling guard. 5S is NOT ACCEPTED.
 - Exact rejection: “This patch bypasses the existing publishing retry guard whenever local provenance exists but the provider ledger is empty, which can re-dispatch after a provider call whose ledger write failed and create duplicate external schedules; the task does not specifically authorize this unsafe exception.”
@@ -214,3 +214,78 @@ Complete every checklist item in the Grok audit section, focused tests and dispo
 Worker `/root/repair_5s_high` used the same `gpt-5.6-terra` model at high effort, escalating one notch from medium as requested. Four retained changed paths are listed in Stopped. Added the Schedule route and corrected stale UI assertions; focused suite 402/0 and A1 HTTP/source cases 2/0. The HTTP test observes no publishing-ledger growth, but the exact dependency-call assertion still needs independent acceptance review. Advisor rejected transition-only provenance because legacy status cycling can manufacture it. Coordinator approved a bounded creation-provenance ownership expansion; automatic approval review rejected its integration with the empty-history guard. Worker removed unintegrated provenance changes; no rejected artifact remains. All original publisher helpers remain unchanged. No browser fixture or fresh Grok closure was run because the known integration blocker remains.
 
 Hygiene for high-effort stop: exit 1 solely for two intentionally retained dirty checkouts. Rescue refs: `refs/wip/content-agents` (`60a4d57`), `refs/wip/content-agents-slice-5s-codex` (`624881e`). No untracked repository paths created or left by this session. Preserve the pre-existing review queue and notes-spread ledger edits, candidate worktree, and existing local-only branches. Coordinator commits only AGENTS guidance plus packet/master documentation.
+
+## Safer-design resume — 2026-09-07
+
+Muxin chose duplicate-safe scheduling instead of accepting the rejected empty-history exception. This is the current instruction and supersedes the prior request for informed risk approval. Coordinate a materially safer design: establish a provable first attempt, reconcile with provider evidence, or use supported provider idempotency. Missing provider history alone is never evidence that dispatch is safe. Creation/approval provenance alone must not bypass the guard.
+
+Before implementation, obtain advisor guidance on durable pre-dispatch fencing and every relevant dispatch entry point. Authorize the smallest necessary owned-file expansion here after the proposal. Preserve uncertain and legacy unknown attempts; do not automatically retry them. A durable claim must precede every external side effect that uses fresh eligibility, and failure or restart after a claim must not restore fresh eligibility. Test concurrent dispatch, failed persistence before dispatch, provider success followed by failed local confirmation, restart and status cycling. The retained four-file candidate is the starting point; builder remains Terra high effort, auditor remains Grok. No real publishing canary.
+
+Resume plan completed through source audit closure; current status and single next action are in `## Stopped`.
+
+## Approved safe-dispatch design — 2026-09-07
+
+Advisor checkpoint: trusted creation plus committed approval is a **one-time dispatch capability**, never a standalone missing-history exception. Implement in the already owned provenance/queue/jobs/publishing-status/serve files, after bounded caller review confirms no alternative dispatch path can leave that capability unconsumed. Authorize reading and adding focused caller-coverage tests in `src/review/publish-drain.test.ts`, `src/grow/experiment-scheduling.test.ts` and `src/publish/unified-cli.test.ts`; production caller edits require a bounded proposal if needed. Do not expand delivery-event schema: use a separate strict safety journal.
+
+- Under the same atomic row claim used by scheduling, re-read the live queue, require current approve and matching committed approval fingerprint. Status mutation and approval evidence must share that claim, with intent/write/commit ordering; interrupted transitions fail closed.
+- Before any scheduler/provider dispatch callback, append and fsync `dispatch_started`, permanently consuming fresh eligibility. Persist directory creation/entry as needed for durability. A failure to persist means zero external dispatch. Provider success followed by failed terminal history write never restores eligibility; no generic error or status cycle clears the fence.
+- Only demonstrably newly created identities receive trusted creation evidence; absent, malformed, incomplete, reused, or changed identity evidence fails closed. Legacy rows remain unknown; unsupported creation paths remain conservatively untrusted.
+- An existing fence requires supported reconciliation or existing explicit proof of no external effect, bound to that attempt. Do not let a stale failed/canceled event override a newer fence. Preserve existing retry semantics only where they prove no object was created.
+- Cover all uses of scheduleApprovedOnce, scheduleApproved and direct caller paths capable of acting on stamped rows. No alternate path may dispatch while leaving a fresh capability usable.
+- Required tests: status-only zero scheduler calls; successful first Schedule exactly once; repeated/concurrent Schedule one provider call; journal write failure zero calls; provider success plus failed terminal save then restart zero additional calls; malformed journal, status cycling, changed payload and ID reuse refuse; existing cleared/failed/uncertain paths correctly gated; mixed selection outcomes visible persistently.
+
+Builder effort was subsequently raised to Terra xhigh; Grok remains independent. This design is authorized by Muxin's explicit safer-scheduling instruction; it does not authorize the previously rejected provenance-only guard bypass. Finish fixture proof before final Grok closure and full gate.
+
+Advisor final caller coverage: GUI Schedule, background drain, Grow experiment scheduling and unified publish CLI all enter `scheduleApprovedOnce`; the direct GUI fallback has no schedule kind and reaches no owned publisher. Authorize integration of the design above. Add a regression for that fallback. Dispatch authorization strictly parses both safety journal and publishing ledger; tolerate malformed history for display only. Persist and fsync the existing uncertain event after the safety fence and before dispatch. Retain protection after ambiguous failure or failed terminal save; exact-attempt reconciliation must not revive a stale capability. No production caller/provider ownership expansion is required by the bounded review.
+
+## Coordinator repair checklist — safer-design review
+
+Raise same Terra builder effort high → xhigh for omitted requirements, per protocol; Grok remains independent. Existing six safety cases and separate-process claim case pass per worker, but do not establish all invariants. Address these before audit:
+
+1. `approvalSchedulingBlock` currently selects older committed status while ignoring a later unmatched intent. Require a complete valid latest transition; test interrupted newer approval/status intent refusing dispatch.
+2. `scheduleApprovedOnce` checks provenance only when no prior ledger event. Require strict safety-journal parsing and attempt-bound fence disposition even with prior failed/canceled events; stale prior outcomes cannot supersede a newer attempt, changed approval or malformed journal. Test each bypass.
+3. Two row-claim implementations diverge; scheduler still releases unconditionally. Unify claim behavior/durability and retain uncertainty protection as specified. Close the previously reported but unimplemented retain-claim behavior with actual failure/restart tests.
+4. Safety journal append lacks file locking and complete-write handling. Serialize the journal and make full event+fsync durability explicit, including directory entries. Test competing writers and persistence failures.
+5. Implement exact-attempt reconciliation or provide an explicitly supported disposition preserving existing resolve/safe retry behavior; current journal has no attempt identifier or exact clear event. Never clear by a generic older failed state.
+6. Creation fingerprint currently locks content forever: ordinary edits plus reapproval must be distinguished from identity reuse. Test supported edit/reapprove path or identify a material acceptance blocker; do not silently strand edited new drafts.
+7. Complete declared focused regression suite, new queue/jobs caller proof, HTTP single/selection success/refusals, and zero-provider fallback proof. Fixture event count is a ledger count, not a callback counter.
+
+Browser verification currently unavailable: CUA getBrowser reports no browser and getState returns empty apps/browsers. No screenshot or rendered A9 pass may be claimed. Complete unaffected focused proof and Grok audit, then stop without acceptance if browser remains unavailable; do not run full gate with known acceptance work remaining.
+
+## Xhigh repair result — 2026-09-07
+
+Same Terra model raised high → xhigh for omitted design requirements. Candidate frozen by worker at `/private/tmp/content-agents-slice-5s-codex`; detached coordinator audit snapshot `/private/tmp/slice-5s-safe-audit` based on `d1c7cc0`, patch SHA256 `88b0366f4011bc9845179c0a0af89d7cc49a305907bd91b390f6e622b2452a2e`. Nine changed paths: queue.ts; review approval-provenance.ts and test (new), publishing-status.ts and test, serve.ts and test, page.ts and test.
+
+Worker reports all final commands exit 0: focused combined 593/593, serve/page 389/389, provenance 13/13, publishing status 15/15, caller regression 176/176, typecheck and diff check. Logs `/private/tmp/slice-5s-evidence/{focused-regression-xhigh-final,serve-page-xhigh-unsandboxed,approval-provenance-xhigh-third,publishing-status-xhigh-third,caller-coverage-xhigh-first,typecheck-xhigh-final,diff-check-xhigh-final}.txt`. These overlapping suites are not additive independent test counts.
+
+Fake HTTP proof: approval callbacks 0→0; single Schedule once; selection skips planned row and schedules second eligible row; final schedulerCallbacks 2. `/private/tmp/slice-5s-evidence/fixture-*.json`. This fixture mocks the scheduling boundary (publishingLedgerEvents stays 0); actual pre-dispatch fence and failure ordering are covered separately by provenance/publishing tests, not by this HTTP fixture. Worker cleaned temporary content and stopped its fixture server. No screenshot or rendered A9 proof: CUA returned no connected apps/browsers. No full gate, integration, or push.
+
+Independent Grok audit launched with workspace sandbox and no edits: first three-turn and second ten-turn runs exited 1 at the reading limit with no findings. Continued the existing session to avoid rereading. Evidence prefix `/private/tmp/slice-5s-evidence/grok-safe-audit-`; final disposition pending below.
+
+## Grok safe-candidate audit — repair checklist
+
+Grok continuation returned A1–A8 supported, no established safety-journal bypass, but NOT clear for acceptance. Coordinator verified introduced A9 defect: Pending text in `page.ts` inherits body 15px instead of required 1.125rem; apply `.scan-body` or explicit equivalent and regression assertion. Keep IDs muted and errors persistent. This is the single established implementation defect in this audit.
+
+Close material verification gap: existing HTTP tests/fixture mock scheduleApprovedOnce; add a real HTTP request through the actual authoritative wrapper, injecting only a fake provider callback and isolated ledger, with fresh creation+approval+dispatch fence evidence and no extra callback on retry. Add explicit revise/discard refusal cases in the same bounded test. Test-only injection remains inaccessible over production HTTP. Re-run affected focused checks and typecheck with recorded exit status; return fixed diff for independent Grok closure.
+
+Evidence dispositions: typecheck empty stdout is normal; worker separately recorded exit 0. Caller suites 176/176 are regression evidence, not proof that every caller exercises a fresh journal path. HTTP fixture counter deliberately mocks scheduling boundary; zero ledger count is not a defect. No screenshot/rendered A9 proof until browser connects. Optional helper alignment and extra caller coverage are not speculative scope expansions; only change if required to establish the fixed invariant.
+
+## Post-audit repair evidence — 2026-09-07
+
+Worker repaired the confirmed body-size defect by applying `.scan-body` and a focused assertion; this closes the source/CSS defect only, not rendered A9 verification. Added HTTP test through actual scheduleApprovedOnce with isolated creation/approval journal and publishing ledger, faking only provider callback. Pending/revise/discard refuse; approve makes zero callbacks; first Schedule observes dispatch_started + uncertain before callback and records planned; repeated Schedule makes no additional callback. An optional journal path in appendRows and test scheduling dependencies isolate the test; production defaults remain unchanged.
+
+Affected tests 418/418, fail 0, exit 0; typecheck exit 0; diff check exit 0. Logs `/private/tmp/slice-5s-evidence/post-audit-{focused,typecheck,diff-check}.txt`. Prior caller regression remains 176/176. No repository-wide gate or real publishing. Independent closure requested from the existing Grok session, bounded incremental diff `/private/tmp/slice-5s-evidence/grok-safe-closure.patch` and prompt/result artifacts of the same prefix.
+
+## Independent closure — 2026-09-07
+
+Grok continuation audit exited 0; subsequent incremental closure also exited 0. Source defect closed, HTTP fence/revise/discard gaps closed, no new established defects. A1–A8 PASS; A9 source PASS, rendered unverified. Caller regression 176/176 is correctly limited to regression coverage. Closure `/private/tmp/slice-5s-evidence/grok-safe-closure-result.txt`; full findings `/private/tmp/slice-5s-evidence/grok-safe-audit-continuation-result.txt`. Final audited diff SHA256 `07f2d394f56ac5d2819f4776cdac71dcfd0edbb8f430a1d138ce995066e0fbde`, saved as `safe-candidate-final.patch` in that evidence directory. Verified audit snapshot exactly matched retained candidate after Grok; removed only this session's disposable audit worktree.
+
+## Stopped
+
+- Blocker: no browser connected to CUA (initial check and final recheck returned apps=[] and browsers=[]); required rendered Publishing/A9 check cannot run. 5S is NOT ACCEPTED. This is a verification-environment blocker, not a request to accept duplicate-schedule risk.
+- Verified: final affected suite 418/418, zero failures, exit 0; prior caller regression 176/176; typecheck and diff check exit 0. Real HTTP wrapper proof: approve zero provider callbacks, first Schedule one callback after durable fence+uncertain ledger, repeated Schedule no extra callback. Grok independent source/behavior audit closure exit 0; no new established defects. No screenshot, authenticated publishing, full repository gate, implementation commit, or push.
+- Retained work: `/private/tmp/content-agents-slice-5s-codex`, branch `slice-5s-codex`; seven tracked modified files (`src/publish/queue.ts`, review `publishing-status.ts`, `publishing-status.test.ts`, `serve.ts`, `serve.test.ts`, `page.ts`, `page.test.ts`) and two new files `src/review/approval-provenance.ts`, `src/review/approval-provenance.test.ts`. Bounded evidence `/private/tmp/slice-5s-evidence/`, final patch/hash as above. Preserve candidate; coordinator commits only this packet/master status, per stopping rule.
+- Next action: connect a browser, recreate the isolated fake-provider Publishing fixture from the retained candidate and complete visual A9/screenshot; obtain independent visual closure, then freeze and run the full unsandboxed gate once before coordinator acceptance/integration.
+- Closeout: NOT ACCEPTED. Legacy unknown-history approvals remain conservatively blocked; no provenance-only bypass was approved. No further user decision about duplicate risk is required. Hygiene disposition follows.
+
+Hygiene closeout: rescue exited 1 solely for two intentionally retained dirty checkouts. Saved main state to `refs/wip/content-agents` (`b6a7af0`) and candidate including both new provenance files to `refs/wip/content-agents-slice-5s-codex` (`d57ccbd`). Per stopping rule, leave candidate uncommitted/unintegrated; these two new files remain on disk and are recoverable in rescue ref and final patch. Main pre-existing `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md` and `data/notes-spread-ledger.jsonl` are preserved. No other untracked repository paths from this session. Identified and stopped this session's remaining port4675 `fixture-server.ts` process; no real provider server touched. Retained local-only branches unchanged. Coordinator commits only packet/master edits.

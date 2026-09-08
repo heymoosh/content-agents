@@ -5,12 +5,12 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, unpushed by standing order).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
 - Current slice: **SLICE-5S NOT ACCEPTED**, `docs/operations/launch-slices/SLICE-5S.md` → `## Stopped`.
-- Blocked on: automatic review rejected creation-provenance/empty-history scheduling; informed approval or materially safer design required.
-- Next dependency-ready: finish **SLICE-5S** after guard resolution; candidate at `/private/tmp/content-agents-slice-5s-codex`, focused checks 402/0.
+- Blocked on: no browser connected; rendered Publishing/A9 proof, then frozen full gate.
+- Next dependency-ready: finish **SLICE-5S** from `/private/tmp/content-agents-slice-5s-codex`; source audit clear, affected checks 418/0, caller regression 176/0.
 - Last accepted: **SLICE-5R**, `71f2df9`; gate 4304 tests / 0 failures.
 - Then unwritten: unscheduled-draft repair on unified route, rerun 5P, durable per-piece X opt-in (5R A6), analytics `brand_id` backfill.
-- Last decision (Muxin, 2026-09-07): use a suitable non-highest-tier Codex builder without waiting for Claude; retain Grok audit. Repair raised to `gpt-5.6-terra`, high effort. Grok workspace sandbox authorized for no-edit audit.
-- **SAFETY, Muxin only:** until 5S, retrying `x-1`/`x-2` can publish once Postiz answers. Set both to `pending` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`; this session did not change either row.
+- Last decision (Muxin, 2026-09-07): duplicate-safe first-attempt handling, no risk exception. Terra xhigh repair; Grok workspace no-edit audit closure PASS.
+- **SAFETY, Muxin only:** main is still pre-5S; retrying `x-1`/`x-2` can publish. Set both to `pending` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`; unchanged here.
 - Design sanity rule: `## Standing constraints`. Needs Muxin, not blocking: `.claude/skills/**` edits named in 5N and 5P.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
 
@@ -50,6 +50,11 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-07 — 5S safer scheduling source audit clear; visual verification blocked
+
+Muxin chose duplicate-safe handling instead of the rejected provenance-only exception. Terra high repair omitted material invariants; same model increased to xhigh and repaired strict latest transitions, durable one-time fence, exact reconciliation, persistence/concurrency and HTTP evidence. Final affected checks 418/0, prior caller regression 176/0, typecheck exit 0. Grok workspace audit found Pending typography defect, now fixed and independently closed; actual HTTP scheduling wrapper/fake callback proof also closed. No browser available, so no rendered A9 or full gate and no implementation integration. Retained candidate and final patch/hash are in SLICE-5S → Stopped. No user risk approval needed; next action is connect browser and finish verification.
+
 
 Append-only. Newest first. Never rewrite a completed dated entry.
 
