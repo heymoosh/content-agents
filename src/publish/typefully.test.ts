@@ -12,9 +12,82 @@
 
 import { test, describe, after } from "node:test";
 import assert from "node:assert/strict";
-import { buildDraftPayload, buildPosts, fetchScheduledDrafts, cancelDraft } from "./typefully.js";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buildDraftPayload, buildPosts, fetchScheduledDrafts, cancelDraft, parseTypefullyCliInvocation, runTypefullyCli } from "./typefully.js";
+import { readQueue, writeCell } from "./queue.js";
+import { commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "../review/approval-provenance.js";
+import { readPublishingStatuses } from "../review/publishing-status.js";
 
 const POSTS = [{ text: "Verbatim note text spread to a text channel." }];
+
+test("the production Typefully CLI parses unscheduled intent and sends one fake-network private draft through the unified route", async () => {
+  const root = mkdtempSync(join(tmpdir(), "slice-5t-typefully-cli-"));
+  const folder = join(root, "piece");
+  const statusPath = join(root, "publishing-status.jsonl");
+  const slotPath = join(root, "slot-ledger.jsonl");
+  const oldFetch = globalThis.fetch;
+  const saved = Object.fromEntries([
+    "TYPEFULLY_API_KEY", "TYPEFULLY_SOCIAL_SET_ID", "CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID",
+    "CONTENT_AGENTS_TEST_BETS_PATH", "CONTENT_AGENTS_TEST_LEDGER",
+  ].map((key) => [key, process.env[key]]));
+  const requests: Array<{ url: string; method: string; payload: Record<string, unknown> }> = [];
+  let preCallbackFence = false;
+  try {
+    mkdirSync(join(folder, "derivatives"), { recursive: true });
+    writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+    writeFileSync(join(folder, "derivatives", "x-1.md"), "---\nplatform: x\n---\n\nApproved fixture body.\n");
+    writeFileSync(join(folder, "review-queue.md"), "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | fixture |\n");
+    const journal = journalPathForLedger(statusPath);
+    recordNewQueueRows(folder, readQueue(folder).rows, journal);
+    assert.equal(commitReviewStatus(folder, "piece", "x-1", "approve", () => writeCell(folder, "x-1", { status: "approve" }), statusPath, journal), true);
+    process.env.TYPEFULLY_API_KEY = "fake-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "fake-set";
+    process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = "human-inference/typefully";
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = join(root, "bets.md");
+    writeFileSync(slotPath, "");
+    process.env.CONTENT_AGENTS_TEST_LEDGER = slotPath;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      preCallbackFence = readFileSync(journal, "utf8").includes("\"dispatch_started\"");
+      requests.push({ url: String(input), method: init?.method ?? "GET", payload: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown> });
+      return new Response(JSON.stringify({ id: "draft-fixture-1" }), { status: 200 });
+    }) as typeof fetch;
+
+    await runTypefullyCli(["node", "src/publish/typefully.ts", folder, "--no-schedule"], {}, { publishingStatusPath: statusPath });
+
+    assert.deepEqual(parseTypefullyCliInvocation(["node", "src/publish/typefully.ts", folder], { TYPEFULLY_SCHEDULE: "off" }), { list: false, folderArg: folder, noSchedule: true, forceReuse: false });
+    assert.throws(() => parseTypefullyCliInvocation(["node", "src/publish/typefully.ts", folder, "--no-schedule"], { TYPEFULLY_SCHEDULE: "on" }), /conflicting scheduling intent/);
+    assert.equal(requests.length, 1, "the approved row creates exactly one draft request");
+    assert.equal(requests[0]?.url, "https://api.typefully.com/v2/social-sets/fake-set/drafts");
+    assert.equal(requests[0]?.method, "POST");
+    assert.ok(!("publish_at" in requests[0]!.payload), "the actual request has no scheduled or next-free-slot value");
+    assert.equal(readQueue(folder).rows[0]?.status, "approve", "saving a private draft must not mark the review row published");
+    const outcome = readPublishingStatuses(statusPath)["piece/x-1"];
+    assert.equal(outcome?.state, "private");
+    assert.equal(outcome?.providerObjectId, "draft-fixture-1");
+    assert.equal(outcome?.plannedFor, undefined);
+    assert.equal(readFileSync(statusPath, "utf8").includes("draft-fixture-1"), true);
+    assert.equal(readFileSync(slotPath, "utf8"), "", "draft mode leaves the automatic slot ledger untouched");
+    if (process.env.SLICE_5T_EVIDENCE_PATH) {
+      writeFileSync(process.env.SLICE_5T_EVIDENCE_PATH, JSON.stringify({
+        command: "node --import tsx --test --test-concurrency=1 src/publish/typefully.test.ts",
+        fakeNetworkCallbackCount: requests.length,
+        preCallbackDispatchFence: preCallbackFence,
+        request: requests[0],
+        publishingResult: { state: outcome?.state, providerObjectId: outcome?.providerObjectId, plannedFor: outcome?.plannedFor },
+        slotLedgerBefore: "",
+        slotLedgerAfter: readFileSync(slotPath, "utf8"),
+      }, null, 2) + "\n");
+    }
+  } finally {
+    globalThis.fetch = oldFetch;
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 describe("typefully buildDraftPayload: scheduled vs unscheduled contract", () => {
   test("daily notes path (publishAt=null) produces an UNSCHEDULED draft: no publish_at key", () => {

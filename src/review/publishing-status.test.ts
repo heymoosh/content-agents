@@ -114,6 +114,39 @@ describe("durable publishing status", () => {
     assert.equal(readPublishingStatuses(path)["piece/x-1"]?.state, "planned");
   });
 
+  test("a private Typefully draft retains its id without a planned time and blocks a later scheduled create", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    let calls = 0;
+    const privateDraft = await scheduleApprovedOnce(folder, "piece", row, async () => {
+      calls++;
+      return { scheduled: { draftId: "private-draft-1", when: "unscheduled", plannedFor: null, autoPublishes: false }, scheduleError: null };
+    }, path, undefined, "unscheduled-draft");
+    assert.equal(privateDraft.publishing.state, "private");
+    assert.equal(privateDraft.publishing.providerObjectId, "private-draft-1");
+    assert.equal(privateDraft.publishing.plannedFor, undefined);
+    await assert.rejects(() => scheduleApprovedOnce(folder, "piece", row, async () => {
+      calls++;
+      return { scheduled: { draftId: "would-duplicate" }, scheduleError: null };
+    }, path), /already has a private publishing attempt|durable dispatch fence/i);
+    assert.equal(calls, 1, "an existing private draft blocks the ordinary scheduled route too");
+  });
+
+  test("a private Typefully draft blocks a repeated private create", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    let calls = 0;
+    await scheduleApprovedOnce(folder, "piece", row, async () => {
+      calls++;
+      return { scheduled: { draftId: "private-draft-1", when: "unscheduled", plannedFor: null, autoPublishes: false }, scheduleError: null };
+    }, path, undefined, "unscheduled-draft");
+    await assert.rejects(() => scheduleApprovedOnce(folder, "piece", row, async () => {
+      calls++;
+      return { scheduled: { draftId: "would-duplicate" }, scheduleError: null };
+    }, path, undefined, "unscheduled-draft"), /already has a private publishing attempt|durable dispatch fence/i);
+    assert.equal(calls, 1, "an existing private draft blocks another private route too");
+  });
+
   test("serializes publishing-ledger appends across processes", async () => {
     const path = ledger();
     const source = `import { appendPublishingStatus } from "./src/review/publishing-status.ts";

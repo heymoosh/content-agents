@@ -18,6 +18,7 @@ import { claimSlots, fmtLa, cadenceSourceFor } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
 import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
+import type { UnifiedPublishOptions } from "./unified-cli.js";
 
 // Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
 // Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish time
@@ -316,15 +317,24 @@ export interface ScheduledRow {
   plannedFor: string | null; // exact provider/ledger timestamp; null for an unscheduled draft
   draftId: string;
   manualComment: string | null;
+  /** An unscheduled draft is private in Typefully and cannot post by itself. */
+  autoPublishes?: false;
 }
 
 // Publish approved text rows (x/linkedin/bluesky) to Typefully as scheduled drafts. Extracted from
 // the CLI so the review GUI can schedule ONE row on approve (opts.onlyIds). With no opts it behaves
-// exactly as the CLI did — every approved text row in the folder — so the CLI + notes-daily paths
-// are unchanged.
+// exactly as the CLI did — every approved text row in the folder. The unified draft adapter is the
+// one explicit caller allowed to defer legacy local completion until it records a durable outcome.
 export async function publishText(
   folder: string,
-  opts: { onlyIds?: string[]; noSchedule?: boolean; forceReuse?: boolean; deliveryPolicy?: DeliveryPolicyDecision } = {}
+  opts: {
+    onlyIds?: string[];
+    noSchedule?: boolean;
+    /** Only the unified draft adapter owns the subsequent durable private-result write. */
+    deferNoScheduleCompletion?: boolean;
+    forceReuse?: boolean;
+    deliveryPolicy?: DeliveryPolicyDecision;
+  } = {}
 ): Promise<ScheduledRow[]> {
   const { rows } = readQueue(folder);
   let approved = rows.filter((r) => r.status === "approve" && TEXT_PLATFORMS.has(r.platform));
@@ -336,8 +346,7 @@ export async function publishText(
   const deliveryDecision = assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
 
   // UNSCHEDULED-draft mode (opts.noSchedule): skip claimSlots + OMIT publish_at, so drafts are saved
-  // UNSCHEDULED and will NOT auto-post — they sit in Typefully until a human schedules them. Used by
-  // the daily notes cloud routine (src/cron/notes-daily.ts) so nothing fires automatically.
+  // UNSCHEDULED and will NOT auto-post — they sit in Typefully until a human schedules them.
   const noSchedule = opts.noSchedule ?? false;
 
   // Reuse guard: skip platforms where this slug was published too recently.
@@ -439,6 +448,24 @@ export async function publishText(
       setId,
       buildDraftPayload({ title: rowDraftTitle(row.id), platformKey, posts, publishAt })
     );
+    // The unified wrapper records this result in its durable publishing ledger immediately after
+    // this function returns. Only that adapter may defer the legacy queue/log/placement mutations:
+    // a local write failure after Typefully accepted the request would otherwise lose the draft id
+    // and incorrectly make a real saved draft look uncertain. Direct noSchedule callers retain
+    // their historic completion behavior below.
+    if (noSchedule && opts.deferNoScheduleCompletion) {
+      console.log(`saved (unscheduled): ${row.id} (${row.platform}) → typefully draft ${draft.id ?? "?"}${manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : ""}`);
+      results.push({
+        id: row.id,
+        platform: row.platform,
+        when: "unscheduled",
+        plannedFor: null,
+        draftId: String(draft.id ?? "?"),
+        manualComment,
+        autoPublishes: false,
+      });
+      continue;
+    }
     setStatus(folder, row, "published");
     const placeNote = ctas.length > 0 ? `, cta→${placement}` : "";
     appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, ${when}${placeNote})`);
@@ -466,30 +493,57 @@ export async function publishText(
   return results;
 }
 
-async function main() {
-  const arg = process.argv[2];
-  if (!arg) {
-    console.error("usage: tsx src/publish/typefully.ts <content-folder> | --list");
-    process.exit(1);
-  }
+export type TypefullyCliInvocation =
+  | { list: true }
+  | { list: false; folderArg: string; noSchedule: boolean; forceReuse: boolean };
+
+/** Parse the public Typefully CLI once, before importing the unified write route. */
+export function parseTypefullyCliInvocation(
+  argv: readonly string[] = process.argv,
+  env: { TYPEFULLY_SCHEDULE?: string } = process.env,
+): TypefullyCliInvocation {
+  const [arg, ...flags] = argv.slice(2);
+  if (!arg) throw new Error("usage: tsx src/publish/typefully.ts <content-folder> [--no-schedule|--schedule] | --list");
   if (arg === "--list") {
+    if (flags.length > 0) throw new Error("--list cannot be combined with publishing flags");
+    return { list: true };
+  }
+  if (arg.startsWith("-")) throw new Error("the content folder must be the first argument");
+  const allowed = new Set(["--no-schedule", "--schedule", "--force-reuse"]);
+  const invalid = flags.find((flag) => !allowed.has(flag));
+  if (invalid) throw new Error(`unknown Typefully publish option: ${invalid}`);
+  const noScheduleFlag = flags.includes("--no-schedule");
+  const scheduleFlag = flags.includes("--schedule");
+  const scheduleEnv = env.TYPEFULLY_SCHEDULE?.trim().toLowerCase() ?? "";
+  if (scheduleEnv && scheduleEnv !== "off" && scheduleEnv !== "on") {
+    throw new Error("TYPEFULLY_SCHEDULE must be 'off' for an unscheduled draft or 'on' for normal scheduling");
+  }
+  if ((noScheduleFlag && scheduleFlag) || (noScheduleFlag && scheduleEnv === "on") || (scheduleFlag && scheduleEnv === "off")) {
+    throw new Error("conflicting scheduling intent: choose either unscheduled draft mode or normal scheduling");
+  }
+  return { list: false, folderArg: arg, noSchedule: noScheduleFlag || scheduleEnv === "off", forceReuse: flags.includes("--force-reuse") };
+}
+
+export async function runTypefullyCli(
+  argv: readonly string[] = process.argv,
+  env: { TYPEFULLY_SCHEDULE?: string } = process.env,
+  testOptions: Omit<UnifiedPublishOptions, "noSchedule" | "dispatchMode"> = {},
+): Promise<void> {
+  const invocation = parseTypefullyCliInvocation(argv, env);
+  if (invocation.list) {
     await runList();
     return;
   }
-  const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
-  const noSchedule =
-    process.argv.includes("--no-schedule") ||
-    (process.env.TYPEFULLY_SCHEDULE ?? "").toLowerCase() === "off";
-  const forceReuse = process.argv.includes("--force-reuse");
-  if (noSchedule || forceReuse) throw new Error("legacy scheduling overrides are unavailable on the unified capability-selected publish path");
+  const folder = isAbsolute(invocation.folderArg) ? invocation.folderArg : join(repoRoot, invocation.folderArg);
+  if (invocation.forceReuse) throw new Error("legacy reuse overrides are unavailable on the unified capability-selected publish path");
   const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
-  await publishApprovedViaConfiguredProviders(folder, "text");
+  await publishApprovedViaConfiguredProviders(folder, "text", { ...testOptions, noSchedule: invocation.noSchedule });
 }
 
 // Run the CLI only when executed directly, so the module can be imported (fetchScheduledDrafts)
 // without triggering main()/process.exit. Matches tiktok.ts / cards.ts / youtube.ts.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((e) => {
+  runTypefullyCli().catch((e) => {
     console.error(e instanceof Error ? e.message : e);
     process.exit(1);
   });

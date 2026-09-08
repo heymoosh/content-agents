@@ -47,6 +47,8 @@ import {
 // Returns null for a row no scheduler owns — it just gets the plain approve status (CLAUDE.md rule 2
 // is preserved: the row was already set to approve; scheduling only mirrors what /publish would do).
 export type ScheduleKind = "text" | "card" | "tiktok" | "video" | "substack" | "outreach-lock" | "media";
+/** `unscheduled-draft` is an explicit Typefully-only intent, never a fallback scheduling route. */
+export type DispatchMode = "scheduled" | "unscheduled-draft";
 export const isConfiguredMediaRow = (row: Pick<QueueRow, "format" | "asset">): boolean =>
   (row.format === "image" || row.format === "video") && isConfiguredMediaAsset(row.asset);
 export function scheduleKind(row: QueueRow): ScheduleKind | null {
@@ -74,7 +76,13 @@ export function scheduleKind(row: QueueRow): ScheduleKind | null {
 // The five folder-level publish functions the dispatch routes to. Injected (default = the real ones)
 // so scheduleApproved is unit-testable WITHOUT any real PostPeer / Upload-Post / YouTube / browser call.
 export interface SchedulerDeps {
-  publishText: (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
+  publishText: (folder: string, opts: {
+    onlyIds?: string[];
+    noSchedule?: boolean;
+    /** This adapter defers completion so publishing-status can persist the provider id first. */
+    deferNoScheduleCompletion?: boolean;
+    deliveryPolicy?: DeliveryPolicyDecision;
+  }) => Promise<unknown[]>;
   publishCards: (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
   publishTikTok: (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
   publishShorts: (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
@@ -532,9 +540,13 @@ export async function scheduleApproved(
   row: QueueRow,
   deps: SchedulerDeps = DEFAULT_SCHEDULER_DEPS,
   policyDecision?: DeliveryPolicyDecision,
+  dispatchMode: DispatchMode = "scheduled",
 ): Promise<{ scheduled: unknown; scheduleError: string | null }> {
   const kind = scheduleKind(row);
   if (!kind) return { scheduled: null, scheduleError: null };
+  if (dispatchMode === "unscheduled-draft" && kind !== "text") {
+    return { scheduled: null, scheduleError: "unscheduled drafts are only supported for Typefully text rows" };
+  }
   // Outreach approval locks a message and never contacts a publishing provider.
   let selected: SelectedSchedulingProvider | undefined;
   // Hoisted out of the block below so the tail dispatch reads the SAME resolved policy's brand the
@@ -564,9 +576,13 @@ export async function scheduleApproved(
       ? deps
       : { ...deps, postizEnv: {} };
     try {
-      selected = policyDecision?.provider === "postiz"
-        ? await selectConfiguredProvider(row, providerDeps)
-        : policyDecision ? { provider: policyDecision.provider as SelectedSchedulingProvider["provider"] } : await selectConfiguredProvider(row, providerDeps);
+      // An explicit unscheduled draft has one supported provider and must never probe Postiz or
+      // choose a scheduled fallback. The Typefully policy is still checked below before its write.
+      selected = dispatchMode === "unscheduled-draft"
+        ? { provider: "typefully" }
+        : policyDecision?.provider === "postiz"
+          ? await selectConfiguredProvider(row, providerDeps)
+          : policyDecision ? { provider: policyDecision.provider as SelectedSchedulingProvider["provider"] } : await selectConfiguredProvider(row, providerDeps);
     }
     catch (e) { return { scheduled: null, scheduleError: e instanceof Error ? e.message : String(e) }; }
     const provider = selected.provider;
@@ -624,5 +640,19 @@ export async function scheduleApproved(
     : kind === "substack" ? deps.publishSubstack
     : kind === "outreach-lock" ? deps.lockOutreachMessage
     : deps.publishShorts;
+  if (dispatchMode === "unscheduled-draft") {
+    try {
+      const done = await deps.publishText(folder, {
+        onlyIds: [row.id],
+        noSchedule: true,
+        deferNoScheduleCompletion: true,
+        ...(policyDecision ? { deliveryPolicy: policyDecision } : {}),
+      });
+      if (done.length === 0) return { scheduled: null, scheduleError: reuseGuardBlock(folder, kind, row, resolvedBrand) ?? REUSE_GUARD_UNSPECIFIED };
+      return { scheduled: done[0], scheduleError: null };
+    } catch (error) {
+      return { scheduled: null, scheduleError: error instanceof Error ? error.message : String(error) };
+    }
+  }
   return runPublisher(fn, folder, row, kind, resolvedBrand, policyDecision);
 }

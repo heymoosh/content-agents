@@ -242,3 +242,43 @@ describe("the Content page's reuse guard checks a row against its own brand's pl
     assert.ok(SCRATCH.startsWith(tmpdir()), "every fixture this suite wrote lives under a throwaway directory");
   });
 });
+
+describe("explicit unscheduled Typefully drafts", () => {
+  test("force Typefully without Postiz discovery or a scheduled fallback", async () => {
+    let discoveryCalls = 0;
+    let captured: Record<string, unknown> | undefined;
+    const deps: SchedulerDeps = {
+      publishText: async (_folder, opts) => {
+        captured = opts;
+        return [{ draftId: "private-draft-1", when: "unscheduled", plannedFor: null, autoPublishes: false }];
+      },
+      publishCards: async () => [], publishTikTok: async () => [], publishShorts: async () => [],
+      publishSubstack: async () => [], lockOutreachMessage: async () => [],
+      resolveDeliveryPolicy: policyFor("human-inference"),
+      postizEnv: { POSTIZ_BASE_URL: "https://would-have-been-probed.test", POSTIZ_API_KEY: "not-used" },
+      fetchPostizRegistry: async () => { discoveryCalls++; throw new Error("must not discover Postiz for a private draft"); },
+    };
+    const result = await scheduleApproved("/tmp/slice-5t-private", textRow(), deps, undefined, "unscheduled-draft");
+    assert.equal(result.scheduleError, null);
+    assert.equal(discoveryCalls, 0);
+    assert.deepEqual(captured, {
+      onlyIds: ["x-1"],
+      noSchedule: true,
+      deferNoScheduleCompletion: true,
+    });
+    assert.deepEqual(result.scheduled, { draftId: "private-draft-1", when: "unscheduled", plannedFor: null, autoPublishes: false });
+  });
+
+  test("refuses a non-text draft mode before any provider activity", async () => {
+    let calls = 0;
+    const deps: SchedulerDeps = {
+      publishText: async () => { calls++; return []; }, publishCards: async () => { calls++; return []; },
+      publishTikTok: async () => { calls++; return []; }, publishShorts: async () => { calls++; return []; },
+      publishSubstack: async () => { calls++; return []; }, lockOutreachMessage: async () => { calls++; return []; },
+      resolveDeliveryPolicy: policyFor("human-inference"),
+    };
+    const result = await scheduleApproved("/tmp/slice-5t-refusal", textRow({ platform: "quote-card:x" }), deps, undefined, "unscheduled-draft");
+    assert.match(result.scheduleError ?? "", /only supported for Typefully text rows/);
+    assert.equal(calls, 0);
+  });
+});

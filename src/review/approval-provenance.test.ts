@@ -215,7 +215,7 @@ test("an ambiguous terminal write leaves the dispatch fence across a restart", a
     mkdirSync(`${item.ledger}.terminal-failure`);
     renameSync(`${item.ledger}.terminal-failure`, item.ledger);
     return { scheduled: { draftId: "provider-created" }, scheduleError: null };
-  }, item.ledger));
+  }, item.ledger), /provider returned typefully object provider-created.*do not retry automatically/i);
   assert.equal(calls, 1);
   rmSync(item.ledger, { recursive: true, force: true });
   await assert.rejects(() => scheduleApprovedOnce(item.folder, item.slug, readQueue(item.folder).rows[0]!, async () => {

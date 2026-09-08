@@ -4,12 +4,13 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, unpushed by standing order).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
-- Current/last accepted: **SLICE-5S ACCEPTED**, `docs/operations/launch-slices/SLICE-5S.md` → `## Accepted closeout`.
-- Blocked on: nothing for 5S. Grok source/behavior and rendered audits PASS; frozen unsandboxed gate 4321/0, exit0.
-- Next dependency-ready: write the bounded unscheduled-draft repair packet on the unified route, then rerun 5P.
+- Current/last accepted: **SLICE-5T ACCEPTED**, `docs/operations/launch-slices/SLICE-5T.md` → `## Accepted closeout`.
+- Blocked on: nothing for 5T. Grok independent closure PASS; frozen unsandboxed gate 4326/0, exit 0.
+- Next dependency-ready: refresh `docs/operations/launch-slices/SLICE-5P.md` for one eligible row, unscheduled live readback/cleanup and no new slot claim, then rerun 5P.
 - Then: durable per-piece X opt-in (5R A6), analytics `brand_id` backfill.
-- Last decision: Approve records review only; Publishing Schedule consumes a durable first-attempt claim. Legacy unknown history remains blocked.
-- Browser proof: approve zero provider callbacks; single + mixed selection two fake callbacks, durable fences first; persistent refusals.
+- Last decision: explicit --no-schedule uses the unified Typefully route, records private draft/id, consumes no slot and blocks repeat creation; legacy unknown history remains refused.
+- 5S remains accepted: Approve records review only; explicit dispatch uses a durable first-attempt claim.
+- Live proof: not performed in 5T; 5P remains not accepted. Operator procedure is in the 5T packet.
 - Design sanity rule: `## Standing constraints`. Needs Muxin, not blocking: `.claude/skills/**` edits named in 5N and 5P.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
 
@@ -1361,6 +1362,23 @@ User-authorized `grok --sandbox workspace` audit completed with exit 0. Review c
 
 Approve is status-only; explicit Publishing Schedule uses the audited durable first-attempt claim, strict history checks and conservative uncertain/legacy refusal. Terra xhigh implementation, independent Grok source/behavior closure and rendered closure PASS. Chrome fixture showed approval callbacks0, single/mixed selection callbacks2 with durable fence+uncertain evidence before both fake callbacks; legacy refusal persisted. Pending typography18px/1.6 and all five rendered design checks PASS. Full frozen unsandboxed `npm run check`:4321 passed/0failed/exit0, using established serial shim; source hashes unchanged. Packet `docs/operations/launch-slices/SLICE-5S.md`; bounded evidence `/private/tmp/slice-5s-evidence/`. No real publishing, operational queue edits, or push. Fixture stopped; coordinator integrates only nine implementation files plus packet/master and closes this slice.
 
+
+### 2026-09-07 — SLICE-5T accepted: unified unscheduled Typefully drafts
+
+Packet: docs/operations/launch-slices/SLICE-5T.md → Accepted closeout. Terra high builder,
+then xhigh for omitted caller verification and incorrect frozen-check metadata; Grok 4.5
+independent source/behavior closure PASS using workspace sandbox and no edits. Explicit
+--no-schedule/TYPEFULLY_SCHEDULE=off traverses the unified approved-row dispatch fence, forces
+Typefully, omits scheduling time, persists private/id with no planned time, and claims no slot.
+Duplicate attempts through draft or scheduled mode refuse. Legacy direct helper behavior is
+preserved. No GUI change, live provider canary or push.
+
+Focused 77/0 and typecheck 0; final frozen unsandboxed npm run check 4326/0, exit 0, wall 570.36s.
+Eight audited source/test paths remain hash-identical after gate. Evidence retained under
+/private/tmp/slice-5t-evidence/. Earlier missing-tsx frozen output was a setup failure, corrected
+and never used as passing proof. Coordinator includes packet/master in acceptance commit and
+preserves the two pre-existing operational edits. Next refresh 5P's one-row eligibility and
+obsolete extra-slot/migration premise, then run its live unscheduled readback/cleanup proof.
 
 ## Current handoff — 2026-09-02
 

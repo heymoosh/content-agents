@@ -5,7 +5,7 @@ import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { approvalDispatchDisposition, claimPublishingAttempt, clearPublishingClaim, markDispatchStarted, publishingClaimIsActive, resolveDispatchFence } from "./approval-provenance.js";
-import { scheduleApproved, scheduleKind, selectConfiguredProvider, type ScheduleKind, type SchedulerDeps } from "./studio-scheduling.js";
+import { scheduleApproved, scheduleKind, selectConfiguredProvider, type DispatchMode, type ScheduleKind, type SchedulerDeps } from "./studio-scheduling.js";
 import { postizRateLimitRetryAt } from "../publish/postiz.js";
 import { resolveDeliveryPolicy, type DeliveryBrand, type DeliveryMode, type DeliveryProvider as PolicyDeliveryProvider } from "../publish/delivery-policy.js";
 import {
@@ -237,7 +237,12 @@ function stableProviderObjectId(provider: PublishingProvider, raw: string): stri
 function details(provider: PublishingProvider, value: unknown): Omit<ReturnType<typeof normalizeProviderStatus>, "provider" | "state"> & { ref?: string } {
   if (!value || typeof value !== "object") return {};
   const item = value as Record<string, unknown>;
-  const plannedFor = typeof (item.plannedFor ?? item.when) === "string" && (item.plannedFor ?? item.when) ? String(item.plannedFor ?? item.when) : undefined;
+  // A Typefully unscheduled draft deliberately returns a human display word ("unscheduled") but
+  // has no provider time. Persisting that word as plannedFor would falsely imply a schedule.
+  const autoPublishes = item.autoPublishes !== false;
+  const plannedFor = autoPublishes && typeof (item.plannedFor ?? item.when) === "string" && (item.plannedFor ?? item.when)
+    ? String(item.plannedFor ?? item.when)
+    : undefined;
   const rawRef = item.ref ?? item.draftId;
   const ref = typeof rawRef === "string" && rawRef ? stableProviderObjectId(provider, rawRef) : undefined;
   const string = (key: string): string | undefined => typeof item[key] === "string" && item[key] ? item[key] as string : undefined;
@@ -267,6 +272,7 @@ export async function scheduleApprovedOnce(
   schedule: typeof scheduleApproved = scheduleApproved,
   path: string = PUBLISHING_STATUS_PATH,
   selectionDeps?: Pick<SchedulerDeps, "fetchPostizRegistry" | "postizEnv">,
+  dispatchMode: DispatchMode = "scheduled",
 ): Promise<{ scheduled: unknown; scheduleError: string | null; publishing: PublishingStatus }> {
   const releaseClaim = claimPublishingAttempt(slug, row.id, path);
   let releaseAfterAttempt = true;
@@ -277,6 +283,9 @@ export async function scheduleApprovedOnce(
     if (!liveRow || liveRow.status !== "approve") throw new Error("this row is no longer currently approved");
     const kind = scheduleKind(liveRow);
     if (!kind) throw new Error("no publishing provider owns this row");
+    if (dispatchMode === "unscheduled-draft" && kind !== "text") {
+      throw new Error("unscheduled drafts are only supported for Typefully text rows");
+    }
     const ledgerError = strictPublishingLedgerError(path);
     if (ledgerError) throw new Error(`${ledgerError}; reconcile it before scheduling`);
     const prior = readPublishingStatuses(path)[publishingKey(slug, liveRow.id)];
@@ -289,7 +298,9 @@ export async function scheduleApprovedOnce(
     }
     let provider: PublishingProvider;
     try {
-      provider = (schedule === scheduleApproved || selectionDeps) && kind !== "outreach-lock"
+      provider = dispatchMode === "unscheduled-draft"
+        ? "typefully"
+        : (schedule === scheduleApproved || selectionDeps) && kind !== "outreach-lock"
         ? (await selectConfiguredProvider(liveRow, selectionDeps)).provider
         : providerForKind(kind);
     } catch (error) {
@@ -338,7 +349,7 @@ export async function scheduleApprovedOnce(
     const injected = disposableProviderOutcome(liveRow);
     const result = injected
       ? { scheduled: injected.scheduled, scheduleError: injected.scheduleError }
-      : await schedule(folder, liveRow, undefined, policy);
+      : await schedule(folder, liveRow, undefined, policy, dispatchMode);
     const status: PublishingStatus = result.scheduleError
       ? {
           slug, rowId: liveRow.id, provider,
@@ -355,7 +366,13 @@ export async function scheduleApprovedOnce(
           const observedState = normalized.state === "uncertain" ? acceptedState(result.scheduled) : normalized.state;
           return { slug, rowId: liveRow.id, provider, state: observedState, at: new Date().toISOString(), ...audit, ...details(provider, result.scheduled) };
         })();
-    appendPublishingStatus(status, path);
+    try {
+      appendPublishingStatus(status, path);
+    } catch (error) {
+      const created = details(provider, result.scheduled).providerObjectId;
+      const providerEvidence = created ? `provider returned ${provider} object ${created}` : `provider returned a result`;
+      throw new Error(`${providerEvidence}, but terminal publishing-status persistence failed; do not retry automatically and reconcile this exact attempt: ${error instanceof Error ? error.message : String(error)}`);
+    }
     if (fencedAttempt && postizRateLimitRetryAt(result.scheduleError)) {
       // Postiz's documented throttle response proves this exact call created nothing.
       resolveDispatchFence(slug, liveRow.id, "not-created", path);
