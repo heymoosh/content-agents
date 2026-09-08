@@ -88,13 +88,39 @@ export function migrateLegacyDataFile(
   });
 }
 
-/** Directory variant used for historical mutable trees such as GUI job logs. */
-export function migrateLegacyDataDirectory(parts: readonly string[], legacyDataRoot = join(repoRoot, "data")): string {
+/**
+ * Directory variant used for historical mutable trees such as GUI job logs.
+ *
+ * A directory copy cannot be installed safely by copying into `canonical`: readers treat an
+ * existing canonical directory as authoritative, so they could otherwise observe a partial tree
+ * or let an interrupted copy suppress every later retry. The private sibling from `mkdtempSync`
+ * lives on the canonical directory's filesystem, and renaming it installs the complete tree in
+ * one step. A process killed during `cpSync` can leave that private sibling and its lock behind;
+ * neither is canonical, and the existing stale-lock policy controls when a later invocation can
+ * retry. We deliberately only remove the staging directory created by this invocation.
+ *
+ * `deps` mirrors migrateLegacyDataFile's narrow failure seam. Production callers use the native
+ * functions; tests use it to force observable copy and rename failure boundaries.
+ */
+export function migrateLegacyDataDirectory(
+  parts: readonly string[],
+  legacyDataRoot = join(repoRoot, "data"),
+  deps: { cpSync: typeof cpSync; renameSync: typeof renameSync } = { cpSync, renameSync }
+): string {
   const canonical = dataPath(...parts);
   const legacy = join(legacyDataRoot, ...parts);
   if (existsSync(canonical) || !existsSync(legacy) || canonical === legacy) return canonical;
   return withFileLock(`${canonical}.migration.lock`, () => {
-    if (!existsSync(canonical) && existsSync(legacy)) cpSync(legacy, canonical, { recursive: true, errorOnExist: false });
+    if (!existsSync(canonical) && existsSync(legacy)) {
+      const staging = mkdtempSync(join(dirname(canonical), `${basename(canonical)}.migrating-`));
+      try {
+        deps.cpSync(legacy, staging, { recursive: true, errorOnExist: false });
+        deps.renameSync(staging, canonical);
+      } finally {
+        // Successful rename leaves no path here; failed copies and renames leave only this attempt's staging tree.
+        rmSync(staging, { recursive: true, force: true });
+      }
+    }
     return canonical;
   });
 }

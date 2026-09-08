@@ -4,14 +4,13 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
-- Current / last accepted: **SLICE-5X**, `docs/operations/launch-slices/SLICE-5X.md`.
-- Blocked on: none; 5X implemented, audited, gated and operationally verified.
-- Last decision: Substack is HI; legacy X/LinkedIn remain unassigned non-HI experimental data.
-- Result: 45 Substack posts/206 captures attributed; 42 routing-eligible, 3 pillarless articles excluded.
-- Proof: Grok v2 PASS; frozen local gate 4338/4338 exit 0; real DB equals verified fixture bytes.
-- Recovery: alternate LinkedIn workbook gives 100/100 post-ID coverage; original checksum remains distinct.
-- Next: 5X complete; no follow-on packet selected in this slice.
-- Evidence/backup: packet → Operational result and Hygiene; preserve provider/scheduler state; do not rerun 5P.
+- Current / next: **SLICE-5Z**, `docs/operations/launch-slices/SLICE-5Z.md` (prepared, unassigned).
+- Last accepted: **5Y**, `docs/operations/launch-slices/SLICE-5Y.md` (atomic job-log directory migration).
+- Blocked on: none; start 5Z with its bounded current-coverage inventory.
+- Last decision: fix future partial-directory publication; preserve existing canonical and legacy trees.
+- Proof: 5Y Grok PASS; frozen local gate 4342/4342 exit 0; nine protected fingerprints unchanged.
+- Next outcome: verify the job-to-child-process execution chain from 5O's recorded coverage gap.
+- Preserve provider/scheduler state and validated 5X backup; do not rerun 5P.
 - Everything below is history; read only packet-cited headings.
 
 
@@ -1503,6 +1502,27 @@ Repository `/Users/Muxin/Documents/GitHub/content-agents`; no push or new live p
 Task-created worktrees/branch removed. Hygiene rescue86428dd retained; no prunable worktrees.
 Other sessions' four edits and existing branches preserved and excluded per packet disposition.
 
+
+### 2026-09-08 — SLICE-5Y accepted: atomic directory migration
+
+5Y closes 5O's recorded directory-copy defect in `migrateLegacyDataDirectory`. The helper now
+copies to a unique sibling under the existing lock, then renames the complete tree into place.
+Ordinary failures clean their staging; a killed process leaves no partial canonical directory.
+Legacy bytes and existing canonical precedence remain unchanged. Retry after a killed process
+still follows the existing five-minute dead-owner lock policy; no old partial tree is guessed.
+
+Codex Terra xhigh implemented the two-file repair. Independent verifier preparation moved from
+Terra high to xhigh after coordinator review found fixture-root/timeout/lock-aging omissions.
+Repaired actual harness passed nested-byte, failure/retry, concurrency and SIGKILL checks;
+old implementation fails as expected. One test-only string|URL type error was also corrected.
+Grok 4.5 workspace audit PASS with no blockers; final frozen unsandboxed gate 4342/4342, exit 0,
+431.56 seconds. Nine protected operational/pre-existing fingerprints unchanged. Full evidence,
+limitations and hygiene: `docs/operations/launch-slices/SLICE-5Y.md`.
+
+The missing next-step handoff was reconstructed from bounded sequence and later-packet evidence;
+5H's historical card-routing recommendation was already covered by 5J/5K. Next is prepared
+`docs/operations/launch-slices/SLICE-5Z.md`: first verify current coverage of the job-spawn chain
+identified by 5O, then close only an established gap. No 5Z worker or implementation started.
 
 ## Current handoff — 2026-09-02
 
