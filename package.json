@@ -179,7 +179,7 @@
     "react-dom": "^19.2.8",
     "remotion": "^4.0.507",
     "yaml": "^2.7.0",
-    "zod": "^4.5.2"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
