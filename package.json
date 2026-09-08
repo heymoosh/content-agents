@@ -25,6 +25,7 @@
     "grade-bets": "tsx src/strategy/grade-bets.ts",
     "link-bet": "tsx src/db/link-bet.ts",
     "tag-source": "tsx src/db/tag-source.ts",
+    "backfill:analytics-brand": "tsx src/db/backfill-analytics-brand.ts",
     "route": "tsx src/strategy/route.ts",
     "spin-control": "tsx src/strategy/spin-control.ts",
     "explore": "tsx src/strategy/exploration.ts",

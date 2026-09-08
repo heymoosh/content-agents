@@ -4,15 +4,14 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
-- Current: **SLICE-5X NOT ACCEPTED**, `docs/operations/launch-slices/SLICE-5X.md` → `## Stopped`.
-- Blocked on: source-account attestation for legacy exports plus one missing LinkedIn source/mapping.
-- Last accepted: **5W**, commit `cfaa766`; packet `docs/operations/launch-slices/SLICE-5W.md`.
-- 5W proof: follow-up Grok workspace audit PASS; prior frozen gate 4332/4332 exit 0.
-- Last decision: recovered export IDs establish row links, not brand ownership; no guessed backfill.
-- 5X measured: X 264/264, LinkedIn 74/100, Substack 13/13 source-post joins; Notes 32 unresolved.
-- Next dependency-ready action: acquire checksum-pinned account provenance, then freeze 5X implementation lanes.
-- Evidence: `/private/tmp/slice-5x-evidence/preparation/contract.md`; audit logs in sibling coordinator directory.
-- Preserve: unrelated edits, database, approvals, provider history and scheduler claims; do not rerun 5P.
+- Current / last accepted: **SLICE-5X**, `docs/operations/launch-slices/SLICE-5X.md`.
+- Blocked on: none; 5X implemented, audited, gated and operationally verified.
+- Last decision: Substack is HI; legacy X/LinkedIn remain unassigned non-HI experimental data.
+- Result: 45 Substack posts/206 captures attributed; 42 routing-eligible, 3 pillarless articles excluded.
+- Proof: Grok v2 PASS; frozen local gate 4338/4338 exit 0; real DB equals verified fixture bytes.
+- Recovery: alternate LinkedIn workbook gives 100/100 post-ID coverage; original checksum remains distinct.
+- Next: 5X complete; no follow-on packet selected in this slice.
+- Evidence/backup: packet → Operational result and Hygiene; preserve provider/scheduler state; do not rerun 5P.
 - Everything below is history; read only packet-cited headings.
 
 
@@ -1475,6 +1474,34 @@ mapping are required before freezing implementation. No source or operational da
 879 older Bluesky child metrics are optional integrity work with no measured current routing
 change; they were not substituted for the requested missing platform history. The packet's Stopped
 section retains the sourcing requirement and exact evidence pointers. No push.
+
+
+### 2026-09-08 — SLICE-5X accepted: Substack history attribution and LinkedIn recovery
+
+Muxin confirmed legacy X/LinkedIn are non-Human-Inference experimental data and Substack is HI.
+Bounded codebase/import-root/Git search found a distinct same-name LinkedIn workbook that adds all
+26 previously unjoined post IDs (union 100/100); its checksum is not substituted for the absent original.
+The previous sourcing stop is resolved without asking for an internal account ID or original file.
+
+5X added a fixed-manifest read-only preview and explicit backed-up attribution command. Actual repair
+assigned 45 posts/206 metric captures across articles and Notes to their existing HI account identities.
+Production routing now sees 42 pillarful posts; 3 articles remain unclassified and outside route cells.
+Legacy X 264/2345 and LinkedIn 100/430 remain unchanged, unassigned and queryable for experimentation.
+Audience/import rows and the unrelated older Bluesky metric gap remain outside this slice.
+
+Parallel preparation and independent verifier tooling used disjoint ownership. Terra xhigh built;
+Terra max repaired two reproduced omissions (dangling backup link and live-WAL snapshot handling)
+after safe reassignment. Grok workspace audit independently closed both, source verdict PASS.
+Actual isolated CLI/production measurement joins/route loader, recovery and ingestion regressions PASS.
+One frozen unsandboxed npm run check passed 4338 tests with exit 0 (624.37 seconds).
+
+Real preview/apply/post-preview all exit 0. The whole resulting DB and validated private backup match
+the independently tested fixture and restored backup byte-for-byte. Approval/provider/scheduler state
+and four pre-existing edits are unchanged. Durable manifest and exact hashes, backup location, worker
+ownership, audit/check evidence and hygiene disposition: `docs/operations/launch-slices/SLICE-5X.md`.
+Repository `/Users/Muxin/Documents/GitHub/content-agents`; no push or new live provider canary.
+Task-created worktrees/branch removed. Hygiene rescue86428dd retained; no prunable worktrees.
+Other sessions' four edits and existing branches preserved and excluded per packet disposition.
 
 
 ## Current handoff — 2026-09-02

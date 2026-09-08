@@ -1,55 +1,61 @@
 # SLICE-5X: Evidence-based analytics brand backfill
 
 Protocol: `AGENTS.md` → `## Slice protocol`. Read that and this file only.
-Do not open the master archive. Do not load the repository for context. Do not commit.
+Do not open the master archive. Do not load the repository for context. Workers never commit.
 
 ## Goal
 
-Brand-filtered routing sees historical analytics that can be positively attributed to that brand.
-Backfill missing brand_id using retained provenance, preserving existing attribution and metrics;
-ambiguous rows remain explicitly reported, never guessed. Provide a repeatable safe repair and
-prevent the identified ingestion paths from recreating the gap.
+Historical Substack analytics positively attributed by Muxin become visible to Human Inference's
+brand filter. Preserve legacy X/LinkedIn as unassigned non-Human-Inference experimental data.
+Repair only missing identities, with a repeatable preview, backed-up application and recovery proof.
+Do not invent topic labels, change metrics or widen publishing permissions.
 
 ## Difficulty
 
-Hard — attribution is a data integrity boundary across platform ingestion and routing.
+Hard — historical attribution and database backup integrity.
 
 ## Depends on
 
-5R and 5W accepted; base cfaa76626e5c50da2adf1cd0840302a334439936.
+5R and 5W accepted. Base b3f206234808a9ecacca110e856fa9d229518a57; last accepted feature cfaa766.
 
 ## Owned files
 
-Preparation checkpoint only. No implementation or database writes until the coordinator freezes
-an evidence-based mapping contract and exact source ownership here.
+- Builder: `src/db/backfill-analytics-brand.ts`, `src/db/backfill-analytics-brand.test.ts`,
+  `package.json` (one command entry).
+- Coordinator: this packet, `SLICE-5X-manifest.json` beside it, master START HERE/progress.
+- Explicit operational application: `data/analytics.db`, only audited CLI after final gate;
+  backup `/Users/Muxin/.content-agents/content-agents-154a8dd69ae2/backups/analytics-before-5x.db`.
 
-Parallel-safe: yes — lane A bounded provenance investigation writes only preparation evidence;
-coordinator's requested follow-up Grok audit reads immutable 5W evidence and writes separate logs.
-Neither runs rewriting commands; shared source inputs are pinned to base cfaa766. Candidate
-verification and any operational repair wait for frozen implementation and cross-family audit.
-Independent verifier tooling will be assigned after the schema/mapping interface is fixed.
+### Preparation, execution and verification ownership
 
-### Lane A — provenance and implementation contract preparation
+All worker outputs are frozen; no worker currently owns an active edit.
+- Initial provenance preparation: `/private/tmp/slice-5x-evidence/preparation/`, Terra high,
+  then paused and reassigned Terra xhigh after invalid substring-account proof was found.
+  That heuristic proof is withdrawn; repaired checksum/post-ID inventory is retained.
+- Recovery lane B: `.../recovery/`, Terra high. Bounded input/archive/Git search and reproducible
+  readonly coverage probe; no repository/DB changes.
+- Mapping lane C: `.../substack-contract/`, Terra xhigh. Owner-attested exact snapshot manifest
+  and readonly Notes/article inventory; no repository/DB changes.
+- Builder lane D: three source paths in `/private/tmp/content-agents-5x-build`, Terra xhigh.
+  Finished builder paused before exclusive same-path repair reassignment to Terra max.
+- Verifier lane E: `.../verifier/`, completed lane C investigator reused at Terra xhigh after
+  thread limit prevented another verifier. Own fixture/scripts only; no implementation ownership.
+- Auditor: Grok 4.5 workspace, bounded criteria/diff/actual checks only, no edits.
 
-- Own only `/private/tmp/slice-5x-evidence/preparation/`.
-- Read-only inputs: `data/analytics.db` via SQLite mode=ro (never connect with write defaults),
-  `src/strategy/route.ts`, `src/strategy/route.test.ts`, `package.json`, and exact imports/symbol
-  uses for analytics schema, brand_id ingestion and brand-filtered routing. Locate only those
-  symbols with bounded rg; read only their relevant bodies. No tree inventory or broad context.
-- Establish actual schema, aggregate counts of missing/existing brand IDs by platform and
-  provenance join coverage. Do not output content bodies, secrets, account tokens, personal data.
-- Follow exact provenance references only as necessary to prove brand mappings; output aggregate
-  counts, path:line code evidence, and anonymized minimal fixture shapes. Do not infer all rows
-  are Human Inference from a platform name or current default.
-- Deliver proposed exact owned source/test paths, dry-run/apply interface, transaction/idempotence
-  and backup/rollback contract, future-ingestion regression scope, checks and immutable input hashes.
-- No repo writes, DB migrations, provider calls or implementation. Frozen handoff to coordinator.
+Parallel-safe: B/C wrote disjoint evidence paths using pinned read-only inputs; D/E independently
+prepared implementation and verification tooling with disjoint writes. No repo-wide rewriters.
+Actual verification waited for frozen D handoff. Conflicting ownership and integration serialized.
+Coordinator owns the final gate, real application and commit. Evidence directories above share
+prefix `/private/tmp/slice-5x-evidence/`; prior preparation remains immutable.
 
 ## Do not touch
 
-- Real database, content, operational ledgers, provider state and credentials during preparation.
-- AGENTS.md, packet template, unrelated changes, backlog, scoped builds or generated copy.
-- Existing brand assignments, analytics metrics or approval/publishing policies.
+- Existing attribution, nonidentity columns, unrelated tables, content, approvals, provider state,
+  scheduler claims, credentials, backlog, other builds or generated copy.
+- Preserve four pre-existing edits: `AGENTS.md`, `docs/operations/launch-slices/SLICE-TEMPLATE.md`,
+  `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`,
+  `data/notes-spread-ledger.jsonl`. Exclude all four from this commit.
+- Do not rerun 5P's live Typefully canary.
 
 ## Cited headings
 
@@ -58,147 +64,152 @@ No master archive headings.
 
 ## Acceptance
 
-- [ ] A1 — Measured inventory and evidence-based attribution rules account for missing brand IDs;
-      ambiguous or conflicting provenance remains unmodified and is reported.
-- [ ] A2 — Supported dry-run reports exact proposed changes without mutation; explicit apply
-      transaction updates only proven NULL brand_id rows, preserving metrics and existing labels.
-- [ ] A3 — Repeated apply is idempotent; failed/conflicting operations leave no partial updates;
-      recoverable backup and bounded rollback evidence exist before real database application.
-- [ ] A4 — Identified ingestion paths preserve known brand attribution on future analytics writes.
-- [ ] A5 — Isolated actual-command verification demonstrates attributed history becomes visible to
-      the intended brand filter, other brands remain isolated, and unknown rows are not assigned.
-- [ ] A6 — Grok cross-family audit closes material gaps before operational application; focused
-      checks and one final frozen unsandboxed npm run check pass before coordinator integration.
-- [ ] A7 — Operational repair result records before/after aggregate counts and preserved-state
-      evidence, or a supported zero-safe-candidates result. No speculative bulk attribution.
+- [x] A1 — Owner-backed mapping accounts for articles/Notes; ambiguous/conflicting rows fail closed.
+      X/LinkedIn remain unassigned experimental data outside HI.
+- [x] A2 — Actual dry-run is nonmutating; explicit apply updates only exact NULL identity fields.
+- [x] A3 — Replay changes zero rows; failures roll back; validated backup restores the original.
+- [x] A4 — Existing direct-import and Notes ingestion regression tests prove future identity binding.
+- [x] A5 — Actual CLI plus production measurementScope/latestMetricsJoin/loadData prove brand/account
+      isolation and routing visibility. X/LinkedIn retained; no guessed pillar assignment.
+- [x] A6 — Grok material findings closed; focused checks PASS; frozen unsandboxed gate 4338/4338 exit 0.
+- [x] A7 — Real45/206 repair PASS; backup verified; full DB matches independently verified result.
 
 ## Verify
 
-Preparation: SQLite read-only aggregate inventory plus bounded source path:line proof and hashes.
-Exact implementation commands will be frozen at the preparation checkpoint before assignment.
-No provider or live model canary. No paid calls beyond the separately authorized Grok audit.
-Coordinator: fresh worktree setup once, frozen unsandboxed `npm run check` once last;
-`bash scripts/repo-hygiene.sh --rescue` for closeout.
+```sh
+node --import tsx --test src/db/backfill-analytics-brand.test.ts
+node --import tsx --test src/ingest/import.test.ts src/atomize/new-notes.test.ts
+npm run backfill:analytics-brand -- --db <explicit-path> --manifest <frozen-manifest>
+npm run backfill:analytics-brand -- --db <explicit-path> --manifest <frozen-manifest> --apply --backup <new-absolute-path>
+```
+
+Default mode is readonly. Original manifest bytes and original database SHA are pinned for initial
+apply; partial/mixed/conflicting states reject. Repeat applied state is a zero-write outcome.
+No destructive rollback CLI; restore validated backup into an isolated DB for recovery proof.
+Reject dangling backup links, symlinked backup parents and active nonempty WAL/journal; do not
+checkpoint or alter unsupported sidecars. Empty WAL/journal and inert SHM are supported.
+
+Independent actual harness: `.../verifier/candidate-verifier.mts` and runner; frozen run evidence
+in `.../verifier/candidate-run-unsandboxed/`. First sandboxed invocation hit tsx IPC EPERM before
+DB access; fixture-only unsandboxed retry passed. No provider/live-model canary.
+Final gate: `npm run worktree:setup` once, then unsandboxed `npm run check` once last on frozen v2;
+retained serial shim `/private/tmp/slice-5q-gate-bin/node` sets --test-concurrency=1.
+Closeout: `bash scripts/repo-hygiene.sh --rescue`.
 
 ## Observable result
 
-Historical platform analytics with proven brand provenance appear in that brand's routing input;
-the repair report explains every changed or unresolved row without guessing.
+45 Substack posts / 206 captures enter HI measurement scope: articles 13/86 at
+`human-inference/browser-analytics`; Notes 32/120 at `human-inference/substack`.
+Actual routing includes 10 articles  + 32 Notes  = 42 posts. Three articles /6 captures lack pillars
+and remain excluded from route cells while becoming brand-queryable. Classification is not assigned.
+X 264 posts/2345 captures and LinkedIn 100/430 remain queryable and excluded from HI.
+Audience 25/import 22 Substack rows and 879 older unbound Bluesky metrics are measured but excluded.
 
 ## Risk
 
-High — audit required: yes; database attribution and future ingestion integrity.
+High — cross-family audit required before operational apply and integration.
 
 ## Families
 
-- Preparation: Codex GPT-5.6 Terra high; bounded backend investigation.
-- Builder: Codex GPT-5.6 Terra xhigh planned after exact ownership checkpoint.
-- Auditor: Grok 4.5, --sandbox workspace, no edits, path:line citations.
+- Preparation/build: Codex Terra high/xhigh as lane record above; repair xhigh→max for omitted cases.
+- Verifier: Codex Terra xhigh, no builder source ownership.
+- Auditor: Grok 4.5, `--sandbox workspace`, never grok_spawn_readonly.
 
 ## Closeout
 
-NOT ACCEPTED — preparation found missing source-account binding; no implementation or database mutation. See ## Stopped.
+PASS — A1–A7 verified; Grok material findings closed; full gate and real repair passed.
+Hygiene disposition is recorded below before coordinator commit.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## RESULT BLOCK
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
+- Source paths: three builder paths above, frozen v2.
+- Focused checks: 6/6; typecheck PASS. Existing import/Notes regression 6/6 PASS.
+- Actual CLI: dry-run/apply/replay exit 0; backup restored equal to original logical DB.
+- Preservation: posts/metrics nonidentity digest, every untouched table and every non-Substack
+  identity unchanged. Other-brand target pairs 0. Fixture post-apply and replay byte/logical hashes equal.
+- Evidence: `.../coordinator/v2-focused.*`; `.../verifier/candidate-run-unsandboxed/`.
+- Full gate: 4338 tests PASS, 0 failures/skips, exit 0,624.37 seconds unsandboxed.
+- Operational: real 45/206 repair PASS; full resulting DB/backup match verified fixture bytes.
+- Closeout: PASS for this slice; pre-existing edit/branch leftovers dispositioned under Hygiene.
 
-## Prior-slice follow-up audit
+## Owner attribution and recovered source
 
-Requested Grok 4.5 follow-up completed using --sandbox workspace, exit 0: PASS A1–A7
-and audit A8 for committed 5W. No new established defects or material verification gaps.
-F1 symlink closure: src/strategy/route.ts:329, :357, :368; F2 header: :595.
-Existing broader CLI matrices remain optional with focused coverage; no scope expansion.
-Pinned source and unrelated-file hashes unchanged after audit. Evidence:
-`/private/tmp/slice-5x-evidence/coordinator/grok-5w-followup.txt` and matching exit JSON.
+2026-09-08 Muxin: "Legacy X and LinkedIn can be treated as non-Human Inference but useful for
+experimentation and data. Substack is Human inference." This supersedes the previous sourcing
+stop at b3f2062. The owner need not invent internal account IDs or find the missing export.
 
-## Preparation repair checkpoint
+Import code uses data/inbox and data/processed (`src/ingest/import.ts:19-20,121-132,175-179`).
+Bounded search covered those 79 retained files, exact naming/storage symbols and Git tracked history.
+Original `48db503c-AggregateAnalytics_Muxin%20Li_2025-06-17_2026-06-16.xlsx` was not found.
+Distinct alternate `data/processed/505f4c94-AggregateAnalytics_Muxin%20Li_2025-06-17_2026-06-16.xlsx`
+has SHA 505f4c94b145e74c395276beddf0e6531bd0e2b2b59d1b29388a06aaa2dbf9a6. It adds all 26 formerly
+unjoined LinkedIn post IDs, union 100/100. Its bytes/captured values are not claimed identical to
+original SHA 48db503c383057f58de668ad7162f5adbb421302b2027b354b4763d8e79294b5.
+Those 26 posts already retain 104 metrics across 4 captures. Missing original is no repair blocker.
+Reproducible `.../recovery/recovery-probe.mjs`, stdout/exit and recovery-report.md retain proof.
 
-Initial preparation worker paused. No source ownership assigned. Coordinator found that
-`export-join-audit.ts` flattened arbitrary config strings and tested URL substring membership;
-that cannot establish canonical account identity. Any Substack/LinkedIn sufficient-account claim
-from that output is withdrawn pending exact identity proof. Existing checksum/post-ID coverage
-is a separate claim and must not be confused with ownership evidence.
+All 13 articles have recovered checksum-verified source-ID joins. All 32 Notes retain direct-ingest
+structure; current cache corroborates 20, while 12 rely on owner attestation plus the pinned legacy
+snapshot, never a false cache claim. Historical substring-account heuristics remain withdrawn.
 
-Lane A evidence ownership is reassigned exclusively to Codex Terra xhigh for this bounded repair:
-`/private/tmp/slice-5x-evidence/preparation/`. The former Terra high worker is paused and must not
-edit. Read-only inputs additionally include `config/brand-accounts.yaml` and exact parser sources
-named in `export-join-audit.ts`. Verify explicit per-platform measurement account fields using
-canonical parsed URL identity components; never flattened arbitrary strings or substrings.
-Record actual reproducible command output, exact missing LinkedIn filename/checksum, and the
-minimal account attestation needed for unresolved platforms. Do not output secrets or content.
-Do not broaden discovery, edit repository source, mutate DB, or commit. Correct contradicted
-claims in the contract in place, including the stale claim that all 409 posts lack recoverable
-provenance. Substack Note 32 posts remain separately unresolved unless exact retained proof exists.
+Durable manifest: `docs/operations/launch-slices/SLICE-5X-manifest.json`, SHA
+7c44574002b3d7e53f002c75ead63a5503678766eda5bb80d81a86ef4e0d5206. Original DB SHA
+ef67f395471207b17abb08f89fc67b8188d5226f0b6ba156a1c97da5120a8670.
+Exact readonly evidence: `.../substack-contract/readonly-substack-audit.stdout.json` and exit 0.
 
-## Stopped
+## Audit closure and frozen candidate
 
-Blocker: legacy export-to-brand/account binding requires owner-supplied provenance; exact source
-recovery also lacks one LinkedIn export. This is a missing sourcing input, not permission to read
-repository context and not a reduction of the requested backfill.
+Prior accepted 5W follow-up Grok workspace audit PASS, exit 0; no new material gap (retained
+`.../coordinator/grok-5w-followup.*`). 5X Grok v1 exit 0 HOLD found two reproduced defects:
+- F1: dangling backup link created an external sentinel. v2 lstat rejection leaves target absent,
+  symlink intact and DB unchanged. Source 219–245; test 252–279.
+- F2: live WAL changed logical state without changing main-file hash. v2 rejects nonempty sidecars
+  unchanged before inspect, after inspect and under IMMEDIATE. Source 248–260,478,489,508; test 282–351.
 
-Verified: 5W follow-up Grok PASS (exit 0); 5X SQLite read-only inventory and checksum-verified
-source recovery. Legacy unbound counts: X 264 posts/2345 metrics, LinkedIn 100/430,
-Substack 13/86, Substack Note 32/120. Recovered export post-ID coverage: X 264/264,
-LinkedIn 74/100, Substack 13/13. No repaired source or DB candidate exists; no repository-wide
-gate was run for preparation-only documentation.
+Grok v2 exit 0,77.95sec: SOURCE/AUDIT PASS; F1/F2 independently closed; actual CLI/production
+routing/A4 evidence accepted. Extra live exclusion count guard is optional: exact original snapshot
+plus sidecar rejection pins initial scope, and independent preservation proof covers the outcome.
+No speculative soft-reporting/ingestion/classification expansion. Audit logs `.../coordinator/grok-v*.txt`.
 
-Account-match evidence from the first preparation pass was defective and is withdrawn:
-flattened config substrings cannot prove ownership. Higher-effort same-model repair found no
-explicit platform public-account-to-brand binding in the configuration. All export-to-brand
-assignments therefore remain unproven pending owner evidence. Source-ID joins alone do not
-establish brand or metric-capture attribution. The 32 Substack Note posts still require bounded
-provenance work; do not silently omit them from the target.
+Frozen v2 `/private/tmp/content-agents-5x-verify-v2`, detached b3f2062 plus reviewed three-path diff:
+- source ca72864916938eef47b055369f4b3c765ef50878e40c47bc7ce881c354ef86d0
+- test 7d0c61fc0586497cc4e8bb69e8a52cac63dd9465afca0bd25b5291bbb88a54f9
+- package 7622df329d5748cd076279f981e1826bc229c4103fa815f88beac03255e42ec6
+Final full gate PASS: 4338 tests, 0 failures/cancellations/skips, exit 0,624.37 seconds.
+Retained actual command/exit and unchanged candidate hashes in `.../coordinator/gate.*`.
 
-The 879 NULL-identity Bluesky child metrics have known parents but predate already bound latest
-metrics. Read-only routing simulation stays 95 latest rows/95 posts, with zero repaired rows
-selected. That optional integrity repair does not substitute for this slice's missing history.
+## Operational result
 
-Retained work: this packet, the master START HERE/progress entry, and
-`/private/tmp/slice-5x-evidence/` containing Grok logs and preparation scripts/results/contract.
-Only these packet/master changes may be committed; no source or DB changes were made.
+Real dry-run exit 0: 45 posts/206 metrics proposed, 0 changed, DB hash unchanged. After validated
+private backup, actual apply exit 0: exactly 45/206 changed. Post-apply readonly preview exit 0:
+replay state, 0 remaining candidates, no mutation. Article 13/86, Notes 32/120, route 42/200,
+pillarless 3/6 and experimental 364/2775 match independently verified expectations.
 
-Single next action: obtain a durable owner account attestation for the checksum-pinned legacy
-exports and the missing LinkedIn source (or an exact alternate mapping), then freeze the mapping
-contract and implementation/verifier ownership. Prepared source references and exact missing
-artifact are retained in the preparation evidence contract. No manual per-row mapping is required
-when the recovered export plus account attestation can establish it.
+Complete real DB SHA e3f36645bb079e341a735d2505e9d562ef17901959bae9f8371fec592fe24b83 equals the
+independently verified post-apply fixture byte-for-byte. This covers nonidentity values, untouched
+tables and other-platform identities, beyond count-only evidence. Private backup at the owned
+external path is mode 0600, SHA ceea75eb5ee89be12c7b2f5d92b6ce2b427b0c1c8b231b88ce8e05c50553accf;
+its complete bytes equal the independently restored backup. CLI also validated isolated restore
+logical equality before mutation. No recovery was needed on the real database.
 
-Pre-existing edits left unchanged and excluded: AGENTS.md; docs/operations/launch-slices/SLICE-TEMPLATE.md;
-content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md;
-data/notes-spread-ledger.jsonl. No worktrees/branches created in this slice; temporary scripts/logs
-are retained outside the repository. Hygiene results are recorded before documentation commit.
+All seven recorded unrelated/approval/provider/scheduler fingerprints unchanged. Evidence:
+`.../coordinator/operational-{dry-run,apply,after}.*`, operational-exact-comparison.json and
+operational-after.exit.json. Source database is ignored operational state, never added to Git.
 
-## Hygiene evidence
+## Hygiene
 
-Hygiene --rescue completed with exit 1 for expected documentation/unrelated edits and existing
-local branches; rescue snapshot 88fad7a. No prunable worktrees. This session created only
-`docs/operations/launch-slices/SLICE-5X.md` inside the repo; it is included in the documentation
-commit. Four pre-existing edits listed above remain unchanged and excluded. Existing merged
-branches slice-5q-queue/slice-5r-routing and five local-only agent/cs* branches are other sessions'
-work and left intact; exact names/output in coordinator/hygiene.txt. No candidate source to commit.
-
-## Frozen preparation result
-
-Terra xhigh repair completed; actual command exit 0, no signal, stderr 0 bytes. Authoritative
-output: `/private/tmp/slice-5x-evidence/preparation/provenance-account-audit.stdout.json` and
-matching exit JSON. Input hashes and exact source-reference inventory are retained there.
-`source-reference-attestation.json` (mode 0600) pins source checksums for the owner attestation.
-Prior heuristic ownership claims are explicitly withdrawn in `prior-evidence-withdrawal.md`.
-
-42/43 source references checksum-verified. Of 409 legacy posts, 351 have recovered source-ID
-joins. Substack's 22 verified sources include 11 parser failures; the successfully parsed sources
-cover its 13 legacy posts, but capture-level coverage still needs verification before repair.
-No parsed public account owner is declared equivalent to the configured brand identity. None of
-these source-ID joins is yet an approved brand assignment. All 32 Note posts remain unresolved.
-
-Exact missing source: `data/processed/48db503c-AggregateAnalytics_Muxin%20Li_2025-06-17_2026-06-16.xlsx`.
-Original filename: `AggregateAnalytics_Muxin%20Li_2025-06-17_2026-06-16.xlsx`.
-SHA-256: `48db503c383057f58de668ad7162f5adbb421302b2027b354b4763d8e79294b5`.
-A user confirmation of which brand/public accounts own the listed exports can supply the missing
-binding; coordinator maps that attestation to the existing canonical internal identity keys.
-Do not require the user to invent internal IDs or manually label rows recoverable from exports.
+Task-created worktrees removed after exact source hashes were verified against staged Git blobs:
+`/private/tmp/content-agents-5x-build`, `/private/tmp/content-agents-5x-verify`,
+`/private/tmp/content-agents-5x-verify-v2`; temporary branch slice-5x-backfill removed.
+This session created three repository files: SLICE-5X-manifest.json beside this packet,
+`src/db/backfill-analytics-brand.ts` and `src/db/backfill-analytics-brand.test.ts`; all staged
+for this accepted commit. Private operational backup and bounded temporary evidence are retained.
+Hygiene --rescue completed exit 1 for expected staged work and existing local branches; rescue
+86428dd. No prunable worktrees. Four pre-existing edits above remain unchanged and excluded.
+Existing merged branches slice-5q-queue/slice-5r-routing are other sessions' work, preserved.
+Existing local-only branches preserved: agent/cs2-jobs-outreach-charles-extract,
+agent/cs2-page-room-pure-helpers, agent/cs2-serve-walled-room-routes,
+agent/cs3-studio-durable-handoff, agent/cs6-parallel-safe-ui-completion. These are an explicit
+leftover disposition, not a new owner decision. No session-created repository file is omitted
+from the six-path accepted commit. Final post-document hygiene output retained in
+`.../coordinator/hygiene-closeout.txt` and matching exit JSON. No push.

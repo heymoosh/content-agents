@@ -1,0 +1,51 @@
+{
+  "version": "slice-5x-substack-backfill-v1",
+  "source_db_sha256": "ef67f395471207b17abb08f89fc67b8188d5226f0b6ba156a1c97da5120a8670",
+  "evidence": {
+    "provenance_account_audit_sha256": "f563cb5c540a56ec41f0506c0d5e07497e9c415d0d57cf8fc9e73a28977a36d0",
+    "source_reference_attestation_sha256": "bdd66d35a744490cabf105ceec4f9b37a00184bf966bd430683ea986eee2617c",
+    "substack_verified_source_count": 22,
+    "substack_verified_source_checksum_set_sha256": "87e9632974f85e1516106e3710566485f8dd6659f2a2284ebbb6f833f464b75f",
+    "owner_attestation": "2026-09-08: historical Substack is Human Inference; legacy X and LinkedIn remain non-Human-Inference experimentation data."
+  },
+  "preconditions": {
+    "all_target_identity_fields_are_both_null": true,
+    "partial_identity_rows": {
+      "posts": 0,
+      "metrics": 0
+    },
+    "excluded_legacy_experiment_pairs": {
+      "x": { "posts": 264, "metrics": 2345 },
+      "linkedin": { "posts": 100, "metrics": 430 }
+    }
+  },
+  "targets": [
+    {
+      "name": "checksum-joined-substack-articles",
+      "platform": "substack",
+      "brand_id": "human-inference",
+      "provider_account_id": "human-inference/browser-analytics",
+      "expected_posts": 13,
+      "expected_metrics": 86,
+      "evidence": "All 13 current legacy article post IDs have an exact checksum-verified recovered source-ID join; owner attestation supplies Human Inference ownership."
+    },
+    {
+      "name": "legacy-substack-notes",
+      "platform": "substack-note",
+      "brand_id": "human-inference",
+      "provider_account_id": "human-inference/substack",
+      "expected_posts": 32,
+      "expected_metrics": 120,
+      "evidence": "Owner attestation plus the exact legacy dataset snapshot predicate. All 32 retain the new-notes direct-ingestion structural signature; 20 are additionally present in the current bounded notes cache and 12 are not claimed as cache-provenanced."
+    }
+  ],
+  "expected_change_totals": {
+    "posts": 45,
+    "metrics": 206
+  },
+  "excluded_scope": {
+    "audience_rows": 25,
+    "import_rows": 22,
+    "reason": "Measured as unbound but excluded from this post/metric routing-history repair; no update is necessary for the stated outcome."
+  }
+}
