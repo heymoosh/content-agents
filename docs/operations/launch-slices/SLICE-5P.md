@@ -1,249 +1,190 @@
-# SLICE-5P: prove the posting path end to end without publishing anything
+# SLICE-5P: prove the posting path with one unscheduled live Typefully draft
 
 Protocol: `AGENTS.md` → `## Slice protocol`. Read that and this file only.
-Do not open `docs/content-studio-master-status.md` unless a heading is cited below.
-Do not load the repository for context. Do not commit.
+Do not open the master document or load the repository for context. Do not commit.
+Status and decisions: `docs/content-studio-master-status.md` → `## START HERE`.
 
 ## Goal
 
-Answer, with observed evidence rather than inference, the question SLICE-5O could not answer:
-**does a piece of content actually travel from `/atomize` to a live Typefully draft?**
-
-Demonstrably true when done: one real source has been atomized, its row approved by Muxin in
-`review-queue.md`, `npm run publish:typefully` has created a **real draft in Muxin's Typefully
-account**, that draft has been observed, and it has been cancelled again — with the repository and
-Muxin's operational data left exactly as they were found, apart from the ledger migration this
-slice is also there to witness.
-
-This is a **verification** slice. Its deliverable is evidence and a defect list, not a feature. If
-the path works, the slice ships a recorded PASS and nothing else. If it breaks, the failure is the
-deliverable and the repair is a separate slice.
+Observe one previously atomized, Muxin-approved real source row travel through the production
+unified Typefully CLI to a live unscheduled draft; read back that exact draft, delete it, and
+verify absence. Nothing schedules or publishes. Preserve operational records and durable attempt
+history. This is verification only: record defects and stop; production repairs get a separate slice.
 
 ## Difficulty
 
-Hard — not for the code, which is small, but because it is the project's first **live authenticated
-run** since the July freeze, it touches Muxin's real Typefully account and her real slot ledger, and
-it requires a human approval step in the middle that no worker may perform or simulate.
+Hard — live account access, exact single-row selection, durable provenance and cleanup evidence.
 
 ## Depends on
 
-SLICE-5O (accepted, commit `540c065`) — the ledger migration this slice will witness firing for the
-first time in production.
-
-## The safety property this slice is built on
-
-Verified in source before this packet was written, at `src/publish/typefully.ts:136-144`:
-
-> `publishAt: null | undefined` → Typefully saves an **UNSCHEDULED** draft. Status is not
-> `"scheduled"`, there is no `scheduled_date`, and **it will not auto-post**. It sits in the queue
-> until a human schedules or publishes it. Only a non-null `publishAt` (an ISO time or
-> `"next-free-slot"`) creates a scheduled draft that auto-fires.
-
-So the entire real path — auth, payload construction, media upload, the API call, the response
-handling — can be exercised against the live service while the thing it produces is structurally
-incapable of posting. That is what makes this a dry run rather than a publish.
-
-`cancelDraft` (`typefully.ts:191`) deletes the draft afterwards by the id `createDraft` returned.
-`releaseClaims` (exported from `src/publish/slots.ts`) releases the slot claim. Both must run.
-
-**This does not weaken rule 2.** Nothing reaches Typefully at all until Muxin has set the row to
-`approve` in `review-queue.md`. The unscheduled-draft property is a second independent guard, not a
-substitute for the first.
-
-## Verification budget — fixed before starting, per the protocol's live-slice binding
-
-- **One** authenticated canary through the workflow. **At most one** retry if it fails on
-  something transient (network, 5xx). A second substantive failure ends the slice and becomes the
-  finding.
-- No retry loop around `createDraft` under any circumstance. `typefully.ts:166-167` says why: a
-  lost response or a 5xx can arrive after the draft was created, so a retry risks a duplicate.
-- If the run produces a good draft but a later step fails, **preserve the draft id and the run
-  output** before doing anything else. Do not discard successful live output to reach a clean state.
+5O accepted (migration), 5S accepted at 7c6815f (approval separated from dispatch and durable
+first-attempt protection), 5T accepted at e78d2a9 (unified unscheduled draft mode); 5U must be accepted for explicit row selection.
 
 ## Owned files
 
-Parallel-safe: **no — single lane.** The work does not divide: it is one sequential live path with
-a human gate in the middle, and every stage's input is the previous stage's output. Two workers
-would be two runs against one real account.
+Parallel-safe: no — one sequential live canary against one account and one durable attempt.
 
-### Lane A — the run and its record
+### Lane A — preflight, bounded run and evidence
 
-- `docs/operations/launch-slices/SLICE-5P.md` (this file — the RESULT BLOCK and the evidence)
-- a scratch transcript under `$TMPDIR`, path named in the RESULT BLOCK
+- Scratch evidence under `/private/tmp/slice-5p-rerun-evidence/` (redact credentials).
+- This packet's RESULT BLOCK and evidence record, only when the coordinator requests it.
+- Coordinator alone owns packet requirements and master updates.
 
-No production source file is owned by this slice. **If the run reveals a defect, the worker records
-it and stops. It does not fix it here** — a repair inside a verification slice destroys the thing
-being verified.
+No production code is owned. Preflight is read-only; do not run a provider command or write any
+operational record until the coordinator releases the audited live phase.
 
 ## Do not touch
 
-- `data/cost-log.csv` — just purged of 404 fixture rows on 2026-09-07 and **not tracked by git**
-  (`.gitignore:14`), so there is no recovery path. A real paid call during this run may legitimately
-  append one row; nothing may rewrite or truncate the file.
-- `data/publish-schedule.jsonl` — the legacy ledger. It is the **source** of the migration this
-  slice witnesses and must survive the run byte-identical (`3a1d30a6f0f8093c251b46b75947e8d4a8fbc817e57ea596a3ef8702be25ca58`).
-- `data/notes-spread-ledger.jsonl`, `data/community-log.md`, `briefs/bets.md` — real operational
-  records, append-only or owner-owned.
-- `.claude/skills/**` — write-protected by Muxin's settings.
-- `review-queue.md` **status column** — the worker may read it and may add generated rows via
-  `/atomize`, but only Muxin sets a status to `approve`.
+- Production source/tests, `.claude/skills/**`, backlog, generated copy and review status.
+- Other sessions' changes, including the existing review-queue and notes-spread-ledger edits.
+- `data/cost-log.csv`: no paid product model calls; preserve bytes, never truncate or rewrite.
+- `data/publish-schedule.jsonl`: preserve bytes; historical SHA256
+  `3a1d30a6f0f8093c251b46b75947e8d4a8fbc817e57ea596a3ef8702be25ca58`.
+- `data/notes-spread-ledger.jsonl`, `data/community-log.md`, `briefs/bets.md`: preserve bytes.
+- Never clear a claim/fence or rewrite attempt history to make the row eligible.
+- No scheduling, publishing, Postiz discovery, bulk draft creation, fresh atomization, paid model
+  generation, or git push. Workers never commit.
 
 ## Cited headings
 
-`none`
+No master archive heading. Bounded read inputs:
 
-## Stages, and where the human gate sits
-
-1. **Pick the source.** A real piece, Muxin's choice, Human Inference brand. Record which.
-2. **Atomize it.** Note what routing includes and what it excludes; a platform absent from the run
-   because routing excluded it is not a failure.
-3. **Stop.** Hand the queue to Muxin. **Worker stops here and reports.**
-4. **Muxin approves exactly one row** in `review-queue.md`. One, not several — the budget is one
-   canary.
-5. **Publish with `publishAt: null`.** Capture the draft id and the full response.
-6. **Observe the draft in Typefully** and confirm from the live queue that its status is not
-   `"scheduled"` and it carries no `scheduled_date`.
-7. **Clean up:** `cancelDraft` the draft, `releaseClaims` the slot.
-8. **Re-verify the world.** Hashes and ledger state per Acceptance below.
+- `docs/operations/launch-slices/SLICE-5T.md` → `## Operator procedure for the later 5P run`.
+- `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/`: review-queue.md,
+  content-request.json, routing.json if present, source/extract provenance and selected derivative
+  only as needed to establish the existing source and exactly one eligible text row.
+- `src/publish/typefully.ts`, `src/publish/unified-cli.ts`, `src/review/publishing-status.ts`,
+  `src/review/studio-scheduling.ts`, `src/review/approval-provenance.ts`, `src/publish/slots.ts`:
+  read only the selection, provenance, draft creation/readback/deletion and ledger interfaces.
+  Narrow imports/callers needed to establish those interfaces may be read; report them.
+- The repository's exact operational publishing/approval/claim ledgers as resolved by those
+  interfaces. Read only records for the selected folder/row; scheduler counts and hashes are allowed.
+- Prior evidence `/tmp/claude-501/slice-5p-transcript.md` → stages 1–4, if still available.
+  Missing old evidence must be reported, never invented.
+- `package.json` only for exact verification command definitions if needed.
 
 ## Acceptance
 
-- [ ] A1 — `/atomize` produced derivatives for a real source, and the routing decision is recorded
-      with the reason each platform was included or excluded.
-- [ ] A2 — Nothing reached Typefully before Muxin set a row to `approve`. Establish this from the
-      run's ordering, not from the code's intent.
-- [ ] A3 — `createDraft` returned a real draft id from Muxin's live account, called exactly once.
-- [ ] A4 — That draft, read back from the **live Typefully queue** (not from local state), has
-      status ≠ `"scheduled"` and no `scheduled_date`. This is the observation the slice exists for.
-- [ ] A5 — **The ledger migration fired in production for the first time.**
-      `~/.content-agents/content-agents-154a8dd69ae2/scheduler/publish-schedule.jsonl` now exists and
-      contains the 54 historical claims plus the new one. Assert on **claims read**, not on a path.
-- [ ] A6 — `data/publish-schedule.jsonl` still hashes `3a1d30a6…`. The migration copies; it must not
-      move, truncate, or delete.
-- [ ] A7 — The draft is cancelled and the slot claim released. The live queue no longer shows it.
-- [ ] A8 — `data/cost-log.csv` grew by only rows that name a genuine paid call, or not at all. No
-      `"Acme Co"`. No rewrite of existing rows.
-- [ ] A9 — Every defect found is recorded with `file:line` and a reproduction, and **none is fixed
-      in this slice**.
+- [ ] A1 — Existing real source and atomization/routing evidence identified. The prior run used
+  https://humaninference.ai/essays/the-worlds-broken-what-do-we-do, human-inference, 14 derivatives,
+  all six platforms included (Bluesky data; others cold start). Verify retained evidence.
+- [ ] A2 — Exactly one eligible Muxin-approved Typefully text row is selected by the actual CLI;
+  current approval and dispatch history satisfy shipped safeguards (fresh provenance or the existing
+  known-safe prior-failure/reconciliation path).
+  If neither current provenance nor supported known-safe retry history establishes eligibility,
+  stop without an external call and state
+  the supported next action. Never synthesize Muxin approval or bypass the unified route.
+- [ ] A3 — Production CLI creates exactly one live draft; retain returned providerObjectId and
+  local private event, no plannedFor. There is no retry around createDraft.
+- [ ] A4 — Live readback of that exact ID confirms draft/unscheduled state and no scheduled_date
+  or other scheduled publication time. Local state and scheduled-only --list are insufficient.
+- [ ] A5 — Scheduler claims are unchanged before/after. Migration already ran with 54 claims in
+  the prior run; do not demand a new migration or a 55th claim. Draft mode consumes no slot.
+- [ ] A6 — Legacy ledger and unrelated operational records are byte-identical before/after;
+  cost log unchanged, review queue unchanged. Preserve all legitimate durable canary events.
+- [ ] A7 — Delete only the returned canary ID with the existing cancelDraft helper; live readback
+  verifies absence. Retain ID and output before cleanup. Do not erase local attempt history.
+- [ ] A8 — Every established defect has path:line and reproduction; no production repair here.
+- [ ] A9 — Grok preflight safety audit and final evidence audit closed; final frozen gate exit 0.
 
 ## Verify
 
-Run the gate unsandboxed. In a fresh worktree run `npm run worktree:setup` first.
+Phase 1, worker read-only: establish A1/A2 with the explicit selector and exact safe create/readback/delete commands; capture
+before hashes/counts, CLI selection and provenance evidence with path:line. No credentials in output.
+Return RESULT BLOCK and stop for coordinator audit. If no eligible row exists, report precise
+supported reconciliation/re-approval options from code, without executing them.
 
-```
-npm run check
+Phase 2, after coordinator audit release: one authenticated workflow canary, at most one retry
+for a safe transient read operation. Never retry createDraft after ambiguity, 5xx or lost response.
+Use the actual CLI:
+
+```sh
+node --import tsx src/publish/typefully.ts content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference --no-schedule --only-id x-1
 ```
 
-State-of-the-world checks, before and after the run:
+After accepted 5U, --only-id x-1 selects exactly that approved text row. Do not run unless phase 1
+establishes its eligibility and no changes invalidate that proof immediately before run. Without
+--only-id the command processes all approved text rows; that default is outside this canary budget.
+Production credentials may be used only in this released phase; never print or export them to
+an auditor. Live draft readback may use authenticated Chrome UI or an existing exact-ID provider
+read interface. --list is scheduled-only. Observe unscheduled state before deletion, then absence.
+On an ambiguous create result, preserve evidence and stop; do not retry or guess an object ID.
+On cleanup failure, preserve exact ID and report the unresolved live object immediately.
 
-```
-shasum -a 256 data/publish-schedule.jsonl
-wc -l < data/cost-log.csv
-ls -la ~/.content-agents/content-agents-154a8dd69ae2/scheduler/ 2>&1
+Capture before/after hashes and counts with read-only tools for the named operational files and
+resolved scheduler ledger. Do not invoke a migrating read helper merely to count; inspect its
+behavior first. Audit bounded source excerpts/fake evidence before any live mutation.
+
+Coordinator final gate, only after audit closure, on a frozen detached checkout:
+
+```sh
+npm run worktree:setup
+PATH=/private/tmp/slice-5q-gate-bin:$PATH npm run check
 ```
 
-Claims actually readable after the migration — assert on the count, not the path:
-
-```
-node --import tsx -e 'import {readLedger,ledgerPath} from "./src/publish/slots.ts"; const c=readLedger(); console.log(ledgerPath()); console.log("claims:", c.length); console.log("newest:", JSON.stringify(c[c.length-1]));'
-```
+Run unsandboxed. The existing serial-node shim is permitted after verifying its contents. One
+final gate; verify exit code. If stopped before live verification with docs-only changes, follow
+protocol Stopping without acceptance; do not claim the slice passed or run a costly gate for a stop.
 
 ## Observable result
 
-Muxin can open Typefully, see a draft appear that is not scheduled to post, and see it disappear
-again. Everything else in this packet is there to prove that what she saw was the real path and not
-a rehearsal of it.
+One real reviewed derivative appears in Typefully as an unscheduled draft and then disappears
+following exact-ID deletion. Evidence connects source, approved row, durable attempt and provider ID.
 
 ## Risk
 
-**High** — audit required: **yes.**
-
-It is the first live authenticated run since the freeze, against the owner's real account, on a
-path whose failure mode is a post going out unreviewed. The audit's job is narrow and specific:
-confirm from evidence that **nothing could have posted**, and that the run exercised the production
-path rather than a test double of it. An auditor that cannot establish the unscheduled property from
-the captured response should say so rather than infer it.
+High — audit required: yes. Grok must distinguish established defects, verification gaps and
+optional hardening. A read-only preflight followed by audited release bounds external effects.
 
 ## Families
 
-- Builder: strong model, one lane. Live credentials and irreversible outward-facing calls.
-- Auditor: different family, strong tier. Receives the run transcript, the captured API responses,
-  the before/after hashes and the acceptance list — never the master document or the repo tree.
+- Builder/operator: OpenAI Codex Terra high, one lane; raise to xhigh only for omitted verification.
+- Auditor: xAI Grok 4.5, --sandbox workspace, no edits, no subagents, no web search. Supply only
+  criteria, diff/changed paths, focused evidence and bounded excerpts; never secrets or master.
 
 ## Closeout
 
-No closeout tool in this repository. The coordinator records `PASS` or the leftover list in this
-packet before the slice can close.
+No separate tool. Record PASS or actionable leftovers here; coordinator commits. Not accepted
+until A1–A9 are observed. Current phase: stopped before live call pending 5U selector repair.
 
-**Closeout 2026-09-07: NOT ACCEPTED. Stopped before stage 5.** Leftover list:
+## Previous run — diagnostic history, superseded requirements
 
-1. Stage 5 is unsatisfiable against shipped code. `src/publish/typefully.ts:480-484` throws on
-   `--no-schedule` (and on `TYPEFULLY_SCHEDULE=off`) before any network call; the unified path
-   (`typefully.ts:485-486` → `src/publish/unified-cli.ts:10` → `src/review/publishing-status.ts:286-290`)
-   has no unscheduled option. The safety property at `typefully.ts:136-144` is reachable only from
-   `buildDraftPayload` / `publishText`, which no command calls with `publishAt: null`. Needs a
-   decision from Muxin: restore an unscheduled path (repair slice, then rerun 5P) or authorize a
-   scoped verification script that calls `createDraft` directly.
-2. The review GUI dispatches a real publish on approve (`src/review/serve.ts:1141-1148`, comment
-   at `:1142-1143`: every publisher creates a **scheduled** draft). Muxin's three approve clicks on
-   `x-1` were three real publish attempts; all failed before any provider request because
-   provider selection tried Postiz first and capability discovery got `fetch failed`
-   (`~/.content-agents/content-agents-154a8dd69ae2/publishing-status.jsonl`, three rows at
-   17:31:24Z, 17:31:29Z, 17:31:49Z, `state: failed`). Needs a decision from Muxin: is approve the
-   publish trigger, or should approve and dispatch be split.
-3. `x-1` remains at `approve` in
-   `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md:31`. If
-   Postiz discovery starts working, a retry creates an auto-firing post. Only Muxin edits status.
-4. Postiz capability discovery `fetch failed` blocks the unified path regardless of item 1.
-5. The permission classifier blocked the worker's `npm run publish:typefully` command; the
-   worker correctly did not script around it.
+2026-09-07: stopped before createDraft. A1/A2 observed; migration had already copied 54 claims;
+no Typefully draft or new slot. The old unified CLI rejected unscheduled mode; 5T repaired that.
+Old GUI approval dispatched automatically; 5S separated approval and dispatch. Three x-1 failures
+reported no provider request, but these legacy records must still meet current safeguards; do not
+infer eligibility. Old requirements to witness first migration, add a slot or release a draft slot
+are retired: the rerun must add zero slots. No provider safety guard is bypassed.
+Earlier diagnostics: queue flash repaired separately; analytics brand_id backfill remains a later
+slice. Write-protected atomize skill bare-tsx/caption-list corrections still need Muxin and do not
+require fresh atomization here. Prior evidence: /tmp/claude-501/slice-5p-transcript.md. Git history
+retains the full previous packet; current requirements above replace the retired assertions.
 
-Defects recorded (A9), none fixed:
+## Stopped
 
-- GUI flash: `src/review/page.ts:1350` removes the message after 1400 ms with no dismiss path;
-  the failure branch at `page.ts:1666` is what Muxin saw. Owned by SLICE-5Q.
-- Write-then-dispatch ordering: `serve.ts:1136` `updateRow` runs before dispatch at `:1148`, so
-  status changes even when dispatch fails. Outside 5Q's scope; its own slice.
-- Failures go to the publishing-status ledger (`publishing-status.ts:330`), never to stdout, so
-  the server log is silent on a failed publish.
-- `.claude/skills/atomize/SKILL.md:169` bare `tsx` not on PATH; `SKILL.md:451-453` caption
-  platform list stale versus `src/publish/typefully.ts:33` TEXT_PLATFORMS. Write-protected; NEEDS
-  MUXIN.
-- `new-content` collides with the pre-existing `content/2026-09-02-the-world-s-broken-what-do-we-do/`
-  (same essay, 14 pending rows) and created a second folder under a brand-suffixed slug.
-- `data/analytics.db`: every X, LinkedIn and Substack row has NULL `brand_id`; only Bluesky rows
-  carry `human-inference`, so a `--brand` routing run sees no X history and falls back to config.
-  Backfill is its own slice.
+2026-09-08: NOT ACCEPTED. The folder-wide CLI selects two approved text rows (x-1 and x-2),
+violating this slice's one-draft budget; no live call was made. Repair is SLICE-5U, not an owner
+scope decision. Do not change either approval to work around selection.
 
-## Known-live issues to watch for, not to fix here
+Verified: existing source/14 derivatives/routing evidence; two selected rows; five recorded
+pre-dispatch failed events with no provider request (x-1 four, x-2 one); no active claims;
+54 scheduler claims and protected-file baseline hashes. Missing newer approval journal alone
+does not block these known-safe failed retries: publishing-status.ts:291-298 permits prior failed
+history, and :330-352 writes the durable uncertain fence before the callback. An initial contrary
+preflight inference was corrected by coordinator source review. No fresh identity/reapproval needed.
 
-- `src/publish/queue-view.ts:346` prints `data/publish-schedule.jsonl` to the user while reading the
-  migrated file. If the run surfaces this to Muxin, record it; the repair is its own slice.
-- `migrateLegacyDataDirectory` (`jobs.ts:70`) is still non-atomic. Not on this path, but if the run
-  touches it, stop and say so.
-- Three test files race on the repo-root `.e2e-configured-engine-token`. Pre-existing; if the gate
-  fails there, it is not this slice's.
+Retained work: this refreshed packet and /private/tmp/slice-5p-rerun-evidence/preflight.md,
+source-excerpts.txt, packet.diff and Grok audit output. Production and operational files unchanged.
+Single next action: accept 5U, then repeat current eligibility preflight with --only-id x-1 before
+releasing the bounded live draft/readback/delete sequence. No full gate run for this docs-only stop.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## RESULT BLOCK
 
-- Changed paths: none in production source. Generated by `/atomize` (stage 2):
-  `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/` (source, extracts,
-  routing, review-queue with 14 rows, content-request.json, 14 derivatives, no images).
-- Outcome: STOPPED before stage 5. Stages 1 to 4 complete. No `createDraft` call, no draft id,
-  nothing reached Typefully. Source: `https://humaninference.ai/essays/the-worlds-broken-what-do-we-do`,
-  brand human-inference. Routing included all six platforms (Bluesky on data, civic-tech 1.23x at
-  n=28; everything else cold start), none skipped.
-- Checks run and results: A1 met; A2 holds (`"no provider request was made"` in all three ledger
-  rows, no `publish-log.md`, no Placed row in `briefs/bets.md`, `x-1` still `approve`); A3, A4
-  not met; A5 partially met (migration fired from Muxin's `npm run review` session between
-  17:21 and 17:38, `readLedger()` returns 54 claims at the migrated path, expected 54+1 but no
-  slot was claimed); A6 holds (`data/publish-schedule.jsonl` =
-  `3a1d30a6f0f8093c251b46b75947e8d4a8fbc817e57ea596a3ef8702be25ca58`, migrated copy
-  byte-identical at 54 lines); A7 not applicable; A8 holds (`data/cost-log.csv` =
-  `8250c61f0ba987b81599587fbb9f044c170f9da067f72c1a7554a01dbb8b70c6`, 35 lines); A9 met.
-  `npm run check` not run: no source changed.
-- Evidence locations: `/tmp/claude-501/slice-5p-transcript.md` (380 lines, section
-  `STAGES 5-8 — STOPPED`); `slice-5p-content-before/after.txt`, `slice-5p-gitstatus-before/after.txt`
-  beside it; `~/.content-agents/content-agents-154a8dd69ae2/publishing-status.jsonl`;
-  `~/.content-agents/content-agents-154a8dd69ae2/scheduler/publish-schedule.jsonl`.
-- Unresolved: see Closeout leftover list above.
+- Changed paths: this packet only; coordinator also creates 5U packet and updates master.
+- Outcome: NOT ACCEPTED; no Typefully call. Bounded selector repair delegated separately.
+- Checks run and results: read-only selection found two approved text rows; known failed retry
+  path confirmed in source; operational baseline captured and all eight hashes unchanged after preflight. Grok preflight audit
+  and three requested excerpt gaps closed, both exit 0. A1 supported; A2 selection blocked;
+  live A3–A7 not attempted. No source repair in 5P.
+- Evidence locations: /private/tmp/slice-5p-rerun-evidence/.
+- Unresolved: 5U, then live readback/cleanup and final verification.

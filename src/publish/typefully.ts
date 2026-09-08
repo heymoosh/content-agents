@@ -495,7 +495,7 @@ export async function publishText(
 
 export type TypefullyCliInvocation =
   | { list: true }
-  | { list: false; folderArg: string; noSchedule: boolean; forceReuse: boolean };
+  | { list: false; folderArg: string; noSchedule: boolean; forceReuse: boolean; onlyId?: string };
 
 /** Parse the public Typefully CLI once, before importing the unified write route. */
 export function parseTypefullyCliInvocation(
@@ -503,17 +503,30 @@ export function parseTypefullyCliInvocation(
   env: { TYPEFULLY_SCHEDULE?: string } = process.env,
 ): TypefullyCliInvocation {
   const [arg, ...flags] = argv.slice(2);
-  if (!arg) throw new Error("usage: tsx src/publish/typefully.ts <content-folder> [--no-schedule|--schedule] | --list");
+  if (!arg) throw new Error("usage: tsx src/publish/typefully.ts <content-folder> [--no-schedule|--schedule] [--only-id <row-id>] | --list");
   if (arg === "--list") {
     if (flags.length > 0) throw new Error("--list cannot be combined with publishing flags");
     return { list: true };
   }
   if (arg.startsWith("-")) throw new Error("the content folder must be the first argument");
-  const allowed = new Set(["--no-schedule", "--schedule", "--force-reuse"]);
-  const invalid = flags.find((flag) => !allowed.has(flag));
-  if (invalid) throw new Error(`unknown Typefully publish option: ${invalid}`);
-  const noScheduleFlag = flags.includes("--no-schedule");
-  const scheduleFlag = flags.includes("--schedule");
+  let noScheduleFlag = false;
+  let scheduleFlag = false;
+  let forceReuse = false;
+  let onlyId: string | undefined;
+  for (let index = 0; index < flags.length; index++) {
+    const flag = flags[index];
+    if (flag === "--no-schedule") { noScheduleFlag = true; continue; }
+    if (flag === "--schedule") { scheduleFlag = true; continue; }
+    if (flag === "--force-reuse") { forceReuse = true; continue; }
+    if (flag === "--only-id") {
+      if (onlyId !== undefined) throw new Error("--only-id may be supplied only once");
+      const value = flags[++index];
+      if (!value || !value.trim() || value.startsWith("-")) throw new Error("--only-id requires one non-empty row id");
+      onlyId = value;
+      continue;
+    }
+    throw new Error(`unknown Typefully publish option: ${flag}`);
+  }
   const scheduleEnv = env.TYPEFULLY_SCHEDULE?.trim().toLowerCase() ?? "";
   if (scheduleEnv && scheduleEnv !== "off" && scheduleEnv !== "on") {
     throw new Error("TYPEFULLY_SCHEDULE must be 'off' for an unscheduled draft or 'on' for normal scheduling");
@@ -521,7 +534,7 @@ export function parseTypefullyCliInvocation(
   if ((noScheduleFlag && scheduleFlag) || (noScheduleFlag && scheduleEnv === "on") || (scheduleFlag && scheduleEnv === "off")) {
     throw new Error("conflicting scheduling intent: choose either unscheduled draft mode or normal scheduling");
   }
-  return { list: false, folderArg: arg, noSchedule: noScheduleFlag || scheduleEnv === "off", forceReuse: flags.includes("--force-reuse") };
+  return { list: false, folderArg: arg, noSchedule: noScheduleFlag || scheduleEnv === "off", forceReuse, ...(onlyId ? { onlyId } : {}) };
 }
 
 export async function runTypefullyCli(
@@ -537,7 +550,11 @@ export async function runTypefullyCli(
   const folder = isAbsolute(invocation.folderArg) ? invocation.folderArg : join(repoRoot, invocation.folderArg);
   if (invocation.forceReuse) throw new Error("legacy reuse overrides are unavailable on the unified capability-selected publish path");
   const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
-  await publishApprovedViaConfiguredProviders(folder, "text", { ...testOptions, noSchedule: invocation.noSchedule });
+  await publishApprovedViaConfiguredProviders(folder, "text", {
+    ...testOptions,
+    noSchedule: invocation.noSchedule,
+    ...(invocation.onlyId ? { onlyId: invocation.onlyId } : {}),
+  });
 }
 
 // Run the CLI only when executed directly, so the module can be imported (fetchScheduledDrafts)

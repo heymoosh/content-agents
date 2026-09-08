@@ -18,12 +18,12 @@ import { join } from "node:path";
 import { buildDraftPayload, buildPosts, fetchScheduledDrafts, cancelDraft, parseTypefullyCliInvocation, runTypefullyCli } from "./typefully.js";
 import { readQueue, writeCell } from "./queue.js";
 import { commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "../review/approval-provenance.js";
-import { readPublishingStatuses } from "../review/publishing-status.js";
+import { appendPublishingStatus, readPublishingStatuses } from "../review/publishing-status.js";
 
 const POSTS = [{ text: "Verbatim note text spread to a text channel." }];
 
-test("the production Typefully CLI parses unscheduled intent and sends one fake-network private draft through the unified route", async () => {
-  const root = mkdtempSync(join(tmpdir(), "slice-5t-typefully-cli-"));
+test("the production Typefully CLI selects one approved text row for a fake-network private draft through the unified route", async () => {
+  const root = mkdtempSync(join(tmpdir(), "slice-5u-typefully-cli-"));
   const folder = join(root, "piece");
   const statusPath = join(root, "publishing-status.jsonl");
   const slotPath = join(root, "slot-ledger.jsonl");
@@ -37,11 +37,17 @@ test("the production Typefully CLI parses unscheduled intent and sends one fake-
   try {
     mkdirSync(join(folder, "derivatives"), { recursive: true });
     writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
-    writeFileSync(join(folder, "derivatives", "x-1.md"), "---\nplatform: x\n---\n\nApproved fixture body.\n");
-    writeFileSync(join(folder, "review-queue.md"), "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | fixture |\n");
+    writeFileSync(join(folder, "derivatives", "x-1.md"), "---\nplatform: x\n---\n\nFirst approved fixture body.\n");
+    writeFileSync(join(folder, "derivatives", "x-2.md"), "---\nplatform: x\n---\n\nSecond approved fixture body.\n");
+    writeFileSync(join(folder, "derivatives", "x-legacy.md"), "---\nplatform: x\n---\n\nKnown-safe legacy retry fixture body.\n");
+    writeFileSync(join(folder, "review-queue.md"), "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | fixture |\n| x-2 | x | text | derivatives/x-2.md | — | — | — | pending | | fixture |\n| x-legacy | x | text | derivatives/x-legacy.md | — | — | — | approve | | fixture |\n| x-pending | x | text | derivatives/x-1.md | — | — | — | pending | | fixture |\n| card-1 | quote-card:x | image | derivatives/x-1.md | — | — | — | approve | | fixture |\n");
     const journal = journalPathForLedger(statusPath);
-    recordNewQueueRows(folder, readQueue(folder).rows, journal);
+    recordNewQueueRows(folder, readQueue(folder).rows.filter((row) => row.id === "x-1" || row.id === "x-2"), journal);
     assert.equal(commitReviewStatus(folder, "piece", "x-1", "approve", () => writeCell(folder, "x-1", { status: "approve" }), statusPath, journal), true);
+    assert.equal(commitReviewStatus(folder, "piece", "x-2", "approve", () => writeCell(folder, "x-2", { status: "approve" }), statusPath, journal), true);
+    // This is the 5P retry shape: the retained status proves its old attempt stopped before a
+    // provider request. Its newer approval journal is intentionally not required for retry.
+    appendPublishingStatus({ slug: "piece", rowId: "x-legacy", provider: "typefully", state: "failed", at: new Date().toISOString(), error: "provider selection failed before dispatch; no provider request was made" }, statusPath);
     process.env.TYPEFULLY_API_KEY = "fake-key";
     process.env.TYPEFULLY_SOCIAL_SET_ID = "fake-set";
     process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = "human-inference/typefully";
@@ -51,16 +57,20 @@ test("the production Typefully CLI parses unscheduled intent and sends one fake-
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       preCallbackFence = readFileSync(journal, "utf8").includes("\"dispatch_started\"");
       requests.push({ url: String(input), method: init?.method ?? "GET", payload: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown> });
-      return new Response(JSON.stringify({ id: "draft-fixture-1" }), { status: 200 });
+      return new Response(JSON.stringify({ id: `draft-fixture-${requests.length}` }), { status: 200 });
     }) as typeof fetch;
 
-    await runTypefullyCli(["node", "src/publish/typefully.ts", folder, "--no-schedule"], {}, { publishingStatusPath: statusPath });
+    await runTypefullyCli(["node", "src/publish/typefully.ts", folder, "--no-schedule", "--only-id", "x-1"], {}, { publishingStatusPath: statusPath });
 
-    assert.deepEqual(parseTypefullyCliInvocation(["node", "src/publish/typefully.ts", folder], { TYPEFULLY_SCHEDULE: "off" }), { list: false, folderArg: folder, noSchedule: true, forceReuse: false });
+    assert.deepEqual(parseTypefullyCliInvocation(["node", "src/publish/typefully.ts", folder, "--only-id", "x-1"], { TYPEFULLY_SCHEDULE: "off" }), { list: false, folderArg: folder, noSchedule: true, forceReuse: false, onlyId: "x-1" });
     assert.throws(() => parseTypefullyCliInvocation(["node", "src/publish/typefully.ts", folder, "--no-schedule"], { TYPEFULLY_SCHEDULE: "on" }), /conflicting scheduling intent/);
+    assert.throws(() => parseTypefullyCliInvocation(["node", "src/publish/typefully.ts", folder, "--only-id"]), /requires one non-empty row id/);
+    assert.throws(() => parseTypefullyCliInvocation(["node", "src/publish/typefully.ts", folder, "--only-id", "x-1", "--only-id", "x-2"]), /only once/);
+    assert.throws(() => parseTypefullyCliInvocation(["node", "src/publish/typefully.ts", "--list", "--only-id", "x-1"]), /cannot be combined/);
     assert.equal(requests.length, 1, "the approved row creates exactly one draft request");
     assert.equal(requests[0]?.url, "https://api.typefully.com/v2/social-sets/fake-set/drafts");
     assert.equal(requests[0]?.method, "POST");
+    assert.equal(requests[0]?.payload.draft_title, "x-1 (content-agents)", "the provider sees the exact selected row");
     assert.ok(!("publish_at" in requests[0]!.payload), "the actual request has no scheduled or next-free-slot value");
     assert.equal(readQueue(folder).rows[0]?.status, "approve", "saving a private draft must not mark the review row published");
     const outcome = readPublishingStatuses(statusPath)["piece/x-1"];
@@ -68,13 +78,42 @@ test("the production Typefully CLI parses unscheduled intent and sends one fake-
     assert.equal(outcome?.providerObjectId, "draft-fixture-1");
     assert.equal(outcome?.plannedFor, undefined);
     assert.equal(readFileSync(statusPath, "utf8").includes("draft-fixture-1"), true);
+    assert.equal(readPublishingStatuses(statusPath)["piece/x-2"], undefined, "the other approved text row has no dispatch event");
     assert.equal(readFileSync(slotPath, "utf8"), "", "draft mode leaves the automatic slot ledger untouched");
-    if (process.env.SLICE_5T_EVIDENCE_PATH) {
-      writeFileSync(process.env.SLICE_5T_EVIDENCE_PATH, JSON.stringify({
+
+    await assert.rejects(
+      () => runTypefullyCli(["node", "src/publish/typefully.ts", folder, "--no-schedule", "--only-id", "x-1"], {}, { publishingStatusPath: statusPath }),
+      /already has a private publishing attempt|reconcile/i,
+      "a private selected attempt must never create a duplicate draft",
+    );
+    assert.equal(requests.length, 1, "the duplicate selected private attempt has zero provider effects");
+
+    for (const [id, expected] of [["missing", /does not name a queue row/], ["x-pending", /not approved/], ["card-1", /not a text row/]] as const) {
+      await assert.rejects(
+        () => runTypefullyCli(["node", "src/publish/typefully.ts", folder, "--no-schedule", "--only-id", id], {}, { publishingStatusPath: statusPath }),
+        expected,
+        `${id} must be rejected before provider selection`,
+      );
+    }
+    assert.equal(requests.length, 1, "invalid selected rows have zero provider effects");
+
+    await runTypefullyCli(["node", "src/publish/typefully.ts", folder, "--no-schedule", "--only-id", "x-legacy"], {}, { publishingStatusPath: statusPath });
+    assert.equal(requests.length, 2, "the known-safe failed pre-dispatch retry creates once");
+    assert.equal(requests[1]?.payload.draft_title, "x-legacy (content-agents)");
+    const dispatchRows = readFileSync(journal, "utf8").split("\n").filter(Boolean)
+      .map((line) => JSON.parse(line) as { kind?: string; rowId?: string })
+      .filter((event) => event.kind === "dispatch_started").map((event) => event.rowId);
+    assert.deepEqual(dispatchRows, ["x-1"], "unselected x-2 and the known-safe legacy retry do not create a fresh dispatch fence");
+
+    const evidencePath = process.env.SLICE_5U_EVIDENCE_PATH ?? process.env.SLICE_5T_EVIDENCE_PATH;
+    if (evidencePath) {
+      writeFileSync(evidencePath, JSON.stringify({
         command: "node --import tsx --test --test-concurrency=1 src/publish/typefully.test.ts",
         fakeNetworkCallbackCount: requests.length,
         preCallbackDispatchFence: preCallbackFence,
-        request: requests[0],
+        selectedRequest: requests[0],
+        legacyRetryRequest: requests[1],
+        unselectedDispatchRows: dispatchRows,
         publishingResult: { state: outcome?.state, providerObjectId: outcome?.providerObjectId, plannedFor: outcome?.plannedFor },
         slotLedgerBefore: "",
         slotLedgerAfter: readFileSync(slotPath, "utf8"),

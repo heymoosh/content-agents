@@ -2,17 +2,18 @@
 
 ## START HERE
 
-- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, unpushed by standing order).
+- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
-- Current/last accepted: **SLICE-5T ACCEPTED**, `docs/operations/launch-slices/SLICE-5T.md` → `## Accepted closeout`.
-- Blocked on: nothing for 5T. Grok independent closure PASS; frozen unsandboxed gate 4326/0, exit 0.
-- Next dependency-ready: refresh `docs/operations/launch-slices/SLICE-5P.md` for one eligible row, unscheduled live readback/cleanup and no new slot claim, then rerun 5P.
-- Then: durable per-piece X opt-in (5R A6), analytics `brand_id` backfill.
-- Last decision: explicit --no-schedule uses the unified Typefully route, records private draft/id, consumes no slot and blocks repeat creation; legacy unknown history remains refused.
-- 5S remains accepted: Approve records review only; explicit dispatch uses a durable first-attempt claim.
-- Live proof: not performed in 5T; 5P remains not accepted. Operator procedure is in the 5T packet.
-- Design sanity rule: `## Standing constraints`. Needs Muxin, not blocking: `.claude/skills/**` edits named in 5N and 5P.
-- Everything below this block is history. Do not read it unless a slice packet cites a heading.
+- Current/last accepted: **SLICE-5U ACCEPTED**, `docs/operations/launch-slices/SLICE-5U.md` → `## Accepted closeout`.
+- Blocked on: nothing for 5U. Grok PASS; frozen unsandboxed gate 4326/0, exit 0.
+- Next dependency-ready: `docs/operations/launch-slices/SLICE-5P.md`, repeat current eligibility preflight then one live unscheduled draft/readback/delete with --only-id x-1.
+- Last decision: preserve x-1 and x-2 approvals; explicit selector uses the existing guarded CLI path, consumes no draft slot.
+- History finding: recorded pre-dispatch failed retries are supported despite absent newer approval journal; unknown history remains blocked.
+- 5P is NOT ACCEPTED; no live provider call in this rerun. Evidence: 5P packet → `## Stopped` and 5U operator procedure.
+- 5S/5T remain accepted: approval separate from dispatch; unified unscheduled draft and durable duplicate protection.
+- Then: durable per-piece X opt-in (5R A6), analytics brand_id backfill.
+- Design sanity: `## Standing constraints`. Needs Muxin, not blocking: .claude/skills fixes named in 5N/5P.
+- Everything below this block is history; read only packet-cited headings.
 
 ## Standing constraints`.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
@@ -1379,6 +1380,27 @@ Eight audited source/test paths remain hash-identical after gate. Evidence retai
 and never used as passing proof. Coordinator includes packet/master in acceptance commit and
 preserves the two pre-existing operational edits. Next refresh 5P's one-row eligibility and
 obsolete extra-slot/migration premise, then run its live unscheduled readback/cleanup proof.
+
+
+### 2026-09-08 — SLICE-5U accepted: exact Typefully row selection for 5P
+
+5P read-only preflight found two approved X rows, x-1 and x-2; the folder-wide command could not
+satisfy the one-draft budget without changing Muxin's approvals. No provider call was made. The
+initial worker inference that missing approval journal blocked them was corrected by coordinator
+source review: their recorded failed-before-dispatch history permits a guarded retry. Grok verified
+the predicate and closed three bounded excerpt gaps. Eight operational-file hashes stayed unchanged.
+
+5U adds --only-id through the same Typefully unified CLI, validates exact unique approved/kind
+selection before provider effects, and preserves no-selector behavior and existing safety checks.
+Terra xhigh implemented; Grok 4.5 independent audit PASS, no established defects. Fake production-entry
+proof covers selected private draft/no slot, unselected row untouched, duplicate refusal, invalid
+selection and supported legacy failed retry. Focused 77/0 and typecheck pass. Frozen detached final
+unsandboxed gate exit 0, 4326/0, wall 558.23s; source hashes unchanged. See 5U Accepted closeout.
+
+Accepted source/test and packet/master changes are committed locally on main, no push. Existing
+review-queue and notes-spread-ledger edits remain outside the commit. Next is refreshed 5P with
+--no-schedule --only-id x-1: recheck current eligibility, observe the real unscheduled draft, delete
+that exact ID and verify absence. No live 5P acceptance is claimed here.
 
 ## Current handoff — 2026-09-02
 

@@ -5,6 +5,8 @@ import { scheduleKind, type DispatchMode, type ScheduleKind, type SchedulerDeps 
 /** Hermetic embedding seam; the terminal CLI never supplies these fields. */
 export interface UnifiedPublishOptions {
   noSchedule?: boolean;
+  /** Restrict this run to one exact, already-approved row before provider selection. */
+  onlyId?: string;
   schedule?: Parameters<typeof scheduleApprovedOnce>[3];
   publishingStatusPath?: string;
   selectionDeps?: Pick<SchedulerDeps, "fetchPostizRegistry" | "postizEnv">;
@@ -20,7 +22,19 @@ export async function publishApprovedViaConfiguredProviders(
   if (opts.noSchedule && kind !== "text") {
     throw new Error("unscheduled drafts are only supported for Typefully text rows");
   }
-  const rows = readQueue(folder).rows.filter((row) => row.status === "approve" && scheduleKind(row) === kind);
+  const queueRows = readQueue(folder).rows;
+  let rows = queueRows.filter((row) => row.status === "approve" && scheduleKind(row) === kind);
+  if (opts.onlyId !== undefined) {
+    const onlyId = opts.onlyId;
+    if (!onlyId.trim()) throw new Error("--only-id must name exactly one row id");
+    const exactMatches = queueRows.filter((row) => row.id === onlyId);
+    if (exactMatches.length === 0) throw new Error(`--only-id ${onlyId} does not name a queue row`);
+    if (exactMatches.length > 1) throw new Error(`--only-id ${onlyId} matches duplicate queue rows`);
+    const row = exactMatches[0]!;
+    if (row.status !== "approve") throw new Error(`--only-id ${onlyId} is not approved`);
+    if (scheduleKind(row) !== kind) throw new Error(`--only-id ${onlyId} is not a ${kind} row`);
+    rows = [row];
+  }
   let completed = 0;
   for (const row of rows) {
     const result = await scheduleApprovedOnce(
