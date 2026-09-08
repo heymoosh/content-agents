@@ -5,11 +5,11 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (branch `main`, unpushed by standing order).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
 - Current slice: **SLICE-5S NOT ACCEPTED**, `docs/operations/launch-slices/SLICE-5S.md` → `## Stopped`.
-- Blocked on: automatic approval review rejected retry-guard exception; Grok read-only sandbox fails on Docker socket symlink.
-- Next dependency-ready: finish **SLICE-5S** after guard design/approval and Grok tooling are resolved; retained candidate at `/private/tmp/content-agents-slice-5s-codex`.
+- Blocked on: rejected retry-guard exception and incomplete endpoint/tests; Grok workspace audit completed, repairs remain.
+- Next dependency-ready: finish **SLICE-5S** after guard design/approval and audit repairs; retained candidate at `/private/tmp/content-agents-slice-5s-codex`.
 - Last accepted: **SLICE-5R**, `71f2df9`; gate 4304 tests / 0 failures.
 - Then unwritten: unscheduled-draft repair on unified route, rerun 5P, durable per-piece X opt-in (5R A6), analytics `brand_id` backfill.
-- Last decision (Muxin, 2026-09-07): use a suitable non-highest-tier Codex builder without waiting for Claude; retain Grok audit. Selected `gpt-5.6-terra`, medium effort.
+- Last decision (Muxin, 2026-09-07): use a suitable non-highest-tier Codex builder without waiting for Claude; retain Grok audit. Selected `gpt-5.6-terra`, medium effort. Grok workspace sandbox authorized for no-edit audit.
 - **SAFETY, Muxin only:** until 5S, retrying `x-1`/`x-2` can publish once Postiz answers. Set both to `pending` in `content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`; this session did not change either row.
 - Design sanity rule: `## Standing constraints`. Needs Muxin, not blocking: `.claude/skills/**` edits named in 5N and 5P.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
@@ -1348,6 +1348,10 @@ Muxin requested Grok for the independent audit. Updated the packet routing from 
 Muxin authorized a non-highest-tier Codex builder; `gpt-5.6-terra` at medium effort ran in `/private/tmp/content-agents-slice-5s-codex` on `slice-5s-codex`. Partial approval/status and Publishing UI work is retained uncommitted. Focused checks: 398 pass / 3 fail; one test assertion changed afterward without rerun. Endpoint, visual proof and acceptance remain incomplete.
 
 Automatic approval review rejected the proposed explicit-scheduling guard exception and its patch artifact, citing duplicate-post risk for legacy approved rows with missing history. No exception was applied. A bounded Grok safety assessment was attempted but its read-only sandbox refused startup because `/var/run/docker.sock` is a symlink. No Grok audit or full gate ran. Packet `## Stopped` records evidence and next action. No candidate integration or push; existing main checkout operational changes remain untouched.
+
+### 2026-09-07 — Grok workspace audit completed; 5S not accepted
+
+User-authorized `grok --sandbox workspace` audit completed with exit 0. Review confirms the missing Schedule endpoint and runtime verification gaps; approved-row duplicate-post guard conflict remains unresolved. Bounded findings, evidence and coordinator dispositions are in SLICE-5S → Grok candidate audit. No implementation integrated or pushed.
 
 ## Current handoff — 2026-09-02
 
