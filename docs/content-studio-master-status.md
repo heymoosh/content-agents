@@ -4,16 +4,17 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`. Protocol: `AGENTS.md` → `## Slice protocol`.
-- Current/last accepted: **SLICE-5P ACCEPTED**, `docs/operations/launch-slices/SLICE-5P.md` → `## Accepted closeout`.
-- Blocked on: nothing for 5P. Grok PASS; frozen unsandboxed gate 4327/0, exit 0.
-- Observed: draft 10682647 unscheduled in authenticated Playwright, then exact-ID deletion and browser absence.
-- Last decision: verified set 314868 Muxin Li binds Human Inference for this canary using process-local account settings.
-- Preserve: both approvals, all durable history, 54 scheduler claims and unrelated work; do not rerun this canary.
-- 5S/5T/5U/5V remain accepted: approval separate from dispatch, private drafts, exact selection and one-attempt create.
-- Evidence: `/private/tmp/slice-5p-rerun-evidence/browser-20260908/` and `browser-coordinator-20260908/`.
-- Next dependency-ready: durable per-piece X opt-in, `docs/operations/launch-slices/SLICE-5R.md` → A6; packet needed for remaining work.
-- Then: analytics brand_id backfill.
+- Current/last accepted: **SLICE-5W ACCEPTED**, `docs/operations/launch-slices/SLICE-5W.md` → `## Accepted closeout`.
+- Blocked on: nothing for 5W. Grok PASS; frozen gate 4332/4332, exit 0.
+- Delivered: explicit per-piece X opt-in/revoke survives rerouting; see router `--help`.
+- Last decision: X defaults stay technical; explicit per-piece exception preserves source/origin safety and approval gates.
+- Parallel work: independent verifier preparation ran beside implementation; actual verification used frozen handoffs.
+- Preserve: unrelated edits, approvals, durable provider history and scheduler claims.
+- 5P stays accepted: do not rerun its deleted canary or erase its local provider history.
+- Evidence: `/private/tmp/slice-5w-evidence/`; packet records focused, CLI, Grok, gate and hygiene proof.
+- Next dependency-ready: analytics brand_id backfill, `docs/operations/launch-slices/SLICE-5R.md` → `## Known data gap, not this slice's`; packet needed.
 - Everything below this block is history; read only packet-cited headings.
+
 
 ## Standing constraints`.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
@@ -1437,6 +1438,23 @@ zero failures, exit 0, 559.879 seconds. No production changes, scheduling, publi
 generation or push. Temporary checkout/browser files were settled; unrelated AGENTS/template,
 review-queue and notes-ledger edits were preserved. Evidence and exact hygiene disposition:
 `docs/operations/launch-slices/SLICE-5P.md` → `## Accepted closeout`.
+
+
+### 2026-09-08 — SLICE-5W accepted: durable per-piece X opt-in
+
+The 5R A6 follow-up is delivered. The route CLI can explicitly opt one content folder into X or
+revoke that choice; strict versioned routing-intent.json survives separate-process rerouting and
+continuation. Ordinary X defaults, non-X routing, source/origin restrictions and approval remain.
+Help and generated routing explain the exact commands. No real content or provider state changed.
+
+Updated parallel-work guidance applied at the completed 5P boundary: bounded interface preparation,
+then disjoint implementation and independent verifier-tooling lanes; candidate checks waited for
+frozen handoffs. Coordinator reproduced a dangling metadata symlink outside-write gap; builder
+fixed it with explicit lstat and no-follow writes. That regression and a contradictory header claim
+were independently closed before integration. Grok PASS; focused 46/46; real CLI 12 groups PASS;
+single frozen unsandboxed gate 4332/4332, exit 0. Packet/evidence: SLICE-5W.md and
+/private/tmp/slice-5w-evidence/. Three temporary worktrees removed after exact patch checks.
+Next work is the analytics brand_id backfill documented in 5R's known data gap.
 
 
 ## Current handoff — 2026-09-02

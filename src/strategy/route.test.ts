@@ -1,13 +1,16 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
 import { repoRoot } from "../db/db.js";
 import {
   applyExplorationOverride,
   applyOriginBlock,
+  applySourceTriage,
   applySubstackRepost,
+  applyXOptIn,
   CONTROL_RUN_SOURCE,
   CORE_TEXT,
   computeFit,
@@ -16,6 +19,10 @@ import {
   loadConfig,
   mergeDecisions,
   originPlatform,
+  readRoutingIntent,
+  resolveRoutingIntentFolder,
+  routingMd,
+  writeRoutingIntent,
   type Decision,
   type LoadedData,
   type MergedDecision,
@@ -170,6 +177,101 @@ describe("mergeDecisions: platform-fit gate across multiple pillars", () => {
     const merged = mergeDecisions(["civic-tech", "human-ai"], perPillar);
     const community = merged.find((m) => m.platform === "community:democratic-resilience")!;
     assert.equal(community.decision, "include");
+  });
+});
+
+describe("durable per-piece X routing intent", () => {
+  function intentFixture(): { root: string; folder: string; outside: string; cleanup: () => void } {
+    const root = mkdtempSync(join(tmpdir(), "slice-5w-route-"));
+    const content = join(root, "content");
+    const folder = join(content, "selected-piece");
+    const outside = join(root, "outside-piece");
+    mkdirSync(folder, { recursive: true });
+    mkdirSync(outside);
+    return { root: content, folder, outside, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  }
+
+  test("missing intent is false; set/revoke are idempotent and preserve unrelated artifacts", () => {
+    const fixture = intentFixture();
+    try {
+      const sentinel = join(fixture.folder, "source.md");
+      writeFileSync(sentinel, "source artifact\n");
+      assert.deepEqual(readRoutingIntent(fixture.folder, fixture.root), { version: 1, x_opt_in: false });
+      assert.deepEqual(writeRoutingIntent(fixture.folder, true, fixture.root), { version: 1, x_opt_in: true });
+      assert.deepEqual(writeRoutingIntent(fixture.folder, true, fixture.root), { version: 1, x_opt_in: true });
+      assert.equal(readRoutingIntent(fixture.folder, fixture.root).x_opt_in, true);
+      assert.deepEqual(writeRoutingIntent(fixture.folder, false, fixture.root), { version: 1, x_opt_in: false });
+      assert.deepEqual(writeRoutingIntent(fixture.folder, false, fixture.root), { version: 1, x_opt_in: false });
+      assert.equal(readRoutingIntent(fixture.folder, fixture.root).x_opt_in, false);
+      assert.equal(readFileSync(sentinel, "utf8"), "source artifact\n");
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  test("malformed, unsupported, and extra-field metadata fail closed without mutation", () => {
+    const fixture = intentFixture();
+    try {
+      const metadata = join(fixture.folder, "routing-intent.json");
+      for (const body of ["{", '{"version":2,"x_opt_in":true}', '{"version":1,"x_opt_in":"true"}', '{"version":1,"x_opt_in":true,"note":"keep"}']) {
+        writeFileSync(metadata, body);
+        assert.throws(() => readRoutingIntent(fixture.folder, fixture.root));
+        assert.throws(() => writeRoutingIntent(fixture.folder, true, fixture.root));
+        assert.equal(readFileSync(metadata, "utf8"), body, "unsupported fields must not be discarded");
+      }
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  test("intent paths reject outside folders and metadata symlinks, including dangling targets", () => {
+    const fixture = intentFixture();
+    try {
+      assert.throws(() => resolveRoutingIntentFolder(fixture.outside, fixture.root));
+      const target = join(fixture.outside, "intent.json");
+      writeFileSync(target, '{"version":1,"x_opt_in":true}');
+      symlinkSync(target, join(fixture.folder, "routing-intent.json"));
+      assert.throws(() => readRoutingIntent(fixture.folder, fixture.root));
+      assert.throws(() => writeRoutingIntent(fixture.folder, true, fixture.root));
+      rmSync(join(fixture.folder, "routing-intent.json"));
+      const danglingTarget = join(fixture.outside, "must-not-be-created.json");
+      const metadata = join(fixture.folder, "routing-intent.json");
+      const routingOutput = join(fixture.folder, "routing.md");
+      writeFileSync(routingOutput, "last valid routing output\n");
+      symlinkSync(danglingTarget, metadata);
+      assert.throws(() => readRoutingIntent(fixture.folder, fixture.root));
+      assert.throws(() => writeRoutingIntent(fixture.folder, true, fixture.root));
+      assert.ok(lstatSync(metadata).isSymbolicLink(), "metadata symlink must remain unchanged");
+      assert.equal(existsSync(danglingTarget), false, "write must not create a dangling symlink target");
+      assert.equal(readFileSync(routingOutput, "utf8"), "last valid routing output\n", "rejected metadata must leave routing output unchanged");
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  test("only X's config-derived rule skip changes, and later safety vetoes still win", () => {
+    const xVeto: MergedDecision = { platform: "x", decision: "skip", score: 9, confidence: "rule", rationale: "hard veto", pillars: ["human-ai"] };
+    const linkedin: MergedDecision = { platform: "linkedin", decision: "include", score: 1, confidence: "data", rationale: "unchanged", pillars: ["human-ai"] };
+    const baseline = [xVeto, linkedin];
+    assert.equal(applyXOptIn(baseline, false), baseline, "missing or false intent leaves the original array untouched");
+    const opted = applyXOptIn(baseline, true);
+    assert.deepEqual(opted[1], linkedin);
+    assert.deepEqual(opted[0], {
+      ...xVeto,
+      decision: "include",
+      rationale: "explicit per-piece X opt-in (routing-intent.json): overrides the config/routing.yaml editorial X exclusion for this piece only",
+    });
+    assert.equal(applySourceTriage(opted, ["x"])[0].decision, "skip", "source triage runs after the X exception");
+    assert.equal(applyOriginBlock(opted, "https://x.com/humaninference/status/123")[0].decision, "skip", "origin block runs after the X exception");
+  });
+
+  test("multi-pillar routing guidance names the narrow X exception and its later safety vetoes", () => {
+    const md = routingMd(["civic-tech", "human-ai"], [
+      { platform: "x", decision: "include", score: null, confidence: "rule", rationale: "explicit per-piece X opt-in", pillars: ["civic-tech"] },
+    ]);
+    assert.match(md, /A deliberate per-piece X opt-in can lift only that X editorial veto/);
+    assert.match(md, /source-triage and origin exclusions still win/);
+    assert.doesNotMatch(md, /that veto wins regardless of other pillars/);
   });
 });
 

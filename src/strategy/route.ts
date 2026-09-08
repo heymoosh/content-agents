@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, constants, lstatSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { openDb, repoRoot } from "../db/db.js";
@@ -22,6 +22,9 @@ import { latestMetricsJoin, measurementScope, parseStrategyMeasurementContext, t
 //          review-queue.md approval still gates publishing; the derivative drafted from this
 //          routing.md should be stamped `exploration_probe: true` in its frontmatter so
 //          tag-source.ts/loadData can exclude its eventual post from the main resonance figures.
+//   npm run route -- --brand <brand> --pillar <pillar> --folder content/<slug> --x-opt-in
+//   npm run route -- --brand <brand> --pillar <pillar> --folder content/<slug> --x-revoke
+//        → records the per-piece X choice in routing-intent.json, then reroutes the folder.
 //   tsx src/strategy/route.ts --brand <brand> --all
 //        → full pillar × platform routing-map markdown (for the strategy brief)
 //   tsx src/strategy/route.ts --brand <brand> --flags
@@ -50,6 +53,9 @@ export const CONTROL_RUN_SOURCE = "spin-control-run";
 // pillar/platform resonance figures decideForPillar/routing-drift.ts read — see
 // src/strategy/exploration.ts for the separate coverage bucket these rows DO feed.
 export const EXPLORATION_SOURCE = "exploration-probe";
+export const ROUTING_INTENT_FILE = "routing-intent.json";
+const ROUTING_INTENT_VERSION = 1;
+const X_OPT_IN_RATIONALE = "explicit per-piece X opt-in (routing-intent.json): overrides the config/routing.yaml editorial X exclusion for this piece only";
 const WEEK = 7 * 24 * 3600 * 1000;
 
 export interface RoutingConfig {
@@ -296,6 +302,78 @@ export interface MergedDecision extends Decision {
   pillars: string[]; // which pillar(s) this decision draws from
 }
 
+export interface RoutingIntent {
+  version: 1;
+  x_opt_in: boolean;
+}
+
+function isInside(parent: string, child: string): boolean {
+  const rel = relative(parent, child);
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+/** Resolve an existing content folder without allowing traversal or symlink escapes. */
+export function resolveRoutingIntentFolder(folder: string, contentRoot = join(repoRoot, "content")): string {
+  const root = realpathSync(contentRoot);
+  const candidate = resolve(folder.startsWith("/") ? folder : join(repoRoot, folder));
+  const resolved = realpathSync(candidate);
+  if (!isInside(root, resolved)) throw new Error(`routing intent folder must be inside ${root}`);
+  if (!lstatSync(resolved).isDirectory()) throw new Error(`routing intent folder is not a directory: ${folder}`);
+  return resolved;
+}
+
+function routingIntentPath(folder: string, contentRoot?: string): string {
+  return join(resolveRoutingIntentFolder(folder, contentRoot), ROUTING_INTENT_FILE);
+}
+
+function lstatRoutingIntent(path: string): ReturnType<typeof lstatSync> | undefined {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+function parseRoutingIntent(text: string, path: string): RoutingIntent {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error(`invalid routing intent metadata: ${path}`);
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`invalid routing intent metadata: ${path}`);
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  if (keys.length !== 2 || keys[0] !== "version" || keys[1] !== "x_opt_in" || record.version !== ROUTING_INTENT_VERSION || typeof record.x_opt_in !== "boolean") {
+    throw new Error(`unsupported routing intent metadata: ${path}`);
+  }
+  return { version: ROUTING_INTENT_VERSION, x_opt_in: record.x_opt_in };
+}
+
+/** Missing intent is the safe default. Present metadata must use the exact supported schema. */
+export function readRoutingIntent(folder: string, contentRoot?: string): RoutingIntent {
+  const path = routingIntentPath(folder, contentRoot);
+  const stat = lstatRoutingIntent(path);
+  if (!stat) return { version: ROUTING_INTENT_VERSION, x_opt_in: false };
+  if (!stat.isFile()) throw new Error(`routing intent metadata must be a regular file: ${path}`);
+  return parseRoutingIntent(readFileSync(path, "utf8"), path);
+}
+
+/** Validate any present intent before replacing it, so unknown fields are never discarded. */
+export function writeRoutingIntent(folder: string, xOptIn: boolean, contentRoot?: string): RoutingIntent {
+  const path = routingIntentPath(folder, contentRoot);
+  if (lstatRoutingIntent(path)) readRoutingIntent(folder, contentRoot);
+  const intent: RoutingIntent = { version: ROUTING_INTENT_VERSION, x_opt_in: xOptIn };
+  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
+  try {
+    writeFileSync(fd, `${JSON.stringify(intent, null, 2)}\n`);
+  } finally {
+    closeSync(fd);
+  }
+  return intent;
+}
+
 export function mergeDecisions(pillars: string[], perPillar: Map<string, Decision[]>): MergedDecision[] {
   const platforms = new Set<string>();
   for (const decs of perPillar.values()) for (const d of decs) platforms.add(d.platform);
@@ -348,6 +426,16 @@ export function mergeDecisions(pillars: string[], perPillar: Map<string, Decisio
     }
   }
   return merged;
+}
+
+// A deliberately recorded per-piece exception can lift only the X editorial rule produced by
+// mergeDecisions. It runs before source-triage and origin safety exclusions, which still win.
+export function applyXOptIn(merged: MergedDecision[], enabled: boolean): MergedDecision[] {
+  if (!enabled) return merged;
+  return merged.map((d) => {
+    if (d.platform !== "x" || d.decision !== "skip" || d.confidence !== "rule") return d;
+    return { ...d, decision: "include", rationale: X_OPT_IN_RATIONALE };
+  });
 }
 
 // The exploration budget's routing hook (card 92bb2ae6, src/strategy/exploration.ts): force ONE
@@ -504,19 +592,63 @@ export function routingMd(pillars: string[], merged: MergedDecision[]): string {
     pillars.length > 1
       ? `# Routing: ${pillars.join(" + ")} (${new Date().toISOString().slice(0, 10)})\n\n` +
         `Generated by \`npm run route\` from analytics + config/routing.yaml, merged across ${pillars.length} pillars in one ` +
-        `pass: a platform is \`include\` if ANY pillar includes it, UNLESS any pillar's editorial \`never\` rule vetoes it ` +
-        `(that veto wins regardless of other pillars). Only \`include\` platforms are atomized and queued; Muxin's ` +
+        `pass: a platform is \`include\` if ANY pillar includes it, UNLESS an editorial \`never\` rule vetoes it. A deliberate per-piece ` +
+        `X opt-in can lift only that X editorial veto; source-triage and origin exclusions still win. Only \`include\` platforms are atomized and queued; Muxin's ` +
         `review-queue approval stays the final gate. \`npm run validate\` hard-fails any derivative drafted for a ` +
-        `platform marked \`skip\` here.\n\n`
+        `platform marked \`skip\` here. To deliberately include X for this piece only, use \`npm run route -- --brand <brand> --pillar <pillars> --folder content/<slug> --x-opt-in\`; ` +
+        `rerun the same command without that flag, or use \`--x-revoke\` to restore the ordinary X exclusion. Do not edit this generated file by hand.\n\n`
       : `# Routing: ${pillars[0]} (${new Date().toISOString().slice(0, 10)})\n\n` +
         `Generated by \`npm run route\` from analytics + config/routing.yaml. Only \`include\` platforms are atomized ` +
         `and queued; Muxin's review-queue approval stays the final gate. \`npm run validate\` hard-fails any derivative ` +
-        `drafted for a platform marked \`skip\` here.\n\n`;
+        `drafted for a platform marked \`skip\` here. To deliberately include X for this piece only, use \`npm run route -- --brand <brand> --pillar <pillar> --folder content/<slug> --x-opt-in\`; ` +
+        `rerun the same command without that flag, or use \`--x-revoke\` to restore the ordinary X exclusion. Do not edit this generated file by hand.\n\n`;
   return header + `| platform | decision | fit | confidence | why |\n|---|---|---|---|---|\n${rows}\n`;
+}
+
+function usage(): string {
+  return [
+    `usage: tsx src/strategy/route.ts --brand <human-inference|charles|fiction> --pillar <${PILLARS.join("|")}>[,<pillar2>,...] [--folder <content-folder>] [--explore <platform>]  |  --all  |  --flags`,
+    "per-piece X exception (content folders only):",
+    "  npm run route -- --brand <brand> --pillar <pillar> --folder content/<slug> --x-opt-in",
+    "  npm run route -- --brand <brand> --pillar <pillar> --folder content/<slug>",
+    "  npm run route -- --brand <brand> --pillar <pillar> --folder content/<slug> --x-revoke",
+    "routing.md is generated and overwritten on rerun; use the set/revoke commands instead of editing it by hand.",
+    "ordinary external-folder routing remains supported, but only content/<slug> can store or consume this exception.",
+  ].join("\n");
+}
+
+function argumentValue(args: string[], flag: string): string | undefined {
+  const matches = args.reduce<number[]>((out, arg, index) => (arg === flag ? [...out, index] : out), []);
+  if (matches.length !== 1) return undefined;
+  const value = args[matches[0] + 1];
+  return value && !value.startsWith("--") ? value : undefined;
+}
+
+function isContentFolder(folder: string): boolean {
+  try {
+    resolveRoutingIntentFolder(folder);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function main() {
   const args = process.argv.slice(2);
+  if (args.includes("--help")) {
+    console.log(usage());
+    return;
+  }
+  const setX = args.includes("--x-opt-in");
+  const revokeX = args.includes("--x-revoke");
+  const setXCount = args.filter((arg) => arg === "--x-opt-in").length;
+  const revokeXCount = args.filter((arg) => arg === "--x-revoke").length;
+  if (setXCount > 1 || revokeXCount > 1) throw new Error("--x-opt-in and --x-revoke may each appear only once");
+  if (setX && revokeX) throw new Error("--x-opt-in and --x-revoke cannot be used together");
+  const managingX = setX || revokeX;
+  if (managingX && (args.includes("--all") || args.includes("--flags") || args.includes("--explore"))) {
+    throw new Error("--x-opt-in/--x-revoke cannot be combined with --all, --flags, or --explore");
+  }
   const cfg = loadConfig();
 
   if (args.includes("--flags")) {
@@ -527,9 +659,8 @@ function main() {
     return;
   }
 
-  const data = loadData(undefined, undefined, parseStrategyMeasurementContext());
-
   if (args.includes("--all")) {
+    const data = loadData(undefined, undefined, parseStrategyMeasurementContext());
     const targets = [...new Set(PILLARS.flatMap((p) => decideForPillar(p, cfg, data).map((d) => d.platform)))]
       .filter((t) => !cfg.thresholds.always_consider.includes(t))
       .sort();
@@ -549,15 +680,21 @@ function main() {
     return;
   }
 
-  const pi = args.indexOf("--pillar");
-  const pillarArg = pi >= 0 ? args[pi + 1] : undefined;
+  const pillarArg = argumentValue(args, "--pillar");
   const pillars = pillarArg ? [...new Set(pillarArg.split(",").map((p) => p.trim()))] : undefined;
   if (!pillars || pillars.length === 0 || pillars.some((p) => !PILLARS.includes(p))) {
-    console.error(
-      `usage: tsx src/strategy/route.ts --brand <human-inference|charles|fiction> --pillar <${PILLARS.join("|")}>[,<pillar2>,...] [--folder <content-folder>]  |  --all  |  --flags`
-    );
+    console.error(usage());
     process.exit(1);
   }
+  const folder = argumentValue(args, "--folder");
+  if (managingX) {
+    const brand = argumentValue(args, "--brand");
+    if (!folder || !brand || !["human-inference", "charles", "fiction"].includes(brand)) {
+      throw new Error("--x-opt-in/--x-revoke require valid --brand, --pillar, and --folder arguments");
+    }
+    writeRoutingIntent(folder, setX);
+  }
+  const data = loadData(undefined, undefined, parseStrategyMeasurementContext());
   const perPillar = new Map(pillars.map((p) => [p, decideForPillar(p, cfg, data)]));
   let merged: MergedDecision[] =
     pillars.length === 1
@@ -567,10 +704,9 @@ function main() {
   // Parsed early (before --explore) so a source-triage exclusion below is in place as a hard
   // "rule"-confidence veto before applyExplorationOverride ever runs — same ordering guarantee
   // as an editorial `never` rule.
-  const fo = args.indexOf("--folder");
-  const folder = fo >= 0 ? args[fo + 1] : undefined;
   const abs = folder ? (folder.startsWith("/") ? folder : join(repoRoot, folder)) : undefined;
   if (abs) {
+    if (isContentFolder(folder!)) merged = applyXOptIn(merged, readRoutingIntent(folder!).x_opt_in);
     const sourceClass = readSourceClass(abs);
     if (sourceClass) {
       merged = applySourceTriage(merged, triageEffects(sourceClass).excludePlatforms);
