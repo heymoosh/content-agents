@@ -7,7 +7,7 @@
   plus bindings in `docs/operations/slice-protocol-environment.md`.
 - Current / last accepted: **6J**, `docs/operations/launch-slices/SLICE-6J.md`.
 - Blocked on: none.
-- Next: none authorized yet — no further slice packet exists; a packet session must write one.
+- Next: **6K** — ID only, no packet path yet; a packet session must write it.
 - Last decision: the closeout gate item now has a written, assertable form (bindings file
   `### Closeout gate disposition`, pointed to from `SLICE-TEMPLATE.md` → `## Closeout`): the
   `none` gate binding, the `**PASS**`-with-date/leftover-list assertable form, the rule that no
