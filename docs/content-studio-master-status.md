@@ -4,13 +4,13 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
-- Current: **SLICE-6B**, `docs/operations/launch-slices/SLICE-6B.md` (parallel source checkpoints).
-- Last runtime accepted: **5Z**, commit `b74c889`; 6A planning reconciliation reviewed.
-- Blocked on: none; queue and render workers have disjoint evidence ownership.
-- Next action: confirm current queue-path/render-cost gaps, then freeze exact implementation ownership.
-- Last decision: parallelize independent preparation; serialize shared-file implementation and integration.
-- Evidence: `/private/tmp/slice-6a-evidence/` and `/private/tmp/slice-6b-evidence/`; bounded packet inputs.
-- Preserve provider/scheduler state and validated 5X backup; do not rerun 5P.
+- Current / last accepted: **SLICE-6B**, `docs/operations/launch-slices/SLICE-6B.md` (**accepted**).
+- Blocked on: none for 6B; Claude independently closed the queue environment-isolation repair.
+- Next action: use 6A's bounded remaining-work map to select an operational/depth readiness packet; no real run selected.
+- Last decision: two disjoint build lanes; keep settled audit evidence and review only the isolation repair delta.
+- Proof: queue 11/11, render 32/32, Claude PASS + delta PASS, frozen full gate 4347 tests / 494 suites, exit 0.
+- Evidence: `/private/tmp/slice-6b-evidence/`; planning map: `docs/operations/launch-slices/SLICE-6A.md`.
+- Preserve provider/scheduler state and validated 5X backup; do not rerun 5P or accepted checks.
 - Everything below is history; read only packet-cited headings.
 
 
@@ -1573,6 +1573,21 @@ Coordinator selected 5O unresolved 2 and 4 for separate bounded current-source c
 ledger text and actual render-child cost observability. Exact scope and checkpoints are in
 `docs/operations/launch-slices/SLICE-6B.md`; source/check ownership is disjoint and no live
 provider/model work is authorized. 6A documentation review passed; 6B is not accepted.
+
+
+### 2026-09-08 — 6B accepted: truthful queue path and exercised render-child logging
+
+Two Codex Terra lanes worked in separate checkouts: queue-view now prints the actual configured
+ledger destination, and the render test observes a real fixture Node child's `logCost` CSV row
+while retaining the free-render no-row assertion. Focused outcomes: queue 11/11, render 32/32.
+Claude's initial PASS exposed a missing env-loader excerpt; coordinator inspected that boundary
+and required a higher-effort test-only repair because `.env` loads from repo root, not cwd.
+The repaired child loader substitutes only that exact read, proves fixture parsing and zero
+fetch calls; Claude delta review independently passed. No production env/render/cost seam changed.
+Frozen unsandboxed full check passed 4347 tests / 494 suites, exit 0, 482.86s. All protected data
+and pre-existing edits were preserved. Evidence `/private/tmp/slice-6b-evidence/`; packet has
+final hashes and closeout. No live provider/model canary, no push. Next selection uses the bounded
+6A remaining-work map; no new operational run or publication is selected by this closeout.
 
 
 ## Current handoff — 2026-09-02

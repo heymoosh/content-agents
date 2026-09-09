@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { repoRoot } from "../db/db.js";
-import { readLedger, pruneLedger, releaseClaims, fmtLa, type Claim } from "./slots.js";
+import { ledgerPath, readLedger, pruneLedger, releaseClaims, fmtLa, type Claim } from "./slots.js";
 import { fetchWithRetry } from "../util/fetch-retry.js";
 import { fetchScheduledDrafts } from "./typefully.js";
 import { listScheduledUploads } from "./youtube.js";
@@ -11,11 +11,11 @@ import { listScheduledUploads } from "./youtube.js";
 // The UNIFIED publish queue — one chronological view of everything scheduled across every channel,
 // readable from any session or worktree.
 //   npm run queue            print the merged queue + drift/reconcile + pending paste
-//   npm run queue -- --sync  also prune past-dated claims from data/publish-schedule.jsonl
+//   npm run queue -- --sync  also prune past-dated claims from the active scheduler ledger
 //
-// WHY read live services, not just the local ledger: the ledger (data/publish-schedule.jsonl) is the
-// write-side source of truth for WHEN we claim slots, but it is gitignored and local — a fresh
-// worktree sees it empty even when Typefully actually holds scheduled drafts. So the table below is
+// WHY read live services, not just the local ledger: the ledger
+// (<dataRoot()>/scheduler/publish-schedule.jsonl) is the write-side source of truth for WHEN we
+// claim slots, but it is operational state under the configured data root. So the table below is
 // built from the LIVE services (Typefully drafts, PostPeer posts, YouTube scheduled uploads); the
 // ledger is then cross-checked against them to flag drift (a claim with no live post, or a live post
 // with no claim). House rules are untouched: this view is READ-ONLY except `--sync`, which only
@@ -266,8 +266,8 @@ export function reconcile(live: QueueItem[], futureClaims: Claim[], ok: Record<s
   }
 
   // A live post with no ledger claim. Only meaningful when the ledger actually has claims (it's
-  // local + gitignored, so a fresh worktree has none — then every live post would falsely look
-  // unclaimed). Skip the per-item list in that case; the caller notes it instead.
+  // operational state can be empty even while providers have scheduled work — then every live post
+  // would falsely look unclaimed). Skip the per-item list in that case; the caller notes it instead.
   const claimsByDay = countByKey(claimsAfterExact, (c) => dayKeyOf(c.platform, c.day));
   const liveNotClaimed =
     futureClaims.length === 0
@@ -340,13 +340,14 @@ async function main(): Promise<void> {
 
   // Reconcile against the local ledger.
   const now = Date.now();
+  const ledger = ledgerPath();
   const claims = readLedger();
   const future = claims.filter((c) => new Date(c.time).getTime() > now);
   const past = claims.length - future.length;
-  console.log(`\n=== LEDGER RECONCILE (data/publish-schedule.jsonl: ${claims.length} claims, ${future.length} future) ===\n`);
+  console.log(`\n=== LEDGER RECONCILE (${ledger}: ${claims.length} claims, ${future.length} future) ===\n`);
 
   if (claims.length === 0) {
-    console.log("  ledger is empty (it's local + gitignored — expected in a fresh worktree). Live table above is the truth.");
+    console.log(`  ledger is empty at ${ledger}. Live table above is the truth.`);
   } else {
     const { claimedNotLive, liveNotClaimed, uncheckable } = reconcile(live, future, ok);
 

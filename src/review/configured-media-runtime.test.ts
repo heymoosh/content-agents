@@ -4,12 +4,15 @@ import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSyn
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { approveConfiguredMediaStage, assertApprovedCardQuoteOnDisk, attachReviewedConfiguredMediaFiles, configuredQuoteCardRender, defaultConfiguredMediaRenderer, executeConfiguredMediaStage, type PersistedConfiguredMediaStage } from "./configured-media-runtime.js";
 import { tryAcquireFileLease } from "../runtime/file-lock.js";
 import { configuredCardImagePath, configuredCardRenderDerivative, configuredCardSourceLine } from "./configured-media.js";
 import { readQueue } from "../publish/queue.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { costLogPath } from "../util/cost-log.js";
+
+const COST_LOG_MODULE = fileURLToPath(new URL("../util/cost-log.ts", import.meta.url));
 
 const IMAGE_BYTES = {
   png: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]),
@@ -152,6 +155,10 @@ function fakeRenderer(
     // inherited CONTENT_AGENTS_TEST_COST_LOG into. Lets a test observe what the CHILD resolves
     // rather than reading the spawn call and inferring it.
     readonly envProbe?: string;
+    // A test-only Node child which imports and calls the real cost logger. Its runner uses a
+    // synchronous hard timeout, so no background watchdog process can outlive this fixture.
+    readonly childLogScript?: string;
+    readonly childRunnerScript?: string;
   } = {},
 ): { dir: string; log: string; calls: () => string[][] } {
   const dir = mkdtempSync(join(tmpdir(), "fake-npm-"));
@@ -166,6 +173,11 @@ function fakeRenderer(
     "#!/bin/sh",
     `printf '%s\\n' "$*" >> ${JSON.stringify(log)}`,
     options.envProbe ? `printf '%s\\n' "$CONTENT_AGENTS_TEST_COST_LOG" >> ${JSON.stringify(options.envProbe)}` : "",
+    ...(options.childLogScript && options.childRunnerScript ? [
+      // The fixture process gets only roots needed for the test. It cannot inherit credentials or
+      // provider configuration from the test runner while it proves the cost-log outcome.
+      `/usr/bin/env -i PATH=/usr/bin:/bin HOME="$HOME" TMPDIR="$TMPDIR" CONTENT_AGENTS_DATA_ROOT="$CONTENT_AGENTS_DATA_ROOT" CONTENT_AGENTS_TEST_COST_LOG="$CONTENT_AGENTS_TEST_COST_LOG" NODE_TEST_CONTEXT=1 ${JSON.stringify(process.execPath)} --import tsx ${JSON.stringify(options.childRunnerScript)} ${JSON.stringify(options.childLogScript)}`,
+    ] : []),
     'for a in "$@"; do last="$a"; done',
     ...writes,
     options.fail ? "exit 1" : "",
@@ -188,6 +200,84 @@ function restoreCostLogEnv(previous: string | undefined): void {
   if (previous === undefined) delete process.env.CONTENT_AGENTS_TEST_COST_LOG;
   else process.env.CONTENT_AGENTS_TEST_COST_LOG = previous;
 }
+
+async function withIsolatedRenderEnvironment<T>(scratch: string, costLog: string, task: () => Promise<T>): Promise<T> {
+  const values = {
+    HOME: join(scratch, "home"),
+    CONTENT_AGENTS_DATA_ROOT: join(scratch, "data"),
+    CONTENT_AGENTS_TEST_COST_LOG: costLog,
+    TMPDIR: join(scratch, "tmp"),
+  } as const;
+  const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]])) as Record<keyof typeof values, string | undefined>;
+  for (const path of Object.values(values)) mkdirSync(path === costLog ? dirname(path) : path, { recursive: true });
+  Object.assign(process.env, values);
+  try {
+    return await task();
+  } finally {
+    for (const key of Object.keys(values) as (keyof typeof values)[]) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  }
+}
+
+test("SLICE-6B: a renderer child writes an observable real logCost row to the isolated shared log", { timeout: 10_000 }, async () => {
+  const scratch = mkdtempSync(join(tmpdir(), "configured-media-render-child-"));
+  const costLog = join(scratch, "cost", "cost-log.csv");
+  try {
+    await withIsolatedRenderEnvironment(scratch, costLog, async () => {
+      const { folder, names } = cardRequestFolder([
+        { id: "child-logged-card", platform: "linkedin", media: "static-quote-card", quote: "A fixture child proves the row is observable." },
+      ]);
+      const childLogScript = join(scratch, "fixture-render-child.ts");
+      writeFileSync(childLogScript, [
+        `import { logCost } from ${JSON.stringify(COST_LOG_MODULE)};`,
+        'logCost({ step: "fixture:configured-render-child", detail: "isolated render child", costUsd: 0, engine: "fixture" });',
+        "",
+      ].join("\n"));
+      const childRunnerScript = join(scratch, "fixture-render-child-runner.ts");
+      writeFileSync(childRunnerScript, [
+        'import { spawnSync } from "node:child_process";',
+        'const childLogScript = process.argv[2];',
+        'if (!childLogScript) throw new Error("missing fixture child script");',
+        'const env = {',
+        '  PATH: "/usr/bin:/bin",',
+        '  HOME: process.env.HOME!,',
+        '  TMPDIR: process.env.TMPDIR!,',
+        '  CONTENT_AGENTS_DATA_ROOT: process.env.CONTENT_AGENTS_DATA_ROOT!,',
+        '  CONTENT_AGENTS_TEST_COST_LOG: process.env.CONTENT_AGENTS_TEST_COST_LOG!,',
+        '  NODE_TEST_CONTEXT: "1",',
+        '};',
+        'const result = spawnSync(process.execPath, ["--import", "tsx", childLogScript], { env, stdio: "inherit", timeout: 5_000, killSignal: "SIGKILL" });',
+        'if (result.error) throw result.error;',
+        'if (result.status !== 0 || result.signal) throw new Error(`fixture child failed: status=${result.status} signal=${result.signal}`);',
+        "",
+      ].join("\n"));
+      const npm = fakeRenderer(folder, { childLogScript, childRunnerScript });
+      try {
+        assert.equal(dirname(folder), join(scratch, "tmp"), "the card fixture stays under the isolated temp root");
+        assert.equal(dirname(npm.dir), join(scratch, "tmp"), "the render shim stays under the isolated temp root");
+        approveConfiguredMediaStage(folder, "child-logged-card");
+        const result = await withFakeNpm(npm.dir, () => executeConfiguredMediaStage(folder, "child-logged-card", defaultConfiguredMediaRenderer));
+        const shared = names.get("child-logged-card")!;
+        assert.deepEqual(npm.calls(), [["run", "render", "--", "--still", folder, "--quote", shared]], "the test-owned shim handled the render command");
+        assert.equal(result.costUsd, 0, "the free renderer outcome remains cost-free");
+        assert.equal(result.primaryAsset, `images/${shared}.png`);
+        assert.deepEqual(readdirSync(join(folder, "images")).sort(), [`${shared}.mp4`, `${shared}.png`]);
+        assert.equal(costLogPath(), costLog, "the parent resolves the explicit isolated cost log");
+        const rows = readFileSync(costLog, "utf8").trimEnd().split("\n");
+        assert.equal(rows.length, 2, "exactly the header and the real fixture-child row were written");
+        assert.equal(rows[0], "timestamp,step,detail,cost_usd,engine");
+        assert.match(rows[1]!, /,fixture:configured-render-child,"isolated render child",0\.0000,fixture$/);
+      } finally {
+        rmSync(folder, { recursive: true, force: true });
+        rmSync(npm.dir, { recursive: true, force: true });
+      }
+    });
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
 
 test("SLICE-5I: two platforms whose card is identical render once and both rows promote to that one file", async () => {
   const quote = "Careful teams ship the smaller first step.";
