@@ -113,14 +113,14 @@ while repair runs; its source inputs are immutable in the separate verification 
 
 ## Acceptance
 
-- [ ] A1: current execution chain and existing coverage established from bounded source and checks.
-- [ ] A2: actual isolated child execution proves the intended job reaches the process runner;
+- [x] A1: current execution chain and existing coverage established from bounded source and checks.
+- [x] A2: actual isolated child execution proves the intended job reaches the process runner;
       observe its output/artifact and resulting job outcome, not only mocked call arguments.
-- [ ] A3: cost evidence lands only in the fixture log; real cost/job/provider data remains unchanged.
+- [x] A3: cost evidence lands only in the fixture log; real cost/job/provider data remains unchanged.
       Errors/timeouts clean up children and do not claim successful execution.
-- [ ] A4: any gap is closed with checks and independent Grok review, or shown already closed by
+- [x] A4: any gap is closed with checks and independent cross-family review, or shown already closed by
       existing outcome-based evidence; no speculative refactor.
-- [ ] A5: final changed candidate passes the frozen unsandboxed gate; coordinator reviews and commits
+- [x] A5: final changed candidate passes the frozen unsandboxed gate; coordinator reviews and commits
       packet/master with only scoped changes. No behavioral change without renewed exact ownership.
 
 ## Verify
@@ -137,14 +137,22 @@ actually ran, with observable output and isolated logging.
 
 ## Risk
 
-High — audit required: yes for new execution/verification machinery. Budget: zero real generation
-or provider calls. Authorized Grok audit uses workspace sandbox and bounded evidence only.
+Meaningful behavior/high risk — medium operational risk, audit required for subprocess verification
+machinery and material A3 cleanup closure. No production behavior changes. Runtime gate applies.
+Review boundary: final test SHA `7764497b1716182b158001efb86cf4c023aba8f12479421b28e6d2f418d722db`.
+Review scope/budget: one Claude Sonnet medium-effort delta review of A3 cleanup and its failure
+injections; retain V1 Grok dispositions at SHA `d27bd10a4de232fbcc53c409b811d051483d2c00440a5370589c64fc1447153b`.
+Only changed evidence or demonstrated invalidation reopens settled findings; symmetric failures
+remain optional. Supply V1-to-final diff, line-numbered bounded source and final raw scoped TAP.
+No real generation/provider canaries. UI/native QA: not applicable to this test-only slice.
+On reviewer outage: preserve review-blocked status and continue independent evidence/preservation
+work; never integrate without required closure. User authorized Claude substitution 2026-09-08.
 
 ## Families
 
 - Initial inventory: Codex Terra high.
 - Builder/verifier if needed: Codex Terra xhigh, disjoint ownership after checkpoint.
-- Auditor: Grok 4.5 workspace; no edits; path:line and explicit verdict.
+- Auditor: Claude Sonnet, medium effort for bounded delta closure (user-selected family on resume); prior Grok 4.5 V1 disposition retained. No edits; path:line and explicit verdict.
 
 ## Closeout
 
@@ -152,15 +160,17 @@ or provider calls. Authorized Grok audit uses workspace sandbox and bounded evid
 bash scripts/repo-hygiene.sh --rescue
 ```
 
-Stopped, not accepted: all workers finished; final cross-family closure blocked by Grok usage balance. See `## Stopped`.
+PASS — accepted 2026-09-08. Claude delta closure and frozen repository gate passed. Historical stopping record retained below.
 
 ## RESULT BLOCK
 
-- Changed paths: test candidate in retained 5Z worktrees; packet/master stopping record only on main.
-- Outcome: implementation and independent verification complete; not accepted.
-- Checks: final scoped 3/3 exit 0; final repository gate not run.
-- Evidence: `/private/tmp/slice-5z-evidence/`, detailed checkpoints below.
-- Unresolved: Grok final closure blocked by balance exhaustion.
+- Changed paths: `src/review/jobs.test.ts`, this packet, `docs/content-studio-master-status.md`.
+- Outcome: accepted; full job-to-child outcome proof and cleanup failure-path coverage.
+- Checks: final scoped 3/3 exit 0 retained; Claude delta audit PASS exit 0;
+  frozen unsandboxed `npm run check` PASS, 4345 tests / 494 suites, zero failures/skips,
+  exit 0, 541.38 seconds including typecheck.
+- Evidence: `/private/tmp/slice-5z-evidence/`; final gate/audit files under `coordinator/`.
+- Unresolved: none blocking 5Z; extra setup-injection sites and symmetric failure cases optional.
 
 ## Evidence checkpoints
 
@@ -192,7 +202,7 @@ Stopped, not accepted: all workers finished; final cross-family closure blocked 
 
 ## Stopped
 
-**Not accepted.** Grok final closure audit exited 1: API 402, `Grok Build usage balance exhausted`.
+Historical checkpoint, superseded by 2026-09-08 Claude resume below. **Not accepted at this checkpoint.** Grok final closure audit exited 1: API 402, `Grok Build usage balance exhausted`.
 The V1 PASS is not independent closure of the materially repaired final candidate.
 
 - Actually verified: V1 full focused 138/138 with raw TAP, independent V1 execution; final repair
@@ -231,3 +241,54 @@ All nine protected fingerprints remain unchanged. Preserve the four pre-existing
 `agent/cs6-parallel-safe-ui-completion`; they are outside this session's ownership.
 Closeout: stopped with actionable blocker; not PASS/accepted. Primary checkout remains main;
 no push. Only this packet and master stopping update enter the coordinator documentation commit.
+
+## Resume checkpoint — 2026-09-08
+
+Updated Slice protocol, audit-efficiency rules and template reread. All affected workers completed;
+no write ownership reassigned. Final build/verify hashes unchanged. User authorizes Claude audit
+in place of unavailable Grok. Classification, review boundary and evidence requirements above
+apply. Retain valid final scoped 3/3 evidence; do not repeat settled V1 audit or valid checks.
+Next: Claude delta closure, then the required frozen unsandboxed repository gate and integration.
+
+## Independent closure — 2026-09-08
+
+Claude Sonnet requested at medium effort; actual reviewer `claude-sonnet-5` (CLI also reported
+Haiku auxiliary usage). Read-only/no-tool delta audit PASS, process exit 0, 74.43s.
+Final candidate SHA `7764497b1716182b158001efb86cf4c023aba8f12479421b28e6d2f418d722db`.
+Evidence: `coordinator/claude-closure-prompt.txt`, `claude-closure.stdout.json`,
+`claude-closure.stderr.txt`, `claude-closure.exit.json` under the retained evidence root.
+
+- Established defects: none. All four A3 cleanup invariants independently closed with path:line.
+- Verification boundaries: reviewer could not inspect Git directly; coordinator verified both
+  frozen candidate hashes and changed-file lists (only `src/review/jobs.test.ts`). Runtime files
+  on main equal the pinned 5Y base; intervening commits contain only protocol/status documents.
+- Setup injection occurs immediately after root creation, not at every later setup instruction.
+  Supported disposition: every setup operation is within the same reviewed try/finally; the
+  injected failure proves cleanup is reached. Extra injection sites are optional; no defect shown.
+- V1 unchanged findings retained; symmetric failure matrix remains optional. Reviewer phrase
+  “real codex spawn/job” denotes the actual process chain with a fake Codex executable, not a
+  real model call. Full gate subsequently passed; see accepted closeout below.
+
+## Accepted closeout — 2026-09-08
+
+PASS. Claude independent delta closure retained at final SHA
+`7764497b1716182b158001efb86cf4c023aba8f12479421b28e6d2f418d722db`.
+Frozen gate command: `PATH=/private/tmp/slice-5q-gate-bin:$PATH npm run check`, unsandboxed,
+from `/private/tmp/content-agents-5z-verify`; setup was already complete and was not repeated.
+Typecheck and 4345 tests / 494 suites passed; fail/cancelled/skipped/todo all zero; exit 0,
+541.38s wall time. Raw output and exit retained as `coordinator/final-gate.stdout.txt`,
+`final-gate.stderr.txt`, `final-gate.exit.json`. No browser/native QA applies to test-only changes.
+
+All nine resume fingerprints unchanged. AGENTS/template had authorized inter-session updates;
+this session preserves their resume values and the existing content/ledger edits. No live
+provider or generation canary ran. Main receives only the identical audited test file plus
+packet/master closeout; no push. Hygiene disposition follows.
+
+Hygiene exit 1 was fully dispositioned: rescued main (`9927247`), build (`755bc83`) and verify
+(`f306ecf`) snapshots. The two owned 5Z checkouts `/private/tmp/content-agents-5z-build` and
+`/private/tmp/content-agents-5z-verify` were removed after their test bytes matched the accepted
+integration copy and no untracked files were present. Recovery refs retained. Bounded evidence
+`/private/tmp/slice-5z-evidence/` is intentionally retained. No session-created untracked
+repository artifacts remain. Four pre-existing edits and all seven older branches named in
+“Stopping closeout disposition” remain untouched. Closeout PASS with those explicit preserved
+leftovers. Coordinator diff/whitespace review PASS; only three scoped paths enter the commit.

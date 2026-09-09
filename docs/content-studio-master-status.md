@@ -3,14 +3,13 @@
 ## START HERE
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
-- This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`, including `### Audit scope and proportional verification` (2026-09-08 progress breadcrumb).
-- Current: **SLICE-5Z**, `docs/operations/launch-slices/SLICE-5Z.md` (**not accepted**, stopped).
-- Blocked on: Grok closure audit returned 402, usage balance exhausted; final candidate has no cross-family closure.
-- Last accepted: **5Y**, `docs/operations/launch-slices/SLICE-5Y.md`.
-- Next dependency-ready action: resume 5Z closure audit after Grok balance is available, then frozen gate.
-- Last decision: test-only full job-spawn proof; close cleanup gaps before integration.
-- Retained candidate: `/private/tmp/content-agents-5z-build`; frozen snapshot: `/private/tmp/content-agents-5z-verify`.
-- Proof: final 5Z scoped 3/3 exit 0; independent verifier PASS; V1 Grok PASS does not cover final repairs.
+- This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
+- Current / last accepted: **SLICE-5Z**, `docs/operations/launch-slices/SLICE-5Z.md` (**accepted**).
+- Blocked on: none for 5Z; Claude independently closed the final cleanup repairs.
+- Next action: select the next dependency-ready slice from the remaining master-plan requirements; no successor packet assigned yet.
+- Last decision: test-only full job-spawn proof; retain settled Grok findings and use Claude delta closure.
+- Proof: final scoped 3/3, Claude PASS, frozen full gate 4345 tests / 494 suites, exit 0.
+- Evidence: `/private/tmp/slice-5z-evidence/`; accepted packet records review boundary and preservation.
 - Preserve provider/scheduler state and validated 5X backup; do not rerun 5P.
 - Everything below is history; read only packet-cited headings.
 
@@ -1551,6 +1550,19 @@ checkpoints. Agents own UI journey proof before design review; fixture/live and 
 evidence stay distinct. Required independent closure, explicit reviewer choices, security/privacy,
 authenticated-canary budgets, and release gates remain in force. Current product acceptance and
 blockers are unchanged. Policy verification uses coordinator review and whitespace/diff checks.
+
+### 2026-09-08 — 5Z accepted after Claude delta closure
+
+5Z closes the remaining 5O full job-spawn verification gap with observable isolated child
+artifacts, output, job status/log and fixture cost evidence. Test-only changes include setup
+and reaper failure cleanup proof. Claude Sonnet (actual `claude-sonnet-5`, medium requested)
+independently closed the four material cleanup invariants; prior Grok V1 dispositions retained.
+No settled audit/check was restarted. Final unsandboxed frozen `npm run check` passed: 4345 tests,
+494 suites, zero failures/skips, exit 0, 541.38s. Final test SHA
+`7764497b1716182b158001efb86cf4c023aba8f12479421b28e6d2f418d722db`.
+Evidence `/private/tmp/slice-5z-evidence/`; packet `docs/operations/launch-slices/SLICE-5Z.md`.
+No production behavior changed, no real provider/model canary, all nine resume fingerprints
+preserved. Primary checkout remains main; no push. Successor slice not yet assigned.
 
 ## Current handoff — 2026-09-02
 

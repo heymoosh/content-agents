@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -2290,6 +2291,344 @@ test("SLICE-5N: the real queue hands the subprocess a branded prompt, and the br
     setSkillSpawn(null);
     rmSync(folder, { recursive: true, force: true });
     jobs.length = 0;
+  }
+});
+
+// ── SLICE-5Z: a GUI job reaches the selected CLI through a real isolated child process ──────────
+// The earlier queue tests stop at the injectable skillSpawn seam and then inspect buildEngineSpawn
+// separately. These fixtures launch an isolated Node process before jobs.ts imports, so the real
+// runQueued -> runAgentSpawn -> buildEngineSpawn -> runCommandSpawn path can execute without a
+// model binary, a real HOME/data root/cost ledger, or an ambient PATH to fall back to.
+type Slice5ZFixtureRun = {
+  engine: "claude" | "codex";
+  mode: "success" | "nonzero" | "timeout";
+  result: { code: number | null; timedOut: boolean; enoent: boolean; stdout: string } | null;
+  rejection: string | null;
+  job: {
+    id: string;
+    status: string;
+    error: string | null;
+    finishedAt: number | null;
+    lastSpawn: { code: number | null; timedOut: boolean; enoent: boolean } | null;
+  };
+  cli: {
+    command: string;
+    args: string[];
+    artifactPath: string;
+    outputFile: string | null;
+    pid: number;
+    envKeys: string[];
+    home: string;
+    path: string;
+    dataRoot: string;
+    costLog: string;
+    tempRoot: string;
+  };
+  artifact: string;
+  jobLog: string;
+  costLog: string;
+  jobLogPath: string;
+};
+
+type Slice5ZKill = (pid: number, signal?: number | NodeJS.Signals) => unknown;
+
+type Slice5ZReapOptions = {
+  kill?: Slice5ZKill;
+  sleep?: (milliseconds: number) => Promise<void>;
+  now?: () => number;
+  timeoutMs?: number;
+  pollMs?: number;
+};
+
+type Slice5ZFixtureHooks = {
+  afterRootCreated?: (root: string) => void;
+  reap?: (receiptPath: string) => Promise<void> | void;
+};
+
+function slice5ZDigest(path: string): string | null {
+  return existsSync(path) ? createHash("sha256").update(readFileSync(path)).digest("hex") : null;
+}
+
+function slice5ZProcessIsMissing(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as NodeJS.ErrnoException).code === "ESRCH";
+}
+
+function slice5ZFixtureIsRunning(kill: Slice5ZKill, pid: number): boolean {
+  try {
+    kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (slice5ZProcessIsMissing(error)) return false;
+    throw error;
+  }
+}
+
+function slice5ZSignalFixture(kill: Slice5ZKill, pid: number, signal: NodeJS.Signals): boolean {
+  try {
+    kill(pid, signal);
+    return true;
+  } catch (error) {
+    if (slice5ZProcessIsMissing(error)) return false;
+    throw error;
+  }
+}
+
+async function slice5ZWaitForFixtureExit(
+  kill: Slice5ZKill,
+  pid: number,
+  sleep: (milliseconds: number) => Promise<void>,
+  now: () => number,
+  timeoutMs: number,
+  pollMs: number,
+): Promise<boolean> {
+  const deadline = now() + timeoutMs;
+  while (true) {
+    if (!slice5ZFixtureIsRunning(kill, pid)) return true;
+    if (now() >= deadline) return false;
+    await sleep(Math.min(pollMs, Math.max(1, deadline - now())));
+  }
+}
+
+async function slice5ZReapFixture(receiptPath: string, options: Slice5ZReapOptions = {}): Promise<void> {
+  if (!existsSync(receiptPath)) return;
+  let pid: number | undefined;
+  try { pid = Number(JSON.parse(readFileSync(receiptPath, "utf8")).pid); } catch { return; }
+  if (!Number.isInteger(pid) || pid! <= 0) return;
+  const kill = options.kill ?? process.kill;
+  const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+  const now = options.now ?? Date.now;
+  const timeoutMs = options.timeoutMs ?? 1_000;
+  const pollMs = options.pollMs ?? 20;
+
+  if (!slice5ZFixtureIsRunning(kill, pid!)) return;
+  if (!slice5ZSignalFixture(kill, pid!, "SIGTERM")) return;
+  if (await slice5ZWaitForFixtureExit(kill, pid!, sleep, now, timeoutMs, pollMs)) return;
+  if (!slice5ZSignalFixture(kill, pid!, "SIGKILL")) return;
+  if (await slice5ZWaitForFixtureExit(kill, pid!, sleep, now, timeoutMs, pollMs)) return;
+  assert.fail(`fixture child ${pid} survived TERM and KILL cleanup`);
+}
+
+async function withSlice5ZFixture(
+  engine: "claude" | "codex",
+  mode: "success" | "nonzero" | "timeout",
+  verify: (actual: Slice5ZFixtureRun) => void,
+  hooks: Slice5ZFixtureHooks = {},
+): Promise<void> {
+  const root = mkdtempSync(join(tmpdir(), `slice-5z-${engine}-${mode}-`));
+  let cliReceipt = "";
+  try {
+    hooks.afterRootCreated?.(root);
+    const bin = join(root, "bin");
+    const home = join(root, "home");
+    const dataRoot = join(root, "data");
+    const costLog = join(root, "cost", "fixture-cost.csv");
+    const tempRoot = join(root, "tmp");
+    const work = join(root, "work");
+    cliReceipt = join(root, "cli-receipt.json");
+    const runner = join(root, "run-fixture.ts");
+    const realLedger = join(repoRoot, "data", "cost-log.csv");
+    const realLedgerBefore = slice5ZDigest(realLedger);
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    mkdirSync(dataRoot, { recursive: true });
+    mkdirSync(tempRoot, { recursive: true });
+    mkdirSync(work, { recursive: true });
+
+    // Both fixture names are executable Node programs with an absolute interpreter. PATH has no
+    // system directories, so a missing fixture fails instead of resolving an installed model CLI.
+    const fixtureCli = join(bin, engine);
+    writeFileSync(fixtureCli, `#!${process.execPath}\nconst fs = require("node:fs");\nconst path = require("node:path");\nconst mode = process.env.FIXTURE_MODE;\nconst args = process.argv.slice(2);\nconst outputFlag = args.indexOf("--output-last-message");\nconst outputFile = outputFlag === -1 ? null : args[outputFlag + 1] || null;\nconst artifactPath = path.join(process.env.FIXTURE_WORK, \`child-\${path.basename(process.argv[1])}-\${mode}.txt\`);\nconst receipt = { command: path.basename(process.argv[1]), args, artifactPath, outputFile, pid: process.pid, envKeys: Object.keys(process.env).sort(), home: process.env.HOME, path: process.env.PATH, dataRoot: process.env.CONTENT_AGENTS_DATA_ROOT, costLog: process.env.CONTENT_AGENTS_TEST_COST_LOG, tempRoot: process.env.TMPDIR };\nfs.writeFileSync(process.env.FIXTURE_CLI_RECEIPT, JSON.stringify(receipt));\nfs.writeFileSync(artifactPath, \`fixture artifact for \${receipt.command}/\${mode}\\n\`);\nif (mode === "timeout") { process.stdout.write("fixture timeout started\\n"); setInterval(() => {}, 1_000); }\nelse if (mode === "nonzero") { process.stdout.write("fixture nonzero stdout\\n"); process.stderr.write("fixture nonzero stderr\\n"); process.exitCode = 23; }\nelse { if (outputFile) fs.writeFileSync(outputFile, "fixture final message from codex\\n"); process.stdout.write(\`fixture success stdout from \${receipt.command}\\n\`); }\n`);
+    chmodSync(fixtureCli, 0o700);
+
+    writeFileSync(runner, `import { existsSync, readFileSync } from "node:fs";\nimport { runAgentSpawn, runQueued, jobs, jobLogPath } from ${JSON.stringify(join(process.cwd(), "src/review/jobs.ts"))};\nasync function main(): Promise<void> {\nconst [engine, mode] = process.argv.slice(2) as ["claude" | "codex", "success" | "nonzero" | "timeout"];\nconst label = \`slice-5z \${engine} \${mode}\`;\nlet result: Awaited<ReturnType<typeof runAgentSpawn>> | null = null;\nlet rejection: string | null = null;\ntry {\n  await runQueued("revise", label, async (job) => {\n    result = await runAgentSpawn(job, engine, \`slice-5z prompt for \${engine}\`, { timeoutMs: 5_000, cwd: process.env.FIXTURE_WORK, permissionMode: "acceptEdits" });\n    if (result.timedOut) throw new Error("fixture timeout");\n    if (result.code !== 0) throw new Error(\`fixture exit \${result.code}\`);\n    return result;\n  }, engine);\n} catch (error) {\n  rejection = error instanceof Error ? error.message : String(error);\n}\nconst job = jobs.find((candidate) => candidate.label === label);\nconst deadline = Date.now() + 2_000;\nwhile (job && job.finishedAt === null && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));\nif (!job || job.finishedAt === null) throw new Error("fixture job never settled");\nconst logPath = jobLogPath(job.id);\nif (!existsSync(process.env.FIXTURE_CLI_RECEIPT!)) throw new Error(\`fixture CLI did not execute: \${JSON.stringify({ result, rejection, job: { status: job.status, error: job.error, lastSpawn: job.lastSpawn ?? null }, log: existsSync(logPath) ? readFileSync(logPath, "utf8") : null })}\`);\nconst cli = JSON.parse(readFileSync(process.env.FIXTURE_CLI_RECEIPT!, "utf8"));\nprocess.stdout.write(JSON.stringify({ engine, mode, result, rejection, job: { id: job.id, status: job.status, error: job.error, finishedAt: job.finishedAt, lastSpawn: job.lastSpawn ?? null }, cli, artifact: readFileSync(cli.artifactPath, "utf8"), jobLog: readFileSync(logPath, "utf8"), costLog: readFileSync(process.env.CONTENT_AGENTS_TEST_COST_LOG!, "utf8"), jobLogPath: logPath }));\n}\nvoid main().catch((error) => { console.error(error); process.exitCode = 1; });\n`);
+
+    const output = String(execFileSync(process.execPath, ["--import", "tsx", runner, engine, mode], {
+      cwd: repoRoot,
+      env: {
+        HOME: home,
+        PATH: bin,
+        TMPDIR: tempRoot,
+        TMP: tempRoot,
+        TEMP: tempRoot,
+        CONTENT_AGENTS_DATA_ROOT: dataRoot,
+        CONTENT_AGENTS_TEST_COST_LOG: costLog,
+        FIXTURE_MODE: mode,
+        FIXTURE_CLI_RECEIPT: cliReceipt,
+        FIXTURE_WORK: work,
+        // macOS supplies this process-local text-encoding hint even when execFileSync receives a
+        // replacement environment. Name it here so the fixture's child environment stays an
+        // explicit allowlist rather than silently accepting an inherited key.
+        __CF_USER_TEXT_ENCODING: "0x1F5:0:0",
+      },
+      encoding: "utf8",
+      timeout: 15_000,
+      killSignal: "SIGTERM",
+    })).trim();
+    const actual = JSON.parse(output) as Slice5ZFixtureRun;
+    const allowedChildEnvironment = [
+      "CONTENT_AGENT_ENGINE", "CONTENT_AGENTS_DATA_ROOT", "CONTENT_AGENTS_TEST_COST_LOG",
+      "FIXTURE_CLI_RECEIPT", "FIXTURE_MODE", "FIXTURE_WORK", "HOME", "PATH", "TEMP", "TMP", "TMPDIR", "__CF_USER_TEXT_ENCODING",
+    ].sort();
+    assert.deepEqual(actual.cli.envKeys, allowedChildEnvironment, "the process runner inherited only the fixture allowlist");
+    assert.equal(actual.cli.path, bin, "PATH contains only fixture executables");
+    assert.equal(actual.cli.home, home);
+    assert.equal(actual.cli.dataRoot, dataRoot);
+    assert.equal(actual.cli.costLog, costLog);
+    assert.equal(actual.cli.tempRoot, tempRoot);
+    assert.ok(actual.jobLogPath.startsWith(join(dataRoot, "logs", "gui-jobs")), "the persisted job log is under the isolated data root");
+    verify(actual);
+    assert.equal(slice5ZDigest(realLedger), realLedgerBefore, "the repository cost ledger is byte-identical");
+  } finally {
+    try {
+      if (cliReceipt) await (hooks.reap ?? slice5ZReapFixture)(cliReceipt);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+}
+
+test("SLICE-5Z: real isolated Claude/Codex children determine GUI job outcomes and leave only fixture evidence", async () => {
+  await withSlice5ZFixture("codex", "success", (actual) => {
+    assert.equal(actual.cli.command, "codex");
+    assert.deepEqual(actual.cli.args.slice(0, 5), ["exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "--output-last-message"]);
+    assert.equal(actual.cli.args.at(-1), "slice-5z prompt for codex");
+    assert.ok(actual.cli.outputFile?.startsWith(join(actual.cli.tempRoot, "content-agents-")), "Codex output is isolated under the fixture temp root");
+    assert.equal(existsSync(actual.cli.outputFile!), false, "runAgentSpawn removes Codex's temporary final-message file");
+    assert.deepEqual(actual.result, { code: 0, timedOut: false, enoent: false, stdout: "fixture final message from codex" });
+    assert.equal(actual.rejection, null);
+    assert.equal(actual.job.status, "done");
+    assert.equal(actual.job.error, null);
+    assert.deepEqual(actual.job.lastSpawn, { code: 0, timedOut: false, enoent: false });
+    assert.equal(actual.artifact, "fixture artifact for codex/success\n");
+    assert.match(actual.jobLog, /fixture success stdout from codex/);
+    assert.match(actual.costLog, /agent:codex,"slice-5z codex success",,codex/);
+  });
+
+  await withSlice5ZFixture("claude", "success", (actual) => {
+    assert.equal(actual.cli.command, "claude");
+    assert.deepEqual(actual.cli.args, ["-p", "slice-5z prompt for claude", "--permission-mode", "acceptEdits"]);
+    assert.deepEqual(actual.result, { code: 0, timedOut: false, enoent: false, stdout: "fixture success stdout from claude\n" });
+    assert.equal(actual.rejection, null);
+    assert.equal(actual.job.status, "done");
+    assert.equal(actual.job.error, null);
+    assert.deepEqual(actual.job.lastSpawn, { code: 0, timedOut: false, enoent: false });
+    assert.equal(actual.artifact, "fixture artifact for claude/success\n");
+    assert.match(actual.jobLog, /fixture success stdout from claude/);
+    assert.match(actual.costLog, /agent:claude,"slice-5z claude success",,claude/);
+  });
+
+  await withSlice5ZFixture("codex", "nonzero", (actual) => {
+    assert.equal(actual.cli.command, "codex");
+    assert.deepEqual(actual.cli.args.slice(0, 5), ["exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "--output-last-message"]);
+    assert.equal(actual.cli.args.at(-1), "slice-5z prompt for codex");
+    assert.deepEqual(actual.result, { code: 23, timedOut: false, enoent: false, stdout: "fixture nonzero stdout\n" });
+    assert.equal(actual.rejection, "fixture exit 23");
+    assert.equal(actual.job.status, "failed");
+    assert.match(actual.job.error ?? "", /fixture exit 23/);
+    assert.deepEqual(actual.job.lastSpawn, { code: 23, timedOut: false, enoent: false });
+    assert.equal(actual.artifact, "fixture artifact for codex/nonzero\n");
+    assert.match(actual.jobLog, /fixture nonzero stdout/);
+    assert.match(actual.jobLog, /fixture nonzero stderr/);
+    assert.match(actual.costLog, /agent:codex,"slice-5z codex nonzero",,codex/);
+  });
+
+  await withSlice5ZFixture("claude", "timeout", (actual) => {
+    assert.equal(actual.cli.command, "claude");
+    assert.deepEqual(actual.cli.args, ["-p", "slice-5z prompt for claude", "--permission-mode", "acceptEdits"]);
+    assert.equal(actual.result?.timedOut, true, "the real runner reports the child timeout");
+    assert.equal(actual.result?.enoent, false);
+    assert.equal(actual.rejection, "fixture timeout");
+    assert.equal(actual.job.status, "failed", "a timed-out child never becomes a successful GUI job");
+    assert.match(actual.job.error ?? "", /fixture timeout/);
+    assert.equal(actual.job.lastSpawn?.timedOut, true);
+    assert.equal(actual.artifact, "fixture artifact for claude/timeout\n");
+    assert.match(actual.jobLog, /fixture timeout started/);
+    assert.match(actual.costLog, /agent:claude,"slice-5z claude timeout",,claude/);
+  });
+});
+
+test("SLICE-5Z: fixture roots are removed when setup or reaping fails", async () => {
+  let setupRoot = "";
+  await assert.rejects(
+    withSlice5ZFixture("claude", "success", () => assert.fail("setup failure must skip verification"), {
+      afterRootCreated(root) {
+        setupRoot = root;
+        throw new Error("forced slice-5z setup failure");
+      },
+    }),
+    /forced slice-5z setup failure/,
+  );
+  assert.notEqual(setupRoot, "", "the injected setup failure ran after mkdtemp");
+  assert.equal(existsSync(setupRoot), false, "setup failure removes the root it created");
+
+  let reapRoot = "";
+  await assert.rejects(
+    withSlice5ZFixture("codex", "success", (actual) => {
+      assert.equal(actual.job.status, "done", "the reaping injection follows a settled fixture run");
+    }, {
+      afterRootCreated(root) { reapRoot = root; },
+      reap: async () => { throw new Error("forced slice-5z reap failure"); },
+    }),
+    /forced slice-5z reap failure/,
+  );
+  assert.notEqual(reapRoot, "", "the reaping injection retained its root path for the assertion");
+  assert.equal(existsSync(reapRoot), false, "a reaping failure cannot skip root removal");
+});
+
+test("SLICE-5Z: fixture reaping bounds TERM-to-KILL cleanup and surfaces unexpected errors", async () => {
+  const root = mkdtempSync(join(tmpdir(), "slice-5z-reap-control-"));
+  const receipt = join(root, "cli-receipt.json");
+  try {
+    writeFileSync(receipt, JSON.stringify({ pid: 42_424 }));
+    let clock = 0;
+    const signals: Array<number | NodeJS.Signals | undefined> = [];
+    await slice5ZReapFixture(receipt, {
+      kill(_pid, signal) {
+        signals.push(signal);
+        if (signal === 0 && signals.includes("SIGKILL")) {
+          throw Object.assign(new Error("fixture child exited"), { code: "ESRCH" });
+        }
+      },
+      sleep: async (milliseconds) => { clock += milliseconds; },
+      now: () => clock,
+      timeoutMs: 1,
+      pollMs: 1,
+    });
+    assert.deepEqual(signals, [0, "SIGTERM", 0, 0, "SIGKILL", 0], "a child surviving the bounded TERM wait is killed and reaped");
+    assert.equal(clock, 1, "the TERM wait uses its bounded deadline before escalation");
+
+    const probeError = Object.assign(new Error("fixture process probe denied"), { code: "EPERM" });
+    const probeSignals: Array<number | NodeJS.Signals | undefined> = [];
+    await assert.rejects(
+      slice5ZReapFixture(receipt, {
+        kill(_pid, signal) {
+          probeSignals.push(signal);
+          throw probeError;
+        },
+      }),
+      (error) => error === probeError,
+    );
+    assert.deepEqual(probeSignals, [0], "only ESRCH establishes that the initial process probe is absent");
+
+    let errorClock = 0;
+    const killError = Object.assign(new Error("fixture kill denied"), { code: "EPERM" });
+    const killSignals: Array<number | NodeJS.Signals | undefined> = [];
+    await assert.rejects(
+      slice5ZReapFixture(receipt, {
+        kill(_pid, signal) {
+          killSignals.push(signal);
+          if (signal === "SIGKILL") throw killError;
+        },
+        sleep: async (milliseconds) => { errorClock += milliseconds; },
+        now: () => errorClock,
+        timeoutMs: 1,
+        pollMs: 1,
+      }),
+      (error) => error === killError,
+    );
+    assert.deepEqual(killSignals, [0, "SIGTERM", 0, 0, "SIGKILL"], "unexpected KILL errors are propagated rather than mistaken for absence");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
