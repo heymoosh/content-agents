@@ -7,7 +7,7 @@
   plus bindings in `docs/operations/slice-protocol-environment.md`.
 - Current / last accepted: **6H**, `docs/operations/launch-slices/SLICE-6H.md`.
 - Blocked on: none.
-- Next: none written yet — no dependency-ready packet exists. Do not write one without a request.
+- Next: **6I**, `docs/operations/launch-slices/SLICE-6I.md` — written and dependency-ready.
 - Last decision: the hygiene closeout item now has a written, assertable form (bindings file
   `### Hygiene disposition`, pointed to from `SLICE-TEMPLATE.md` → `## Closeout`): a non-zero
   `repo-hygiene.sh --rescue` exit is not itself a failure when every listed path is one this
