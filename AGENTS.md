@@ -233,6 +233,28 @@ look at independent remaining work, not concurrent reassignment of its owned pat
 active slice, change lane ownership only after affected workers pause and the coordinator updates
 the packet and issues the revised assignments. Cross-family audit requirements remain unchanged.
 
+### Delivery batch and owner checkpoint
+
+Before launching, record the authorized slice IDs, dependencies, per-slice deliverables
+(design versus implementation), acceptance boundaries, and stop condition in the current
+packet. A free slot is not permission to pull another slice from the backlog. Expand the batch
+only with owner authorization; preparation and repairs within its fixed requirements remain
+engineering decisions. Prefer acceptance of built, dependency-ready candidates over additional
+implementation. Preserve healthy running gates and existing ownership at checkpoints.
+
+Collect genuine scope decisions and human-only acceptance steps in one short upfront owner
+checkpoint. Record resolved decisions, remaining human actions and their required checkpoint;
+arrange hands-on verification early enough for the owner's availability. Do not ask the owner
+to choose engineering methods, manufacture new decisions, or treat advance approval as proof
+that a later walkthrough occurred. Independent authorized work may continue around a blocker.
+
+Keep handoffs compact: current candidate identity, status, evidence pointers, unresolved items
+and next action. Reload unchanged packets, histories, diffs or skill references only for a named
+new question or changed input; retain durable evidence rather than reconstructing history in
+model context. Report built, verified, accepted and committed states separately. Report local
+test elapsed time separately from model calls and provider-reported usage; mark unavailable
+usage unknown, never infer tokens or cost from runtime or a subscription percentage.
+
 ### Writing a missing packet
 
 If the START HERE block names a slice packet that does not exist, writing it **is**

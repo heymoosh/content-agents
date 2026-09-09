@@ -17,6 +17,11 @@ Do not load the repository for context. Do not commit.
 
 <slice IDs that must be accepted first, or `none`>
 
+Delivery batch: <authorized slice IDs; design/implementation deliverables; acceptance order
+and stop condition — a free slot does not authorize another slice>
+Owner checkpoint: <resolved scope decisions; human-only acceptance actions and when needed;
+availability/dependencies, or `none` — engineering choices remain with the coordinator>
+
 ## Owned files
 
 Before assigning workers, separate preparation, execution, and verification. Identify useful
@@ -97,6 +102,13 @@ Documentation only: record the scoped review/diff result in this packet. Otherwi
 <closeout gate command from the protocol bindings>
 ```
 
+Preflight: <schema/required fields; pinned candidate and changed paths; ownership; every
+acceptance item mapped to accessible evidence; check exit codes; independent audit policy
+and evidence completeness; all final-gate prerequisites closed>
+Gate cost: <exact command and candidate identity; measured local runtime with evidence or
+`unknown`; any additional audit/rerun and its distinct reason; no paperwork-only rerun without
+first explaining cost and proposing a separate bounded fix; no bypass or unsupported reuse>
+
 Use the `### Hygiene disposition` form in `docs/operations/slice-protocol-environment.md` for
 the hygiene item — not a bare exit code.
 
@@ -110,6 +122,9 @@ the closeout read-set print — not an ad hoc re-derivation.
 - Checks run and results:
 - Evidence locations:
 - Unresolved:
+- Delivery state and next action: <built | verified | accepted | committed; workers cannot accept/commit>
+- Usage: <local check elapsed time separately from model calls/provider-reported usage;
+  unavailable values `unknown`; prior history behind evidence pointers>
 
 ## Usage budget and handoff
 
