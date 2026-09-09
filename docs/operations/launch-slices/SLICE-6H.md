@@ -160,11 +160,31 @@ gate binary in this repository, so record `PASS` or the leftover list here.
 
 ## RESULT BLOCK (worker fills this in and returns it)
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
+- Changed paths: `docs/operations/slice-protocol-environment.md` (new `### Hygiene disposition`
+  subsection), `docs/operations/launch-slices/SLICE-TEMPLATE.md` (`## Closeout` pointer),
+  `docs/operations/launch-slices/SLICE-6H.md` (this RESULT BLOCK only).
+- Outcome: both documentation edits landed; see Verify output below.
+- Checks run and results: see `## Verify` command block output below.
+- Evidence locations: this file's `## Verify` section (commands run inline, output recorded
+  here); no separate transcript.
+- Unresolved: none.
+- Hygiene disposition (item 12): command run — `bash scripts/repo-hygiene.sh --rescue`, exit 1;
+  output reviewed — yes. Session-created paths committed or deleted: none — this worker created
+  no new paths; it edited three pre-existing tracked files
+  (`docs/operations/slice-protocol-environment.md`,
+  `docs/operations/launch-slices/SLICE-TEMPLATE.md`,
+  `docs/operations/launch-slices/SLICE-6H.md`) and, per protocol, a worker never commits — left
+  for the coordinator. Every other path the command listed, named and left in place: two
+  pre-existing uncommitted files in this worktree named in this packet's "Do not touch"
+  (`content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`,
+  `data/notes-spread-ledger.jsonl`); three other worktrees' uncommitted work
+  (`/private/tmp/content-agents-6d-fiction`, `/private/tmp/content-agents-6d-recommendations`,
+  `/private/tmp/content-agents-6d-verify`); two merged branches safe to delete
+  (`slice-5q-queue`, `slice-5r-routing`); five unpushed/unmerged local branches
+  (`agent/cs2-jobs-outreach-charles-extract`, `agent/cs2-page-room-pure-helpers`,
+  `agent/cs2-serve-walled-room-routes`, `agent/cs3-studio-durable-handoff`,
+  `agent/cs6-parallel-safe-ui-completion`). None of these were created by this worker; all left
+  untouched.
 
 ## Usage budget and handoff
 

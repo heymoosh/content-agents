@@ -33,6 +33,20 @@ siblings, which exist so a packet can move its dated records and stay small; `SL
 the packet template itself; and `SLICE-5L-coverage.md` by name, exempt as companion analysis, per
 SLICE-6E.
 
+### Hygiene disposition
+
+`bash scripts/repo-hygiene.sh --rescue` exits non-zero whenever it lists anything, including
+another session's uncommitted work, merged-but-undeleted branches, or a stray checkout that this
+slice did not create and the closeout rule forbids removing. A non-zero exit is therefore not by
+itself a slice failure when every item the command lists is a path this session did not create.
+A packet must not assert `scripts/repo-hygiene.sh --rescue` exits `0`; that form is unachievable
+whenever other sessions have pending work, and mis-specifies the actual gate.
+
+Assert instead, in the RESULT BLOCK, all four of: the command was run; its output was reviewed;
+every path this session created was committed or deleted (name each one); every other path the
+command listed was named and left in place (name each one). An exit code alone is not an
+acceptable entry for this item.
+
 ### Model routing on this Mac
 
 - Claude for frontend and Codex for backend are defaults, not rules.

@@ -5,13 +5,14 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6G**, `docs/operations/launch-slices/SLICE-6G.md`.
+- Current / last accepted: **6H**, `docs/operations/launch-slices/SLICE-6H.md`.
 - Blocked on: none.
-- Next: **6H** — `docs/operations/launch-slices/SLICE-6H.md`, written and dependency-ready.
-- Last decision: the 12,288 B packet cap's scope is now written down in the bindings file
-  (`### Packet cap scope`): it governs `SLICE-<ID>.md` anywhere under `launch-slices/`;
-  `*-LOG.md`, `SLICE-TEMPLATE.md` and `SLICE-5L-coverage.md` are exempt.
-- Details: `## Progress log` → 2026-09-09 (6G) entry.
+- Next: none written yet — no dependency-ready packet exists. Do not write one without a request.
+- Last decision: the hygiene closeout item now has a written, assertable form (bindings file
+  `### Hygiene disposition`, pointed to from `SLICE-TEMPLATE.md` → `## Closeout`): a non-zero
+  `repo-hygiene.sh --rescue` exit is not itself a failure when every listed path is one this
+  session didn't create; assert the four-part form instead of an exit code.
+- Details: `## Progress log` → 2026-09-09 (6H) entry.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints
@@ -47,6 +48,29 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-09 (6H) — hygiene closeout item made assertable
+
+Ran SLICE-6H (documentation-only, single Claude mid-tier worker, medium effort). Added
+`### Hygiene disposition` to `docs/operations/slice-protocol-environment.md`: a non-zero
+`repo-hygiene.sh --rescue` exit is not itself a slice failure when every listed path is one the
+session didn't create; the RESULT BLOCK must instead assert all four of — command run, output
+reviewed, session-created paths committed-or-deleted (each named), every other path named and
+left in place. `SLICE-TEMPLATE.md` → `## Closeout` now points there instead of asserting a bare
+exit code, which SLICE-6G had shown was unachievable whenever another session has pending work.
+
+Bounded cross-family audit (Codex, ordinary effort, unsandboxed after the sandboxed launch hit
+`Operation not permitted` per the bindings' known fix): PASS on both required questions — the new
+wording neither forbids anything the closeout rule permits nor permits anything it forbids, and
+it does not contradict the bindings' `Hygiene command` row (still
+`bash scripts/repo-hygiene.sh --rescue`, unchanged).
+
+`AGENTS.md` untouched (byte-identical to HEAD, per "Do not touch"). Hygiene run before commit:
+this session created no new paths; the two pre-existing uncommitted files it was told not to
+touch, three other worktrees' uncommitted work, two merged branches, and five unpushed local
+branches were all named and left in place, none created by this slice.
+
+No SLICE-6I packet exists yet — `## START HERE` now says so rather than inventing one.
 
 ### 2026-09-09 (6G) — the startup reading surface: one heading, every packet under cap, cap scope written down
 

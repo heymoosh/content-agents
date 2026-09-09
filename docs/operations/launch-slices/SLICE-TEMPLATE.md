@@ -97,6 +97,9 @@ Documentation only: record the scoped review/diff result in this packet. Otherwi
 <closeout gate command from the protocol bindings>
 ```
 
+Use the `### Hygiene disposition` form in `docs/operations/slice-protocol-environment.md` for
+the hygiene item — not a bare exit code.
+
 ## RESULT BLOCK (worker fills this in and returns it)
 
 - Changed paths:
