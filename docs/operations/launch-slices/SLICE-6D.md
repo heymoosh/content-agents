@@ -1,4 +1,4 @@
-# SLICE-6D: Correct Fiction's Grok sandbox launch mode
+# SLICE-6D: Fiction Grok compatibility and reviewed recommendation integration proof
 
 Protocol: `AGENTS.md` → `## Slice protocol`. Read that and this file only.
 Do not open the master archive. Do not load the repository for context. Workers do not commit.
@@ -7,7 +7,9 @@ Do not open the master archive. Do not load the repository for context. Workers 
 
 Fiction's idea classification/cleanup and comment-revision Grok launches use the Mac-compatible
 workspace sandbox, preserving their text-return contract and all other engine constraints.
-Prove the affected local execution paths with isolated fixture children. No authenticated run.
+Prove the affected local execution paths with isolated fixture children. In parallel, build a
+fixture integration check for the existing reviewed recommendation-to-request contract, resolving
+the 6C caller uncertainty without inventing a generic adapter. No authenticated run.
 
 ## Difficulty
 
@@ -41,13 +43,41 @@ Coordinator owns this packet, master, evidence reconciliation and integration.
 - Handoff: completed RESULT BLOCK, diff/changed list, source hashes, raw check output and exit,
   cleanup proof, and precise limitations. Stop edits before coordinator freezes the candidate.
 
-Parallel-safe: single worker. Splitting the two small, analogous builders would add coordination
-and duplicate fixture design without a useful independent deliverable; the worker owns both
-launch paths and their tests. Cross-family review remains separate and waits for frozen handoff.
+### Lane B — reviewed recommendation integration proof
+
+- Own only new `src/review/recommendation-request-integration.test.ts` in a separate
+  coordinator-created checkout and `/private/tmp/slice-6d-evidence/recommendations/` plus unique fixtures.
+- Deliver an executable fixture test through the existing recommendation/request authorization
+  boundary, covering valid evidence and stale/forged/unreviewed rejection where the actual contract
+  supports it. Trace actual persisted/authorized outcomes, not only function arguments.
+- Immutable read-only inputs at assignment commit: `src/review/recommendations.ts`,
+  `src/review/content-request.ts`, `src/review/content-request-store.ts`, `src/review/treatment.ts`,
+  `src/review/reviewed-mechanism-recommendations.ts` and their same-basename tests; the dossier path
+  explicitly referenced by that reader, limited to its schema/fixture contract. May search exact
+  imported symbols within these files and request bounded dependencies needed to execute fixtures.
+- First checkpoint: report actual seam and proposed test outcomes before writing. No generic adapter,
+  production changes, real evidence rows, generation or content bodies. Avoid duplicating existing
+  unit checks: exercise the combined boundary or report that existing tests already establish it.
+- Checks: `node --import tsx --test src/review/recommendation-request-integration.test.ts` and
+  `git diff --check`; writes only isolated fixtures/evidence, no repository `.env` reads or model calls.
+- Handoff: test, exact contract/disposition with path:line, raw check output/exit, hashes and cleanup.
+
+Parallel-safe: yes. A and B have disjoint source/test paths and separate checkouts/evidence/temp
+roots; neither creates paths in the other's owned directories. No repo-wide rewriting commands.
+Both consume immutable runtime inputs at `f286169917c4e77a564c24d8242e58f974287775`, never
+unfinished lane output. A single worker keeps the two tiny Fiction builders together; B supplies
+an independent recommendation integration test. Candidate review, full gate and integration serialize.
+
+## Assignment — 2026-09-08
+
+Baseline: `f286169917c4e77a564c24d8242e58f974287775`; four Fiction files unchanged from accepted 6B.
+Lane A checkout: `/private/tmp/content-agents-6d-fiction`.
+Lane B checkout: `/private/tmp/content-agents-6d-recommendations`.
+Both builders: Codex Terra high. No prior active owner is reassigned. Coordinator owns docs.
 
 ## Do not touch
 
-- Other production code/tests, root or scoped rules, real `.env`, content, analytics/cost logs,
+- Other production code/tests outside lane ownership, root or scoped rules, real `.env`, content, analytics/cost logs,
   scheduler/provider state, backlog, or unrelated edits. No publication, GitHub PR or paid calls.
 - Preserve non-Grok sandbox/tool/permission choices. Do not widen fiction's content-edit approval
   or canonical-update permissions. Workspace sandbox is not a promise of read-only enforcement.
@@ -62,6 +92,10 @@ launch paths and their tests. Cross-family review remains separate and waits for
 - Named bounded source paths above. No master archive.
 
 ## Acceptance
+
+- [ ] Lane B establishes the existing recommendation/request integration contract with a meaningful
+      passing fixture test or demonstrates equivalent existing coverage with exact source evidence;
+      no generic adapter or real-input readiness is inferred.
 
 - [ ] Both effective Grok launch configurations use `workspace` without duplicate/conflicting
       sandbox flags; all relevant Fiction callers are accounted for by a scoped symbol search.
@@ -81,12 +115,14 @@ launch paths and their tests. Cross-family review remains separate and waits for
 ## Verify
 
 Meaningful behavior — model subprocess launch configuration and test isolation. Bounded Claude
-review of exact changed evidence and preserved permission/text-return invariants. No UI change;
+review of exact changed evidence and preserved permission/text-return invariants, plus the
+recommendation fixture's canonical identity, persistence and fail-closed assertions. No UI change;
 functional proof is real isolated child execution. Authenticated Mac/Grok verification remains
 a separate budgeted workflow; no live canary is necessary for this fixture-only correction.
 
 ```
 node --import tsx --test src/fiction/idea-inbox.test.ts src/fiction/review-pr.test.ts
+node --import tsx --test src/review/recommendation-request-integration.test.ts
 git diff --check
 ```
 
@@ -98,6 +134,8 @@ serial Node test shim may be reused after verifying its identity; record actual 
 
 Fiction no longer emits the known incompatible Grok sandbox option, and fixture execution proves
 classification, cleanup and revision outputs still reach their callers with isolated state.
+The reviewed recommendation test proves canonical evidence survives request persistence and
+that forged/stale evidence cannot grant generation authorization.
 
 ## Risk
 
@@ -116,7 +154,7 @@ outage retain candidate and continue independent evidence preparation; no integr
 
 ## Closeout
 
-Not started. Record focused proof, independent closure, frozen gate, preservation and hygiene
+Assigned in parallel; not accepted. Record focused proof, independent closure, frozen gate, preservation and hygiene
 disposition before marking accepted. No worker commits; coordinator integrates locally on main.
 
 ## RESULT BLOCK (worker fills this in and returns it)
@@ -126,3 +164,100 @@ disposition before marking accepted. No worker commits; coordinator integrates l
 - Checks run and results:
 - Evidence locations:
 - Unresolved:
+
+## Coordinator finding R1 — fixture isolation
+
+Initial Lane A handoff omitted credential allowlisting and pre-import `.env` isolation. Merely
+having no `.env` in the build checkout does not make the committed test safe elsewhere. Its added
+production revision timeout is unnecessary scope and only sends SIGTERM. Initial worker paused.
+Reassign the same four paths to Codex Terra xhigh (one effort notch) in the same checkout.
+
+- Remove the newly introduced production timeout; preserve non-Grok behavior.
+- Run affected runtime imports/execution inside a credential-free, bounded real child harness.
+  Ensure repository `.env` cannot be read before imports (loader interception or equivalent),
+  observe fixture loading and real outputs, use SIGKILL deadline for fixture processes and finally cleanup.
+- Bounded additional read-only reference: `src/publish/queue-view.test.ts` for the accepted 6B
+  subprocess/env-loader isolation pattern. Do not edit or rerun that test. May use Node module loader
+  in test-only code, no production seams. Scope-search every affected test/import path.
+- Rerun only Fiction focused checks; handoff exact final diff/check evidence. Claude review remains
+  required before integration. No accepted audit exists for this initial candidate.
+
+R1 final coordinator check also requires blocking the outer test module's runtime import before
+it can load repository `.env`; protecting only the spawned fixture is insufficient for the stated
+whole-invocation guarantee. Same paused/completed R1 owner resumed at Terra xhigh, same paths.
+Lane B independently found the analogous transitive import and added an exact-path dynamic-import
+FS guard; its final two-test proof is ready for independent review.
+
+## Independent review — 2026-09-08
+
+Final candidate hashes: `/private/tmp/slice-6d-evidence/coordinator/candidate-manifest.json`.
+Initial Claude Sonnet medium review completed (actual `claude-sonnet-5`, exit 0, is_error false,
+108.97 seconds): no established defects; PASS subject to caller-search and diff-check receipts.
+Supplied those exact command/output/exit receipts without changing source. Delta closure returned
+PASS, no unresolved findings (same actual model, exit 0, is_error false, 43.60 seconds).
+Evidence: coordinator `audit.*`, `audit-delta.*`, `audit-gap-evidence.txt` and `candidate.diff`.
+
+Coordinator disposition: continuity's separate adapter does not emit the affected explicit Grok
+read-only flag; its Codex option is unchanged. Do not infer filesystem enforcement for Grok from
+legacy continuity prose or the auditor's shorthand. No change to that adapter is claimed here.
+Optional duplicated fixture helper extraction is deferred; no generic harness refactor in this slice.
+
+Focused final proof: Fiction 33/33, recommendation 2/2; all pass with no skips. Both outer Fiction
+imports and the new recommendation import block the exact repository `.env` read. Fiction's child
+fixtures use a credential-free environment allowlist, receipt-verified `.env` substitution, isolated
+roots and a 10-second SIGKILL deadline. The fake children return real parsed helper outputs.
+No live Grok startup, real recommendations/input readiness, browser journey or publication is claimed.
+
+Lane B establishes the existing specialized reviewed-dossier path through GUI authorization,
+persistence/reload and generation authorization. It does not establish a generic Pattern adapter.
+Its initial missing import isolation was repaired on Terra high before independent review; Lane A's
+omitted isolation received Terra xhigh as specified. All worker edits stopped before review.
+
+Full gate: running on `/private/tmp/content-agents-6d-verify`, detached baseline `f286169` plus the
+five audited files; manifest equality verified. Fresh setup passed once; serial Node shim identity
+matched prior accepted gate infrastructure. No implementation edits permitted during this gate.
+
+## Stopped — owner-requested Claude handoff, 2026-09-08
+
+Not accepted: owner requested closeout to conserve Codex usage while the frozen full gate is still
+running. Both builders have stopped. Required independent Claude source audit and evidence-gap
+closure PASS; final focused checks PASS (33 Fiction + 2 recommendation tests). No source commit.
+
+Retained candidate: four Fiction files in `/private/tmp/content-agents-6d-fiction`; new
+`src/review/recommendation-request-integration.test.ts` in
+`/private/tmp/content-agents-6d-recommendations`; combined five-file candidate in detached
+`/private/tmp/content-agents-6d-verify`. All match coordinator `candidate-manifest.json`.
+All evidence is under `/private/tmp/slice-6d-evidence/`; the exact combined patch is
+`coordinator/candidate.diff`. Main still has only coordinator docs plus four pre-existing edits.
+
+Single next action: Claude reads `coordinator/full-gate.exit.json` once it exists and the final
+`full-gate.stdout.txt`/`full-gate.stderr.txt`; do not restart the running valid gate. The background
+wrapper is `/private/tmp/slice-6d-evidence/coordinator/run-gate.py` (Codex exec session 24364).
+It writes durable exit and elapsed-time evidence on completion. PASS requires actual exit 0,
+then final hash comparison, hygiene and coordinator integration of the five reviewed files plus
+packet/master. If the gate fails, repair only established failures and independently close material
+changes before a new frozen gate. If no exit receipt appears and the process is gone, record an
+incomplete gate; do not infer PASS from trailing output. No source changes since audit.
+
+Preserve accepted 6B/6C evidence, current policy, operational state, other sessions' four edits,
+and the 5X backup. Never rerun 5P. No live workflow budget consumed by this slice.
+
+### Handoff hygiene disposition
+
+Hygiene exited 1 with all leftovers retained intentionally for handoff; no prunable worktrees.
+Rescue refs: main `4a521fd`, Fiction `dce3f0c`, recommendations `e0824d4`, verification `65511ac`
+under their matching `refs/wip/content-agents*` names. These snapshots preserve work, not acceptance.
+Keep all three session checkouts until Claude finishes integration. Session-created untracked
+`src/review/recommendation-request-integration.test.ts` exists in recommendation and verification
+checkouts and is rescued in both refs; retain it under the stopping-without-acceptance branch.
+The packet copy in each build checkout is assignment-time context; canonical handoff is this file
+on main. External session artifacts are confined to `/private/tmp/slice-6d-evidence/`.
+
+Pre-existing main edits preserved unchanged: `AGENTS.md`,
+`content/2026-09-07-the-world-s-broken-what-do-we-do-human-inference/review-queue.md`,
+`data/notes-spread-ledger.jsonl`, and `docs/operations/launch-slices/SLICE-TEMPLATE.md`.
+Older branches retained untouched: `slice-5q-queue`, `slice-5r-routing`,
+`agent/cs2-jobs-outreach-charles-extract`, `agent/cs2-page-room-pure-helpers`,
+`agent/cs2-serve-walled-room-routes`, `agent/cs3-studio-durable-handoff`,
+`agent/cs6-parallel-safe-ui-completion`. No user decision is needed for these unrelated leftovers.
+Closeout: handoff recorded; runtime acceptance remains pending the full gate. No push.

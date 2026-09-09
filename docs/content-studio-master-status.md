@@ -2,18 +2,18 @@
 
 ## START HERE
 
+- Usage: `AGENTS.md` → `### Usage discipline`; apply at the next safe checkpoint.
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
-- This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
-- Current / last accepted: **SLICE-6C**, `docs/operations/launch-slices/SLICE-6C.md` (parallel readiness reconciliation).
-- Blocked on: none for 6C; no live workflow or runtime change performed.
-- Next: **SLICE-6D**, `docs/operations/launch-slices/SLICE-6D.md` — Fiction Grok sandbox fix; not started.
-- Independent preparation: recommendation integration-seam check scoped in 6C; no generic adapter decided.
-- Last decision: Charles persona editing is represented on main; preserve current policy and accepted evidence.
-- Proof: three frozen reports, pinned-source/ancestry verification and scoped documentation review; 6B runtime proof retained.
-- Evidence: `/private/tmp/slice-6c-evidence/`; concrete findings and follow-ups: 6C → `## Reconciliation — 2026-09-08`.
-- Preserve provider/scheduler state, validated 5X backup and unrelated edits; never repeat 5P or accepted checks.
+- Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`.
+- Current: **6D not accepted**, `docs/operations/launch-slices/SLICE-6D.md` → `## Stopped`.
+- Blocked on: final full-gate result; owner requested Claude handoff to conserve Codex usage.
+- Last accepted: **6C**, commit `f286169`; prior accepted checks retained.
+- Completed: both build lanes, focused proof and independent Claude audit/closure PASS.
+- Next: inspect retained gate receipt, then accept/integrate 6D if PASS; do not restart the running gate.
+- Candidate/checkouts/hashes: 6D → `## Stopped`; evidence: `/private/tmp/slice-6d-evidence/`.
+- Last decision: Fiction compatibility plus existing recommendation integration proof; no generic adapter.
+- Preserve unrelated edits, provider/scheduler state and 5X backup; never repeat 5P.
 - Everything below is history; read only packet-cited headings.
-
 
 ## Standing constraints`.
 - Everything below this block is history. Do not read it unless a slice packet cites a heading.
@@ -51,6 +51,22 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-08 — 6D parallel build, Claude handoff before acceptance
+
+Two disjoint Codex Terra lanes built the Fiction Grok workspace launch correction and an existing
+reviewed recommendation/request integration fixture. Coordinator review closed import/environment
+isolation omissions; Fiction repair used Terra xhigh. Final focused checks passed: 33 Fiction tests
+and 2 recommendation tests. Claude Sonnet medium (actual claude-sonnet-5) found no established defect;
+its two evidence-only requests were supplied and independently closed PASS without source changes.
+
+The combined five-file candidate is frozen in `/private/tmp/content-agents-6d-verify`; required
+unsandboxed full check is still running at owner-requested closeout. No candidate source is committed
+or accepted. The owner asked to conserve Codex usage and let Claude take over. Packet
+`docs/operations/launch-slices/SLICE-6D.md` → `## Stopped` names retained files, exact hashes/evidence,
+gate receipt paths and the single next action. Do not restart valid checks or repeat settled audits.
+No live Grok/production workflow, publication, browser journey or real evidence readiness is claimed.
+
 
 ### 2026-09-07 — 5S safer scheduling source audit clear; visual verification blocked
 
@@ -1612,6 +1628,16 @@ Documentation-only scope: no runtime gate or external audit required. Three sour
 24 pinned source hashes and Charles ancestry/blob checks passed. Final diff, hygiene and preserved
 leftovers are recorded in 6C's closeout. No source, operational state, provider or publication changes.
 
+### 2026-09-08 — Portable usage discipline rollout
+
+Owner-directed documentation-only update: `AGENTS.md` → `### Usage discipline` and the
+packet template now require a useful benefit for extra lanes, bounded worker contexts,
+explicit model/effort, completion notifications, concise check results with disk evidence,
+and automatic closeout at coherent capability boundaries. Apply at the next safe checkpoint;
+preserve current worker ownership until a frozen handoff. Existing audits, outcome gates,
+product scope and accepted/stopped statuses remain in force. Scoped review covers exact
+insertions, rule consistency, pointer existence and whitespace; no runtime audit/build/E2E
+is required for this policy-only change. Other sessions' work is excluded from this commit.
 
 ## Current handoff — 2026-09-02
 
