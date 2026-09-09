@@ -5,14 +5,15 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6I**, `docs/operations/launch-slices/SLICE-6I.md`.
+- Current / last accepted: **6J**, `docs/operations/launch-slices/SLICE-6J.md`.
 - Blocked on: none.
-- Next: **6J**, `docs/operations/launch-slices/SLICE-6J.md` — written, dependency-ready.
-- Last decision: the closeout read-set print now has a written, assertable form (bindings file
-  `### Read-set measurement`, pointed to from `SLICE-TEMPLATE.md` → `## Closeout`): the three
-  commands, their pinned-to-commit form, both caps, and the `/^## [^S]/` extraction trap that
-  overstates the START HERE block 3317 vs 927.
-- Details: `## Progress log` → 2026-09-09 (6I) entry.
+- Next: none authorized yet — no further slice packet exists; a packet session must write one.
+- Last decision: the closeout gate item now has a written, assertable form (bindings file
+  `### Closeout gate disposition`, pointed to from `SLICE-TEMPLATE.md` → `## Closeout`): the
+  `none` gate binding, the `**PASS**`-with-date/leftover-list assertable form, the rule that no
+  command belongs in that slot, and `SLICE-6I.md` named as the packet that conflated the gate
+  with the hygiene command.
+- Details: `## Progress log` → 2026-09-09 (6J) entry.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints
@@ -48,6 +49,37 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-09 (6J) — closeout gate item made assertable
+
+Ran SLICE-6J (documentation-only, single Claude mid-tier worker, medium effort). Worker added
+`### Closeout gate disposition` to `docs/operations/slice-protocol-environment.md`: states this
+repository's `Closeout gate` binding is `none`, the assertable form (a `**PASS**` line with a
+date, or an explicit leftover list, written before closeout), that no command belongs in the
+`## Closeout` gate slot while the binding is `none`, names `SLICE-6I.md` as the packet that put
+`bash scripts/repo-hygiene.sh --rescue` in that slot instead, and cites `AGENTS.md` →
+`### Mandatory closeout gate` for the fallback. `SLICE-TEMPLATE.md` → `## Closeout` now points
+there instead of prompting for a command, alongside the existing (unchanged) Hygiene disposition
+and Read-set measurement pointers. This was the third and last hand-asserted closeout item.
+
+Codex cross-family audit (`codex exec --sandbox read-only`, unsandboxed locally — same
+`Operation not permitted` sandbox failure as prior slices) raised one flag on the two fixed
+questions: it read the new section's `**PASS**`-with-date requirement as going beyond the quoted
+bindings row/`### Mandatory closeout gate` text. Not an established defect — that exact form is
+this packet's own acceptance item 3 and matches the `**PASS** — <date>` convention every other
+accepted slice already uses; the auditor simply wasn't handed the packet's acceptance list, only
+the looser protocol prose. No repair made. The second question (whether removing the template's
+fenced placeholder dropped any instruction) came back clean. Full RESULT BLOCK and audit
+transcript summary in `SLICE-6J-LOG.md`.
+
+Hygiene (`bash scripts/repo-hygiene.sh --rescue`, exit 1 as expected — non-zero alone is not a
+failure per `### Hygiene disposition`): the two owned files plus this packet were committed here;
+everything else it listed (the two pre-existing uncommitted files from another session, three
+`/private/tmp/content-agents-6d-*` checkouts, two merged branches, five unmerged `agent/cs*`
+branches) is other sessions' work, named and left untouched.
+
+No next slice packet exists yet; this session did not write one (writing a packet is a separate,
+strongest-model session per `AGENTS.md` → `### Effort tiers`).
 
 ### 2026-09-09 (6I) — closeout read-set print made assertable
 

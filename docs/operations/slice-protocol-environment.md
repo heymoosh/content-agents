@@ -83,6 +83,24 @@ every path this session created was committed or deleted (name each one); every 
 command listed was named and left in place (name each one). An exit code alone is not an
 acceptable entry for this item.
 
+### Closeout gate disposition
+
+This repository's `Closeout gate` binding (row above) is `none — record PASS or the leftover
+list in the slice packet`. No command exists to run in that role here.
+
+Assertable form: a packet's `## Closeout` is only satisfied when it carries either a line
+beginning `**PASS**` followed by a date, or an explicit list of what is left, written before the
+slice closes. Neither form is a command invocation.
+
+No command belongs in the `## Closeout` gate slot while the binding is `none`. In particular,
+`bash scripts/repo-hygiene.sh --rescue` is a separate hygiene item (see `### Hygiene disposition`
+above) and must not be recorded as the closeout gate. `SLICE-6I.md` is the observed instance of
+this conflation: it placed that hygiene command in the closeout gate slot and then asked for the
+same command again under its hygiene item.
+
+Per `AGENTS.md` → `## Slice protocol` → `### Mandatory closeout gate`, a packet recording neither
+a `**PASS**` line nor a leftover list has not closed.
+
 ### Model routing on this Mac
 
 - Claude for frontend and Codex for backend are defaults, not rules.

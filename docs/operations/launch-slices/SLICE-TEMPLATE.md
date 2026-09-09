@@ -96,11 +96,9 @@ of a candidate whose required review is pending>
 
 ## Closeout
 
-Documentation only: record the scoped review/diff result in this packet. Otherwise:
-
-```
-<closeout gate command from the protocol bindings>
-```
+Documentation only: record the scoped review/diff result in this packet. Otherwise, use the
+`### Closeout gate disposition` form in `docs/operations/slice-protocol-environment.md` for the
+closeout gate item — not a fenced command.
 
 Preflight: <schema/required fields; pinned candidate and changed paths; ownership; every
 acceptance item mapped to accessible evidence; check exit codes; independent audit policy

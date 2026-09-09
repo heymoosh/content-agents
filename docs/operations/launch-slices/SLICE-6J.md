@@ -175,29 +175,12 @@ independent authorized work remains, so take the stopping-without-acceptance bra
 Documentation only: record the scoped review/diff result here. The bindings' closeout gate is
 `none`, so record `PASS` or the leftover list in this packet — the form this slice writes down.
 
-Preflight: schema matches `SLICE-TEMPLATE.md`; candidate is the working-tree diff of the two
-Lane A files plus this packet's `## RESULT BLOCK`; one lane owns everything; every acceptance item
-maps to a numbered `## Verify` command the coordinator reads; exit codes recorded, not inferred;
-the cross-family audit is required with its two questions fixed above; documentation-only closes
-the remaining final-gate prerequisites.
-Gate cost: no repository-wide gate runs. `git diff --check` and the `## Verify` block are seconds
-of local runtime; measured elapsed `unknown` until run. No extra audit or rerun beyond the one
-bounded review and a delta review of any material finding. No paperwork-only rerun, no bypass, no
-reuse of another candidate's evidence.
+**PASS** — 2026-09-09. Coordinator diff review plus cross-family Codex audit, no established
+defect. One audit flag traced to auditor scope, not the candidate; recorded in `SLICE-6J-LOG.md`.
 
-Use the `### Hygiene disposition` form in `docs/operations/slice-protocol-environment.md` for the
-hygiene item, not a bare exit code. Use that file's `### Read-set measurement` form for the
-closeout read-set print, not an ad hoc re-derivation.
+## RESULT BLOCK
 
-## RESULT BLOCK (worker fills this in and returns it)
-
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action: <built | verified; workers cannot accept or commit>
-- Usage: <local check elapsed separately from model/provider usage; unavailable values `unknown`>
+Accepted 2026-09-09. The full RESULT BLOCK and the Codex audit are in `SLICE-6J-LOG.md`.
 
 ## Usage budget and handoff
 
