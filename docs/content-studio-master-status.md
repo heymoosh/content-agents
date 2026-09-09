@@ -4,12 +4,12 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
-- Current / last accepted: **SLICE-5Z**, `docs/operations/launch-slices/SLICE-5Z.md` (**accepted**).
-- Blocked on: none for 5Z; Claude independently closed the final cleanup repairs.
-- Next action: select the next dependency-ready slice from the remaining master-plan requirements; no successor packet assigned yet.
-- Last decision: test-only full job-spawn proof; retain settled Grok findings and use Claude delta closure.
-- Proof: final scoped 3/3, Claude PASS, frozen full gate 4345 tests / 494 suites, exit 0.
-- Evidence: `/private/tmp/slice-5z-evidence/`; accepted packet records review boundary and preservation.
+- Current: **SLICE-6B**, `docs/operations/launch-slices/SLICE-6B.md` (parallel source checkpoints).
+- Last runtime accepted: **5Z**, commit `b74c889`; 6A planning reconciliation reviewed.
+- Blocked on: none; queue and render workers have disjoint evidence ownership.
+- Next action: confirm current queue-path/render-cost gaps, then freeze exact implementation ownership.
+- Last decision: parallelize independent preparation; serialize shared-file implementation and integration.
+- Evidence: `/private/tmp/slice-6a-evidence/` and `/private/tmp/slice-6b-evidence/`; bounded packet inputs.
 - Preserve provider/scheduler state and validated 5X backup; do not rerun 5P.
 - Everything below is history; read only packet-cited headings.
 
@@ -1563,6 +1563,17 @@ No settled audit/check was restarted. Final unsandboxed frozen `npm run check` p
 Evidence `/private/tmp/slice-5z-evidence/`; packet `docs/operations/launch-slices/SLICE-5Z.md`.
 No production behavior changed, no real provider/model canary, all nine resume fingerprints
 preserved. Primary checkout remains main; no push. Successor slice not yet assigned.
+
+### 2026-09-08 — 6A parallel reconciliation and 6B source checkpoints
+
+Two Codex Terra workers independently reconciled safety and operating-loop requirements against
+`b74c889`, writing only separate evidence directories. Settled 5B/5Q/5Y/5Z work stays closed.
+P2 historical operational items do not establish new code defects or restore superseded policy.
+Coordinator selected 5O unresolved 2 and 4 for separate bounded current-source checks: queue-view
+ledger text and actual render-child cost observability. Exact scope and checkpoints are in
+`docs/operations/launch-slices/SLICE-6B.md`; source/check ownership is disjoint and no live
+provider/model work is authorized. 6A documentation review passed; 6B is not accepted.
+
 
 ## Current handoff — 2026-09-02
 
