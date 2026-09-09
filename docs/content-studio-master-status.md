@@ -6,7 +6,7 @@
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`.
 - Current / last accepted: **6F**, `docs/operations/launch-slices/SLICE-6F.md`.
 - Blocked on: none.
-- Next: **6G** — no packet written yet; a packet session is needed before execution.
+- Next: **6G**, `docs/operations/launch-slices/SLICE-6G.md` — written, dependency-ready.
 - Last decision: SLICE-6F's Lane B relocated the whole `## Slice protocol` → Repo bindings table
   (not just the 3 named rows) to `docs/operations/slice-protocol-environment.md` to clear the
   4,118 B overage; accepted per the section's own repo-neutral/repo-specific split.
