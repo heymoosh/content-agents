@@ -5,15 +5,15 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6J**, `docs/operations/launch-slices/SLICE-6J.md`.
+- Current / last accepted: **6K**, `docs/operations/launch-slices/SLICE-6K.md`.
 - Blocked on: none.
-- Next: **6K** `docs/operations/launch-slices/SLICE-6K.md` and **6L** `docs/operations/launch-slices/SLICE-6L.md` — both written, dependency-ready, disjoint owned paths, runnable in parallel.
-- Last decision: the closeout gate item now has a written, assertable form (bindings file
-  `### Closeout gate disposition`, pointed to from `SLICE-TEMPLATE.md` → `## Closeout`): the
-  `none` gate binding, the `**PASS**`-with-date/leftover-list assertable form, the rule that no
-  command belongs in that slot, and `SLICE-6I.md` named as the packet that conflated the gate
-  with the hygiene command.
-- Details: `## Progress log` → 2026-09-09 (6J) entry.
+- Next: **6L** `docs/operations/launch-slices/SLICE-6L.md` — written, dependency-ready; appears
+  in-flight under a separate session (uncommitted `e2e/`-owned edits observed at 6K's closeout).
+- Last decision: 6K's freeze-candidate mechanism shipped after a two-round cross-family (Codex)
+  audit found and closed one HIGH + two MEDIUM defects (untracked-path exception bypass,
+  unbounded scratch-root, silent diff-failure); one further audit item (gitignored files excluded
+  from the freeze) was disposed as by-design, not a defect. Full record: `SLICE-6K-LOG.md`.
+- Details: `## Progress log` → 2026-09-09 (6K) entry.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints
@@ -49,6 +49,38 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-09 (6K) — runnable freeze-candidate mechanism for completion-sequence step 6
+
+Ran SLICE-6K (meaningful behavior / high risk, one Claude mid-tier worker at medium effort).
+Built `src/operations/freeze-candidate.ts`: a pure `planFreeze` function (no git call, no fs
+write) that refuses to freeze on `sha_mismatch`, `untracked_path`, `undeclared_modification`, or
+`scratch_root_inside_repo`, plus a thin CLI that reads real git state, calls it, and on acceptance
+creates a detached `git worktree` checkout outside the repo with a manifest recording sha,
+checkout path, changed-file list and an ISO timestamp. 13 tests in
+`src/operations/freeze-candidate.test.ts`, one added `package.json` scripts entry.
+
+Cross-family audit (Codex, `codex exec --sandbox read-only`) ran twice. Round 1 found and the
+worker fixed: HIGH — a declared `--allow` exception could suppress the untracked-path refusal too
+(not just the modification refusal), so an allowed-but-untracked file would silently vanish from
+the frozen checkout; MEDIUM — `--scratch-root` had no check that it lands outside the repo working
+tree; MEDIUM — a failed `git diff --name-only` silently defaulted the changed-file list to `[]`
+instead of refusing. Round 2 confirmed both fixes are real by independent re-read, and surfaced one
+further item (gitignored files are absent from `git status --porcelain`, so silently excluded from
+the freeze) that the coordinator disposed as by-design rather than a defect — ignored files are
+never part of any git-tracked candidate sha for any consumer, and this repo has real gitignored
+clutter (`.env`, `data/analytics.db`, `node_modules`, logs) that `--ignored` would spuriously flag.
+A symlink-mediated scratch-root containment bypass was accepted as low-risk P2 hardening, not
+fixed. Two cheap test gaps (a diff-failure regression test, tightening a `assert.throws`-only test
+to check the actual refusal reason) were closed before acceptance.
+
+`npm run check` (coordinator's own final run, unsandboxed): exit 1, 4372/4373 pass — the sole
+failure is the pre-existing, out-of-scope SLICE-5Z env-var-leak test in `src/review/jobs.test.ts`
+(do-not-touch for this slice), reproduced identically with this slice's files stashed out. Codex
+CLI auth was broken mid-session (expired/reused refresh token) and required the owner to
+re-authenticate before the audit could run; this is a machine/account state issue, not a repo one,
+so it isn't added to the bindings' machine-facts list. Full evidence and dated record in
+`SLICE-6K-LOG.md` → `## Accepted — 2026-09-09`.
 
 ### 2026-09-09 (6J) — closeout gate item made assertable
 

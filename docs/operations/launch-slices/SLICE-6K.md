@@ -61,27 +61,33 @@ none
 
 ## Acceptance
 
-- [ ] `src/operations/freeze-candidate.ts` exists and exports a pure function that takes a
+- [x] `src/operations/freeze-candidate.ts` exists and exports a pure function that takes a
       repository state description (current sha, porcelain status entries, a target root) and
       returns either a refusal with a named reason or a freeze plan carrying the sha, the changed
       paths and the checkout path. The pure function performs no git call and no filesystem write.
-- [ ] The module's CLI entry point, when run, creates a detached checkout of the current `HEAD`
+- [x] The module's CLI entry point, when run, creates a detached checkout of the current `HEAD`
       sha under a scratch root outside the repository working tree, and writes a manifest file
       recording at least: the sha, the checkout path, the changed-file list it froze, and an
       ISO-8601 timestamp.
-- [ ] The refusal path is implemented and tested for all three of: a tree carrying staged or
+- [x] The refusal path is implemented and tested for all three of: a tree carrying staged or
       unstaged modifications the caller did not declare, an untracked path that would not exist in
       the detached checkout, and a `HEAD` sha that does not match a sha the caller passed in.
       Each refusal names which condition fired.
-- [ ] `src/operations/freeze-candidate.test.ts` exists, is discovered by `npm test`
+- [x] `src/operations/freeze-candidate.test.ts` exists, is discovered by `npm test`
       (`src/**/*.test.ts`), and contains at least one test per refusal condition above plus at
       least one test asserting the accepted plan's sha, changed paths and checkout path.
-- [ ] Every test in that file asserts the returned plan or refusal value. No test asserts only
+- [x] Every test in that file asserts the returned plan or refusal value. No test asserts only
       that a git command was constructed or an argument was passed.
-- [ ] `package.json` gained exactly one `scripts` entry invoking the CLI, and `git diff` on
+- [x] `package.json` gained exactly one `scripts` entry invoking the CLI, and `git diff` on
       `package.json` shows no change outside the `scripts` object.
-- [ ] `npm run check` exits 0, run unsandboxed.
-- [ ] The RESULT BLOCK records one real invocation of the new script against this candidate: the
+- [x] `npm run check` — exit 1, sole failure is the pre-existing, out-of-scope
+      `src/review/jobs.test.ts` SLICE-5Z env-var-leak assertion (do-not-touch: any `src/` path
+      other than `src/operations/`). Reproduced identically with this slice's files stashed out
+      (unrelated, predates this change) and confirmed again on the coordinator's own final run:
+      4372/4373 pass, same single failure, same location. Disposition: accepted — the literal
+      "exits 0" wording cannot be met without violating the do-not-touch list; this is the
+      documented exception.
+- [x] The RESULT BLOCK records one real invocation of the new script against this candidate: the
       exact command, its exit code, the sha it froze, and the manifest path it wrote.
 
 ## Verify
@@ -131,37 +137,9 @@ and do not integrate. 6L is independent authorized work and may continue.
 
 ## Closeout
 
-Use the `### Closeout gate disposition` form in `docs/operations/slice-protocol-environment.md`
-for the closeout gate item — a `**PASS**` line with a date or an explicit leftover list, never a
-fenced command.
-
-Preflight: candidate sha pinned and changed paths listed; every acceptance item above mapped to a
-named test or a recorded command output; `npm run check` exit code captured, not piped through
-`tail`; audit findings separated into established defects, verification gaps and optional
-improvements, with every material finding closed by a fix plus evidence or an explicit
-disposition.
-Gate cost: `npm run check` on the frozen candidate, run once, last. Record measured local elapsed
-time separately from model usage; mark provider-reported usage `unknown` if unavailable. Do not
-rerun the gate for paperwork.
-
-Use the `### Hygiene disposition` form in `docs/operations/slice-protocol-environment.md` for the
-hygiene item — not a bare exit code. Expect a non-zero exit: other sessions have pending work,
-several `/private/tmp/content-agents-6d-*` checkouts and unmerged `agent/cs*` branches. Name each
-path this session created and settled, and name each path left in place.
-
-Use the `### Read-set measurement` form in `docs/operations/slice-protocol-environment.md` for the
-closeout read-set print — not an ad hoc re-derivation.
-
-## RESULT BLOCK (worker fills this in and returns it)
-
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action: <built | verified | accepted | committed; workers cannot accept/commit>
-- Usage: <local check elapsed time separately from model calls/provider-reported usage;
-  unavailable values `unknown`; prior history behind evidence pointers>
+**PASS** — 2026-09-09. Accepted and committed. Full record (gate output, hygiene disposition,
+read-set measurement, two-round cross-family audit findings and dispositions, worker RESULT
+BLOCK) moved to `SLICE-6K-LOG.md` → `## Accepted — 2026-09-09` per packet size discipline.
 
 ## Usage budget and handoff
 
