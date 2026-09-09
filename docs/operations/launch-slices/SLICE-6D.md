@@ -68,13 +68,6 @@ Both consume immutable runtime inputs at `f286169917c4e77a564c24d8242e58f9742877
 unfinished lane output. A single worker keeps the two tiny Fiction builders together; B supplies
 an independent recommendation integration test. Candidate review, full gate and integration serialize.
 
-## Assignment — 2026-09-08
-
-Baseline: `f286169917c4e77a564c24d8242e58f974287775`; four Fiction files unchanged from accepted 6B.
-Lane A checkout: `/private/tmp/content-agents-6d-fiction`.
-Lane B checkout: `/private/tmp/content-agents-6d-recommendations`.
-Both builders: Codex Terra high. No prior active owner is reassigned. Coordinator owns docs.
-
 ## Do not touch
 
 - Other production code/tests outside lane ownership, root or scoped rules, real `.env`, content, analytics/cost logs,
@@ -188,36 +181,18 @@ whole-invocation guarantee. Same paused/completed R1 owner resumed at Terra xhig
 Lane B independently found the analogous transitive import and added an exact-path dynamic-import
 FS guard; its final two-test proof is ready for independent review.
 
-## Independent review — 2026-09-08
+## Accepted — Claude integration, 2026-09-08
 
-Final candidate hashes: `/private/tmp/slice-6d-evidence/coordinator/candidate-manifest.json`.
-Initial Claude Sonnet medium review completed (actual `claude-sonnet-5`, exit 0, is_error false,
-108.97 seconds): no established defects; PASS subject to caller-search and diff-check receipts.
-Supplied those exact command/output/exit receipts without changing source. Delta closure returned
-PASS, no unresolved findings (same actual model, exit 0, is_error false, 43.60 seconds).
-Evidence: coordinator `audit.*`, `audit-delta.*`, `audit-gap-evidence.txt` and `candidate.diff`.
+Full gate finished: `full-gate.exit.json` reports exit 0 in ~404.9s
+(`PATH=/private/tmp/slice-5q-gate-bin:$PATH npm run check`). Coordinator hash-verified the frozen
+`/private/tmp/content-agents-6d-verify` candidate's five files against `candidate-manifest.json`
+(sha256 match, all five). Independent Claude audit and delta-audit closure (both exit 0, retained
+from the Stopped handoff below) still hold — no source changes since audit. Coordinator copied the
+five reviewed files into main and committed them with this packet and master-status update, in one
+reviewed commit. Hygiene leftovers (worktrees, rescue refs, other sessions' four preserved edits)
+are unchanged from the disposition already recorded below and remain retained, not superseded.
 
-Coordinator disposition: continuity's separate adapter does not emit the affected explicit Grok
-read-only flag; its Codex option is unchanged. Do not infer filesystem enforcement for Grok from
-legacy continuity prose or the auditor's shorthand. No change to that adapter is claimed here.
-Optional duplicated fixture helper extraction is deferred; no generic harness refactor in this slice.
-
-Focused final proof: Fiction 33/33, recommendation 2/2; all pass with no skips. Both outer Fiction
-imports and the new recommendation import block the exact repository `.env` read. Fiction's child
-fixtures use a credential-free environment allowlist, receipt-verified `.env` substitution, isolated
-roots and a 10-second SIGKILL deadline. The fake children return real parsed helper outputs.
-No live Grok startup, real recommendations/input readiness, browser journey or publication is claimed.
-
-Lane B establishes the existing specialized reviewed-dossier path through GUI authorization,
-persistence/reload and generation authorization. It does not establish a generic Pattern adapter.
-Its initial missing import isolation was repaired on Terra high before independent review; Lane A's
-omitted isolation received Terra xhigh as specified. All worker edits stopped before review.
-
-Full gate: running on `/private/tmp/content-agents-6d-verify`, detached baseline `f286169` plus the
-five audited files; manifest equality verified. Fresh setup passed once; serial Node shim identity
-matched prior accepted gate infrastructure. No implementation edits permitted during this gate.
-
-## Stopped — owner-requested Claude handoff, 2026-09-08
+## Stopped — owner-requested Claude handoff, 2026-09-08 (superseded by Accepted above)
 
 Not accepted: owner requested closeout to conserve Codex usage while the frozen full gate is still
 running. Both builders have stopped. Required independent Claude source audit and evidence-gap

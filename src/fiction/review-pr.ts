@@ -344,7 +344,7 @@ export async function validateStoryChapter(series: string, chapter: number, repo
   required(await execute("npx", ["tsx", "src/fiction/validate.ts", series, "--chapter", String(chapter)]), "story validation");
 }
 
-/** Read-only helper for future engine adapters; no provider/API key is introduced here. */
+/** Text-only helper for future engine adapters; no provider/API key is introduced here. */
 export function buildRevisionSpawn(engine: Engine, prompt: string): { command: string; args: string[]; input?: string } {
   const built = buildEngineSpawn(engine, prompt, {
     timeoutMs: 120_000, sandbox: "read-only", permissionMode: null, tools: "",
@@ -352,7 +352,7 @@ export function buildRevisionSpawn(engine: Engine, prompt: string): { command: s
   if (engine === "grok") built.args.push(
     "--output-format", "json",
     "--system-prompt-override", GROK_FINAL_TEXT_SYSTEM_PROMPT,
-    "--sandbox", "read-only",
+    "--sandbox", "workspace",
     "--disable-web-search", "--no-subagents", "--verbatim",
   );
   return built;

@@ -5,14 +5,14 @@
 - Usage: `AGENTS.md` → `### Usage discipline`; apply at the next safe checkpoint.
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`.
-- Current: **6D not accepted**, `docs/operations/launch-slices/SLICE-6D.md` → `## Stopped`.
-- Blocked on: final full-gate result; owner requested Claude handoff to conserve Codex usage.
-- Last accepted: **6C**, commit `f286169`; prior accepted checks retained.
-- Completed: both build lanes, focused proof and independent Claude audit/closure PASS.
-- Next: inspect retained gate receipt, then accept/integrate 6D if PASS; do not restart the running gate.
-- Candidate/checkouts/hashes: 6D → `## Stopped`; evidence: `/private/tmp/slice-6d-evidence/`.
+- Current: **6D accepted and integrated**, `docs/operations/launch-slices/SLICE-6D.md` → `## Accepted`.
+- Blocked on: none for 6D.
+- Last accepted: **6D**; prior accepted checks (6C, commit `f286169`) retained.
+- Completed: full gate PASS (exit 0, ~405s) on the hash-verified five-file candidate; independent Claude audit/delta-audit closure PASS retained from handoff.
+- Next: `docs/operations/launch-slices/SLICE-6E.md` exists (untracked, unreviewed) but is not yet cited by this block — read it and vet dependency-readiness before starting a 6E session.
+- Candidate/checkouts/hashes: 6D → `## Accepted`; evidence retained at `/private/tmp/slice-6d-evidence/`.
 - Last decision: Fiction compatibility plus existing recommendation integration proof; no generic adapter.
-- Preserve unrelated edits, provider/scheduler state and 5X backup; never repeat 5P.
+- Preserve unrelated in-progress edits (SLICE-5*/6B/6C doc updates, `*-LOG.md` files, `SLICE-6E.md`) from other sessions untouched; provider/scheduler state and 5X backup; never repeat 5P.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints`.

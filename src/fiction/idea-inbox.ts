@@ -335,7 +335,7 @@ export function buildIdeaSpawn(engine: Engine, prompt: string): { command: strin
   if (engine === "grok") built.args.push(
     "--output-format", "json",
     "--system-prompt-override", GROK_FINAL_TEXT_SYSTEM_PROMPT,
-    "--sandbox", "read-only",
+    "--sandbox", "workspace",
     "--disable-web-search", "--no-subagents", "--verbatim",
   );
   return built;

@@ -1,22 +1,56 @@
 import { strict as assert } from "node:assert";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import fs, { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
-import {
+import type {
+  IdeaClassification,
+} from "./idea-inbox.js";
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const repoEnvPath = join(repoRoot, ".env");
+const originalReadFileSync = fs.readFileSync;
+let blockedRepoEnvReads = 0;
+
+(fs as { readFileSync: unknown }).readFileSync = ((path: string | Buffer | URL | number, ...args: unknown[]) => {
+  if (path === repoEnvPath) {
+    blockedRepoEnvReads += 1;
+    const error = new Error("fiction fixture blocks repository .env reads") as NodeJS.ErrnoException;
+    error.code = "ENOENT";
+    throw error;
+  }
+  return Reflect.apply(originalReadFileSync, fs, [path, ...args]);
+}) as typeof fs.readFileSync;
+syncBuiltinESMExports();
+
+let ideaInbox: typeof import("./idea-inbox.js");
+try {
+  ideaInbox = await import("./idea-inbox.js");
+} finally {
+  fs.readFileSync = originalReadFileSync;
+  syncBuiltinESMExports();
+}
+
+const {
   approveIdea,
   appendClarificationTurn,
   buildIdeaContext,
   classifyIdeaOutput,
   classifyIdeaWithEngine,
+  cleanupIdeaWithEngine,
   buildIdeaSpawn,
   createIdea,
   createCleanupProposal,
   readIdea,
   rejectIdea,
   setIdeaClassification,
-  type IdeaClassification,
-} from "./idea-inbox.js";
+} = ideaInbox;
+
+assert.equal(blockedRepoEnvReads, 1, "fixture must block the static import chain from reading the repository .env");
+const TSX_LOADER = join(repoRoot, "node_modules", "tsx", "dist", "loader.mjs");
 
 function seriesRoot() {
   const base = mkdtempSync(join(tmpdir(), "fiction-inbox-"));
@@ -32,6 +66,155 @@ function seriesRoot() {
   return { storageRoot, storiesRoot, dir };
 }
 
+function runIsolatedGrokIdeaFixture(): void {
+  const root = mkdtempSync(join(tmpdir(), "fiction-grok-fixture-"));
+  const bin = join(root, "bin");
+  const home = join(root, "home");
+  const data = join(root, "data");
+  const cost = join(root, "cost");
+  const temp = join(root, "tmp");
+  const cwd = join(root, "cwd");
+  const log = join(root, "grok-calls.jsonl");
+  const envReadReceipt = join(root, "env-read.txt");
+  const resultReceipt = join(root, "result.json");
+  const fixtureEnv = join(root, "fixture.env");
+  const envReadLoader = join(root, "env-read-loader.mjs");
+  const envReadInterceptor = join(root, "env-read-interceptor.mjs");
+  const envReadPreload = join(root, "env-read-preload.mjs");
+  const exactRepoEnv = join(repoRoot, ".env");
+  const sentinels = [home, data, cost, temp].map((dir) => {
+    mkdirSync(dir, { recursive: true });
+    const sentinel = join(dir, "sentinel.txt");
+    writeFileSync(sentinel, `preserve:${dir}`);
+    return sentinel;
+  });
+  mkdirSync(bin);
+  mkdirSync(cwd);
+  const fakeGrok = join(bin, "grok");
+  writeFileSync(fakeGrok, `#!${process.execPath}
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+const valueAfter = (flag) => args[args.indexOf(flag) + 1];
+const required = ["--output-format", "--system-prompt-override", "--disable-web-search", "--no-subagents", "--verbatim"];
+const allowed = new Set(JSON.parse(process.env.FICTION_GROK_ALLOWED_ENV || "[]"));
+const unexpected = Object.keys(process.env).filter((name) => !allowed.has(name));
+if (unexpected.length || args.filter((value) => value === "--sandbox").length !== 1 || valueAfter("--sandbox") !== "workspace" || required.some((flag) => !args.includes(flag)) || valueAfter("--output-format") !== "json" || valueAfter("--tools") !== "" || args.includes("acceptEdits")) {
+  process.stderr.write("unexpected Grok fixture invocation\\n");
+  process.exit(64);
+}
+const prompt = valueAfter("-p") || "";
+const text = prompt.includes("Classify this fiction inbox idea") ? "world" : "Polished cleanup.";
+fs.appendFileSync(process.env.FICTION_GROK_FIXTURE_LOG, JSON.stringify({ args, home: process.env.HOME, data: process.env.CONTENT_AGENTS_HOME, cost: process.env.CONTENT_AGENTS_COST_LOG, temp: process.env.TMPDIR }) + "\\n");
+process.stdout.write(JSON.stringify({ text }) + "\\n");
+`);
+  chmodSync(fakeGrok, 0o700);
+  try {
+    writeFileSync(fixtureEnv, "FICTION_GROK_FIXTURE_LOADED=loaded\n");
+    writeFileSync(
+      envReadLoader,
+      [
+        "const envModuleUrl = process.env.CONTENT_AGENTS_TEST_ENV_MODULE_URL;",
+        "const interceptorUrl = process.env.CONTENT_AGENTS_TEST_ENV_INTERCEPTOR_URL;",
+        "export async function resolve(specifier, context, nextResolve) {",
+        "  if (specifier === 'node:fs' && context.parentURL === envModuleUrl) {",
+        "    return { url: interceptorUrl, shortCircuit: true };",
+        "  }",
+        "  return nextResolve(specifier, context);",
+        "}",
+        "",
+      ].join("\n")
+    );
+    writeFileSync(
+      envReadInterceptor,
+      [
+        "import { appendFileSync, readFileSync as nativeReadFileSync } from 'node:fs';",
+        "const exactRepoEnv = process.env.CONTENT_AGENTS_TEST_EXACT_REPO_ENV;",
+        "const fixtureEnv = process.env.CONTENT_AGENTS_TEST_FIXTURE_ENV;",
+        "const receipt = process.env.CONTENT_AGENTS_TEST_ENV_RECEIPT;",
+        "export function readFileSync(path, ...args) {",
+        "  if (path !== exactRepoEnv) throw new Error(`unexpected env read: ${path}`);",
+        "  appendFileSync(receipt, `substituted:${path}\\n`);",
+        "  return nativeReadFileSync(fixtureEnv, ...args);",
+        "}",
+        "",
+      ].join("\n")
+    );
+    writeFileSync(
+      envReadPreload,
+      [
+        "import { writeFileSync } from 'node:fs';",
+        "import { register } from 'node:module';",
+        "writeFileSync(process.env.CONTENT_AGENTS_TEST_ENV_RECEIPT, '');",
+        "register(new URL('./env-read-loader.mjs', import.meta.url));",
+        "",
+      ].join("\n")
+    );
+    const env = {
+      HOME: home,
+      PATH: bin,
+      TMPDIR: temp,
+      TMP: temp,
+      TEMP: temp,
+      NODE_ENV: "test",
+      __CF_USER_TEXT_ENCODING: "0x0:0:0",
+      CONTENT_AGENTS_HOME: data,
+      CONTENT_AGENTS_COST_LOG: join(cost, "cost-log.csv"),
+      FICTION_GROK_FIXTURE_LOG: log,
+      FICTION_GROK_ALLOWED_ENV: "",
+      CONTENT_AGENTS_TEST_ENV_MODULE_URL: pathToFileURL(join(repoRoot, "src", "util", "env.ts")).href,
+      CONTENT_AGENTS_TEST_ENV_INTERCEPTOR_URL: pathToFileURL(envReadInterceptor).href,
+      CONTENT_AGENTS_TEST_EXACT_REPO_ENV: exactRepoEnv,
+      CONTENT_AGENTS_TEST_FIXTURE_ENV: fixtureEnv,
+      CONTENT_AGENTS_TEST_ENV_RECEIPT: envReadReceipt,
+      CONTENT_AGENTS_TEST_RESULT_RECEIPT: resultReceipt,
+      CONTENT_AGENTS_TEST_TARGET_URL: pathToFileURL(join(repoRoot, "src", "fiction", "idea-inbox.ts")).href,
+    };
+    env.FICTION_GROK_ALLOWED_ENV = JSON.stringify([...Object.keys(env), "FICTION_GROK_FIXTURE_LOADED"].sort());
+    const childScript = [
+      "import { appendFileSync, readFileSync } from 'node:fs';",
+      "const allowed = new Set(JSON.parse(process.env.FICTION_GROK_ALLOWED_ENV || '[]'));",
+      "const unexpected = Object.keys(process.env).filter((name) => !allowed.has(name));",
+      "if (unexpected.length) throw new Error(`unexpected child environment: ${unexpected.join(',')}`);",
+      "const { classifyIdeaWithEngine, cleanupIdeaWithEngine } = await import(process.env.CONTENT_AGENTS_TEST_TARGET_URL);",
+      "if (process.env.FICTION_GROK_FIXTURE_LOADED !== 'loaded') throw new Error('fixture env was not loaded');",
+      "const classification = await classifyIdeaWithEngine('The city loses power.', 'grok');",
+      "const cleanup = await cleanupIdeaWithEngine('The city loses power.', 'world', 'grok');",
+      "if (classification !== 'world' || cleanup !== 'Polished cleanup.') throw new Error(`unexpected idea outputs: ${classification} / ${cleanup}`);",
+      "const calls = readFileSync(process.env.FICTION_GROK_FIXTURE_LOG, 'utf8').trim().split('\\n').map(JSON.parse);",
+      "if (calls.length !== 2) throw new Error(`expected two Grok calls, got ${calls.length}`);",
+      "appendFileSync(process.env.CONTENT_AGENTS_TEST_RESULT_RECEIPT, JSON.stringify({ classification, cleanup, calls }) + '\\n');",
+      "",
+    ].join("\n");
+    const child = spawnSync(process.execPath, ["--import", TSX_LOADER, "--import", pathToFileURL(envReadPreload).href, "--input-type=module", "--eval", childScript], {
+      cwd,
+      env,
+      encoding: "utf8",
+      timeout: 10_000,
+      killSignal: "SIGKILL",
+      maxBuffer: 1_000_000,
+    });
+    assert.equal(child.error, undefined, `idea fixture should finish before the SIGKILL deadline: ${child.error?.message ?? ""}`);
+    assert.equal(child.signal, null, `idea fixture should not be terminated: ${child.stderr}`);
+    assert.equal(child.status, 0, `idea fixture failed: ${child.stderr}`);
+    assert.equal(readFileSync(envReadReceipt, "utf8"), `substituted:${exactRepoEnv}\n`);
+    const result = JSON.parse(readFileSync(resultReceipt, "utf8")) as { classification: string; cleanup: string; calls: Array<{ args: string[]; home: string; data: string; cost: string; temp: string }> };
+    assert.equal(result.classification, "world");
+    assert.equal(result.cleanup, "Polished cleanup.");
+    assert.equal(result.calls.length, 2);
+    for (const call of result.calls) {
+      assert.equal(call.args.filter((value) => value === "--sandbox").length, 1);
+      assert.equal(call.args[call.args.indexOf("--sandbox") + 1], "workspace");
+      assert.equal(call.home, home);
+      assert.equal(call.data, data);
+      assert.equal(call.cost, join(cost, "cost-log.csv"));
+      assert.equal(call.temp, temp);
+    }
+    for (const sentinel of sentinels) assert.match(readFileSync(sentinel, "utf8"), /^preserve:/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 test("classifier accepts only the six exact destinations and abstains to clarify", () => {
   const expected: IdeaClassification[] = ["world", "character", "plot", "chapter", "imagery", "clarify"];
   for (const label of expected) assert.equal(classifyIdeaOutput(label), label);
@@ -40,20 +223,24 @@ test("classifier accepts only the six exact destinations and abstains to clarify
   assert.equal(classifyIdeaOutput("unknown"), "clarify");
 });
 
-test("Fiction inbox subscription adapters cannot edit files and GPT-OSS is paused", async () => {
+test("Fiction inbox subscription adapters preserve text-only flags and GPT-OSS is paused", async () => {
   for (const engine of ["claude", "grok"] as const) {
     const built = buildIdeaSpawn(engine, "private fiction");
     assert.equal(built.args.includes("acceptEdits"), false);
     assert.ok(built.args.some((value, index) => value === "--tools" && built.args[index + 1] === ""));
     if (engine === "grok") {
       assert.ok(built.args.some((value, index) => value === "--output-format" && built.args[index + 1] === "json"));
-      assert.ok(built.args.some((value, index) => value === "--sandbox" && built.args[index + 1] === "read-only"));
+      assert.ok(built.args.some((value, index) => value === "--sandbox" && built.args[index + 1] === "workspace"));
       assert.ok(built.args.includes("--system-prompt-override"));
       assert.ok(built.args.includes("--disable-web-search"));
     }
   }
   assert.deepEqual(buildIdeaSpawn("codex", "private fiction").args.slice(0, 3), ["exec", "--sandbox", "read-only"]);
   await assert.rejects(() => classifyIdeaWithEngine("An idea", "ollama-gpt-oss"), /GPT-OSS.*paused/i);
+});
+
+test("Grok fixture rejects the retired sandbox and returns classification and cleanup text with isolated state", async () => {
+  runIsolatedGrokIdeaFixture();
 });
 
 test("raw idea bytes survive durable persistence and identical submission is idempotent", () => {
