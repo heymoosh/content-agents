@@ -2,17 +2,13 @@
 
 ## START HERE
 
-- Usage: `AGENTS.md` → `### Usage discipline`; apply at the next safe checkpoint.
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`.
-- Current: **6E accepted and integrated**, `docs/operations/launch-slices/SLICE-6E.md` → `## Closeout result`.
-- Blocked on: none for 6D or 6E.
-- Last accepted: **6E**, commit `628bac7`; prior accepted (6D, commit `701e4c0`; 6C, commit `f286169`) retained.
-- Completed: ten over-cap slice packets capped ≤12,288 B (one recorded deviation, SLICE-5O +669 B, live Traps content not movable); history moved to sibling `-LOG.md` files with verified zero content loss. Grok cross-family audit hit a usage-balance outage (402); documentation-only reviewer-outage clause applied, coordinator completed the bounded diff review instead.
-- Next: none queued. Deferred by 6E: SLICE-5T/5Z (still over cap), the 24 KB `## Slice protocol` trim, and a possible later re-cap of 5O.
-- Candidate/checkouts/hashes: 6E → `## Closeout result`; scratch evidence at `$TMPDIR` (session-local, not retained).
-- Last decision: SLICE-5O's `## Traps` section stays uncut; cap overage accepted and recorded rather than cutting live spec content.
-- Preserve unrelated in-progress edits (SLICE-5H/5P/5R/5S/5T/5W/5X/5Y/5Z/6B/6C doc updates and their `-LOG.md` files) from other sessions untouched; provider/scheduler state and 5X backup; never repeat 5P.
+- Current / last accepted: **6E**, `docs/operations/launch-slices/SLICE-6E.md`, commit `628bac7`.
+- Blocked on: none.
+- Next: none queued — no dependency-ready slice ID assigned yet.
+- Last decision: SLICE-5O's `## Traps` stays uncut; its cap overage is accepted, not repaired.
+- Details: `## Progress log` → 2026-09-09 entry.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints`.
@@ -51,6 +47,36 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-09 — 6D accepted and integrated; 6E capped ten over-cap packets
+
+Claude read the retained `full-gate.exit.json`: exit 0, ~404.9s. Hash-verified the frozen
+`/private/tmp/content-agents-6d-verify` candidate's five files against `candidate-manifest.json`
+(sha256 match, all five); prior Claude audit/delta-audit closure (both exit 0) still held with no
+source changes since. Copied the five files into main and committed with packet/master updates in
+one reviewed commit (`701e4c0`). SLICE-6D.md's superseded `## Stopped` handoff and its earlier
+`## Coordinator finding R1` note moved to `SLICE-6D-LOG.md`, newest first, bringing the packet from
+15,785 B to 10,765 B.
+
+Then ran SLICE-6E: two disjoint Claude lanes (mid-tier, medium effort) trimmed ten over-cap slice
+packets (5C/5D/5G/5J/5K, 5L/5M/5N/5O/5Q) to sibling `-LOG.md` files, newest first, moving only
+completed RESULT BLOCKs and dated/superseded sections. Both lanes independently hit a real ugrep
+quirk — this machine's `grep -F -x -v -f` silently drops blank-line patterns from a `-f` file, so
+the packet's own verify script over-reports `missing_from_log`; a Python non-blank line-set diff
+confirmed 0 real content loss across all ten IDs. Coordinator called the one open item: SLICE-5O
+stays 669 B over its 12,288 cap because its only remaining movable content was live `## Traps`
+guidance, not a dated record — recorded as an accepted deviation rather than cutting spec content.
+Cross-family Grok audit was requested but Grok returned `402 Payment Required` (usage balance
+exhausted); the packet's documentation-only reviewer-outage clause applied, so the coordinator
+completed the bounded diff review itself (byte counts, heading-count deltas, required headings
+present, `## Stopped` counts, `git diff --check` exit 0, scoped `git status --porcelain`).
+Committed as `628bac7` (+ master pointer update `1e4230a`). Hygiene exit 0 both times; all
+pre-existing leftovers from other in-progress sessions (6D checkouts, SLICE-5H/5P/5R/5S/5T/5W/5X/
+5Y/5Z/6B/6C doc edits) were snapshotted and left untouched throughout.
+
+Deferred, no ID assigned yet: SLICE-5T (12,346 B) and SLICE-5Z (15,775 B) remain over cap; the
+`## Slice protocol` section itself is 28,217 B against its own 24 KB cap; SLICE-5O could be
+re-capped later if its own work is revisited.
 
 ### 2026-09-08 — 6D parallel build, Claude handoff before acceptance
 
