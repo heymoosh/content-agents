@@ -25,6 +25,14 @@ it is repository-neutral.
 | Live or authenticated model slices | Fix the verification budget before starting: normally one authenticated canary per workflow and at most one retry. Isolate Git, operational data, secrets, ports, and model permissions in a disposable harness. Preserve successful model output when later validation fails. |
 | Machine facts that bite | System `grep` is ugrep 7.5.0: never combine `-q` with `-v` — count then test. There is no coreutils `timeout` binary. `git pull` piped through `tail`/`head` prints "Updating a..b" before a would-be-overwritten abort, so verify with `git status -sb`. |
 
+### Packet cap scope
+
+The 12,288 B packet cap governs files named `SLICE-<ID>.md` anywhere under
+`docs/operations/launch-slices/`. Three kinds of file in that directory are exempt: `*-LOG.md`
+siblings, which exist so a packet can move its dated records and stay small; `SLICE-TEMPLATE.md`,
+the packet template itself; and `SLICE-5L-coverage.md` by name, exempt as companion analysis, per
+SLICE-6E.
+
 ### Model routing on this Mac
 
 - Claude for frontend and Codex for backend are defaults, not rules.

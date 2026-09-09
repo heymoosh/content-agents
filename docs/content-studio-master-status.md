@@ -3,18 +3,16 @@
 ## START HERE
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
-- Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`.
-- Current / last accepted: **6F**, `docs/operations/launch-slices/SLICE-6F.md`.
+- Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
+  plus bindings in `docs/operations/slice-protocol-environment.md`.
+- Current / last accepted: **6G**, `docs/operations/launch-slices/SLICE-6G.md`.
 - Blocked on: none.
-- Next: **6G**, `docs/operations/launch-slices/SLICE-6G.md` — written, dependency-ready.
-- Last decision: SLICE-6F's Lane B relocated the whole `## Slice protocol` → Repo bindings table
-  (not just the 3 named rows) to `docs/operations/slice-protocol-environment.md` to clear the
-  4,118 B overage; accepted per the section's own repo-neutral/repo-specific split.
-- Details: `## Progress log` → 2026-09-09 entry.
+- Next: **6H** — no packet written yet; a packet session is needed before execution.
+- Last decision: the 12,288 B packet cap's scope is now written down in the bindings file
+  (`### Packet cap scope`): it governs `SLICE-<ID>.md` anywhere under `launch-slices/`;
+  `*-LOG.md`, `SLICE-TEMPLATE.md` and `SLICE-5L-coverage.md` are exempt.
+- Details: `## Progress log` → 2026-09-09 (6G) entry.
 - Everything below is history; read only packet-cited headings.
-
-## Standing constraints`.
-- Everything below this block is history. Do not read it unless a slice packet cites a heading.
 
 ## Standing constraints
 
@@ -49,6 +47,47 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-09 (6G) — the startup reading surface: one heading, every packet under cap, cap scope written down
+
+Wrote SLICE-6G in a packet-only session (`57a84c0`), then ran it. Three deliverables.
+
+Coordinator took deliverable 1: `## START HERE` had a corrupted twin below it —
+`## Standing constraints`.` with a stray backtick-period tail, plus an orphaned "everything below
+is history" bullet, wreckage from an earlier in-place rewrite. Two headings matched
+`^## Standing constraints`, so anything anchoring on that heading could land on the empty one.
+Deleted both lines; count 2 → 1, constraint bullets 7 → 7.
+
+One Lane A worker (Claude mid-tier, medium effort — the packet declares low risk) took
+deliverables 2 and 3: compressed `SLICE-5O.md` from 12,957 B to 12,280 B, and added
+`### Packet cap scope` to `docs/operations/slice-protocol-environment.md` recording that the cap
+governs `SLICE-<ID>.md` anywhere under `launch-slices/` while `*-LOG.md`, `SLICE-TEMPLATE.md` and
+`SLICE-5L-coverage.md` are exempt. That last rule is why the 20,485 B coverage file stops being
+re-flagged by every future sweep.
+
+The Codex audit earned its place. Mechanical checks were all green — heading list byte-identical,
+acceptance 10/10, traps 6/6, `dropped_code_spans: []` — and Codex still found four meaning changes
+none of them could see: a reversed visibility relation ("invisible to every prior claim" instead
+of the scheduler being unable to see the claims), a dropped "on this machine" verification scope,
+a dropped "to empty" on what `beforeEach` truncates, and a deleted archival eligibility rule.
+The fourth was compounded by the coordinator: I had "corrected" 6E's post-archive figure of
+12,549 B / 261 B over to today's 669 B, conflating two different moments. Reverted. All four
+repaired, the ~180 B paid back out of descriptive framing only; delta audit returned all CLOSED
+with no new meaning change.
+
+One accepted deviation, recorded in `SLICE-6G-LOG.md`: the packet's acceptance item
+"`repo-hygiene.sh --rescue` exits 0" is unachievable by anything this slice may do — hygiene's 5
+items are three `/private/tmp/content-agents-6d-*` checkouts, two merged branches and five
+unmerged `agent/cs*` branches, all other sessions' work that the closeout rule says to report and
+leave. Judged instead as: run, reviewed, own paths committed, everything else named and untouched.
+A future packet should assert that form directly.
+
+Also fixed two bugs in SLICE-6G's own `## Verify`: steps 2 and 9 used
+`awk '/^## START HERE/{f=1} f&&/^## [^S]/{exit} f'`, whose `[^S]` runs straight past
+`## Standing constraints` and swallows the whole section into the "START HERE block" measurement.
+
+Read-set at closeout: `## Slice protocol` 24,568 B (cap 24,576), `## START HERE` 813 B,
+`SLICE-6G.md` 12,235 B (cap 12,288).
 
 ### 2026-09-09 (later) — 6F: landed the orphaned second capping wave, protocol section back under cap
 

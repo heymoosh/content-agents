@@ -10,14 +10,13 @@ The startup reading surface is correct and self-describing:
 
 1. The master document has one `## Standing constraints` heading. It has two: line 16 is
    `## Standing constraints`.` (stray backtick-period tail) plus an orphaned history bullet, left
-   by an earlier in-place `## START HERE` rewrite. Anything anchoring on that heading can land on
-   the empty duplicate.
+   by an earlier in-place `## START HERE` rewrite. Anything anchoring on it hits the empty twin.
 2. `SLICE-5O.md` is under the 12,288 B cap. It is 12,957 B, 669 B over. SLICE-6E accepted the
    overage because its only movable content was live `## Traps` guidance. This slice closes it by
    **compressing** that prose, never by deleting a rule.
-3. The bindings file states which files under `docs/operations/launch-slices/` the cap governs.
-   Without it every sweep re-flags `SLICE-5L-coverage.md` (20,485 B), which SLICE-6E declared
-   "companion analysis, not a packet" and nine files cite by its current path.
+3. The bindings file states which files under `launch-slices/` the cap governs. Without it every
+   sweep re-flags `SLICE-5L-coverage.md` (20,485 B), which SLICE-6E declared "companion analysis,
+   not a packet" and nine files cite by path.
 
 ## Difficulty
 
@@ -32,8 +31,8 @@ wave). Nothing else.
 
 Parallel-safe: **no.** Deliverable 2 is one continuous judgment over one 13 KB file.
 Deliverables 1 and 3 are ~10 lines each, and 1 sits in the block the coordinator rewrites at every
-closeout, so a concurrent worker would only create a write conflict there. A second lane repeats
-this packet's context and adds a handoff checkpoint for no extra deliverable.
+closeout, so a concurrent worker would only conflict there. A second lane repeats this packet's
+context and adds a checkpoint for no extra deliverable.
 
 ### Lane A — the only lane (one worker, serial)
 
@@ -44,16 +43,14 @@ this packet's context and adds a handoff checkpoint for no extra deliverable.
 
 ### Coordinator-owned (not the worker's)
 
-- `docs/content-studio-master-status.md` — deliverable 1, this packet's pointer line, and the
-  closeout `## START HERE` rewrite.
+- `docs/content-studio-master-status.md` — deliverable 1, the pointer line, the closeout rewrite.
 - `docs/operations/launch-slices/SLICE-6G.md` — the `## RESULT BLOCK` and read-set print.
 
 ## Do not touch
 
 - `docs/content-studio-master-status.md` — coordinator-owned here.
 - `docs/operations/launch-slices/SLICE-5L-coverage.md` — do not move, rename or trim. Its cap
-  exemption is a settled SLICE-6E decision and nine files cite its path. This slice records the
-  exemption; it does not act on the file.
+  exemption is a settled SLICE-6E decision and nine files cite its path. This slice records it.
 - `AGENTS.md` — `## Slice protocol` is 24,568 B against a 24,576 B cap. Eight bytes of headroom.
   Nothing is added there; the new text goes in the bindings file.
 - Any other `SLICE-*.md` or `*-LOG.md`.
@@ -88,7 +85,9 @@ Each item is true or false against the working tree, by the matching command in 
       exempt.
 - [ ] The sweep in `## Verify` reports zero over-cap files across every `SLICE-<ID>.md`.
 - [ ] `git diff --check` exits `0`.
-- [ ] `bash scripts/repo-hygiene.sh --rescue` exits `0`.
+- [ ] `bash scripts/repo-hygiene.sh --rescue` is run, its output reviewed, every path this
+      session created is committed and every other path reported by name and left in place.
+      (The original `exits 0` form was mis-specified — see `SLICE-6G-LOG.md`.)
 - [ ] This packet's `## RESULT BLOCK` records the closeout read-set print: byte size of
       `AGENTS.md` → `## Slice protocol`, the master's `## START HERE` block, and this packet.
 
@@ -97,11 +96,10 @@ Each item is true or false against the working tree, by the matching command in 
 Classification and applicable gate: **documentation only.** No executable, generated or
 runtime-prompt input changes. Per that exception: coordinator review for accuracy, links and rule
 consistency, plus a whitespace/diff check — not `npm run check`, no runtime closeout command, no
-detached checkout. One bounded cross-family review is still required, because compression can
-silently soften a rule and a byte count cannot detect that.
+detached checkout. One bounded cross-family review is still required: compression can silently
+soften a rule and a byte count cannot detect that.
 
-For UI changes: none. No page, journey, viewport, flag or backend is touched. Live integration is
-not applicable.
+For UI changes: none. No page, journey, viewport, flag or backend touched. Live integration n/a.
 
 ```
 cd /Users/Muxin/Documents/GitHub/content-agents
@@ -111,8 +109,8 @@ grep -c '^## Standing constraints' docs/content-studio-master-status.md
 grep -c '^## Standing constraints`\.$' docs/content-studio-master-status.md
 
 # 2. START HERE block length and shape
-awk '/^## START HERE/{f=1} f&&/^## [^S]/{exit} f' docs/content-studio-master-status.md | wc -l
-awk '/^## START HERE/{f=1} f&&/^## [^S]/{exit} f' docs/content-studio-master-status.md | grep -v '^$' | tail -1
+awk '/^## START HERE/{f=1;print;next} f&&/^## /{exit} f' docs/content-studio-master-status.md | wc -l
+awk '/^## START HERE/{f=1;next} f&&/^## /{exit} f' docs/content-studio-master-status.md | grep -v '^$' | tail -1
 
 # 3. Standing constraints bullets preserved (both counts must match)
 B='/^## Standing constraints$/{f=1;next} f&&/^## /{exit} f'
@@ -159,7 +157,7 @@ bash scripts/repo-hygiene.sh --rescue; echo "hygiene exit $?"
 
 # 9. read-set print for the RESULT BLOCK
 awk '/^## Slice protocol/{f=1;print;next} f&&/^## /{exit} f' AGENTS.md | wc -c
-awk '/^## START HERE/{f=1} f&&/^## [^S]/{exit} f' docs/content-studio-master-status.md | wc -c
+awk '/^## START HERE/{f=1;print;next} f&&/^## /{exit} f' docs/content-studio-master-status.md | wc -c
 wc -c < docs/operations/launch-slices/SLICE-6G.md
 ```
 
@@ -170,14 +168,13 @@ then test. Verify each gate by exit code, never a `| tail` pipe.
 
 Muxin opens `docs/content-studio-master-status.md` and sees one `## Standing constraints` heading
 where there were two, no stray backtick line between START HERE and it. Step 7 prints only
-`sweep done`. `SLICE-5O.md` reads as the same spec — same headings, traps, acceptance list — in
-fewer bytes.
+`sweep done`. `SLICE-5O.md` reads as the same spec, in fewer bytes.
 
 ## Risk
 
 **low** — audit required: **yes, bounded.** Byte counts and heading-set diffs prove structure
 survived, not that compressed prose still says the same thing. A rule softened inside `## Traps`
-passes every mechanical check in `## Verify`. That is the one unanswered question.
+passes every mechanical check here. That is the one unanswered question.
 
 Review boundary: this candidate. Scope/budget: the `SLICE-5O.md` diff plus the
 `### Packet cap scope` addition — ordinary effort, one pass, no repository export. Do not send the
@@ -188,18 +185,17 @@ analysis is retained, not reopened. It reopens only if that file becomes an exec
 
 On reviewer outage: the candidate is review-blocked and **not** integrated. Record the blocker and
 retry condition in a `## Stopped` section, take the stopping-without-acceptance branch, leave the
-tree as it stands. Never substitute a same-family review. No independent authorized work remains;
-every deliverable sits inside the blocked candidate.
+tree as it stands. Never substitute a same-family review. No independent work remains; every
+deliverable sits inside the blocked candidate.
 
 ## Families
 
 - Builder: **Claude, mid-tier, medium effort** — one worker, Lane A. Per Effort tiers, bounded
   mechanical documentation edits are lighter-model work. Escalate to strongest/high only if a
   first pass fails acceptance.
-- Auditor: **Codex (GPT family), ordinary effort** — a different family from the builder, and the
-  one that completed a bounded review on this machine on 2026-09-09. Run
+- Auditor: **Codex (GPT family), ordinary effort** — different family from the builder. Run
   `codex exec --sandbox read-only`; on `Operation not permitted`, rerun unsandboxed locally as the
-  6F audit did. Fallback: Grok, and only with `--sandbox workspace` per the bindings' launch fix —
+  6F audit did. Fallback: Grok, only with `--sandbox workspace` per the bindings' launch fix —
   never `--sandbox read-only`, never `grok_spawn_readonly` here. Supply the acceptance criteria,
   the `SLICE-5O.md` diff, the changed-file list and step 5's output. Require it to separate
   established defects, verification gaps and optional improvements, and to name any trap, path or
@@ -210,25 +206,23 @@ every deliverable sits inside the blocked candidate.
 Documentation only: record the scoped review/diff result here. The bindings' closeout gate is
 `none`, so record `PASS` or the leftover list in this packet.
 
-## RESULT BLOCK (worker fills this in and returns it)
+**PASS** — 2026-09-09. Coordinator diff review plus cross-family Codex audit and delta audit, all
+findings closed. One accepted deviation on the hygiene exit code, recorded in `SLICE-6G-LOG.md`.
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
+## RESULT BLOCK
+
+Accepted 2026-09-09. The RESULT BLOCK, both Codex audits, the read-set print and the one
+accepted deviation (hygiene exit code) are in `SLICE-6G-LOG.md`.
 
 ## Usage budget and handoff
 
 Apply `AGENTS.md` → Slice protocol → Usage discipline.
 
 - Each extra lane: none. Serial — deliverables 1 and 3 are ~10 lines each and one sits in the
-  coordinator's closeout file, so delegation adds a checkpoint and repeated context with no
-  independent deliverable.
+  coordinator's closeout file, so delegation adds cost with no independent deliverable.
 - Assignment: one fresh packet-sized worker context, Claude mid-tier at medium effort, holding
   `## Slice protocol`, the bindings file and this packet. Frozen handoff at its `RESULT BLOCK`.
 - Evidence return: the `RESULT BLOCK` only — commands, exit codes, step 5 and 7 output verbatim,
   byte counts before and after, pointers to anything under `$TMPDIR`. No transcript, no replan.
 - Capability boundary: one coherent capability (the startup reading surface). Closeout runs once,
-  after the audit closes, not after the worker returns. Use completion notifications, do not poll.
-  The next resume pointer goes in `## START HERE`.
+  after the audit closes, not after the worker returns. Next resume pointer goes in START HERE.
