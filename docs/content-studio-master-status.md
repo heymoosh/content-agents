@@ -4,10 +4,12 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`.
-- Current / last accepted: **6E**, `docs/operations/launch-slices/SLICE-6E.md`, commit `628bac7`.
+- Current / last accepted: **6F**, `docs/operations/launch-slices/SLICE-6F.md`.
 - Blocked on: none.
-- Next: **6F**, `docs/operations/launch-slices/SLICE-6F.md` — written, dependency-ready.
-- Last decision: SLICE-5O's `## Traps` stays uncut; its cap overage is accepted, not repaired.
+- Next: **6G** — no packet written yet; a packet session is needed before execution.
+- Last decision: SLICE-6F's Lane B relocated the whole `## Slice protocol` → Repo bindings table
+  (not just the 3 named rows) to `docs/operations/slice-protocol-environment.md` to clear the
+  4,118 B overage; accepted per the section's own repo-neutral/repo-specific split.
 - Details: `## Progress log` → 2026-09-09 entry.
 - Everything below is history; read only packet-cited headings.
 
@@ -47,6 +49,43 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-09 (later) — 6F: landed the orphaned second capping wave, protocol section back under cap
+
+Ran SLICE-6F as two disjoint lanes, per the packet's own split, both Claude. Lane A (mid-tier,
+medium effort) verified/finished the second wave of packet-capping over 11 IDs
+(5H/5P/5R/5S/5T/5W/5X/5Y/5Z/6B/6C): 8 were already correctly capped from a prior session, Lane A
+fixed the remaining 3 (5H/5T/5Z) by moving completed `RESULT BLOCK`s / superseded `## Stopped`
+sections into their `-LOG.md` siblings. Python line-set diff confirmed zero non-blank lines lost
+against `HEAD` across all 11; all 11 landed ≤ 12,288 B with ≤1 `## Stopped` section each.
+
+Lane B (Claude, strongest available, high effort — packet-declared high risk) brought
+`AGENTS.md` → `## Slice protocol` from 28,694 B back to 24,568 B (cap 24,576). The packet named
+only 3 items to relocate (~1,900 B), not enough for the 4,118 B overage, so Lane B relocated the
+entire `## Repo bindings` table (all 12 rows, not just the 3 named) into a new
+`docs/operations/slice-protocol-environment.md`, per the section's own text declaring that whole
+table repo-specific ("the only part of the protocol that changes between repositories"). Coordinator
+accepted this as in-scope engineering judgment, not a scope question for the owner.
+
+Coordinator found and fixed one gap the lanes missed: `git diff --check` failed on trailing
+blank-line-at-EOF in 9 of Lane A's packets; trimmed to a single trailing newline, re-ran Lane A's
+verify script (still PASS, 0 missing lines), confirmed `git diff --check` exit 0.
+
+Cross-family audit (Codex, ordinary effort, `codex exec --sandbox read-only`, unsandboxed locally
+after an `Operation not permitted` sandbox failure) ran against Lane B's diff + the new
+environment file. Verdict: environment material (bindings, Grok CLI section, the
+Claude/Codex-default bullet) verbatim-relocated; two other removed lines (an audit-scope summary
+under `Mandatory closeout gate`) are genuine duplicates of the unchanged `Audit scope and
+proportional verification` section. Codex flagged 5 apparent rule changes in the parallel-lane
+rewrite, but explicitly noted the supplied diff couldn't attribute them to Lane B — they belong to
+the pre-existing uncommitted parallel-lane rewrite this slice was authorized to land as-is (not
+authored or touched by either lane), so no rework was needed.
+
+Committed the 24 owned documentation paths (11 packets + 11 `-LOG.md` + `AGENTS.md` +
+`SLICE-TEMPLATE.md` + the new environment file) in one reviewed commit, this master-doc update
+included. The two `## Do not touch` content paths
+(`content/2026-09-07-.../review-queue.md`, `data/notes-spread-ledger.jsonl`) were left exactly as
+found, modified by an unrelated session.
 
 ### 2026-09-09 — 6D accepted and integrated; 6E capped ten over-cap packets
 

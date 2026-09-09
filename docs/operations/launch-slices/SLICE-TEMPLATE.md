@@ -1,6 +1,7 @@
 # SLICE-<ID>: <one line>
 
-Protocol: `AGENTS.md` → `## Slice protocol`. Read that and this file only.
+Protocol: `AGENTS.md` → `## Slice protocol`, plus the bindings in
+`docs/operations/slice-protocol-environment.md`. Read those and this file only.
 Do not open `docs/content-studio-master-status.md` unless a heading is cited below.
 Do not load the repository for context. Do not commit.
 
@@ -18,12 +19,20 @@ Do not load the repository for context. Do not commit.
 
 ## Owned files
 
-Group the paths into lanes. Lanes run at the same time, one worker each, but only if all three
-safety conditions in the protocol hold — no shared path or directory, no repo-wide rewriting
-command inside a lane, and lane-local verification. Confirm below that they hold, or run the
-lanes one at a time. A single-lane packet needs a one-line reason why the work does not divide.
+Before assigning workers, separate preparation, execution, and verification. Identify useful
+independent deliverables; a shared execution budget or final artifact serializes only the
+operations that modify or consume it. Use parallel lanes when the protocol's three conditions
+hold: disjoint write ownership, no repo-wide rewriting commands, and checks that write only
+lane-owned paths and read only lane-owned files or explicitly named immutable shared inputs.
 
-Parallel-safe: <yes — all three conditions hold | no — lanes run one at a time because ...>
+For each lane, list its deliverable, owned paths (including temporary/check outputs), pinned
+read-only inputs, focused checks, dependencies and frozen handoff checkpoint. Do not read another
+lane's unfinished output. Prepare verification tooling independently where useful; actual
+candidate verification waits for the frozen handoff.
+
+Parallel-safe: <yes — name concurrent lanes and serialized handoffs | no — name the concrete
+blocking dependency/resource conflict and the independent split considered; for a small task,
+explain why a separate assignment would add cost without a useful independent deliverable>
 
 ### Lane A — <what this lane delivers>
 
@@ -85,7 +94,7 @@ of a candidate whose required review is pending>
 Documentation only: record the scoped review/diff result in this packet. Otherwise:
 
 ```
-<closeout gate command from AGENTS.md bindings>
+<closeout gate command from the protocol bindings>
 ```
 
 ## RESULT BLOCK (worker fills this in and returns it)
@@ -103,3 +112,10 @@ Apply `AGENTS.md` → Slice protocol → Usage discipline.
 - Assignment: <worker model/effort; fresh context or related repair reuse; frozen handoff>
 - Evidence return: <command, exit, counts, candidate identity, short result and artifact pointers>
 - Capability boundary: <automatic closeout and next resume pointer; completion notifications, no routine polling>
+
+## Stopped
+
+<Current frozen handoff only — one section, at most 4 KB, and only while the slice is paused.
+Pointers to evidence, not the evidence. Move superseded `## Stopped` sections, completed
+`RESULT BLOCK`s and dated session records into `SLICE-<ID>-LOG.md` beside this packet. This
+packet stays under 12 KB.>

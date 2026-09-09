@@ -151,54 +151,14 @@ or add a local copy.
 
 ## Slice protocol
 
-### Grok CLI on this Mac
-
-Docker Desktop makes `/var/run/docker.sock` a symlink. Grok `--sandbox read-only`
-refuses to start on this machine. Use `--sandbox workspace` for Grok calls, including
-audits; do not call `grok_spawn_readonly`. If a plugin is required, use
-`grok_spawn_worker` only when it supports an explicit `sandbox=workspace` argument.
-
-For a bounded audit, run from the intended checkout or disposable audit directory:
-
-```sh
-grok --sandbox workspace --no-subagents --disable-web-search --max-turns 3 --model grok-4.5 --prompt-file /absolute/path/audit-prompt.txt
-```
-
-The prompt must say: "Audit against the supplied requirements. Do not modify files.
-Cite path:line. Separate established defects, verification gaps, and optional improvements."
-Supply the acceptance criteria, candidate diff, changed-file list and focused check output;
-request bounded excerpts for missing evidence. Workspace sandbox is not read-only enforcement:
-inspect the diff afterward and never treat the sandbox choice as permission to edit.
-Keep the input bounded; if Grok offloads a long prompt, allow enough turns to read it and
-finish the audit. Verify exit status and an actual verdict before reporting audit completion.
-This launch fix does not expand repository-export or implementation authorization.
-
-
 This section is the frozen procedure, and it is self-contained on purpose. Session prompts stay
 short because they point here. A coordinator that reads only this section, the master document's
-`## START HERE` block, and one slice packet has everything it needs. Nothing in this
-section depends on reading any other part of this file, and every way a session can end is
-described here.
+`## START HERE` block, the environment file named below and one slice packet has everything it
+needs, and every way a session can end is described here.
 
-### Repo bindings
-
-This table is the only part of the protocol that changes between repositories. Everything below
-it is repository-neutral.
-
-| Binding | This repository |
-| --- | --- |
-| Repository root | the worktree you were launched in — never `cd` to another checkout |
-| Master document | `docs/content-studio-master-status.md` |
-| Slice packets | `docs/operations/launch-slices/SLICE-<ID>.md` |
-| Packet template | `docs/operations/launch-slices/SLICE-TEMPLATE.md` |
-| Repository-wide gate | Documentation-only exception below; otherwise `npm run check` (typecheck + unit tests). Run it unsandboxed — under the sandbox it reports roughly 196 phantom venture failures. In a fresh worktree run `npm run worktree:setup` once first, or every command fails on missing `node_modules`. |
-| Hygiene command | `bash scripts/repo-hygiene.sh --rescue` |
-| Closeout gate | none — record `PASS` or the leftover list in the slice packet |
-| Integration rule | one coordinator, one reviewed commit at a time, a passing applicable gate on the candidate before each integration commit |
-| Delivery boundary | branch `main`, remote `origin` (`heymoosh/content-agents`). Merge is local-first: the recorded local gate result is the merge proof. Hosted CI is a manual diagnostic — never push merely to obtain a CI result. |
-| Non-negotiable product rules | Extraction-first: never compose new claims, arguments, or worldview statements in Muxin's voice; text and image derivatives quote and trim verbatim and carry `source_lines`. The scoped exceptions (Content Studio treatments, common hook templates, video scripts, Build 3 Venture, Build 4 Charles) are enumerated in the root `CLAUDE.md` and never widen. Nothing publishes without Muxin's review in `review-queue.md`; committing generated content is not publishing. Generated copy follows `config/voice.yaml` — no em dashes, no AI tells. Prefer subscription and free model routes; every paid call is opt-in and logged to `data/cost-log.csv`. Never edit `docs/content-agents-backlog.md` as text — board writes go through `prose_kanban` only. |
-| Live or authenticated model slices | Fix the verification budget before starting: normally one authenticated canary per workflow and at most one retry. Isolate Git, operational data, secrets, ports, and model permissions in a disposable harness. Preserve successful model output when later validation fails. |
-| Machine facts that bite | System `grep` is ugrep 7.5.0: never combine `-q` with `-v` — count then test. There is no coreutils `timeout` binary. `git pull` piped through `tail`/`head` prints "Updating a..b" before a would-be-overwritten abort, so verify with `git status -sb`. |
+The bindings table, model routing defaults and the Grok CLI launch fix live in
+`docs/operations/slice-protocol-environment.md`, read with this section. "The bindings" below
+means that table.
 
 The master document is the single source of truth for status and decisions. Its `## START HERE`
 block is the only part a new session reads.
@@ -238,21 +198,40 @@ named in the bindings; do not invent a different shape. Handing a worker a packe
 includes this protocol section — "only that packet" bounds what else the worker may read, not
 whether it receives the rules.
 
-Prefer parallel work, but only where it is provably safe. Workers share one working tree — they
-are concurrent processes on the same files, not isolated copies — so parallelism is safe only
-when the lanes cannot touch. Split the owned files into the largest number of lanes for which
-**all three** hold, and state in the packet that they hold:
+Before choosing lanes, separate preparation, execution, and verification. Identify useful
+independent deliverables and the dependencies between them. A shared execution budget, mutable
+resource, or final artifact serializes only the operations that modify or consume it; it does
+not by itself justify serializing independent preparation or verification tooling.
 
-- No path appears in two lanes, and no lane creates, moves or deletes a path inside another
-  lane's directories.
-- No lane runs a repo-wide command that rewrites files — formatters, codegen, migrations,
+Prefer useful parallel work within available agent and resource limits. Workers share one
+working tree, so every concurrent lane must satisfy all three conditions, stated in the packet:
+
+- Write ownership is disjoint: no path is owned by two lanes, and no lane creates, moves or
+  deletes a path inside another lane's owned directories. Shared read-only inputs are allowed
+  only under the third condition below.
+- No lane runs a repo-wide command that rewrites files — formatters, codegen, migrations or
   `--fix` linters. Those belong to the coordinator, after every lane has finished.
-- Each lane's focused verification reads and writes only its own files.
+- Each lane's focused checks write only to its owned paths, including temporary files and
+  generated outputs. Checks may read explicitly named immutable shared inputs, pinned to a
+  commit or content hash. They must not depend on another lane's unfinished or changing output.
 
-If any of the three cannot be shown, run the lanes one at a time. Serial is the safe fallback
-and needs no justification; a single-lane packet states in one line why the work does not
-divide. Conflicting edits and all integration are always serialized, and workers must preserve
-other sessions' changes.
+Record each lane's deliverable, owned paths, immutable inputs, focused checks, dependencies and
+handoff checkpoint. Independent verification tooling may be prepared against fixed requirements
+and lane-owned fixtures while implementation proceeds. Verification of the actual candidate
+waits for a completed, frozen handoff; preparation is not proof that the candidate passes.
+
+If a condition fails, serialize the affected operations and reassess the remaining independent
+work. For a single-worker slice, name the concrete dependency or resource conflict that prevents
+useful parallel work and the independent split considered. "Coupled work", "shared budget", or
+"safer serially" alone is insufficient. Small tasks may remain single-worker when a separate
+assignment would add coordination cost without a useful independent deliverable; state that
+reason. Do not create workers merely to increase utilization or duplicate the same investigation.
+
+Conflicting edits, shared mutable budgets, final integration and commits remain serialized.
+Workers must preserve other sessions' changes. A stalled lane triggers a checkpoint and a fresh
+look at independent remaining work, not concurrent reassignment of its owned paths. For an
+active slice, change lane ownership only after affected workers pause and the coordinator updates
+the packet and issues the revised assignments. Cross-family audit requirements remain unchanged.
 
 ### Writing a missing packet
 
@@ -315,7 +294,6 @@ counting missed requirements, retries, audits, and repairs — not the price of 
 - Coordination, slice boundaries, acceptance calls, integration decisions: strong model.
 - Bounded reading, inventories, mechanical edits, status writing: lighter model.
 - Difficult or high-stakes implementation: strong model.
-- Claude for frontend and Codex for backend are defaults, not rules.
 
 Choose audit effort from the change's risk and unanswered questions, not the strongest available
 setting by default. Routine bounded reviews use a capable reviewer at ordinary effort; reserve
@@ -394,10 +372,6 @@ Every worker slice finishes through the closeout gate named in the bindings. It 
 declared check and retains only this slice's bounded evidence, then persists `PASS` or an
 actionable list of what is left. Where a repository has no such tool, the coordinator records
 `PASS` or the leftover list in the slice packet itself before the slice can close.
-
-Audit meaningful behavior changes and high-stakes slices before integration. Tiny mechanical
-slices may share one audit at a coherent capability boundary, but every slice still gets focused
-checks and a diff review.
 
 ### Findings and escalation
 
@@ -495,3 +469,55 @@ are covered by both.
    rule above.
 6. Review the final diff and commit it, master document included in the same commit.
 7. Print the master document's full path and the repository root, then stop.
+
+### Packet size discipline
+
+A slice packet is a specification, not a session log. It is read in full at the start of every
+session, so its size is a recurring cost paid by every future session.
+
+- Cap a packet at 12 KB, roughly 3,000 tokens. Measure bytes, not lines. A packet can hold 30 KB
+  in 300 lines when its prose is unwrapped, so a line count hides the real cost.
+- A packet carries exactly one `## Stopped` section, and that section is at most 4 KB. A frozen
+  handoff is a set of pointers to evidence, never the evidence itself.
+- Superseded `## Stopped` sections, completed `RESULT BLOCK`s, and every dated session record
+  (`## Accepted — <date>`, `## Independent audit — <date>`, `## Resumed — …`) move to
+  `SLICE-<ID>-LOG.md` beside the packet, newest first. No session reads that file. It exists so
+  the packet can stay small.
+- A session cut off mid-work — a usage limit, an interrupt — writes down everything it knows.
+  That dump is correct behaviour, not a violation of the cap: an ending session cannot tell
+  what the next one will need. The **resuming** session compresses it to pointers as its first
+  act, before anything else. It has just read the dump, so it is the cheapest and safest place
+  to decide what mattered. Never compress another session's handoff without having read it.
+- This protocol section is capped at 24 KB. A section already over the cap is trimmed at the next
+  closeout, not appended to.
+- At either cap, something is archived or compressed. Nothing is appended past a cap.
+- At closeout the coordinator prints its starting read set: the byte size of this protocol
+  section, of the master document's `## START HERE` block, and of the packet it read. A number in
+  the log is what stops slow drift.
+
+### Effort tiers
+
+The coordinator does two jobs whose cost differs by an order of magnitude. Bind the model and
+effort to the job, not to the session. Tiers are named by strength, never by provider.
+
+| Job | Tier |
+| --- | --- |
+| Write a new slice packet | strongest available model, high effort |
+| Run a packet that is already written | mid-tier model, medium effort |
+| Judge a bounced, blocked or deviating candidate | strongest available model, high effort |
+| Closeout and `## START HERE` rewrite | mid-tier model, low effort |
+
+Workers default to a mid-tier model at medium effort. Escalate a worker only when its packet
+declares the work high-risk, or when a first pass fails acceptance. Auditors keep the
+cross-family rule above; family matters more than tier for a review.
+
+Writing a packet and running it are separate sessions. A packet session reads this section, the
+`## START HERE` block and any cited headings, writes one packet, spawns no workers, and ends.
+Before ending, that same packet session rewrites the one `## START HERE` line naming the slice it
+just wrote: the planned slice ID is replaced by the packet's path, marked dependency-ready, and
+that single-line edit is committed together with the packet. A closeout session names a next slice
+by ID only, with no path, because its packet does not exist yet. Without this handshake the
+pointer stays one step behind and the execution session refuses work that is already ready.
+An execution session runs a packet that already exists. If `## START HERE` names no written,
+dependency-ready packet, the execution session stops and asks for a packet session instead of
+switching modes mid-session at the wrong tier.
