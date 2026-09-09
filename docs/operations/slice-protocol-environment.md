@@ -33,6 +33,42 @@ siblings, which exist so a packet can move its dated records and stay small; `SL
 the packet template itself; and `SLICE-5L-coverage.md` by name, exempt as companion analysis, per
 SLICE-6E.
 
+### Read-set measurement
+
+`AGENTS.md` → `## Slice protocol` → `### Packet size discipline` requires printing three numbers
+at closeout: the byte size of the protocol section, of the master document's `## START HERE`
+block, and of the packet read. These are the commands, run from the repository root.
+
+Live tree:
+
+```sh
+# Slice protocol section
+awk '/^## Slice protocol/{f=1} f&&/^## /&&!/^## Slice protocol/{exit} f' AGENTS.md | wc -c
+# START HERE block
+awk '/^## START HERE/{f=1} f&&/^## /&&!/^## START HERE/{exit} f' docs/content-studio-master-status.md | wc -c
+# the packet read this session — substitute the actual filename, e.g. SLICE-6I.md
+wc -c < docs/operations/launch-slices/SLICE-6I.md
+```
+
+Pinned to a specific commit (e.g. to reproduce the numbers below, run at the commit this section
+was written against — prints `24568`, `927`, and the packet's own byte size):
+
+```sh
+git show HEAD:AGENTS.md | awk '/^## Slice protocol/{f=1} f&&/^## /&&!/^## Slice protocol/{exit} f' | wc -c
+git show HEAD:docs/content-studio-master-status.md | awk '/^## START HERE/{f=1} f&&/^## /&&!/^## START HERE/{exit} f' | wc -c
+git show HEAD:docs/operations/launch-slices/SLICE-6I.md | wc -c
+```
+
+Caps: a `SLICE-<ID>.md` packet is capped at 12288 B; the `## Slice protocol` section is capped at
+24576 B. A measured value strictly greater than its cap is the violation — equal to the cap is
+fine.
+
+Extraction trap: a terminator predicate of `/^## [^S]/` does not stop at `## Standing
+constraints` (that heading also starts with `## S`), so it overruns into later sections. Against
+the pinned commit above that broken form reports `3317` for the START HERE block instead of the
+correct `927` — a 3.6x overstatement. Always terminate on `/^## /&&!/^## <this heading>/`, not on
+a character-class exclusion.
+
 ### Hygiene disposition
 
 `bash scripts/repo-hygiene.sh --rescue` exits non-zero whenever it lists anything, including

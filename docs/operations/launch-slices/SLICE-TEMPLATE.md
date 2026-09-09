@@ -100,6 +100,9 @@ Documentation only: record the scoped review/diff result in this packet. Otherwi
 Use the `### Hygiene disposition` form in `docs/operations/slice-protocol-environment.md` for
 the hygiene item — not a bare exit code.
 
+Use the `### Read-set measurement` form in `docs/operations/slice-protocol-environment.md` for
+the closeout read-set print — not an ad hoc re-derivation.
+
 ## RESULT BLOCK (worker fills this in and returns it)
 
 - Changed paths:

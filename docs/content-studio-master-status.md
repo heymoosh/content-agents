@@ -5,14 +5,14 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6H**, `docs/operations/launch-slices/SLICE-6H.md`.
+- Current / last accepted: **6I**, `docs/operations/launch-slices/SLICE-6I.md`.
 - Blocked on: none.
-- Next: **6I**, `docs/operations/launch-slices/SLICE-6I.md` — written and dependency-ready.
-- Last decision: the hygiene closeout item now has a written, assertable form (bindings file
-  `### Hygiene disposition`, pointed to from `SLICE-TEMPLATE.md` → `## Closeout`): a non-zero
-  `repo-hygiene.sh --rescue` exit is not itself a failure when every listed path is one this
-  session didn't create; assert the four-part form instead of an exit code.
-- Details: `## Progress log` → 2026-09-09 (6H) entry.
+- Next: **6J** — no packet written yet; a packet session is needed before execution can run it.
+- Last decision: the closeout read-set print now has a written, assertable form (bindings file
+  `### Read-set measurement`, pointed to from `SLICE-TEMPLATE.md` → `## Closeout`): the three
+  commands, their pinned-to-commit form, both caps, and the `/^## [^S]/` extraction trap that
+  overstates the START HERE block 3317 vs 927.
+- Details: `## Progress log` → 2026-09-09 (6I) entry.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints
@@ -48,6 +48,39 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-09 (6I) — closeout read-set print made assertable
+
+Ran SLICE-6I (documentation-only, single Claude mid-tier worker, medium effort). Worker added
+`### Read-set measurement` to `docs/operations/slice-protocol-environment.md`: the three
+closeout commands (protocol-section bytes, START HERE-block bytes, packet bytes), their
+pinned-to-`HEAD` form, both exact caps (12288 / 24576) with the strictly-greater violation rule,
+and the `/^## [^S]/` extraction trap that overstates the START HERE block as 3317 B instead of
+927 B. `SLICE-TEMPLATE.md` → `## Closeout` now points there, alongside the existing (unchanged)
+`### Hygiene disposition` pointer.
+
+Codex cross-family audit (`codex exec --sandbox read-only`, unsandboxed locally — sandboxed
+launch fails with `Operation not permitted`; default model, `gpt-5.1-codex` is rejected on this
+ChatGPT account) caught two real defects the same-family worker missed: the third "live tree"
+command used the literal placeholder `SLICE-<ID>.md`, which isn't verbatim-runnable (the shell
+reads `<ID>` as input redirection); and the pinned-command block was missing the third (packet)
+command entirely. Confirmed the trap explanation itself was correct (927 vs 3317, predicate
+skips `## Standing constraints` because it also starts `## S`). Coordinator fixed both — concrete
+example filename `SLICE-6I.md` with a substitution note, added the missing pinned packet
+command — then re-ran all three live and all three pinned commands from the repo root: `24568`,
+`927`, `10953` both ways, matching the section's claims exactly. `AGENTS.md` untouched (0-byte
+diff), `SLICE-6I.md` stayed at 10953 B (cap 12288), `git diff --check` clean.
+
+Hygiene: `repo-hygiene.sh --rescue` exited 1. Command run, output reviewed. This session created
+no new paths. Every listed path was pre-existing: this session's own two edited files (now
+committed), two other sessions' uncommitted files
+(`content/2026-09-07-.../review-queue.md`, `data/notes-spread-ledger.jsonl`), three unrelated
+`/private/tmp/content-agents-6d-*` checkouts, two merged branches (`slice-5q-queue`,
+`slice-5r-routing`), and five unpushed `agent/cs*` branches — all left in place, none created or
+touched by this slice.
+
+Read-set at closeout: `## Slice protocol` 24568 B (cap 24576), `## START HERE` 927 B, `SLICE-6I.md`
+10953 B (cap 12288).
 
 ### 2026-09-09 (6H) — hygiene closeout item made assertable
 
