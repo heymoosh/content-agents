@@ -4,13 +4,14 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - This document: `docs/content-studio-master-status.md`; protocol: `AGENTS.md` → `## Slice protocol`.
-- Current / last accepted: **SLICE-6B**, `docs/operations/launch-slices/SLICE-6B.md` (**accepted**).
-- Blocked on: none for 6B; Claude independently closed the queue environment-isolation repair.
-- Next action: use 6A's bounded remaining-work map to select an operational/depth readiness packet; no real run selected.
-- Last decision: two disjoint build lanes; keep settled audit evidence and review only the isolation repair delta.
-- Proof: queue 11/11, render 32/32, Claude PASS + delta PASS, frozen full gate 4347 tests / 494 suites, exit 0.
-- Evidence: `/private/tmp/slice-6b-evidence/`; planning map: `docs/operations/launch-slices/SLICE-6A.md`.
-- Preserve provider/scheduler state and validated 5X backup; do not rerun 5P or accepted checks.
+- Current / last accepted: **SLICE-6C**, `docs/operations/launch-slices/SLICE-6C.md` (parallel readiness reconciliation).
+- Blocked on: none for 6C; no live workflow or runtime change performed.
+- Next: **SLICE-6D**, `docs/operations/launch-slices/SLICE-6D.md` — Fiction Grok sandbox fix; not started.
+- Independent preparation: recommendation integration-seam check scoped in 6C; no generic adapter decided.
+- Last decision: Charles persona editing is represented on main; preserve current policy and accepted evidence.
+- Proof: three frozen reports, pinned-source/ancestry verification and scoped documentation review; 6B runtime proof retained.
+- Evidence: `/private/tmp/slice-6c-evidence/`; concrete findings and follow-ups: 6C → `## Reconciliation — 2026-09-08`.
+- Preserve provider/scheduler state, validated 5X backup and unrelated edits; never repeat 5P or accepted checks.
 - Everything below is history; read only packet-cited headings.
 
 
@@ -1588,6 +1589,28 @@ Frozen unsandboxed full check passed 4347 tests / 494 suites, exit 0, 482.86s. A
 and pre-existing edits were preserved. Evidence `/private/tmp/slice-6b-evidence/`; packet has
 final hashes and closeout. No live provider/model canary, no push. Next selection uses the bounded
 6A remaining-work map; no new operational run or publication is selected by this closeout.
+
+
+### 2026-09-08 — 6C parallel product-depth reconciliation
+
+Three bounded investigations at ea77d5b separated implementation from live/input proof. Workflow
+and Charles ran concurrently; the completed workflow worker then handled recommendation evidence
+because the third initial dispatch hit the agent thread limit. All reports are frozen under
+`/private/tmp/slice-6c-evidence/`; final hashes and coordinator dispositions live in `SLICE-6C.md`.
+
+One concrete code gap is next: Fiction's idea and revision Grok builders still use read-only
+sandboxing on this Mac. Prepared `SLICE-6D.md` for the two source/test pairs, actual isolated child
+outcomes, bounded Claude review and final runtime gate. It is not implemented or accepted.
+Charles's held persona-edit capability is represented on main; do not merge its old branch or
+reinstate historical manual-policy wording. Fiction, Scout and Human Inference workflows still
+need the bounded real-input exercises identified by P2; this slice ran none. Recommendation
+ledgers/readiness and a specialized dossier path exist. A generic missing adapter was not proven;
+next inspect the exact request/recommendation/treatment contracts before selecting implementation.
+Real reviewed inputs gate operational recommendations, not independent fixture preparation.
+
+Documentation-only scope: no runtime gate or external audit required. Three source/history reports,
+24 pinned source hashes and Charles ancestry/blob checks passed. Final diff, hygiene and preserved
+leftovers are recorded in 6C's closeout. No source, operational state, provider or publication changes.
 
 
 ## Current handoff — 2026-09-02
