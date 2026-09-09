@@ -2,6 +2,7 @@
 
 ## START HERE
 
+- Usage: `AGENTS.md` → `### Usage discipline`; apply at the next safe checkpoint.
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`.
 - Current: **6D not accepted**, `docs/operations/launch-slices/SLICE-6D.md` → `## Stopped`.
@@ -1627,6 +1628,16 @@ Documentation-only scope: no runtime gate or external audit required. Three sour
 24 pinned source hashes and Charles ancestry/blob checks passed. Final diff, hygiene and preserved
 leftovers are recorded in 6C's closeout. No source, operational state, provider or publication changes.
 
+### 2026-09-08 — Portable usage discipline rollout
+
+Owner-directed documentation-only update: `AGENTS.md` → `### Usage discipline` and the
+packet template now require a useful benefit for extra lanes, bounded worker contexts,
+explicit model/effort, completion notifications, concise check results with disk evidence,
+and automatic closeout at coherent capability boundaries. Apply at the next safe checkpoint;
+preserve current worker ownership until a frozen handoff. Existing audits, outcome gates,
+product scope and accepted/stopped statuses remain in force. Scoped review covers exact
+insertions, rule consistency, pointer existence and whitespace; no runtime audit/build/E2E
+is required for this policy-only change. Other sessions' work is excluded from this commit.
 
 ## Current handoff — 2026-09-02
 

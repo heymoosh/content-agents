@@ -95,3 +95,11 @@ Documentation only: record the scoped review/diff result in this packet. Otherwi
 - Checks run and results:
 - Evidence locations:
 - Unresolved:
+
+## Usage budget and handoff
+
+Apply `AGENTS.md` → Slice protocol → Usage discipline.
+- Each extra lane: <independent result and expected benefit, or serial because delegation adds only overhead>
+- Assignment: <worker model/effort; fresh context or related repair reuse; frozen handoff>
+- Evidence return: <command, exit, counts, candidate identity, short result and artifact pointers>
+- Capability boundary: <automatic closeout and next resume pointer; completion notifications, no routine polling>

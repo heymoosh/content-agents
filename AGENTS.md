@@ -331,6 +331,32 @@ blocked candidate. When ending work on that candidate without an independently a
 deliverable, use the stopping-without-acceptance branch. Separately scoped, accepted changes use
 the accepted closeout; keep blocked candidates and their status separate from that commit.
 
+### Usage discipline
+
+Optimize total model work to verified completion, including context, coordination, retries and
+review. This qualifies the parallel-work preference above: a safe split alone is insufficient.
+Record the useful independent result and expected benefit of each extra lane in one line in the
+packet. Keep work serial when another agent would mostly repeat context or add bookkeeping.
+
+Use a fresh packet-sized worker context for unrelated work. Reuse a worker for related repairs
+when its retained context saves investigation; preserve ownership until a frozen handoff. Record
+worker model and effort with the assignment and apply Model routing to mechanical work as well
+as implementation. Do not use the strongest worker merely because it is already available.
+
+Use completion notifications. Poll only for a missing notification, a deadline, a suspected
+stalled process or a concrete intervention; do not repeatedly inspect unchanged progress.
+Scripts should produce command, exit code, counts, candidate identity and a short result.
+Keep raw logs, screenshots and manifests on disk. The coordinator reviews the candidate diff,
+RESULT BLOCKs, audit findings and check summaries; load further evidence only for a named
+acceptance question or failure. Do not duplicate evidence bundles or narrate their contents.
+This limits context overhead, not required outcome tests, visual inspection or independent review.
+
+Perform closeout automatically once per completed coherent capability, not after every worker,
+command or repair. Compact when continuing unfinished related work. Prefer a fresh coordinator
+chat at the next substantial capability boundary when START HERE and the packet suffice; retain
+only the short resume pointers. Neither repeated compaction nor fresh chats substitute for these
+usage controls. Do not make the owner monitor workers or restate this policy in session prompts.
+
 ### Worker contract
 
 A worker returns a compact `RESULT BLOCK` and nothing else: changed paths, outcome, checks run
