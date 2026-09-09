@@ -6,7 +6,7 @@
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`.
 - Current / last accepted: **6E**, `docs/operations/launch-slices/SLICE-6E.md`, commit `628bac7`.
 - Blocked on: none.
-- Next: none queued — no dependency-ready slice ID assigned yet.
+- Next: **6F**, `docs/operations/launch-slices/SLICE-6F.md` — written, dependency-ready.
 - Last decision: SLICE-5O's `## Traps` stays uncut; its cap overage is accepted, not repaired.
 - Details: `## Progress log` → 2026-09-09 entry.
 - Everything below is history; read only packet-cited headings.
