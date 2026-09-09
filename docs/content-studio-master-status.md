@@ -7,7 +7,7 @@
   plus bindings in `docs/operations/slice-protocol-environment.md`.
 - Current / last accepted: **6G**, `docs/operations/launch-slices/SLICE-6G.md`.
 - Blocked on: none.
-- Next: **6H** — no packet written yet; a packet session is needed before execution.
+- Next: **6H** — `docs/operations/launch-slices/SLICE-6H.md`, written and dependency-ready.
 - Last decision: the 12,288 B packet cap's scope is now written down in the bindings file
   (`### Packet cap scope`): it governs `SLICE-<ID>.md` anywhere under `launch-slices/`;
   `*-LOG.md`, `SLICE-TEMPLATE.md` and `SLICE-5L-coverage.md` are exempt.
