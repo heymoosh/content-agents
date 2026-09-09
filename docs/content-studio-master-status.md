@@ -5,14 +5,14 @@
 - Usage: `AGENTS.md` → `### Usage discipline`; apply at the next safe checkpoint.
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`.
-- Current: **6D accepted and integrated**, `docs/operations/launch-slices/SLICE-6D.md` → `## Accepted`.
-- Blocked on: none for 6D.
-- Last accepted: **6D**; prior accepted checks (6C, commit `f286169`) retained.
-- Completed: full gate PASS (exit 0, ~405s) on the hash-verified five-file candidate; independent Claude audit/delta-audit closure PASS retained from handoff.
-- Next: `docs/operations/launch-slices/SLICE-6E.md` exists (untracked, unreviewed) but is not yet cited by this block — read it and vet dependency-readiness before starting a 6E session.
-- Candidate/checkouts/hashes: 6D → `## Accepted`; evidence retained at `/private/tmp/slice-6d-evidence/`.
-- Last decision: Fiction compatibility plus existing recommendation integration proof; no generic adapter.
-- Preserve unrelated in-progress edits (SLICE-5*/6B/6C doc updates, `*-LOG.md` files, `SLICE-6E.md`) from other sessions untouched; provider/scheduler state and 5X backup; never repeat 5P.
+- Current: **6E accepted and integrated**, `docs/operations/launch-slices/SLICE-6E.md` → `## Closeout result`.
+- Blocked on: none for 6D or 6E.
+- Last accepted: **6E**, commit `628bac7`; prior accepted (6D, commit `701e4c0`; 6C, commit `f286169`) retained.
+- Completed: ten over-cap slice packets capped ≤12,288 B (one recorded deviation, SLICE-5O +669 B, live Traps content not movable); history moved to sibling `-LOG.md` files with verified zero content loss. Grok cross-family audit hit a usage-balance outage (402); documentation-only reviewer-outage clause applied, coordinator completed the bounded diff review instead.
+- Next: none queued. Deferred by 6E: SLICE-5T/5Z (still over cap), the 24 KB `## Slice protocol` trim, and a possible later re-cap of 5O.
+- Candidate/checkouts/hashes: 6E → `## Closeout result`; scratch evidence at `$TMPDIR` (session-local, not retained).
+- Last decision: SLICE-5O's `## Traps` section stays uncut; cap overage accepted and recorded rather than cutting live spec content.
+- Preserve unrelated in-progress edits (SLICE-5H/5P/5R/5S/5T/5W/5X/5Y/5Z/6B/6C doc updates and their `-LOG.md` files) from other sessions untouched; provider/scheduler state and 5X backup; never repeat 5P.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints`.
