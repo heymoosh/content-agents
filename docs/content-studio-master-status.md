@@ -7,7 +7,7 @@
   plus bindings in `docs/operations/slice-protocol-environment.md`.
 - Current / last accepted: **6I**, `docs/operations/launch-slices/SLICE-6I.md`.
 - Blocked on: none.
-- Next: **6J** — no packet written yet; a packet session is needed before execution can run it.
+- Next: **6J**, `docs/operations/launch-slices/SLICE-6J.md` — written, dependency-ready.
 - Last decision: the closeout read-set print now has a written, assertable form (bindings file
   `### Read-set measurement`, pointed to from `SLICE-TEMPLATE.md` → `## Closeout`): the three
   commands, their pinned-to-commit form, both caps, and the `/^## [^S]/` extraction trap that
