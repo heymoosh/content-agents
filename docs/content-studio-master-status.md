@@ -7,12 +7,10 @@
   plus bindings in `docs/operations/slice-protocol-environment.md`.
 - Current / last accepted: **6K**, `docs/operations/launch-slices/SLICE-6K.md`.
 - Blocked on: none.
-- Next: **6L** `docs/operations/launch-slices/SLICE-6L.md` — written, dependency-ready; appears
-  in-flight under a separate session (uncommitted `e2e/`-owned edits observed at 6K's closeout).
+- Next: **6L** — a separate session appeared to have it in flight (uncommitted `e2e/`-owned edits
+  observed during 6K's closeout); confirm state before starting.
 - Last decision: 6K's freeze-candidate mechanism shipped after a two-round cross-family (Codex)
-  audit found and closed one HIGH + two MEDIUM defects (untracked-path exception bypass,
-  unbounded scratch-root, silent diff-failure); one further audit item (gitignored files excluded
-  from the freeze) was disposed as by-design, not a defect. Full record: `SLICE-6K-LOG.md`.
+  audit found and closed one HIGH + two MEDIUM defects. Full record: `SLICE-6K-LOG.md`.
 - Details: `## Progress log` → 2026-09-09 (6K) entry.
 - Everything below is history; read only packet-cited headings.
 
