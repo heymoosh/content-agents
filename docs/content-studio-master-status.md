@@ -2,16 +2,19 @@
 
 ## START HERE
 
-- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, no push).
+- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed to `origin/main`).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
 - Current / last accepted: **6K**, `docs/operations/launch-slices/SLICE-6K.md`.
-- Blocked on: `docs/operations/launch-slices/SLICE-6L.md` → `## Stopped` — `npm run test:e2e`
-  exited non-zero on the candidate (2 failed journeys + a shared-worktree isolation-check trip);
-  packet's own rule sends a red e2e run here rather than to acceptance. Retained diff uncommitted
-  in the main checkout, snapshotted to `refs/wip/content-agents` (fc91b82).
+- Blocked on: `docs/operations/launch-slices/SLICE-6L.md` → `## Stopped` — its retained diff was
+  committed (`f0940ca`, 2026-09-09) at Muxin's direct request so nothing sat uncommitted; a clean
+  re-run confirmed the isolation trip was shared-worktree noise (now byte-identical) and the same
+  2 journey failures reproduce, both being SLICE-6M's already-diagnosed stale-assertion issue, not
+  a regression. Per the packet's own rule a non-zero e2e exit still blocks formal acceptance
+  regardless of cause, so 6L stays logged as committed-but-not-accepted.
 - Next: **6M**, `docs/operations/launch-slices/SLICE-6M.md` — written, dependency-ready. It
-  realigns the two stale journeys blocking 6L; run it, then resume 6L from its retained diff.
+  realigns the two stale journeys; once it lands, `npm run test:e2e` should exit 0 and 6L can be
+  formally accepted.
 - Last decision: 6K's freeze-candidate mechanism shipped after a two-round cross-family (Codex)
   audit found and closed one HIGH + two MEDIUM defects. Full record: `SLICE-6K-LOG.md`.
 - Details: `## Progress log` → 2026-09-09 (6K) entry; SLICE-6L.md → `## Stopped` for this block.

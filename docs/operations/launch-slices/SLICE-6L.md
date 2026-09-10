@@ -238,6 +238,23 @@ closeout read-set print — not an ad hoc re-derivation.
   failed journeys before deciding whether they're a real regression or shared-worktree noise; then
   resume this packet from the retained diff above.
 
+## Landed uncommitted, still not accepted (2026-09-09)
+
+- At Muxin's direct request to get all uncommitted work backed up to `origin/main`, the retained
+  diff above (`e2e-summary.ts`, `e2e-summary.test.ts`, `run-all.ts` emit call, `.gitignore`) was
+  committed as `f0940ca`, confirmed no other session was writing to the repo first.
+- Re-ran `npm run test:e2e` on that clean checkout: isolation check now passes byte-identical (the
+  prior `data/analytics.db-shm`/`-wal` trip was shared-worktree noise, not a real leak). The same
+  35 pass / 2 fail / 16 skipped result reproduced exactly, confirming the two failures are not
+  isolation-driven. Both are the SLICE-6M packet's already-diagnosed stale assertions (pre-5S
+  combined approve/schedule behavior); SLICE-6M's own doc states this is not a product defect.
+  `npm run check` still isolates to the same single pre-existing SLICE-5Z failure.
+- Disposition: per `## Acceptance`'s own branch, a non-zero `npm run test:e2e` exit still sends
+  this candidate to `### Stopping without acceptance` regardless of cause — committing the code
+  does not change that. This block records that the code is now safely in git history and
+  verified free of new regressions; formal acceptance still waits on SLICE-6M turning the suite
+  green.
+
 ## Usage budget and handoff
 
 Apply `AGENTS.md` → Slice protocol → Usage discipline.
