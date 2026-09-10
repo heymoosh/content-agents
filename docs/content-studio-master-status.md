@@ -11,6 +11,9 @@
 - Next: **6M** (packet written: `docs/operations/launch-slices/SLICE-6M.md`, dependency-ready).
 - Then: **6O** (packet written: `docs/operations/launch-slices/SLICE-6O.md`, dependency-ready,
   independent of 6M).
+- Then: **6R** (packet written: `docs/operations/launch-slices/SLICE-6R.md`, dependency-ready,
+  independent of 6M and 6O) — narrows the six agent-CLI spawn sites 6Q's audit left inheriting
+  `.env`.
 - Last decision: 6Q stopped agent-CLI children from inheriting `.env` secrets, by subtracting the
   loader-injected keys, not an allowlist; `npm run check` goes from 4372/4373 to 4374/4374 green.
   Codex audit PASS, authenticated canary passed. Full record:
