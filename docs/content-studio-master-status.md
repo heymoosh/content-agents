@@ -5,21 +5,16 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed to `origin/main`).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6K**, `docs/operations/launch-slices/SLICE-6K.md`.
-- Blocked on: `docs/operations/launch-slices/SLICE-6L.md` → `## Stopped` — its retained diff was
-  committed (`f0940ca`, 2026-09-09) at Muxin's direct request so nothing sat uncommitted; a clean
-  re-run confirmed the isolation trip was shared-worktree noise (now byte-identical) and the same
-  2 journey failures reproduce, both being SLICE-6M's already-diagnosed stale-assertion issue, not
-  a regression. Per the packet's own rule a non-zero e2e exit still blocks formal acceptance
-  regardless of cause, so 6L stays logged as committed-but-not-accepted.
-- Next: **6M**, `docs/operations/launch-slices/SLICE-6M.md` — written, dependency-ready. It
-  realigns the two stale journeys; once it lands, `npm run test:e2e` should exit 0 and 6L can be
-  formally accepted.
-- Then: **6O**, `/Users/Muxin/Documents/GitHub/content-agents/docs/operations/launch-slices/SLICE-6O.md` — written, dependency-ready, independent of 6M (disjoint owned paths); closes 6K's deferred P2, a lexical `scratch_root_inside_repo` check a symlink defeats. (6N closed moot 2026-09-09, `SLICE-6N-LOG.md` → `## Stopped — 2026-09-09`.)
-- Also: **6P**, `/Users/Muxin/Documents/GitHub/content-agents/docs/operations/launch-slices/SLICE-6P.md` — accepted and committed (`7ec5368`, 2026-09-10). The e2e isolation check now partitions changed paths so another session's SQLite sidecars (`data/analytics.db-shm`/`-wal`/`-journal` only, exact-path allowlist) stop failing a candidate — the false-failure vector that sent 6L to not-accepted is closed. Cross-family audit (Codex) caught and closed one HIGH defect (an initial basename-suffix match was too permissive) before integration. Does not by itself flip 6L to accepted — that still needs 6M's journey realignment per the Blocked-on line above.
-- Last decision: 6K's freeze-candidate mechanism shipped after a two-round cross-family (Codex)
-  audit found and closed one HIGH + two MEDIUM defects. Full record: `SLICE-6K-LOG.md`.
-- Details: `## Progress log` → 2026-09-09 (6K) entry; SLICE-6L.md → `## Stopped` for this block.
+- Current / last accepted: **6P**, `docs/operations/launch-slices/SLICE-6P.md` (`7ec5368`).
+- Blocked on: `docs/operations/launch-slices/SLICE-6L.md` → `## Stopped` — committed
+  (`f0940ca`) but not formally accepted; still needs 6M's journey realignment.
+- Next: **6M** (packet written: `docs/operations/launch-slices/SLICE-6M.md`, dependency-ready).
+- Then: **6O** (packet written: `docs/operations/launch-slices/SLICE-6O.md`, dependency-ready,
+  independent of 6M).
+- Last decision: 6P partitioned the e2e isolation check so another session's SQLite sidecars
+  stop failing a candidate; one Codex-audit HIGH closed pre-integration. Full record:
+  `SLICE-6P-LOG.md` → `## Accepted — 2026-09-10`.
+- Details: `## Progress log` → 2026-09-10 (6P) entry.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints
@@ -55,6 +50,36 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-10 (6P) — e2e isolation check stops failing candidates for another session's SQLite sidecars
+
+Ran SLICE-6P (easy, one Claude mid-tier worker at medium effort). `e2e/harness.ts` gained
+`partitionIsolationChanges(changed: string[])`, a pure function splitting a changed-path list into
+`failing` and a closed, exact-path `volatile` set (`data/analytics.db-shm`/`-wal`/`-journal` only —
+confirmed the repo's only database, `src/db/db.ts:7`); `data/analytics.db` itself always stays in
+`failing`. `e2e/run-all.ts`'s isolation block now fails the run only on `failing.length > 0` and
+names any `volatile` paths as explicitly not failing. 6 tests added to `e2e/isolation.test.ts` (12
+total). This closes the false-failure vector `SLICE-6L.md` → `## Stopped` recorded: a concurrent
+session's `data/analytics.db-shm`/`-wal` tripping the guard for a reason unrelated to the
+candidate.
+
+Cross-family audit (Codex, `codex exec --sandbox read-only`), two rounds. Round 1: HIGH — the
+first implementation matched any path whose *basename* ended in the three suffixes anywhere in
+the tree (e.g. a candidate's stray `tmp/leak.db-wal` would be silently exempted), defeating the
+guard's purpose; fixed by narrowing to the exact-path allowlist above, with a regression test
+proving same-suffix files elsewhere still land in `failing`. Also fixed pre-audit (coordinator's
+own review): `run-all.ts`'s "byte-identical" line was printing even when a volatile sidecar had in
+fact changed. Round 2 (delta re-audit) confirmed the HIGH closed by direct inspection; a second
+point (the three canonical paths stay exempt even if the candidate itself, not another session,
+touches them) was dispositioned as an accepted, packet-fixed design tradeoff, not a defect — the
+packet's own Goal/Owner-checkpoint/Risk sections already fixed this scope, and `data/analytics.db`
+itself remaining in `failing` still catches real candidate writes.
+
+`npm run check` (unsandboxed): 4370/4373 pass, the same 3 pre-existing failures (Grok fixtures x2,
+scheduler-ledger CLI test) reproduced identically with this slice's three owned files stashed out.
+Accepted and committed as `7ec5368` on `main` (fast-forward from `9b02cdb`). Does not by itself
+flip 6L to accepted — that still needs 6M's journey realignment. Full record, hygiene disposition,
+read-set measurement and RESULT BLOCK: `SLICE-6P-LOG.md` → `## Accepted — 2026-09-10`.
 
 ### 2026-09-09 (6N) — closed moot: red gate did not reproduce
 
