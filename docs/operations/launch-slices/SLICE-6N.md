@@ -182,16 +182,8 @@ closeout read-set print — not an ad hoc re-derivation.
 
 ## Stopped
 
-Blocker: premise void — `jobs.test.ts` (136/136) + `npm run check` (4373/4373) exit 0 unsandboxed
-at `main` fork `3395dc2`; the red gate does not reproduce.
-Verified: baseline x2 (worker) + `npm run check` (coordinator); all exit 0.
-Retained work: none — no file edited, worktree/branch clean.
-Next: confirm `main` tip still green, then close 6N moot or re-cut if red elsewhere.
-
-## RESULT BLOCK
-
-- Changed paths: none. See `## Stopped`.
-- Usage: 1 Claude worker (~81K tok) + coordinator verify.
+Superseded — moved to `SLICE-6N-LOG.md` → `## Stopped — 2026-09-09`. Premise void: the red gate
+this slice targets does not reproduce; no edit was made; closed moot.
 
 ## Usage budget and handoff
 

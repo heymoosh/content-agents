@@ -15,8 +15,8 @@
 - Next: **6M**, `docs/operations/launch-slices/SLICE-6M.md` — written, dependency-ready. It
   realigns the two stale journeys; once it lands, `npm run test:e2e` should exit 0 and 6L can be
   formally accepted.
-- Then: **6N**, `docs/operations/launch-slices/SLICE-6N.md` → `## Stopped` — attempted 2026-09-09,
-  not accepted: premise void, `npm run check` already exits 0 (4373/4373) on `main`; no edit made.
+- Then: **6N** — closed moot 2026-09-09, `docs/operations/launch-slices/SLICE-6N-LOG.md` →
+  `## Stopped — 2026-09-09` (premise void, no edit made).
 - Last decision: 6K's freeze-candidate mechanism shipped after a two-round cross-family (Codex)
   audit found and closed one HIGH + two MEDIUM defects. Full record: `SLICE-6K-LOG.md`.
 - Details: `## Progress log` → 2026-09-09 (6K) entry; SLICE-6L.md → `## Stopped` for this block.
@@ -55,6 +55,19 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-09 (6N) — closed moot: red gate did not reproduce
+
+SLICE-6N was written to repair a red `npm run check` (`src/review/jobs.test.ts`, landed by 5Z).
+On pickup, the worker's mandatory baseline step found the file passing 136/136 unsandboxed at the
+worktree's `main` fork (`3395dc2`); the coordinator independently re-ran both that test and a full
+`npm run check` (4373/4373, exit 0) and confirmed the same. The packet's own rule for this case —
+"if the baseline exits 0, the premise is void; record it and stop without editing" — applied, so
+no `src/` change was made. Builder tooling note: the Codex CLI could not be used non-interactively
+in this session (its autonomous-approval flags were blocked by the permission classifier, and its
+default on-request approval mode produced zero output/zero diff over three attempts); the build
+step ran as a Claude subagent instead, consistent with the bindings' "defaults, not rules" note.
+Full record: `SLICE-6N-LOG.md` → `## Stopped — 2026-09-09`.
 
 ### 2026-09-09 (6K) — runnable freeze-candidate mechanism for completion-sequence step 6
 
