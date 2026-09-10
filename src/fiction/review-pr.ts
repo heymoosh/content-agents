@@ -1,4 +1,4 @@
-import "../util/env.js";
+import { withoutDotenvKeys } from "../util/env.js";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -362,7 +362,7 @@ export async function reviseSpanWithEngine(span: string, instruction: string, en
   const prompt = `Read .claude/skills/story/SKILL.md before acting. Revise only the exact commented fiction span below. Preserve the surrounding story and return only the replacement prose, with no headings or Markdown fences. No em dashes.\n\nEXACT SPAN:\n${span}\n\nEDITOR COMMENT:\n${instruction}`;
   const built = buildRevisionSpawn(engine, prompt);
   return new Promise((resolveOutput, reject) => {
-    const child = spawn(built.command, built.args, { cwd: repoRoot, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(built.command, built.args, { cwd: repoRoot, stdio: ["pipe", "pipe", "pipe"], env: withoutDotenvKeys() });
     let stdout = ""; let stderr = "";
     child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
     child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });

@@ -1,4 +1,4 @@
-import "../util/env.js";
+import { withoutDotenvKeys } from "../util/env.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -253,6 +253,7 @@ export function callEngineContinuity(engine: Engine): ContinuityModelCall {
         cwd: repoRoot,
         timeout: CHECK_TIMEOUT_MS,
         maxBuffer: 20_000_000,
+        env: withoutDotenvKeys(),
       });
       return stdout;
     } catch (e) {

@@ -1,4 +1,4 @@
-import "../util/env.js";
+import { withoutDotenvKeys } from "../util/env.js";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -344,7 +344,7 @@ export function buildIdeaSpawn(engine: Engine, prompt: string): { command: strin
 function runCli(engine: Engine, prompt: string): Promise<string> {
   const built = buildIdeaSpawn(engine, prompt);
   return new Promise((resolveOutput, reject) => {
-    const child = spawn(built.command, built.args, { cwd: repoRoot, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(built.command, built.args, { cwd: repoRoot, stdio: ["pipe", "pipe", "pipe"], env: withoutDotenvKeys() });
     let stdout = ""; let stderr = "";
     child.stdout.on("data", (chunk) => { stdout += chunk; });
     child.stderr.on("data", (chunk) => { stderr += chunk; });

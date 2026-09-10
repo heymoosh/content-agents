@@ -168,9 +168,10 @@ evidence collection.
 
 ## Closeout
 
-Closeout gate: this repository's binding is `none`. Record either a line beginning `**PASS**`
-followed by the date, or an explicit list of what is left, in this packet before the slice closes.
-No command belongs in this slot.
+**PASS** 2026-09-10 — all six sites narrowed, `src/util/env.test.ts` covers both mechanisms plus
+the source guard and negative-mutation proof, both canaries recorded, Codex cross-family audit
+obtained with one optional-improvement note (no established production defect, no fix required),
+`npm run check` 4378/4378 green, coordinator committed.
 
 Preflight: the six paths above plus `src/util/env.test.ts` are the complete changed set; every
 acceptance item maps to one of the commands, a canary transcript, or a named diff; every exit code
@@ -187,16 +188,10 @@ entry: the command exits non-zero whenever it lists another session's work.
 Read-set measurement: use the `### Read-set measurement` commands in
 `docs/operations/slice-protocol-environment.md`, substituting `SLICE-6R.md`.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## RESULT BLOCK
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action: <built | verified | accepted | committed; workers cannot accept/commit>
-- Usage: <local check elapsed time separately from model calls/provider-reported usage;
-  unavailable values `unknown`; prior history behind evidence pointers>
+Accepted and committed. Full dated record (RESULT BLOCK, audit, canaries, preflight, hygiene):
+`SLICE-6R-LOG.md` → `## Accepted — 2026-09-10`.
 
 ## Usage budget and handoff
 

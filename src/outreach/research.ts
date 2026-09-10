@@ -1,4 +1,4 @@
-import "../util/env.js";
+import { withoutDotenvKeys } from "../util/env.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, unlinkSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -397,7 +397,7 @@ async function callClaudeResearch(
         timeout: timeoutMs,
         maxBuffer: 20_000_000,
         env: {
-          ...process.env,
+          ...withoutDotenvKeys(),
           OUTREACH_SEARCH_BUDGET_COUNTER_FILE: counterFile,
           OUTREACH_SEARCH_BUDGET_TOTAL: String(totalBudget),
         },

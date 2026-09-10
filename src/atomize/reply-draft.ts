@@ -14,7 +14,7 @@
 // reason those are: nothing here publishes — it lands `pending` and Muxin reviews it like anything
 // else /atomize queues.
 
-import "../util/env.js";
+import { withoutDotenvKeys } from "../util/env.js";
 import { writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import { spawn } from "node:child_process";
@@ -134,6 +134,7 @@ export function realSpawnClaude(prompt: string): Promise<ClaudeRunResult> {
       cwd: repoRoot,
       timeout: REPLY_TIMEOUT_MS,
       killSignal: "SIGTERM",
+      env: withoutDotenvKeys(),
     });
     child.on("error", reject);
     child.stdout?.on("data", (c) => (stdout += c.toString("utf8")));

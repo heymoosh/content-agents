@@ -1,4 +1,4 @@
-import "../../util/env.js";
+import { withoutDotenvKeys } from "../../util/env.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { TextPolishProvider } from "../types.js";
@@ -42,6 +42,7 @@ export const provider: TextPolishProvider = {
         cwd: repoRoot,
         timeout: POLISH_TIMEOUT_MS,
         maxBuffer: 20_000_000,
+        env: withoutDotenvKeys(),
       });
       stdout = r.stdout;
     } catch (e) {
