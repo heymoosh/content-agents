@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { changedWorktreePaths, E2E_PHASE3_SLUG, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
+import { summarizeE2ERun, type JourneyRecord } from "../src/operations/e2e-summary.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SHARED_ROOT = join(HERE, "..");
@@ -55,12 +56,19 @@ function makeDisposableRepo(): DisposableRepo {
   }
 }
 
+function candidateSha(): string {
+  const rev = spawnSync("git", ["rev-parse", "HEAD"], { cwd: SHARED_ROOT, encoding: "utf8" });
+  return rev.status === 0 ? rev.stdout.trim() : "unknown";
+}
+
 function main(): void {
   const requestedPass = process.argv[2];
   const passes = requestedPass ? PASSES.filter((pass) => pass.name === requestedPass) : PASSES;
   if (requestedPass && !passes.length) {
     throw new Error(`Unknown E2E pass ${requestedPass}. Choose one of: ${PASSES.map((pass) => pass.name).join(", ")}`);
   }
+  const command = ["npm", "run", "test:e2e", ...(requestedPass ? ["--", requestedPass] : [])].join(" ");
+  const sha = candidateSha();
   const sharedBefore = snapshotWorktree(SHARED_ROOT);
   const disposable = makeDisposableRepo();
   // HOME below is intentionally disposable for application drafts. Pin Playwright to the cache
@@ -180,6 +188,17 @@ function main(): void {
     // when a pass crashes. No cleanup command touches the shared checkout.
     rmSync(disposable.parent, { recursive: true, force: true });
   }
+  // Written after the isolation check above, on both the all-passed and the any-failed path, so
+  // the shared-worktree byte-identical guarantee still compares apples to apples: this file is
+  // present in both the "before" and "after" snapshot of every run but this one's own.
+  const summaryPath = join(SHARED_ROOT, "e2e", "e2e-summary.json");
+  const summary = summarizeE2ERun(rows as JourneyRecord[], {
+    candidateSha: sha,
+    command,
+    exitCode: anyFailed ? 1 : 0,
+  });
+  writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+  console.log(`E2E summary: ${summaryPath}`);
   process.exit(anyFailed ? 1 : 0);
 }
 
