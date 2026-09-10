@@ -11,6 +11,8 @@
 - Next: **6M** (packet written: `docs/operations/launch-slices/SLICE-6M.md`, dependency-ready).
 - Then: **6O** (packet written: `docs/operations/launch-slices/SLICE-6O.md`, dependency-ready,
   independent of 6M).
+- Then: **6Q** (packet written: `docs/operations/launch-slices/SLICE-6Q.md`, dependency-ready,
+  independent of 6M and 6O; unblocks the `npm run check` gate both of them assert).
 - Last decision: 6P partitioned the e2e isolation check so another session's SQLite sidecars
   stop failing a candidate; one Codex-audit HIGH closed pre-integration. Full record:
   `SLICE-6P-LOG.md` → `## Accepted — 2026-09-10`.
