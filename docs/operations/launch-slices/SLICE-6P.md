@@ -144,33 +144,10 @@ the stopping-without-acceptance branch rather than integrating.
 
 ## Closeout
 
-Not documentation-only. Use the `### Closeout gate disposition` form in
-`docs/operations/slice-protocol-environment.md`: this packet's `## Closeout` carries either a
-`**PASS**` line with a date or an explicit leftover list, written before the slice closes.
-
-Preflight: the RESULT BLOCK carries every template field; the candidate sha and changed-path list
-are pinned; the changed paths are a subset of Owned files; each Acceptance item maps to a named
-command exit or a named test; the audit ran and its material findings are closed or dispositioned.
-Gate cost: `npm run check` on the pinned candidate, run unsandboxed (under the sandbox it reports
-roughly 196 phantom venture failures — bindings row). Measured local runtime: `unknown` until run;
-record it. One rerun only after a real code change, never to refresh paperwork.
-
-Use the `### Hygiene disposition` form in `docs/operations/slice-protocol-environment.md` for the
-hygiene item — not a bare exit code.
-
-Use the `### Read-set measurement` form in `docs/operations/slice-protocol-environment.md` for the
-closeout read-set print — not an ad hoc re-derivation.
-
-## RESULT BLOCK (worker fills this in and returns it)
-
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action: <built | verified | accepted | committed; workers cannot accept/commit>
-- Usage: <local check elapsed time separately from model calls/provider-reported usage;
-  unavailable values `unknown`; prior history behind evidence pointers>
+**PASS** — 2026-09-10. Accepted and committed as `7ec5368` on `main` (fast-forward from `9b02cdb`).
+One audit-driven repair (Codex, HIGH: basename-suffix match too permissive, narrowed to an
+exact-path allowlist) landed before integration. Full record, hygiene disposition, read-set
+measurement and RESULT BLOCK: `SLICE-6P-LOG.md` → `## Accepted — 2026-09-10`.
 
 ## Usage budget and handoff
 

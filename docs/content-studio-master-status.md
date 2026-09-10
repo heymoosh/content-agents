@@ -16,7 +16,7 @@
   realigns the two stale journeys; once it lands, `npm run test:e2e` should exit 0 and 6L can be
   formally accepted.
 - Then: **6O**, `/Users/Muxin/Documents/GitHub/content-agents/docs/operations/launch-slices/SLICE-6O.md` — written, dependency-ready, independent of 6M (disjoint owned paths); closes 6K's deferred P2, a lexical `scratch_root_inside_repo` check a symlink defeats. (6N closed moot 2026-09-09, `SLICE-6N-LOG.md` → `## Stopped — 2026-09-09`.)
-- Also: **6P**, `/Users/Muxin/Documents/GitHub/content-agents/docs/operations/launch-slices/SLICE-6P.md` — written, dependency-ready, independent of 6M and 6O (disjoint owned paths); partitions the e2e isolation check so another session's SQLite sidecars (`data/analytics.db-shm`/`-wal`) stop failing a candidate, the false failure that sent 6L to not-accepted.
+- Also: **6P**, `/Users/Muxin/Documents/GitHub/content-agents/docs/operations/launch-slices/SLICE-6P.md` — accepted and committed (`7ec5368`, 2026-09-10). The e2e isolation check now partitions changed paths so another session's SQLite sidecars (`data/analytics.db-shm`/`-wal`/`-journal` only, exact-path allowlist) stop failing a candidate — the false-failure vector that sent 6L to not-accepted is closed. Cross-family audit (Codex) caught and closed one HIGH defect (an initial basename-suffix match was too permissive) before integration. Does not by itself flip 6L to accepted — that still needs 6M's journey realignment per the Blocked-on line above.
 - Last decision: 6K's freeze-candidate mechanism shipped after a two-round cross-family (Codex)
   audit found and closed one HIGH + two MEDIUM defects. Full record: `SLICE-6K-LOG.md`.
 - Details: `## Progress log` → 2026-09-09 (6K) entry; SLICE-6L.md → `## Stopped` for this block.
