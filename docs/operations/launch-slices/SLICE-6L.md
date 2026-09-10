@@ -167,14 +167,76 @@ closeout read-set print — not an ad hoc re-derivation.
 
 ## RESULT BLOCK (worker fills this in and returns it)
 
-- Changed paths:
-- Outcome:
+- Changed paths: `src/operations/e2e-summary.ts` (new), `src/operations/e2e-summary.test.ts` (new,
+  9 tests), `e2e/run-all.ts` (emit call: candidate sha via `git rev-parse HEAD`, command string,
+  calls `summarizeE2ERun`, writes `e2e/e2e-summary.json` on both the all-passed and any-failed
+  path), `.gitignore` (added `e2e/e2e-summary.json`).
+- Outcome: implementation complete per Acceptance. `npm run test:e2e` on this candidate exited
+  non-zero — per Acceptance's branch, this candidate takes `### Stopping without acceptance`.
 - Checks run and results:
-- Evidence locations:
+  - `node --import tsx --test src/operations/e2e-summary.test.ts`: 9/9 pass (0.28s).
+  - `npm run test:e2e` (unsandboxed, candidate sha `83f9aa4337cd1ac1243a1cb01bf1d45951c513ff`):
+    exit 1. 35 passed, 2 failed, 16 skipped. Failed: "A-reads: Content opens request-grouped
+    approval before the separate Publish step"; "B-writes: Content grouped approval reports
+    injected provider success and retained failure separately" (reason: `success=undefined/
+    undefined; failure=undefined/undefined`). Separately, the runner's own isolation check
+    reported `E2E isolation failure: shared worktree changed (data/analytics.db-shm,
+    data/analytics.db-wal)` — not a journey record, but forces the runner's exit code to 1.
+    Neither failure touches this slice's owned paths; both pre-exist this change.
+  - `npm run check` (unsandboxed): exit 1. Isolated via standalone `npm test`: 4373 tests, 4372
+    pass, 1 fail — `not ok 1622 - SLICE-5Z: real isolated Claude/Codex children determine GUI job
+    outcomes and leave only fixture evidence` (`src/review/jobs.test.ts:72`). Unrelated file,
+    outside this slice's owned/touched paths — pre-existing, not introduced by this change.
+  - `bash scripts/repo-hygiene.sh --rescue` (unsandboxed): exit 1 (expected, non-zero per packet).
+    This session's uncommitted paths (`.gitignore`, `e2e/run-all.ts`,
+    `src/operations/e2e-summary.ts`, `src/operations/e2e-summary.test.ts`, plus this repo's
+    pre-existing dirty `content/.../review-queue.md` and `data/notes-spread-ledger.jsonl` that
+    predate this session) were snapshotted to `refs/wip/content-agents` (fc91b82) and left in
+    place, uncommitted, for the coordinator. All other listed items (worktrees
+    `content-agents-6d-fiction`/`-recommendations`/`-verify`, merged branches
+    `slice-5q-queue`/`slice-5r-routing`, unpushed branches `agent/cs2-*`, `agent/cs3-*`,
+    `agent/cs6-*`, `closeout/6k-status`) belong to other sessions; this worker created none of
+    them and took no action on them.
+- Evidence locations: `e2e/e2e-summary.json` (this run's summary artifact, all six fields
+  present); full `npm test` log at `/tmp/claude/e6l-test-full.log`; Playwright/e2e console output
+  retained in the background task transcript (task id `bosqyiafh`).
 - Unresolved:
-- Delivery state and next action: <built | verified | accepted | committed; workers cannot accept/commit>
-- Usage: <local check elapsed time separately from model calls/provider-reported usage;
-  unavailable values `unknown`; prior history behind evidence pointers>
+  - `npm run test:e2e` red per above — not this slice's problem to turn green, per packet.
+  - `npm run check` red due to a pre-existing, unrelated failure in `src/review/jobs.test.ts`
+    (SLICE-5Z) — outside this slice's owned files.
+  - The isolation-check failure (`data/analytics.db-shm`/`-wal` changed) is a pre-existing runner
+    behavior this slice did not introduce; not represented as a journey in the summary artifact
+    since it isn't a per-journey record, only a whole-run isolation guard.
+  - UI-change design-sanity check: not applicable — this slice changes no page, component, or
+    user-visible copy, per the packet's Verify section.
+- Delivery state and next action: built, not verified-clean, not accepted, not committed. Next
+  action: someone re-runs `npm run test:e2e` on a clean, isolated checkout (no shared-worktree
+  writers touching `data/analytics.db*`) to get a true read on the two failed journeys, since one
+  of the two carries `success=undefined/undefined`, suggestive of a fixture/isolation issue rather
+  than a real regression — but that determination is out of this slice's scope to make.
+- Usage: `npm run test:e2e` real 5m4.8s; `npm run check` background run real 2m30.4s before
+  truncated output required a standalone `npm test` isolation rerun (~2-3 min, not separately
+  timed); `bash scripts/repo-hygiene.sh --rescue` well under a minute. Provider-reported model
+  usage: unknown.
+
+## Stopped
+
+- Blocker: `npm run test:e2e` exited non-zero on this candidate (2 failed journeys + a
+  shared-worktree isolation-check trip); per this packet's Acceptance branch, a non-zero e2e exit
+  sends the slice here rather than to acceptance, regardless of cause.
+- What was verified: implementation matches every other Acceptance item — pure summariser with no
+  fs I/O, all six required fields present and correctly derived from records (9/9 unit tests
+  including the all-skipped-is-not-a-pass case), `e2e/run-all.ts` writes the artifact on both the
+  pass and fail path, `npm run check` isolated to one pre-existing unrelated failure
+  (`src/review/jobs.test.ts`, SLICE-5Z). Neither red run touches this slice's owned paths.
+- Retained work: `src/operations/e2e-summary.ts`, `src/operations/e2e-summary.test.ts`,
+  `e2e/run-all.ts` (emit call), `.gitignore` — uncommitted in the main checkout, snapshotted to
+  `refs/wip/content-agents` (fc91b82) by the hygiene rescue. `e2e/e2e-summary.json` from the run
+  is on disk at that path.
+- Next action: re-run `npm run test:e2e` on a checkout no other session is writing to (the
+  isolation guard tripped on `data/analytics.db-shm`/`-wal`), to get a clean read on the two
+  failed journeys before deciding whether they're a real regression or shared-worktree noise; then
+  resume this packet from the retained diff above.
 
 ## Usage budget and handoff
 
