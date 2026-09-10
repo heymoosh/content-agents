@@ -180,15 +180,18 @@ session created and settled, and each path left in place.
 Use the `### Read-set measurement` form in `docs/operations/slice-protocol-environment.md` for the
 closeout read-set print — not an ad hoc re-derivation.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## Stopped
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action:
-- Usage:
+Blocker: premise void — `jobs.test.ts` (136/136) + `npm run check` (4373/4373) exit 0 unsandboxed
+at `main` fork `3395dc2`; the red gate does not reproduce.
+Verified: baseline x2 (worker) + `npm run check` (coordinator); all exit 0.
+Retained work: none — no file edited, worktree/branch clean.
+Next: confirm `main` tip still green, then close 6N moot or re-cut if red elsewhere.
+
+## RESULT BLOCK
+
+- Changed paths: none. See `## Stopped`.
+- Usage: 1 Claude worker (~81K tok) + coordinator verify.
 
 ## Usage budget and handoff
 
