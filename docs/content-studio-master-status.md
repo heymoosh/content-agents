@@ -15,6 +15,7 @@
 - Next: **6M**, `docs/operations/launch-slices/SLICE-6M.md` — written, dependency-ready. It
   realigns the two stale journeys; once it lands, `npm run test:e2e` should exit 0 and 6L can be
   formally accepted.
+- Then: **6N**, `/Users/Muxin/Documents/GitHub/content-agents/docs/operations/launch-slices/SLICE-6N.md` — written, dependency-ready (depends on none; repairs the red `npm run check` gate, disjoint from 6M).
 - Last decision: 6K's freeze-candidate mechanism shipped after a two-round cross-family (Codex)
   audit found and closed one HIGH + two MEDIUM defects. Full record: `SLICE-6K-LOG.md`.
 - Details: `## Progress log` → 2026-09-09 (6K) entry; SLICE-6L.md → `## Stopped` for this block.
