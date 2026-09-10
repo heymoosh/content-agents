@@ -5,14 +5,12 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed to `origin/main`).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6P**, `docs/operations/launch-slices/SLICE-6P.md` (`7ec5368`).
+- Current / last accepted: **6Q**, `docs/operations/launch-slices/SLICE-6Q.md` (`3120a77`).
 - Blocked on: `docs/operations/launch-slices/SLICE-6L.md` → `## Stopped` — committed
   (`f0940ca`) but not formally accepted; still needs 6M's journey realignment.
 - Next: **6M** (packet written: `docs/operations/launch-slices/SLICE-6M.md`, dependency-ready).
 - Then: **6O** (packet written: `docs/operations/launch-slices/SLICE-6O.md`, dependency-ready,
   independent of 6M).
-- Then: **6Q** (packet written: `docs/operations/launch-slices/SLICE-6Q.md`, dependency-ready,
-  independent of 6M and 6O; unblocks the `npm run check` gate both of them assert).
 - Last decision: 6P partitioned the e2e isolation check so another session's SQLite sidecars
   stop failing a candidate; one Codex-audit HIGH closed pre-integration. Full record:
   `SLICE-6P-LOG.md` → `## Accepted — 2026-09-10`.
@@ -52,6 +50,40 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-10 (6Q) — agent children stop inheriting `.env` secrets; `npm run check` goes green
+
+Ran SLICE-6Q (declared meaningful-behavior/high-risk, one Claude strong-model worker at high
+effort). `src/util/env.ts` now records which keys it actually injected from `.env` (`undefined`
+in the ambient environment before the loader ran) and exports `dotenvInjectedKeys` plus
+`withoutDotenvKeys(env)`. `runCommandSpawn` (`src/review/jobs.ts`) gained an optional `baseEnv`
+defaulting to the full `process.env`, so `scout`, `pull`, the venture/fiction runners and
+`serve.ts`'s other spawns are unaffected. `runAgentSpawn` passes `baseEnv: withoutDotenvKeys()`,
+so an agent CLI child gets the ambient environment minus exactly the `.env`-injected keys —
+subtraction, not an allowlist, so a key genuinely present ambiently (even if `.env` also names it)
+still reaches the child. 1 test added to `src/review/jobs.test.ts` (136→137), asserting on a real
+child's own reported environment by key name. The existing 12-key `allowedChildEnvironment`
+assertion at `jobs.test.ts:2468-2472` is byte-identical.
+
+Codex (cross-family, high effort) audited: PASS, no introduced blocker, all four required
+questions answered affirmatively for this candidate. It flagged five pre-existing spawn paths
+outside this slice's owned files (`src/atomize/reply-draft.ts`, `src/outreach/research.ts`,
+`src/providers/polish/claude-cli.ts`, `src/fiction/continuity.ts`, `src/fiction/idea-inbox.ts`,
+`src/fiction/review-pr.ts`) that still inherit the full `.env` — real, but out of this slice's
+scope; candidates for a future slice, not blockers here.
+
+Authenticated canary: a real `claude` Develop job (`job-1789065331989-1`, 194 s, subscription
+route, $0) ran under the narrowed environment against
+`content/2026-06-16-building-an-innovation-nation` and completed normally, proving the real CLI
+still authenticates and works with `.env` secrets stripped from its environment. Its own output
+separately flagged that `config/routing.yaml`'s `human-ai: never: [x]` rule (added 2026-09-07)
+postdates and contradicts this piece's 7 already-published X posts under that pillar — a real
+finding, unrelated to this slice, not acted on here.
+
+`node --import tsx --test src/review/jobs.test.ts`: 137/137, exit 0 (unsandboxed, real `.env`
+present). `npm run check`: 4374/4374, exit 0 (unsandboxed, real `.env` present) — baseline at
+`6de90f7` was 4372/4373 with this file's assertion the one failure. Full record:
+`SLICE-6Q.md` → `## RESULT BLOCK` / `## Closeout`.
 
 ### 2026-09-10 (6P) — e2e isolation check stops failing candidates for another session's SQLite sidecars
 

@@ -167,33 +167,12 @@ do not integrate.
 
 ## Closeout
 
-Closeout gate, hygiene item and read-set print take the bindings' forms — `### Closeout gate
-disposition` (a `**PASS**` line with a date or an explicit leftover list, never a fenced command),
-`### Hygiene disposition` (the four assertions, never a bare exit code), `### Read-set measurement`
-(its commands, not an ad hoc re-derivation). Expect the hygiene command to exit non-zero: other
-sessions have pending work, `/private/tmp/content-agents-*` checkouts and unmerged branches. Name
-each path this session created and settled, and each left in place; the canary's job logs under
-the studio's job-log directory are this session's and must be settled by name.
+**PASS** — 2026-09-10. Full RESULT BLOCK, audit disposition, canary record, preflight and
+read-set: `SLICE-6Q-LOG.md` → `## Accepted — 2026-09-10`.
 
-Preflight: candidate sha pinned and changed paths listed; every acceptance item mapped to a named
-command output or a quoted diff hunk; check exit codes captured by exit status, not from piped
-output; the untouched-expectation claim evidenced by the diff showing no change at
-`jobs.test.ts:2468-2471`; the canary recorded with job id and log path, or declared a verification
-gap; audit findings separated into defects, verification gaps and optional improvements, each
-closed by a fix plus evidence or an explicit disposition.
-Gate cost: `npm run check` on the frozen candidate, once, last, after the focused test; baseline
-`6de90f7` at 4372/4373. Record local elapsed time per command separately from model usage; mark
-provider usage `unknown` if unavailable. No paperwork rerun.
+## RESULT BLOCK
 
-## RESULT BLOCK (worker fills this in and returns it)
-
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action:
-- Usage:
+See `SLICE-6Q-LOG.md` → `## Accepted — 2026-09-10` → `### RESULT BLOCK`.
 
 ## Usage budget and handoff
 
