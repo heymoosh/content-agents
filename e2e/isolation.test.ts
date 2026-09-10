@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { changedWorktreePaths, E2E_PHASE3_SLUG, E2E_WRITE_SLUG, EXPENSIVE_REQUESTS, EXPENSIVE_ROUTES, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
+import { changedWorktreePaths, E2E_PHASE3_SLUG, E2E_WRITE_SLUG, EXPENSIVE_REQUESTS, EXPENSIVE_ROUTES, partitionIsolationChanges, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
 import { NOT_COVERED } from "./pass-d-notcovered.js";
 
 test("live content generation fails closed outside the disposable injected-engine browser pass", () => {
@@ -90,6 +90,59 @@ test("dependency and git metadata are outside the byte-change contract", () => {
     writeFileSync(join(root, ".git", "index"), "changed metadata");
     writeFileSync(join(root, "node_modules", "dependency.js"), "changed dependency");
     assert.deepEqual(changedWorktreePaths(before, snapshotWorktree(root)), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a changed SQLite sidecar alone does not fail the isolation check", () => {
+  const { failing, volatile } = partitionIsolationChanges(["data/analytics.db-wal"]);
+  assert.deepEqual(failing, []);
+  assert.deepEqual(volatile, ["data/analytics.db-wal"]);
+});
+
+test("a changed database file itself still fails the isolation check", () => {
+  const { failing, volatile } = partitionIsolationChanges(["data/analytics.db"]);
+  assert.deepEqual(failing, ["data/analytics.db"]);
+  assert.deepEqual(volatile, []);
+});
+
+test("a sidecar change plus a real stray write only fails on the real write", () => {
+  const { failing, volatile } = partitionIsolationChanges(["data/analytics.db-wal", "new-untracked-file"]);
+  assert.deepEqual(failing, ["new-untracked-file"]);
+  assert.deepEqual(volatile, ["data/analytics.db-wal"]);
+});
+
+test("partitionIsolationChanges preserves order and drops nothing, across all three sidecar paths", () => {
+  const changed = ["b", "data/analytics.db-journal", "data/analytics.db-shm", "data/analytics.db-wal", "e.db"];
+  const { failing, volatile } = partitionIsolationChanges(changed);
+  assert.deepEqual(failing, ["b", "e.db"]);
+  assert.deepEqual(volatile, ["data/analytics.db-journal", "data/analytics.db-shm", "data/analytics.db-wal"]);
+  assert.deepEqual([...failing, ...volatile].sort(), [...changed].sort());
+});
+
+test("a same-suffix file outside data/analytics.db* still fails the isolation check", () => {
+  const { failing, volatile } = partitionIsolationChanges([
+    "tmp/leak.db-wal",
+    "other.db-shm",
+    "nested/data/analytics.db-wal",
+  ]);
+  assert.deepEqual(failing, ["tmp/leak.db-wal", "other.db-shm", "nested/data/analytics.db-wal"]);
+  assert.deepEqual(volatile, []);
+});
+
+test("snapshotWorktree/changedWorktreePaths still report a changed SQLite sidecar upstream", () => {
+  const root = mkdtempSync(join(tmpdir(), "content-agents-e2e-snapshot-"));
+  try {
+    mkdirSync(join(root, "data"), { recursive: true });
+    writeFileSync(join(root, "data", "analytics.db-wal"), "before\n");
+    const before = snapshotWorktree(root);
+    writeFileSync(join(root, "data", "analytics.db-wal"), "after\n");
+    const changed = changedWorktreePaths(before, snapshotWorktree(root));
+    assert.deepEqual(changed, ["data/analytics.db-wal"]);
+    // The split into failing/volatile happens downstream of the snapshot, not by excluding the
+    // sidecar from what gets recorded as changed in the first place.
+    assert.deepEqual(partitionIsolationChanges(changed), { failing: [], volatile: ["data/analytics.db-wal"] });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

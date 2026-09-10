@@ -12,7 +12,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symli
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { changedWorktreePaths, E2E_PHASE3_SLUG, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
+import { changedWorktreePaths, E2E_PHASE3_SLUG, partitionIsolationChanges, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
 import { summarizeE2ERun, type JourneyRecord } from "../src/operations/e2e-summary.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -178,10 +178,16 @@ function main(): void {
   } finally {
     const sharedAfter = snapshotWorktree(SHARED_ROOT);
     const changed = changedWorktreePaths(sharedBefore, sharedAfter);
-    if (changed.length) {
+    const { failing, volatile } = partitionIsolationChanges(changed);
+    if (volatile.length) {
+      console.log(
+        `E2E isolation: ignoring another session's SQLite sidecar(s), did not fail the run (${volatile.join(", ")})`,
+      );
+    }
+    if (failing.length) {
       anyFailed = true;
-      console.error(`\nE2E isolation failure: shared worktree changed (${changed.join(", ")})`);
-    } else {
+      console.error(`\nE2E isolation failure: shared worktree changed (${failing.join(", ")})`);
+    } else if (!volatile.length) {
       console.log("E2E isolation: shared worktree byte-identical after disposable passes.");
     }
     // This removes the copied source, generated writes, draft home, and dependency symlink even

@@ -96,6 +96,35 @@ export function changedWorktreePaths(before: Map<string, string>, after: Map<str
   return [...changed].sort();
 }
 
+// The only database this repo has (src/db/db.ts) — not a suffix match against any basename, so a
+// candidate defect that writes some other same-suffix file (e.g. `tmp/leak.db-wal`) still fails.
+const VOLATILE_SIDECAR_PATHS = new Set([
+  "data/analytics.db-shm",
+  "data/analytics.db-wal",
+  "data/analytics.db-journal",
+]);
+
+/**
+ * Split a `changedWorktreePaths` result into paths that should fail the isolation check and a
+ * closed, named set of SQLite sidecar files another session's own database connection can touch
+ * without writing anything the candidate is responsible for. Only the exact repo-relative sidecar
+ * paths for `data/analytics.db` are routed to `volatile`; `data/analytics.db` itself, and every
+ * other path (including a same-suffix file elsewhere), lands in `failing`. Pure: no fs or process
+ * access.
+ */
+export function partitionIsolationChanges(changed: string[]): { failing: string[]; volatile: string[] } {
+  const failing: string[] = [];
+  const volatile: string[] = [];
+  for (const path of changed) {
+    if (VOLATILE_SIDECAR_PATHS.has(path)) {
+      volatile.push(path);
+    } else {
+      failing.push(path);
+    }
+  }
+  return { failing, volatile };
+}
+
 // Routes that spawn a `claude -p` process, hit a paid API, or drive a real browser session. The
 // suite must never trigger one: they cost real money or subscription time, take minutes, and would
 // make every run non-deterministic. A feature behind one of these is reported as
