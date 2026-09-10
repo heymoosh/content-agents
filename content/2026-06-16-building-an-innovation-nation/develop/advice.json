@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "rounds": [
+    {
+      "index": 1,
+      "trigger": "initial",
+      "replyText": null,
+      "at": "2026-09-10T18:00:00Z",
+      "cards": [
+        {
+          "id": "r1-c1",
+          "kind": "angle",
+          "title": "Belief under audit: shareholder value is how you measure a well-run company",
+          "summary": "Reader: a LinkedIn professional/manager who assumes quarterly shareholder-value pressure is just what good governance looks like. Payoff: a citation trail (Welch, Buffett/Dimon, the 2019 Business Roundtable reversal, Ries) to name what's actually happening when long-horizon work gets cut for this quarter's number. Altitude: professional, maps to linkedin per brand.yaml altitudes. Belief under audit: maximizing shareholder value every quarter is the correct way to run a company. Observable: pull the 2019 Business Roundtable statement (181 CEOs walking back the model they endorsed since 1997) and check it against your own company's last earnings call in under 10 minutes. Not yet extracted: linkedin-1/2 use the education and judgment lines (L10, 20, 46, 104, 106, 108, 118, 120), never the governance citations themselves.",
+          "lens": "shareholder-primacy",
+          "sourceLines": [57, 59],
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c2",
+          "kind": "angle",
+          "title": "Belief under audit: our innovation problem is a talent/idea shortage, not a funding structure",
+          "summary": "Reader: a builder or PM (builder pillar) frustrated that ambitious work keeps losing to this quarter's roadmap. Payoff: a named list of exactly what quarterly incentives starve, so they can point at the pattern instead of blaming themselves or their team. Altitude: professional/technical, maps to linkedin or x per brand.yaml. Belief under audit: we already fund innovation adequately, we just lack better ideas. Observable: pick one item off the list (foundational research, workforce training, customer discovery, new-category bets, infra upkeep) and check whether your own team's current roadmap has a line item for it, or whether it's 100% feature/metric work. Not yet extracted: no existing derivative cites these five bullets.",
+          "lens": "rnd-starvation-list",
+          "sourceLines": ["51-55"],
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c3",
+          "kind": "angle",
+          "title": "Belief under audit: founders succeed because they had the right idea",
+          "summary": "Reader: career-work/builder audience weighing whether they have 'what it takes.' Payoff: a concrete, learnable checklist (resilience, questioning assumptions, talking to customers before the product is ready, tolerating ambiguity) that recasts founder success as trainable behavior, not a personality you either have or don't. Altitude: professional, maps to linkedin. Belief under audit: startup success comes from having the right idea. Observable: audit your own last quarter of work against the 9-item list and count how many you actually did. Not yet extracted: no existing derivative cites the founder-lesson list itself (L44's education contrast is used, but not this list).",
+          "lens": "founder-checklist",
+          "sourceLines": ["29-31", "35-43"],
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c4",
+          "kind": "angle",
+          "title": "Belief under audit: wealth reflects merit when the game is actually fair",
+          "summary": "Reader: technical/contrarian X audience skeptical of 'wealth = value created.' Payoff: a live simulation they can run themselves, not just a conclusion to take on faith. Altitude: technical, maps to x. Belief under audit: extreme inequality only happens when the game is rigged. Observable: the piece already built the cheapest possible test, a 100-agent coin-toss wealth simulation at the linked URL, that a reader can run in under a minute and watch the same extreme concentration emerge from a fair 50/50 coin toss. This is deliberately distinct from x-1 and quote-card-2, which extract the conclusion sentence (L78/L94); this angle makes the run-it-yourself simulation setup the hook instead of the punchline.",
+          "lens": "yard-sale-observable",
+          "sourceLines": [81, 83, 93],
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c5",
+          "kind": "cta",
+          "title": "CTA split holds: source primary, voting-tool project secondary",
+          "summary": "Content type reads as society_capitalism_piece per config/content-types.yaml (AI/judgment scarcity, through shareholder primacy, to wealth inequality, closing on a civic ask), which pairs primary=source, secondary=project. The piece's own project_url, the voting-history tool at L138-140, is real and already wired into derivatives/community-democratic-resilience.md through config/platforms.yaml's civic-tech override (always: community:democratic-resilience). No project_url question needs to go to Muxin here; nothing invented.",
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c6",
+          "kind": "spin",
+          "title": "Platform spin fit, per config/platforms.yaml spin_angles",
+          "summary": "x: weak case-shape fit (no single tool/mechanism-plus-number scene), so a spin pass correctly falls back to non-case extraction, matching how x-1 through x-7 already read. linkedin: same, no literal quoted belief statement from a named practitioner, so the case-beat template doesn't fit and linkedin-1/2 correctly fall back too. mastodon: strong fit, the shareholder-primacy angle (r1-c1) is exactly the 'you already questioned one entrenched system, now question this one' parallel the angle calls for. threads: strong fit for the founder-checklist angle (r1-c3), a personal, relatable 'what it actually takes' framing over the technical specifics. substack: strong fit, the whole essay already is the builder-philosopher thesis. bluesky: strong fit, the wealth-inequality material plus the civic close match the democracy-as-broken-UX angle directly.",
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c7",
+          "kind": "note",
+          "title": "Routing preview could not run live this session, plus a policy-vs-history mismatch worth flagging",
+          "summary": "npm run route failed under the sandbox (tsx's IPC listener hit EPERM on the /tmp pipe) and the unsandboxed retry was denied, so this round reports from the existing routing.md (generated 2026-06-16) and a direct read of config/routing.yaml instead of a fresh live run. Pillars read as human-ai (primary) and civic-tech (secondary, via the voting-tool close), matching extracts.md's existing tags. Worth flagging: config/routing.yaml's rules block now reads human-ai: never: [x], dated 2026-09-07, after this piece's original routing pass. A routing preview run today would exclude x for the human-ai pillar, which would contradict the 7 already-published x-1 through x-7 posts filed under this pillar. civic-tech's rules (always: community:democratic-resilience, never: x) already match what shipped, no mismatch there. Worth a live re-run once the sandbox or the tool restriction allows it.",
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        }
+      ]
+    }
+  ]
+}
