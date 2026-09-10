@@ -10,8 +10,8 @@
   exited non-zero on the candidate (2 failed journeys + a shared-worktree isolation-check trip);
   packet's own rule sends a red e2e run here rather than to acceptance. Retained diff uncommitted
   in the main checkout, snapshotted to `refs/wip/content-agents` (fc91b82).
-- Next: re-run `npm run test:e2e` on a checkout no other session is writing to, then resume
-  SLICE-6L from its retained diff. 6K is done; no other dependency-ready packet is queued.
+- Next: **6M**, `docs/operations/launch-slices/SLICE-6M.md` — written, dependency-ready. It
+  realigns the two stale journeys blocking 6L; run it, then resume 6L from its retained diff.
 - Last decision: 6K's freeze-candidate mechanism shipped after a two-round cross-family (Codex)
   audit found and closed one HIGH + two MEDIUM defects. Full record: `SLICE-6K-LOG.md`.
 - Details: `## Progress log` → 2026-09-09 (6K) entry; SLICE-6L.md → `## Stopped` for this block.
