@@ -168,7 +168,7 @@
   "dependencies": {
     "@atproto/api": "^0.20.42",
     "@mozilla/readability": "^0.6.0",
-    "@remotion/bundler": "^4.0.512",
+    "@remotion/bundler": "^4.0.520",
     "@remotion/captions": "^4.0.512",
     "@remotion/cli": "^4.0.518",
     "@remotion/renderer": "^4.0.512",
