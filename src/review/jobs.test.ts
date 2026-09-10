@@ -2681,3 +2681,129 @@ test("SLICE-5N: a dispatch that throws fails its own job and still lets the next
     jobs.length = 0;
   }
 });
+
+// ── SLICE-6Q: agent children do not inherit the repo's .env secrets ─────────────────────────────
+// src/util/env.ts injects the repo-root .env into process.env at import time, and runCommandSpawn
+// hands every child `{ ...process.env, ...opts.env }`. That gave every `claude`/`codex` child the
+// full provider secret set. runAgentSpawn now subtracts exactly the keys the loader injected —
+// subtraction, not an allowlist, so the ambient keys the real CLIs and the fixture depend on stay.
+// Asserted on a real child's own reported environment, by key name, not by asserting a filter ran.
+
+function slice6QFixture(receiptPath: string, probeKeys: string[]): string {
+  return [
+    `#!${process.execPath}`,
+    `const fs = require("node:fs");`,
+    `const probe = ${JSON.stringify(probeKeys)};`,
+    `const values = {};`,
+    `for (const key of probe) values[key] = process.env[key] ?? null;`,
+    // Key NAMES for every variable, but VALUES only for this test's own probes: a receipt on disk
+    // must never carry a real provider secret, which is the whole point of the slice.
+    `fs.writeFileSync(${JSON.stringify(receiptPath)}, JSON.stringify({ envKeys: Object.keys(process.env).sort(), values }));`,
+    `process.stdout.write("slice-6q fixture ok\\n");`,
+    ``,
+  ].join("\n");
+}
+
+test("SLICE-6Q: an agent child loses every .env-injected key while a plain runCommandSpawn child keeps them", () => {
+  // A key that .env sets AND the spawning process already has: the loader leaves it alone, so it
+  // was never .env-sourced and stripping it from the agent child would be a regression.
+  const envFilePath = join(repoRoot, ".env");
+  const envFileExists = existsSync(envFilePath);
+  const ambientAlsoInEnvFile = (envFileExists
+    ? readFileSync(envFilePath, "utf8").split("\n").map((line) => line.match(/^\s*([A-Z0-9_]+)\s*=/)?.[1]).find((key): key is string => Boolean(key))
+    : undefined) ?? "SLICE_6Q_NO_ENV_FILE";
+
+  const root = mkdtempSync(join(tmpdir(), "slice-6q-"));
+  try {
+    const bin = join(root, "bin");
+    const home = join(root, "home");
+    const dataRoot = join(root, "data");
+    const tempRoot = join(root, "tmp");
+    const work = join(root, "work");
+    for (const dir of [bin, home, dataRoot, tempRoot, work]) mkdirSync(dir, { recursive: true });
+    const agentReceipt = join(root, "agent-receipt.json");
+    const plainReceipt = join(root, "plain-receipt.json");
+    const probeKeys = ["SLICE_6Q_AMBIENT_ONLY", "SLICE_6Q_OVERRIDE", "HOME", "PATH", ambientAlsoInEnvFile];
+
+    const agentFixture = join(bin, "claude");
+    const plainFixture = join(bin, "slice6q-plain-child");
+    writeFileSync(agentFixture, slice6QFixture(agentReceipt, probeKeys));
+    writeFileSync(plainFixture, slice6QFixture(plainReceipt, probeKeys));
+    chmodSync(agentFixture, 0o700);
+    chmodSync(plainFixture, 0o700);
+
+    const runner = join(root, "run-slice-6q.ts");
+    const jobsModule = JSON.stringify(join(process.cwd(), "src/review/jobs.ts"));
+    const envModule = JSON.stringify(join(process.cwd(), "src/util/env.ts"));
+    writeFileSync(runner, [
+      `import { readFileSync } from "node:fs";`,
+      `import { runQueued, runAgentSpawn, runCommandSpawn } from ${jobsModule};`,
+      `import { dotenvInjectedKeys } from ${envModule};`,
+      `async function main(): Promise<void> {`,
+      `  await runQueued("revise", "slice-6q agent", async (job) => await runAgentSpawn(job, "claude", "slice-6q prompt", { timeoutMs: 15_000, cwd: process.env.FIXTURE_WORK, permissionMode: "acceptEdits", env: { SLICE_6Q_OVERRIDE: "from-opts" } }), "claude");`,
+      `  await runQueued("revise", "slice-6q plain", async (job) => await runCommandSpawn(job, "slice6q-plain-child", [], { timeoutMs: 15_000, cwd: process.env.FIXTURE_WORK }), "claude");`,
+      `  process.stdout.write(JSON.stringify({`,
+      `    injectedKeys: [...dotenvInjectedKeys].sort(),`,
+      `    agent: JSON.parse(readFileSync(${JSON.stringify(agentReceipt)}, "utf8")),`,
+      `    plain: JSON.parse(readFileSync(${JSON.stringify(plainReceipt)}, "utf8")),`,
+      `  }));`,
+      `}`,
+      `void main().catch((error) => { console.error(error); process.exitCode = 1; });`,
+      ``,
+    ].join("\n"));
+
+    const output = String(execFileSync(process.execPath, ["--import", "tsx", runner], {
+      cwd: repoRoot,
+      env: {
+        HOME: home,
+        PATH: bin,
+        TMPDIR: tempRoot,
+        TMP: tempRoot,
+        TEMP: tempRoot,
+        CONTENT_AGENTS_DATA_ROOT: dataRoot,
+        CONTENT_AGENTS_TEST_COST_LOG: join(root, "cost", "fixture-cost.csv"),
+        FIXTURE_WORK: work,
+        SLICE_6Q_AMBIENT_ONLY: "ambient",
+        SLICE_6Q_OVERRIDE: "from-ambient",
+        [ambientAlsoInEnvFile]: "ambient-wins",
+        __CF_USER_TEXT_ENCODING: "0x1F5:0:0",
+      },
+      encoding: "utf8",
+      timeout: 60_000,
+      killSignal: "SIGTERM",
+    })).trim();
+    const actual = JSON.parse(output.slice(output.indexOf("{"))) as {
+      injectedKeys: string[];
+      agent: { envKeys: string[]; values: Record<string, string | null> };
+      plain: { envKeys: string[]; values: Record<string, string | null> };
+    };
+
+    // The loader's own record is only trustworthy if it matches reality: with a real .env it has
+    // injected something, without one it is empty. Without this the whole test reads green in a
+    // fresh worktree that has no .env — which is exactly how this leak survived SLICE-6N.
+    if (envFileExists) {
+      assert.ok(actual.injectedKeys.length > 0, "a real .env must inject at least one key into the runner");
+      assert.equal(actual.injectedKeys.includes(ambientAlsoInEnvFile), false, "a key already in the ambient environment is not .env-sourced");
+    } else {
+      assert.deepEqual(actual.injectedKeys, [], "no .env means nothing was injected");
+    }
+
+    const agentKeys = new Set(actual.agent.envKeys);
+    assert.deepEqual(actual.injectedKeys.filter((key) => agentKeys.has(key)), [], "no .env-injected key reaches the agent child");
+
+    // ...and the narrowing is a subtraction, not an allowlist: everything else still arrives.
+    assert.equal(actual.agent.values.SLICE_6Q_AMBIENT_ONLY, "ambient", "an ambient key absent from .env still reaches the agent child");
+    assert.equal(actual.agent.values.SLICE_6Q_OVERRIDE, "from-opts", "opts.env still wins over the ambient value");
+    assert.equal(actual.agent.values.HOME, home);
+    assert.equal(actual.agent.values.PATH, bin);
+    assert.equal(actual.agent.values[ambientAlsoInEnvFile], "ambient-wins", "a .env key that was already ambient is not stripped");
+    assert.equal(agentKeys.has("CONTENT_AGENT_ENGINE"), true, "runAgentSpawn still stamps the engine");
+
+    // The scout/pull/venture/fiction path spawns repo scripts that legitimately need those keys.
+    const plainKeys = new Set(actual.plain.envKeys);
+    assert.deepEqual(actual.injectedKeys.filter((key) => !plainKeys.has(key)), [], "a direct runCommandSpawn child still receives every .env key");
+    assert.equal(actual.plain.values.SLICE_6Q_AMBIENT_ONLY, "ambient");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

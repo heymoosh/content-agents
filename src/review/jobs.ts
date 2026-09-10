@@ -20,6 +20,7 @@ import { checkPlatformLimits, checkSkeletonGate, checkCaseGate } from "../atomiz
 import { readSourceClass, readCaseEvidence, classifyContentOriginClass, type SourceClass } from "../atomize/source-triage.js";
 import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { withoutDotenvKeys } from "../util/env.js";
 import { upsertFrontmatterField } from "../outreach/qualify.js";
 import { CONTENT, safeFolder, isValidLens } from "./rows.js";
 import { readPillar } from "./reschedule.js";
@@ -1755,7 +1756,7 @@ export function runCommandSpawn(
   job: Job,
   command: string,
   args: string[],
-  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv; input?: string; cwd?: string }
+  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv; input?: string; cwd?: string; baseEnv?: NodeJS.ProcessEnv }
 ): Promise<CommandSpawnResult> {
   // A stopped job's future spawns are stillborn. A task job stopped between two spawns has no
   // child to signal, so stopJob settles it and hands the lane on immediately — without this guard
@@ -1783,7 +1784,10 @@ export function runCommandSpawn(
       // to 3s for stdin input before it warns and proceeds without it ("no stdin data received in
       // 3s"). Closing it up front skips that wait entirely.
       stdio: [opts.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
-      env: { ...process.env, ...opts.env },
+      // `baseEnv` defaults to the full ambient environment: repo scripts spawned straight through
+      // here (scout, pull, the venture and fiction runners) legitimately need the provider keys
+      // `.env` supplies. Only runAgentSpawn narrows it — see there.
+      env: { ...(opts.baseEnv ?? process.env), ...opts.env },
     });
     if (opts.input !== undefined && child.stdin) {
       child.stdin.end(opts.input);
@@ -1831,6 +1835,10 @@ export async function runAgentSpawn(
   try {
     const result = await runCommandSpawn(job, built.command, built.args, {
       timeoutMs: opts.timeoutMs,
+      // An agent CLI needs none of the repo's provider secrets, so it gets the ambient environment
+      // minus exactly what `.env` injected. Subtraction, not an allowlist: the real CLIs and the
+      // test fixture both depend on ambient keys nobody here can enumerate.
+      baseEnv: withoutDotenvKeys(),
       env: { ...opts.env, CONTENT_AGENT_ENGINE: engine },
       input: built.input,
       cwd: opts.cwd,
