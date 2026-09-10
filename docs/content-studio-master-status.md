@@ -5,21 +5,14 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed to `origin/main`).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6Q**, `docs/operations/launch-slices/SLICE-6Q.md` (`3120a77`).
-- Blocked on: `docs/operations/launch-slices/SLICE-6L.md` → `## Stopped` — committed
-  (`f0940ca`) but not formally accepted; still needs 6M's journey realignment.
-- Next: **6M** (packet written: `docs/operations/launch-slices/SLICE-6M.md`, dependency-ready).
-- Then: **6O** (packet written: `docs/operations/launch-slices/SLICE-6O.md`, dependency-ready,
-  independent of 6M).
-- **6R** accepted (`docs/operations/launch-slices/SLICE-6R.md`) — narrowed the six agent-CLI
-  spawn sites 6Q's audit left inheriting `.env`, all now passing `withoutDotenvKeys()`; both
-  canaries (claude, grok) passed, Codex audit PASS (one design-only optional-improvement note,
-  no fix required), `npm run check` 4378/4378 green.
-- Last decision: 6Q stopped agent-CLI children from inheriting `.env` secrets, by subtracting the
-  loader-injected keys, not an allowlist; `npm run check` goes from 4372/4373 to 4374/4374 green.
-  Codex audit PASS, authenticated canary passed. Full record:
-  `SLICE-6Q-LOG.md` → `## Accepted — 2026-09-10`.
-- Details: `## Progress log` → 2026-09-10 (6Q) entry.
+- Current / last accepted: **6R**, `docs/operations/launch-slices/SLICE-6R.md` (`cc54cd4`).
+- Blocked on: `docs/operations/launch-slices/SLICE-6L.md` → `## Stopped` (`f0940ca`, not
+  formally accepted; needs 6M's journey realignment).
+- Next: **6M** (`docs/operations/launch-slices/SLICE-6M.md`, dependency-ready).
+- Then: **6O** (`docs/operations/launch-slices/SLICE-6O.md`, dependency-ready, indep. of 6M).
+- Last decision: 6R narrowed the six remaining agent-CLI spawn sites off `.env`; audit PASS,
+  both canaries passed, `npm run check` 4378/4378 green. `SLICE-6R-LOG.md` → `## Accepted`.
+- Details: `## Progress log` → 2026-09-10 (6R) entry.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints
@@ -55,6 +48,48 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-10 (6R) — the six remaining agent-CLI spawn sites stop inheriting `.env` secrets
+
+Ran SLICE-6R (declared high-risk/meaningful-behavior, one Claude strong-model worker at high
+effort). Narrowed the six spawn sites 6Q's Codex audit had named as still inheriting the full
+`.env`: `src/atomize/reply-draft.ts:133` (`spawn("claude", …)`), `src/outreach/research.ts:392`
+(`execFileP("claude", …)`, keeping its `OUTREACH_SEARCH_BUDGET_COUNTER_FILE`/
+`OUTREACH_SEARCH_BUDGET_TOTAL` overrides byte-for-byte), `src/providers/polish/claude-cli.ts:41`,
+and the three fiction engine-CLI sites (`continuity.ts:252`, `idea-inbox.ts:347`,
+`review-pr.ts:365`). Each now passes `env: withoutDotenvKeys()`, imported from `src/util/env.js`
+(6Q's helper, unchanged). `src/fiction/review-pr.ts:21`'s separate `git`/`gh` exec deliberately
+keeps the full environment (needs a `.env`-sourced `GITHUB_TOKEN`), asserted by its own test.
+
+New `src/util/env.test.ts` (4 tests) proves both mechanisms against a real child: a `spawn` and an
+`execFile` test each launch `process.execPath -e` under `withoutDotenvKeys()` and assert, from the
+child's own printed `Object.keys(process.env)`, that no `.env`-injected key survives and `PATH`
+does; a source guard reads all six files and fails naming any site that doesn't reference the
+helper (negative-proof: reverting `continuity.ts` failed the guard, naming it); a fourth test
+confirms `review-pr.ts`'s git/gh exec is not narrowed.
+
+Codex (cross-family) audited the six-file diff plus the new test file: one established finding
+(P2) — the source guard's windowed substring check doesn't assert the spawn's `env` expression is
+exactly `withoutDotenvKeys()`, so a stray in-window mention of the helper name could in principle
+produce a false pass. Disposition: no fix required this slice — the coordinator confirmed no such
+stray occurrence exists in any of the six files today (each file's only in-window match is the
+real call; every `import` line falls outside its anchor's window), the packet's own acceptance
+criterion only required the guard to fail when a site "does not reference" the helper, and the
+`continuity.ts` negative-mutation proof already demonstrates it catches a real reversion. Recorded
+as an optional AST-based hardening improvement, not pulled into scope.
+
+Two authenticated canaries, zero retries: `npm run script:draft` (claude family, $0 subscription
+route, 14 s) completed normally under the narrowed environment; `callEngineContinuity('grok')`
+(non-claude engine, 13 s) returned `"OK"` under the same narrowed environment — both `grok` and
+`codex` were installed and authenticated, so all six files ship (the packet's Canary-2-unavailable
+revert rule did not apply).
+
+`node --import tsx --test src/util/env.test.ts`: 4/4, exit 0 (worker and coordinator, both
+independently, unsandboxed, real `.env` present). Focused regression suite across the six touched
+files: 99/99, exit 0, matching pre-change baselines. `npm run check`: 4378/4378, exit 0 (worker
+152 s; coordinator's independent re-run 149.5 s) — baseline 4374/4374 plus this slice's 4 new
+tests, no other difference. Accepted and committed as `cc54cd4` on `main`. Full record:
+`SLICE-6R.md` → `## Closeout`; dated record in `SLICE-6R-LOG.md` → `## Accepted — 2026-09-10`.
 
 ### 2026-09-10 (6Q) — agent children stop inheriting `.env` secrets; `npm run check` goes green
 
