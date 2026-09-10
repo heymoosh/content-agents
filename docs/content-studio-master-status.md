@@ -11,10 +11,11 @@
 - Next: **6M** (packet written: `docs/operations/launch-slices/SLICE-6M.md`, dependency-ready).
 - Then: **6O** (packet written: `docs/operations/launch-slices/SLICE-6O.md`, dependency-ready,
   independent of 6M).
-- Last decision: 6P partitioned the e2e isolation check so another session's SQLite sidecars
-  stop failing a candidate; one Codex-audit HIGH closed pre-integration. Full record:
-  `SLICE-6P-LOG.md` → `## Accepted — 2026-09-10`.
-- Details: `## Progress log` → 2026-09-10 (6P) entry.
+- Last decision: 6Q stopped agent-CLI children from inheriting `.env` secrets, by subtracting the
+  loader-injected keys, not an allowlist; `npm run check` goes from 4372/4373 to 4374/4374 green.
+  Codex audit PASS, authenticated canary passed. Full record:
+  `SLICE-6Q-LOG.md` → `## Accepted — 2026-09-10`.
+- Details: `## Progress log` → 2026-09-10 (6Q) entry.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints
