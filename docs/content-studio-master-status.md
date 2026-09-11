@@ -6,13 +6,13 @@
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
 - Current / last accepted: **6R**, `docs/operations/launch-slices/SLICE-6R.md` (`cc54cd4`).
-- Blocked on: `docs/operations/launch-slices/SLICE-6M.md` → `## Stopped` (2026-09-11): 6M's fix
-  is verified correct, but a pre-existing Pass D timeout (unrelated, reproduced on `main`) keeps
-  `test:e2e` red. Needs an owner call or a new slice for Pass D.
-- Next dependency-ready: **6O** (`docs/operations/launch-slices/SLICE-6O.md`, indep. of 6M).
+- In progress: **6S** (`docs/operations/launch-slices/SLICE-6S.md`) — fixes the two pre-existing
+  Pass D timeouts blocking 6M. On acceptance, re-verify 6M's diff (`refs/wip/wt-slice-6m`,
+  `d881432`) end-to-end and merge it.
+- Next dependency-ready: **6O** (`docs/operations/launch-slices/SLICE-6O.md`, indep. of 6M/6S).
 - Last decision: 6R narrowed the six remaining agent-CLI spawn sites off `.env`; audit PASS,
   both canaries passed, `npm run check` 4378/4378 green. `SLICE-6R-LOG.md` → `## Accepted`.
-- Details: `## Progress log` → 2026-09-10 (6R) entry; 6M's stop: `SLICE-6M-LOG.md`.
+- Details: `## Progress log` → 2026-09-10 (6R); 6M's stop: `SLICE-6M-LOG.md`; 6S: `## Goal`.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints
