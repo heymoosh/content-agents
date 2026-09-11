@@ -7,8 +7,8 @@
   `docs/operations/slice-protocol-environment.md`.
 - Current / last accepted: **6U**, `docs/operations/launch-slices/SLICE-6U.md`, PASS. Nothing blocked.
   `npm run test:e2e` green end to end for the first time, 50 / 0 / 16 blocked; `npm run check` 4379 / 0.
-- Next: **6V** (packet not yet written). Trim `AGENTS.md` -> `## Slice protocol` to its 24576 B cap;
-  it is 26179 B and has now been carried across two closeouts.
+- Next: **6V**, `docs/operations/launch-slices/SLICE-6V.md`, written and dependency-ready. Trim
+  `AGENTS.md` -> `## Slice protocol` to its 24576 B cap; it is 26179 B, carried across two closeouts.
 - Last decision: the e2e seam stands in for the whole provider round trip, discovery included, so it
   resolves before provider selection; the disposable root never carries `.env`, the non-secret account
   identity is stated in the harness instead.
