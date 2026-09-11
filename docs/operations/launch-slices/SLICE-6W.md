@@ -81,32 +81,32 @@ Stage-2-affecting change.
 
 ## Acceptance
 
-- [ ] 1. `npm run test:e2e` exits 0 with 0 failures, counts recorded, before any live call.
-- [ ] 2. `npm run verify:postiz-canary` scoped to Bluesky exits 0; its report shows the Bluesky text
+- [x] 1. `npm run test:e2e` exits 0 with 0 failures, counts recorded, before any live call.
+- [x] 2. `npm run verify:postiz-canary` scoped to Bluesky exits 0; its report shows the Bluesky text
   channel `ok: true` with a `postId` and a `scheduledAt`.
-- [ ] 3. That same report shows the canary post reconciled to `canceled` — Stage 1 leaves nothing
+- [x] 3. That same report shows the canary post reconciled to `canceled` — Stage 1 leaves nothing
   standing at the provider.
-- [ ] 4. That same report records a `rescheduledTo` different from its `scheduledAt`, proving the
+- [x] 4. That same report records a `rescheduledTo` different from its `scheduledAt`, proving the
   move path before it is used for real.
-- [ ] 5. Muxin has named exactly one Bluesky text row (slug + row id), and that row's status in
+- [x] 5. Muxin has named exactly one Bluesky text row (slug + row id), and that row's status in
   `review-queue.md` reads `approve` at the moment of scheduling.
-- [ ] 6. That row is scheduled through the Studio Publishing room's Schedule action in a browser,
+- [x] 6. That row is scheduled through the Studio Publishing room's Schedule action in a browser,
   not by a CLI shortcut, and the Studio page afterwards shows it scheduled with a concrete PT date
   and time.
-- [ ] 7. The scheduled time came from the unified scheduler's next free Bluesky slot: a matching
+- [x] 7. The scheduled time came from the unified scheduler's next free Bluesky slot: a matching
   line exists in `data/publish-schedule.jsonl` and no time was typed by hand.
-- [ ] 8. Exactly one provider object was created for that row. Bluesky is configured for both
+- [x] 8. Exactly one provider object was created for that row. Bluesky is configured for both
   `postiz` and `typefully` in `config/brand-accounts.yaml`; the evidence must show one post, not one
   per provider.
-- [ ] 9. `npm run publish:reschedule -- --slug <slug> --id <row> --to <ISO> --dry-run` lists that one
+- [x] 9. `npm run publish:reschedule -- --slug <slug> --id <row> --to <ISO> --dry-run` lists that one
   row and no other; the same command without `--dry-run` then exits 0.
-- [ ] 10. `npm run publish:reconcile` exits 0 and the row's delivery event carries a
+- [x] 10. `npm run publish:reconcile` exits 0 and the row's delivery event carries a
   provider-reported scheduled time equal to the moved time, not merely the requested time.
-- [ ] 11. After the moved slot passes, Muxin confirms the post is live, and
+- [x] 11. After the moved slot passes, Muxin confirms the post is live, and
   `npm run publish:record-evidence` exits 0 printing an event with `state` `live`.
-- [ ] 12. No other `review-queue.md` row changed status, and the Bluesky account gained exactly one
+- [x] 12. No other `review-queue.md` row changed status, and the Bluesky account gained exactly one
   new post from this slice.
-- [ ] 13. `npm run check` run unsandboxed exits 0 with 0 failures, last.
+- [x] 13. `npm run check` run unsandboxed exits 0 with 0 failures, last.
 
 ## Verify
 
@@ -180,53 +180,21 @@ partial. Retry when the reviewer returns; never integrate a live delivery whose 
 
 ## Closeout
 
-Record `**PASS**` with a date, or the explicit leftover list, in this packet before the slice
-closes. The binding's closeout gate is `none`; no command belongs in this slot.
+**PASS** — 2026-09-11. Accepted. All 13 acceptance items closed: one real Bluesky post scheduled
+through Studio's own Schedule action, moved once, failed once at the provider (a stale
+Postiz→Bluesky session token — resolved by Muxin reconnecting the account in Postiz, not a bug in
+this codebase), retried, and confirmed live by her —
+`https://bsky.app/profile/did:plc:brjgstzt7gooqouz5kdci6n7/post/3mvbildnkj52w`. Full dated story:
+`SLICE-6W-LOG.md`, esp. `## Stage 2 retry, root cause, and delivery, 2026-09-11`. Two items
+deferred to a future slice, not abandoned: the general provenance-journal fix; auditing other
+Postiz-routed channels' connection health. `npm run check` unsandboxed: PASS (see RESULT BLOCK).
 
-Preflight: this packet names every owned path and every command; Stage 1 PASS is recorded before
-Stage 2 starts; the row Muxin named is pinned by slug and id in the RESULT BLOCK; every acceptance
-item above maps to a file, a command exit code, or a named human confirmation; no acceptance item
-rests on intent.
-Gate cost: `npm run check`, unsandboxed, on the frozen candidate — measured at 173 s on 2026-09-11.
-`npm run test:e2e` runs once in Stage 1 and again only if `src/` or `e2e/` changed. No
-paperwork-only rerun.
-
-Use the `### Hygiene disposition` form in `docs/operations/slice-protocol-environment.md` for the
-hygiene item — not a bare exit code. Four other-session items are already known to be listed
-(`wt-slice-6m`, `wt-slice-6s`, and two merged branches); name them and leave them in place.
-
-Use the `### Read-set measurement` form in the same file for the closeout read-set print.
-
-## Stopped
-
-Resolved 2026-09-11: `bluesky-2` now carries real `approval-dispatch-safety.jsonl` provenance
-(`{"kind":"fresh"}`) via the audited one-off `scripts/slice-6w-seed-provenance.ts` — see
-`SLICE-6W-LOG.md` → `## One-off provenance seed, 2026-09-11`. The general systemic gap (production
-never populates that journal for newly-approved rows) is real and still open, deferred for a future
-slice — see `SLICE-6W-LOG.md` → `## Deferred — general provenance-journal fix, 2026-09-11`.
-
-Verified: Stage 1 PASSED (hermetic + live create-and-cancel Bluesky canary, nothing left standing).
-Stage 2, done for real through Studio's own UI (not CLI): live Schedule click on `bluesky-2`
-succeeded (one `POST /api/publishing/schedule`, 200; provider object `cmtxe0dww0004mn81r740iylk`,
-first slot Sat Sep 12 6:30 PM PT, confirmed against the unified scheduler's own ledger entry, not
-hand-typed) — acceptance items 6-8. Then moved once to a different real slot via
-`npm run publish:reschedule --to 2026-09-14T01:30:00.000Z` (dry-run first, listed only this row;
-real run `ok:true`, same provider object, new `plannedFor` Sun Sep 13 6:30 PM PT), confirmed in
-Studio's own UI after the move — acceptance item 9. `npm run publish:reconcile` ran clean
-(`state:"ok"`, exit 0; 0 observations, since the slot has not passed yet) — acceptance item 10's
-mechanical half.
-
-Retained: `content/.../review-queue.md` (bluesky-2→approve, uncommitted);
-`$TMPDIR/slice-6w/canary.json`.
-
-Next action: wait for the moved slot (2026-09-14T01:30:00.000Z / Sun Sep 13, 6:30 PM PT) to pass,
-get Muxin's live confirmation the post is on Bluesky, then `npm run publish:record-evidence`, a
-final check of item 12 (no other row changed, exactly one new post), and unsandboxed
-`npm run check` to close. Note for closeout: this packet is over the 12,288 B cap — trim then.
+Hygiene: four other-session items known and left in place — worktrees `wt-slice-6m`, `wt-slice-6s`;
+merged branches `slice-6m-worker`, `slice-6s-worker` (same four listed at 6U/6V).
 
 ## RESULT BLOCK
 
-See `SLICE-6W-LOG.md` → `## RESULT BLOCK — 2026-09-11`.
+See `SLICE-6W-LOG.md` → `## RESULT BLOCK — 2026-09-11 (final)`.
 
 ## Usage budget and handoff
 

@@ -33,7 +33,7 @@ yet. The three card rows below are queued on their drafted captions only.
 | x-3 | x | text | derivatives/x-3.md | 5 | 4 | true | pending | flag: spin pass suggested (low: narrative) | from /cycle |
 | linkedin-1 | linkedin | text | derivatives/linkedin-1.md | 5 | 5 | true | pending | | from /cycle |
 | bluesky-1 | bluesky | text | derivatives/bluesky-1.md | 5 | 5 | true | pending | | from /cycle |
-| bluesky-2 | bluesky | text | derivatives/bluesky-2.md | 5 | 5 | true | pending | | from /cycle |
+| bluesky-2 | bluesky | text | derivatives/bluesky-2.md | 5 | 5 | true | published | | from /cycle |
 | mastodon-1 | mastodon | text | derivatives/mastodon-1.md | 5 | 5 | true | pending | | from /cycle |
 | mastodon-2 | mastodon | text | derivatives/mastodon-2.md | 5 | 4 | true | pending | | from /cycle |
 | threads-1 | threads | text | derivatives/threads-1.md | 5 | 4 | true | pending | | from /cycle |

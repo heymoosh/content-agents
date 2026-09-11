@@ -5,15 +5,16 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed). Master:
   `docs/content-studio-master-status.md`; rules: `AGENTS.md` -> `## Slice protocol` + bindings in
   `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6V**, PASS.
-- Blocked: **6W**, `docs/operations/launch-slices/SLICE-6W.md` (`## Stopped`). Stage 1 PASSED.
-  Stage 2 refused scheduling `bluesky-2` — Studio never populates its approval-provenance journal
-  in production, blocking every first-time approved row, not just this one. Owner decision needed:
-  audited `serve.ts` fix vs. an audited one-off exception. Detail: `SLICE-6W-LOG.md` -> Stopped.
-- Next dependency-ready: none until 6W's blocker resolves.
-- Last decision: e2e seam stands in for the provider round trip; disposable root never carries `.env`.
-- Housekeeping: hygiene lists four other-session items plus one retained uncommitted 6W path.
-- Details: `## Progress log` -> 2026-09-11. Below is history; read only cited headings.
+- Current / last accepted: **6W**, `docs/operations/launch-slices/SLICE-6W.md`, PASS. Nothing
+  blocked. First real Bluesky post scheduled/moved through Studio's own Schedule action, confirmed
+  live by Muxin. `npm run check` 4379/0.
+- Next: **6X** — no packet written yet; a packet session picks scope and writes it. Two open items
+  to consider for it: the general provenance-journal fix, and auditing other Postiz-routed
+  channels' connection health (both deferred out of 6W's scope, detail in `SLICE-6W-LOG.md`).
+- Last decision: a stale Postiz->Bluesky session token (not disabled, just expired) causes silent
+  delivery failure with no detail; fixed by reconnecting the account in Postiz, not a code change.
+- Housekeeping: hygiene lists four other-session items, left in place by rule.
+- Details: `## Progress log` -> 2026-09-11 (6W). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -48,6 +49,20 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-11 (6W) — the first real scheduled delivery through Studio, live and confirmed
+
+One Bluesky text post Muxin had approved (`bluesky-2`) was scheduled through the Studio Publishing
+room's own Schedule action, moved once to a real different slot, failed once at the provider
+(Postiz's stored Bluesky session token had gone stale — its integrations API still showed the
+account `disabled: false`, so "connected" in Postiz's UI didn't mean the token still worked),
+retried via a new pinned one-off (`scripts/slice-6w-retry-bluesky-2.ts`, calling the same official
+Postiz adapter functions Studio itself uses), and delivered after Muxin reconnected the account in
+Postiz's own dashboard. She confirmed the post live. All 13 acceptance items closed; `npm run check`
+4379/0. Full dated record, including the earlier provenance-gate block and its one-off fix:
+`SLICE-6W-LOG.md`. Two items deferred to a future slice: the general provenance-journal fix; an
+audit of other Postiz-routed channels' connection health (TikTok, LinkedIn, X, Threads, Mastodon,
+Facebook, Instagram, YouTube share this same Postiz instance and could go stale the same way).
 
 ### 2026-09-11 (6V) — trimmed the runtime prompt without losing a rule, twice caught by cross-family audit
 

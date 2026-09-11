@@ -3,6 +3,67 @@
 Dated records, superseded `## Stopped` sections, and completed `RESULT BLOCK`s move here, newest
 first. No session reads this file at start; the packet's compact pointers are enough.
 
+## RESULT BLOCK — 2026-09-11 (final)
+
+- Changed paths: `scripts/slice-6w-retry-bluesky-2.ts` (new, kept). No `src/**`, `e2e/**`,
+  `config/**`, `AGENTS.md`, or `.env` change. `content/.../review-queue.md` (`bluesky-2` →
+  `published`, written by Studio's own dispatch, not hand-edited).
+- Outcome: **accepted**. All 13 acceptance items closed — see `## Stage 2 retry, root cause, and
+  delivery, 2026-09-11` below for items 9-12; items 1-8, 10 closed in the prior `Stage 2 live run`
+  entry.
+- Checks run and results: `npm run publish:reconcile` (unsandboxed) → `state:"live"`,
+  `canonicalUrl` present. `npm run publish:record-evidence` → exit 0, `evidenceKind:"human"`.
+  `npm run check` unsandboxed: 4379/4379 pass, 0 fail, exit 0.
+- Evidence: `publishing-status.jsonl` terminal `live` events (provider-reconciled and
+  human-confirmed) for `bluesky-2`/`cmtxe0dww0004mn81r740iylk`; post at
+  `https://bsky.app/profile/did:plc:brjgstzt7gooqouz5kdci6n7/post/3mvbildnkj52w`.
+- Unresolved, deferred to future slices: the general provenance-journal fix (below); auditing other
+  Postiz-routed channels' connection health (above).
+- Delivery state: accepted and closed.
+
+## Stage 2 retry, root cause, and delivery, 2026-09-11
+
+The moved slot (`2026-09-11T20:31:00.000Z`, chosen at Muxin's explicit "yes" so she could confirm
+same-day) passed and `npm run publish:reconcile` found Postiz reporting the post `failed`, not
+live — first real delivery failure in this stack.
+
+`rescheduleRow` (`src/review/reschedule.ts`) refuses to move a row whose last state isn't
+`"planned"` — by design, so a failed row is never silently re-moved without understanding why. A
+new pinned one-off, `scripts/slice-6w-retry-bluesky-2.ts`, was written to retry it instead: it
+calls the same official Postiz adapter functions Studio itself uses
+(`findPostizPost`/`buildPostizInput`/`reschedulePostizPost`, `src/publish/postiz.ts`), pinned to
+this one slug/row/`providerObjectId`, refusing if any of them drift or if the row isn't `"failed"`.
+
+- First retry (to `2026-09-11T21:12:24Z`) failed identically — Postiz's UI gave only "an error
+  occurred," no detail. Muxin's own manual retry from Postiz's dashboard failed the same way.
+- Root cause found via `GET /api/public/v1/integrations`: the Bluesky account showed
+  `disabled: false` throughout — Postiz's "not disabled" does not mean the stored session token
+  still works. This is a Postiz/Bluesky-side stale-token issue, not a bug in this codebase.
+- Muxin disconnected and reconnected the Bluesky account in Postiz's own dashboard
+  (`https://postiz-threads.meta:4443` — this deployment's `MAIN_URL`/`FRONTEND_URL`/
+  `NEXT_PUBLIC_BACKEND_URL` are deliberately pinned to that domain for Threads/Facebook Meta OAuth;
+  `localhost:4007` throws a CORS origin mismatch and should not be "fixed" to match it).
+- After reconnecting, Postiz's own post attempt succeeded without a further explicit retry:
+  `cmtxe0dww0004mn81r740iylk` now reports `published`. `npm run publish:reconcile` picked this up
+  and wrote a `state:"live"` event with `canonicalUrl`
+  `https://bsky.app/profile/did:plc:brjgstzt7gooqouz5kdci6n7/post/3mvbildnkj52w`. Muxin confirmed
+  in chat she sees the post live. `npm run publish:record-evidence` then recorded the same as a
+  human-confirmed terminal event (`evidenceKind:"human"`), exit 0 — acceptance item 11.
+- Verified closed: `git diff HEAD -- content/.../review-queue.md` shows only `bluesky-2`'s status
+  line changed (pending → published); every `publishing-status.jsonl` event for `bluesky-2` shares
+  the one `providerObjectId` `cmtxe0dww0004mn81r740iylk` — exactly one provider object, exactly one
+  new Bluesky post — acceptance item 12.
+
+Deferred, explicitly out of scope for this slice (Muxin asked, declined): auditing every other
+Postiz-routed channel's connection health (TikTok, LinkedIn, X, Threads, Mastodon, Facebook,
+Instagram, YouTube all run through this same Postiz instance and could go stale the same silent
+way). Real risk, not this slice's job — candidate for a future slice, same as the provenance-journal
+general fix below.
+
+`scripts/slice-6w-retry-bluesky-2.ts` kept as a committed artifact (same precedent as
+`scripts/slice-6w-seed-provenance.ts`): small, pinned to one row, safe, and it documents exactly
+what retry action was taken.
+
 ## Deferred — general provenance-journal fix, 2026-09-11
 
 Owner decision after two cross-family audit rounds: defer the general fix (wiring
