@@ -140,25 +140,21 @@ direct-edit record still turns red if editing or saving breaks.
 
 ## Risk
 
-medium — audit required: yes. Fix 2 removes a live model call from a test path; the audit must
+medium: audit required yes. Fix 2 removes a live model call from a test path; the audit must
 confirm nothing downstream actually depended on receiving a real model verdict rather than the
 keyword fallback, and that no other still-passing assertion was quietly weakened to get there.
 Review boundary: this candidate.
 Review scope/budget: ordinary effort, one bounded review. Three fixed questions for the auditor:
-(1) does the rescoped Charles-edit selector still fail if editing or saving breaks, or is it now
-trivially true; (2) does every assertion in `pass-d-content-generation.ts` that this slice leaves
-untouched still hold once `/api/captures/classify` is aborted rather than answered by a model;
-(3) does any part of the diff touch `src/` or change product behavior rather than test/harness
-expectations.
-Prior accepted evidence: none retained; this slice's own root-cause diagnosis (grep evidence for
-both selectors and the missing allowlist entry) is recorded above in `## Goal`, not re-derived by
-the worker from scratch.
+(1) does the rescoped selector still fail if editing/saving breaks; (2) do untouched
+`pass-d-content-generation.ts` assertions still hold once classify is aborted; (3) does the diff
+touch `src/` or change product behavior.
+Prior accepted evidence: none; root-cause diagnosis (grep evidence) is in `## Goal` above.
 On reviewer outage: mark the candidate review-blocked, record the retry condition in `## Stopped`,
 and do not integrate.
 
 ## Families
 
-- Builder: Claude, mid-tier model, medium effort — one lane, fresh packet-sized context.
+- Builder: Claude, mid-tier model, medium effort, one lane, fresh packet-sized context.
 - Auditor: Codex (GPT), different family from the builder, ordinary effort. Launch
   `codex exec --sandbox read-only` unsandboxed locally — the sandboxed launch fails with
   `Operation not permitted` here, and the default model is required because `gpt-5.1-codex` is
@@ -171,28 +167,31 @@ for the closeout gate item — a `**PASS**` line with a date or an explicit left
 fenced command.
 
 Preflight: candidate sha pinned and changed paths listed; every acceptance item mapped to a named
-command output or a quoted diff hunk; both `npm run test:e2e` and `npm run check` exit codes
-captured by exit status, not by reading piped output; the deliberate-break demonstration recorded
-with what was broken and what was observed; audit findings separated into established defects,
-verification gaps and optional improvements, each closed by a fix plus evidence or an explicit
-disposition.
+command output or quoted diff hunk; both gate exit codes captured by status, not piped output; the
+deliberate-break demonstration recorded with what was broken and observed; audit findings
+separated into defects, verification gaps and optional improvements, each closed with evidence.
 Gate cost: `npm run check` on the frozen candidate, run once, last, after the journey run. Record
-measured local elapsed time per command separately from model usage; mark provider-reported usage
-`unknown` if unavailable. Do not rerun either for paperwork.
+elapsed time per command separately from model usage; mark usage `unknown` if unavailable. Do not
+rerun either for paperwork.
 
 Use the `### Hygiene disposition` form in `docs/operations/slice-protocol-environment.md` for the
 hygiene item — not a bare exit code. Expect a non-zero exit: other sessions have pending work,
-several stray checkouts and unmerged branches, including SLICE-6M's own retained
-`refs/wip/wt-slice-6m` snapshot — name it as another session's/prior slice's, not this session's,
-and never remove it. Name every path this session created and settled, and every other path left
-in place. Regenerated `e2e/results.jsonl` and `e2e/RESULTS.md` are this session's paths and must
-be settled by name.
+including SLICE-6M's own retained `refs/wip/wt-slice-6m` snapshot — name it as prior work, not
+this session's, and never remove it. Name every path this session created and settled, and every
+other path left in place.
 
 Use the `### Read-set measurement` form in `docs/operations/slice-protocol-environment.md` for the
-closeout read-set print — not an ad hoc re-derivation.
+closeout read-set print, not an ad hoc re-derivation.
 
-## Next, once accepted
+## Stopped
 
-Report back to the coordinator/owner. SLICE-6M's diff (`refs/wip/wt-slice-6m`, `d881432`) is
-already correct and needs no new work — only a fresh `npm run test:e2e` run against a worktree
-carrying both this slice's fix and that diff, then a normal integration commit for 6M.
+Full RESULT BLOCK/evidence: `SLICE-6S-LOG.md` → `## Stopped — 2026-09-10` (not read at start).
+Both assigned fixes verified correct against baseline (crash reproduced, both diagnosed bugs
+confirmed). Blocker: `test:e2e` exit 1 from two further, pre-existing bugs in
+`pass-d-content-generation.ts` (do-not-touch), reachable only once this slice's fixes stop the
+earlier crash from masking them: (1) `session.blockedCalls` accumulates whole-session, so this
+fix's own correct classify-aborts trip a later `blockedCalls.length===0` check at line 236; (2) a
+fiction-refusal string the test expects (line 288) exists only in the test, nowhere in `src/`.
+Retained: `pass-d-editorial.ts`/`e2e/harness.ts` uncommitted in `wt-slice-6s` (branch
+`slice-6s-worker`), snapshotted to `refs/wip/wt-slice-6s` (`c140a6e`). Next: owner accepts 6S's own
+fixes on the narrower bar, or a new slice fixes both `pass-d-content-generation.ts` items first.
