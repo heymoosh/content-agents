@@ -198,6 +198,10 @@ async function main(): Promise<void> {
     await page.waitForSelector("#contentConfigSave:not([disabled])", { timeout: 15_000 });
     const savedResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/content/request");
     const generatedResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/content/generate").catch(() => null);
+    // session.blockedCalls accumulates for the whole browser session and is never reset, so the
+    // earlier capture-classify flows in this file have already populated it with correctly aborted
+    // calls. Snapshot the count here so the record below only judges this action's own calls.
+    const blockedBefore = session.blockedCalls.length;
     await page.click("#contentConfigSave");
     const save = await savedResponse;
     const savePayload = await save.json() as { ok?: boolean; error?: string };
@@ -231,10 +235,11 @@ async function main(): Promise<void> {
       status: passed ? "pass" : "fail",
       detail: `HTTP ${response.status()}; injected=${payload.engineExecution}; derivatives=${derivativeFiles.length}; traced=${traced}; controlExact=${controlExact}; treatedStandalone=${treatedStandalone}; editorStamped=${editorStamped}; essayCta=${essayCta}; pending=${pending}${payload.error ? `; error=${payload.error}` : ""}`,
     });
+    const blockedDuringGeneration = session.blockedCalls.slice(blockedBefore);
     record({
       feature: "Configured-generation browser pass cannot invoke a real model or provider",
-      status: payload.engineExecution === "disposable-injected" && session.blockedCalls.length === 0 ? "pass" : "fail",
-      detail: `server execution=${payload.engineExecution ?? "missing"}; browser-aborted calls=${session.blockedCalls.join(", ") || "none"}`,
+      status: payload.engineExecution === "disposable-injected" && session.blockedCalls.length === blockedBefore ? "pass" : "fail",
+      detail: `server execution=${payload.engineExecution ?? "missing"}; browser-aborted calls during this generation=${blockedDuringGeneration.join(", ") || "none"}; earlier in this session=${blockedBefore}`,
     });
 
     const crossRoomCases = [
@@ -277,17 +282,30 @@ async function main(): Promise<void> {
       detail: `HTTP ${ventureResponse.status()}; injected=${venturePayload.engineExecution}; outputs=${ventureBodies.length}; composed=${ventureComposed}; venture-social-v1=${ventureEditorStamped}; pending=${venturePending}; blocked calls=${session.blockedCalls.join(", ") || "none"}${venturePayload.error ? `; error=${venturePayload.error}` : ""}`,
     });
 
+    // A fiction promotion is edited for the feed by the blind fiction-social editor (decision 10b2,
+    // PR #457): it sees only finished drafts and platform limits, never the chapter, bible, or
+    // canon, and may only tighten, reorder, and cut. The untreated control still ships verbatim and
+    // every row stays pending, so nothing reaches a reader without Muxin's review.
     const fictionResult = await page.evaluate(async (slug) => {
       const response = await fetch("/api/content/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug, engine: "codex" }) });
-      return { status: response.status, body: await response.json() as { ok?: boolean; error?: string } };
+      return { status: response.status, body: await response.json() as { ok?: boolean; ids?: string[]; engineExecution?: string; error?: string } };
     }, FICTION_SLUG);
     const fictionFolder = join(ROOT, "content", FICTION_SLUG);
-    const fictionWrites = readdirSync(join(fictionFolder, "derivatives"));
-    const refused = fictionResult.status === 400 && /treatments are unavailable.*untreated control/i.test(fictionResult.body.error ?? "") && fictionWrites.length === 0;
+    const fictionIds = fictionResult.body.ids ?? [];
+    const fictionBodies = fictionIds.map((id) => readFileSync(join(fictionFolder, "derivatives", `${id}.md`), "utf8"));
+    const fictionQueue = readFileSync(join(fictionFolder, "review-queue.md"), "utf8");
+    const fictionControlExact = fictionBodies.some((body) => /variant_kind:\s*["']?control/.test(body) && body.trimEnd().endsWith("Approved fiction promotion."));
+    const fictionEditorStamped = fictionBodies.some((body) => /variant_kind:\s*["']?treated/.test(body) && /^editor_pass:\s*fiction-social-v1$/m.test(body));
+    // The request's originalInput is deliberately unapproved wording; the server-owned approved
+    // promotion must win over it in every derivative, treated or not.
+    const fictionAuthoritative = fictionBodies.length > 0 && fictionBodies.every((body) => !body.includes("Unapproved request wording"));
+    const fictionPending = fictionIds.length > 0 && fictionIds.every((id) => new RegExp(`\\| ${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\|[^\\n]+\\| pending \\|`).test(fictionQueue));
+    const fictionOk = fictionResult.status === 200 && fictionResult.body.ok === true && fictionResult.body.engineExecution === "disposable-injected"
+      && fictionControlExact && fictionEditorStamped && fictionAuthoritative && fictionPending;
     record({
-      feature: "Configured Fiction treatment fails closed before a model job or derivative write",
-      status: refused ? "pass" : "fail",
-      detail: `HTTP ${fictionResult.status}; derivatives=${fictionWrites.length}; error=${fictionResult.body.error ?? "missing"}`,
+      feature: "Configured Fiction promotion ships an untreated control beside a blind fiction-social edit, both pending",
+      status: fictionOk ? "pass" : "fail",
+      detail: `HTTP ${fictionResult.status}; injected=${fictionResult.body.engineExecution ?? "missing"}; outputs=${fictionBodies.length}; controlExact=${fictionControlExact}; fiction-social-v1=${fictionEditorStamped}; approvedBodyWins=${fictionAuthoritative}; pending=${fictionPending}${fictionResult.body.error ? `; error=${fictionResult.body.error}` : ""}`,
     });
   } finally {
     if (session) await session.close();

@@ -671,6 +671,104 @@ test("configured generation dispatches Venture through its editor and stamps the
   }
 });
 
+test("an untreated control ships the server-owned approved body, never arbitrary request wording", async () => {
+  const marker = join(repoRoot, ".e2e-configured-engine-token");
+  const priorToken = process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;
+  const priorRoot = process.env.E2E_REPO_ROOT;
+  const priorMarker = existsSync(marker) ? readFileSync(marker, "utf8") : null;
+  const token = `test-control-authoritative-${process.pid}-${Date.now()}`;
+  const cases = [
+    {
+      origin: "fiction" as const,
+      expected: "Approved fiction promotion.",
+      sourceContext: {
+        kind: "fiction-approved-promotion" as const,
+        authoritativeBody: "Approved fiction promotion.",
+        series: { id: "test-series", title: "Test Series" },
+        chapter: { number: 1, title: "The Door" },
+        sourcePassages: [{ ref: "chapters/chapter-01.md#L1", text: "Locked passage.", locked: true as const }],
+        restrictions: { canon: ["no new canon"], provenance: ["locked passage only"] },
+      },
+    },
+    {
+      origin: "charles" as const,
+      expected: "Approved Charles observation.",
+      sourceContext: {
+        kind: "charles-approved-post" as const,
+        authoritativeBody: "Approved Charles observation.",
+        personaRef: "charles/config/persona.yaml" as const,
+        identity: "charles-lord-featherbottom" as const,
+        restrictions: ["no new leak claims"],
+      },
+    },
+    // The other side of the boundary: an origin with no server-owned context keeps its reviewed
+    // request bytes, surrounding whitespace included. `resolveConfiguredProvenance` compares
+    // originalInput to the source boundary only after trimming, so substituting the extracted
+    // source body here would silently renormalize what Muxin approved.
+    {
+      origin: "studio" as const,
+      originalInput: "  The approved studio claim is exactly this sentence.  ",
+      expected: "  The approved studio claim is exactly this sentence.  ",
+      source: "The approved studio claim is exactly this sentence.\n",
+      sourceProvenance: { kind: "source" as const, sourceLines: [1] },
+    },
+    {
+      origin: "human-inference" as const,
+      originalInput: "  The approved Human Inference claim is exactly this sentence.  ",
+      expected: "  The approved Human Inference claim is exactly this sentence.  ",
+      source: "The approved Human Inference claim is exactly this sentence.\n",
+      sourceProvenance: { kind: "source" as const, sourceLines: [1] },
+    },
+    {
+      // Venture resolves no authoritative body at all, so its control keeps the approved request
+      // bytes for the opposite reason: there is nothing server-owned to substitute.
+      origin: "venture" as const,
+      originalInput: "  The approved Venture premise is exactly this sentence.  ",
+      expected: "  The approved Venture premise is exactly this sentence.  ",
+      ventureId: "v1",
+      ventureSource: {
+        artifactId: "p1", phase: 1 as const, artifactKind: "text-post-note" as const, messageId: "m1", bodyPath: "phase-1/p1.md",
+        claimRefs: [{ claim: "Careful operators need a smaller first step.", ref: "intake:q7" }],
+        approval: { editorialStatus: "approved" as const, provenance: "muxin-editorial-approval" as const },
+      },
+    },
+  ];
+  const unapproved = "Unapproved request wording must not become content.";
+  writeFileSync(marker, token, { mode: 0o600 });
+  process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = token;
+  process.env.E2E_REPO_ROOT = repoRoot;
+  try {
+    for (const item of cases) {
+      const slug = `test-${item.origin}-control-${process.pid}-${Date.now()}`;
+      const folder = join(repoRoot, "content", slug);
+      const configured = buildContentRequest({
+        id: slug, origin: item.origin, descriptor: "approved promotion", originalInput: item.originalInput ?? unapproved,
+        treatments: ["shorter"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
+        sourceContext: item.sourceContext ?? null, sourceProvenance: item.sourceProvenance ?? null,
+        ventureId: item.ventureId ?? null, ventureSource: item.ventureSource ?? null,
+      });
+      mkdirSync(folder, { recursive: true });
+      if (item.source) writeFileSync(join(folder, "source.md"), item.source);
+      writeFileSync(join(folder, "review-queue.md"), "# Review queue — control provenance test\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n");
+      try {
+        const result = await generateConfiguredContent(slug, configured);
+        assert.equal(result.engineExecution, "disposable-injected", `${item.origin} stays hermetic`);
+        const control = configured.variants.find((variant) => variant.identity.kind === "control")!;
+        const raw = readFileSync(join(folder, "derivatives", `${control.identity.id}.md`), "utf8");
+        // A control is written byte-for-byte after its frontmatter, so compare the whole body, not
+        // a substring: containment would accept an approved sentence wrapped in invented text.
+        assert.equal(raw.slice(raw.lastIndexOf("\n---\n") + 5), item.expected, `${item.origin} control body is exactly the expected bytes`);
+      } finally {
+        rmSync(folder, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    if (priorMarker === null) rmSync(marker, { force: true }); else writeFileSync(marker, priorMarker, { mode: 0o600 });
+    if (priorToken === undefined) delete process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN; else process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN = priorToken;
+    if (priorRoot === undefined) delete process.env.E2E_REPO_ROOT; else process.env.E2E_REPO_ROOT = priorRoot;
+  }
+});
+
 test("configured generation dispatches Fiction and Charles through their own editors, not Muxin's voice guard", async () => {
   const marker = join(repoRoot, ".e2e-configured-engine-token");
   const priorToken = process.env.CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN;

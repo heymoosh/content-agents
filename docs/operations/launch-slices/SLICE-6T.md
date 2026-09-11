@@ -7,36 +7,19 @@ Do not load the repository for context. Do not commit.
 
 ## Goal
 
-SLICE-6S's fixes (uncommitted, `refs/wip/wt-slice-6s` `c140a6e`) stop two Pass D crashes from
-masking two further, distinct pre-existing bugs in `e2e/pass-d-content-generation.ts`, both
-confirmed by grep against `main` at `116f7a2`:
+Two pre-existing bugs in `e2e/pass-d-content-generation.ts` that SLICE-6S's fixes stopped masking.
+Full diagnosis, and how fix 2's premise turned out to be wrong, is in `SLICE-6T-LOG.md`.
 
-1. Line 236, record `"Configured-generation browser pass cannot invoke a real model or
-   provider"`, asserts `session.blockedCalls.length === 0`. `blockedCalls`
-   (`e2e/harness.ts:317,330,351,364`) is one array, pushed once per whole browser session, never
-   reset. This file's three earlier `#routeBtn`/`#captureVerdict` capture-classify flows (~lines
-   119, 140, 150) already populate it with correctly-aborted `/api/captures/classify` calls
-   before line 236 runs — 6S's own intended fix, not a defect — so the raw `.length === 0` check
-   now always fails even though no real model call happened for *this* action. Test-only defect:
-   `harness.ts` needs no change; every other `blockedCalls.length === 0` assertion in the suite
-   (`pass-d-outreach-generation.ts:106`, `pass-d-fiction-idea.ts:62`) is the first
-   classify-adjacent check in its own file/session and is unaffected.
-2. Line 288 (`"Configured Fiction treatment fails closed before a model job or derivative
-   write"`) expects `POST /api/content/generate` to return HTTP 400 matching
-   `/treatments are unavailable.*untreated control/i` when a fiction-origin request carries a
-   `treated` variant. Confirmed by grep: that string exists only in the test, nowhere in `src/`.
-   `assertConfiguredTreatmentPolicy` (`src/review/jobs.ts:882-889`) refuses only an
-   unauthorized `belief-shift` treatment and an unauthorized Venture treatment — no fiction-origin
-   case — so a fiction request with a treatment (`summary`, per `seedFictionRefusal()`,
-   `e2e/pass-d-content-generation.ts:56-67`) generates successfully today. Real product gap:
-   Build 2 (Fiction) is deliberately walled off from treatments (`CLAUDE.md` rule 1's scoped
-   exceptions list Content Studio treatments, hook templates, video scripts, Venture and Charles,
-   never Fiction) — a treated variant must never reach a fiction-origin request; only its
-   untreated control may ship.
-
-When this slice is done, both records pass deterministically, `npm run test:e2e` exits 0 with no
-journey failing (once 6S's retained fixes are also present, see `## Depends on`), and a
-fiction-origin request carrying a treated variant is refused before any write.
+1. The record `"Configured-generation browser pass cannot invoke a real model or provider"`
+   asserted `session.blockedCalls.length === 0`. That array accumulates across the whole browser
+   session and is never reset, so the file's three earlier capture-classify flows make the raw
+   check unpassable. Test-only defect; `harness.ts` needs no change.
+2. The record `"Configured Fiction treatment fails closed before a model job or derivative write"`
+   expected a blanket refusal of fiction treatments that no `src/` code ever implemented. Superseded
+   by decision 10b2 (PR #457): fiction promos DO get a blind fiction-social editor pass. Muxin
+   decided in session to keep the editor and fix the record. Rewriting it exposed the real defect:
+   the untreated **control** shipped `request.originalInput` rather than the server-owned approved
+   body, so a fiction or Charles control could carry arbitrary prompt wording.
 
 ## Difficulty
 
@@ -97,35 +80,33 @@ none
 
 ## Acceptance
 
-- [ ] `session.blockedCalls.length === 0` no longer appears in
+Items 3-5 were rewritten mid-slice after Muxin decided to keep the fiction social editor and fix
+the stale record instead of refusing fiction treatments (`SLICE-6T-LOG.md` → `## Accepted`).
+
+- [x] `session.blockedCalls.length === 0` no longer appears in
       `pass-d-content-generation.ts`; the replacement baseline-diff assertion is scoped to calls
       made during this record's own `POST /api/content/generate`, not calls made earlier in the
       file by other records.
-- [ ] That record still fails if a real model/provider call happens during this action:
-      demonstrate by temporarily pushing one fake entry onto `session.blockedCalls` after the
-      baseline snapshot, confirming the record now reads `fail`, then restoring — record what was
-      changed and observed.
-- [ ] `assertConfiguredTreatmentPolicy` refuses a fiction-origin request with any non-empty
-      `treated` list, with an error string matching `/treatments are unavailable.*untreated
-      control/i`, verifiable by grep and by the record's own regex.
-- [ ] The refusal fires before any job, write, or derivative is created (mirrors the existing
-      venture-origin refusal's placement, already proven to run before `runQueued`).
-- [ ] A fiction-origin request with an empty `treated` list (untreated-control-only) still
-      generates normally. Demonstrate with the existing fixture or a minimal unit check; do not
-      weaken or remove the untreated-control path.
-- [ ] Neither record in `pass-d-content-generation.ts` was deleted, commented out, downgraded to
+- [x] That record still fails if a real model/provider call happens during this action:
+      demonstrated by pushing one fake entry onto `session.blockedCalls` after the baseline
+      snapshot, confirming `fail`, then restoring.
+- [x] The untreated control ships the server-owned approved body for the two origins that have one
+      (`fiction`, `charles`), proven by exact post-frontmatter byte comparison.
+- [x] That substitution fires only where `authoritative.contextKind` is set, so `studio`,
+      `human-inference` and `venture` keep their exact request bytes — proven by padded-whitespace
+      cases for all three and by negative mutation.
+- [x] The gate input and the written bytes are one value (`controlBody`), computed once.
+- [x] No record in `pass-d-content-generation.ts` was deleted, commented out, downgraded to
       `blocked`, or made to record a status other than `pass`/`fail`.
-- [ ] `node --import tsx --test e2e/isolation.test.ts` exits 0.
-- [ ] `npm run test:e2e` exits 0, run unsandboxed from a dedicated worktree with SLICE-6S's
-      retained diff applied (per `## Depends on`), twice solo (no concurrent process — confirm
-      via `pgrep`/`lsof` before each run). If any journey still fails, the RESULT BLOCK names it
-      and its reason and the slice takes `### Stopping without acceptance`.
-- [ ] `npm run check` was run unsandboxed and its result recorded. It is currently red on `main`
-      for a pre-existing reason outside this slice (`src/review/jobs.test.ts`, SLICE-5Z). Do not
-      assert exit 0. Assert instead that every failure it reports is reproduced with this slice's
-      changes (and 6S's) stashed out, and name each one.
-- [ ] `bash scripts/repo-hygiene.sh --rescue` was run and settled per the `### Hygiene
-      disposition` form (not a bare exit code).
+- [x] `node --import tsx --test e2e/isolation.test.ts` exits 0 (12/12).
+- [x] `npm run test:e2e` run twice solo, unsandboxed, from a dedicated worktree with SLICE-6S's
+      retained diff applied. Pass D configured-content-generation 8/8 both runs. The suite still
+      exits 1 on one Pass A and one Pass B failure, both reproduced on clean `main` with every
+      change stashed; named in the log and left alone.
+- [x] `npm run check` run unsandboxed: 4377 pass / 2 fail, exit 1. Both failures
+      (`src/util/env.test.ts`, SLICE-6R's real-child env tests) reproduce with this slice's and
+      6S's changes stashed; the worktree has no `.env`.
+- [x] `bash scripts/repo-hygiene.sh --rescue` run and settled per `### Hygiene disposition`.
 
 ## Verify
 
@@ -180,23 +161,9 @@ and do not integrate.
 
 ## Closeout
 
-Use the `### Closeout gate disposition` form in `docs/operations/slice-protocol-environment.md`
-for the closeout gate item — a `**PASS**` line with a date or an explicit leftover list, never a
-fenced command.
+**PASS** — 2026-09-10. Both target records pass, the cross-family audit's one P1 is closed with a
+negative-mutation proof, and every acceptance item above is checked. Full record, evidence and the
+owner decision that reshaped fix 2: `SLICE-6T-LOG.md` → `## Accepted — 2026-09-10`.
 
-Preflight: candidate sha pinned and changed paths listed (this slice's own diff, separate from
-6S's applied-unmodified diff); every acceptance item mapped to a named command output or quoted
-diff hunk; both gate exit codes captured by status, not piped output; the deliberate-break
-demonstration recorded; audit findings separated into defects, verification gaps and optional
-improvements, each closed with evidence.
-Gate cost: `npm run check` on the frozen candidate, run once, last. Record elapsed time per
-command separately from model usage; mark usage `unknown` if unavailable. Do not rerun for
-paperwork.
-
-Use `### Hygiene disposition` (env doc) for the hygiene item — not a bare exit code. Expect
-non-zero: `wt-slice-6m`/`refs/wip/wt-slice-6m` and `wt-slice-6s`/`refs/wip/wt-slice-6s` are prior
-work, not this session's — name both, never remove them. Name every path this session created
-and settled, and every other path left in place.
-
-Use `### Read-set measurement` (env doc) for the closeout read-set print, not an ad hoc
-re-derivation.
+Leftover, deliberately not pulled into scope: one Pass A and one Pass B "Content grouped approval"
+failure, both pre-existing on `main`. They are the next slice.

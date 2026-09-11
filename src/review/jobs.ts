@@ -1325,9 +1325,18 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
     // platform carries an approved angle whose re-hook latitude applies (resolvePlatformSpin) — so
     // a composed, no-source-lines origin (Venture, Charles, fiction promo) is never spun.
     const gateSourceKind = configuredSourceKind(folder);
+    // The one body every control ships, computed once so the gate input and the written bytes
+    // cannot drift apart. A fiction or Charles request carries a SERVER-OWNED approved body
+    // (`contextKind` is set only for those two) that must win over arbitrary prompt wording on the
+    // control exactly as it does on the treated variant. Every other origin keeps `originalInput`
+    // byte-for-byte: studio/human-inference deliberately ship the reviewed input bytes, and
+    // `resolveConfiguredProvenance` compares it to the source boundary only after trimming, so
+    // substituting the extracted body there would silently renormalize the approved whitespace.
+    // Venture has no authoritative body at all.
+    const controlBody = authoritative?.contextKind ? authoritative.body : request.originalInput;
     const gateCandidates = variants.map((variant) => {
       const id = variant.identity.id;
-      const generated = variant.identity.kind === "control" ? request.originalInput : bodies.get(id)!.body;
+      const generated = variant.identity.kind === "control" ? controlBody : bodies.get(id)!.body;
       const sourceLines = variant.identity.kind === "control" ? (authoritative?.sourceLines ?? []) : bodies.get(id)!.sourceLines;
       const spinDescriptor = variant.identity.kind === "treated"
         ? resolvePlatformSpin(variant.platform, { traceable: sourceLines.length > 0, sourceKind: gateSourceKind })
@@ -1399,7 +1408,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
       for (const variant of variants) {
         const id = variant.identity.id;
         const generated: ConfiguredAuthoritativeBody = variant.identity.kind === "control"
-          ? { ...(authoritative ?? { body: request.originalInput, sourceLines: [] }), body: request.originalInput }
+          ? { ...(authoritative ?? { body: request.originalInput, sourceLines: [] }), body: controlBody }
           : bodies.get(id)!;
         const body = generated.body;
         const path = join(folder, "derivatives", `${id}.md`);

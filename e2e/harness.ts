@@ -151,6 +151,7 @@ export const EXPENSIVE_ROUTES = [
   "/api/outreach/scout",
   "/api/outreach/message/revise",
   "/api/notes",
+  "/api/captures/classify",
 ];
 
 /** Model-backed writes that share a pathname with a safe read and therefore need method scoping. */

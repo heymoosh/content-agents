@@ -94,13 +94,17 @@ async function main(): Promise<void> {
     await page.click('nav[aria-label="Charles pages"] [data-charles-page="needs-review"]');
     await page.waitForSelector(`#charlesDraftList [data-id="${CHARLES_ID}"]`);
     await page.click(`#charlesDraftList [data-id="${CHARLES_ID}"]`);
-    await page.click("#charlesEditBtn");
-    const editor = page.locator("#charlesBody textarea");
+    const charlesArticle = page.locator(`article[data-charles-output="${CHARLES_ID}"]`);
+    await charlesArticle.locator(".charles-edit-btn").click();
+    const editor = charlesArticle.locator(".charles-body textarea");
     const prose = await editor.inputValue();
     const edited = `${prose}\n\nE2E direct edit.`;
     await editor.fill(edited);
-    await page.click("#charlesEditBtn");
-    await page.waitForFunction(() => !document.querySelector("#charlesBody textarea"));
+    await charlesArticle.locator(".charles-edit-btn").click();
+    await page.waitForFunction(
+      (id) => !document.querySelector(`article[data-charles-output="${id}"] .charles-body textarea`),
+      CHARLES_ID,
+    );
     const charlesPath = join(ROOT, "charles", "posts", "one-liners", `${CHARLES_ID}.md`);
     const saved = readFileSync(charlesPath, "utf8");
     const editOk = saved.startsWith("---\ntype: one-liner\n") && saved.includes("E2E direct edit.") && !prose.startsWith("---");

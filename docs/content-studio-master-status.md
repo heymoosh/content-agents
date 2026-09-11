@@ -5,14 +5,19 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed to `origin/main`).
 - Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
   plus bindings in `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6R**, `docs/operations/launch-slices/SLICE-6R.md` (`cc54cd4`).
-- Blocked on: 6M/6S both stopped (Pass D). Dependency-ready: **6T**,
-  `docs/operations/launch-slices/SLICE-6T.md`, fixes the two bugs 6S's fix exposed in
-  `pass-d-content-generation.ts`, applies 6S's diff first. Also dependency-ready: **6O**
-  (`docs/operations/launch-slices/SLICE-6O.md`, indep. of 6M/6S/6T).
-- Last decision: 6R narrowed the six remaining agent-CLI spawn sites off `.env`; audit PASS,
-  both canaries passed, `npm run check` 4378/4378 green. `SLICE-6R-LOG.md` → `## Accepted`.
-- Details: `## Progress log` → 2026-09-10 (6R); 6M: `SLICE-6M-LOG.md`; 6S: `SLICE-6S-LOG.md`.
+- Current / last accepted: **6T**, `docs/operations/launch-slices/SLICE-6T.md`. It carried
+  SLICE-6S's retained diff in with it, so 6M/6S are closed out too — nothing is blocked.
+- Next: **6U** (packet not yet written). One Pass A failure ("Content opens request-grouped
+  approval before the separate Publish step") and one Pass B failure ("Content grouped approval
+  reports injected provider success and retained failure separately"), both reproduced on clean
+  `main`, are the only things keeping `npm run test:e2e` off exit 0.
+- Last decision: fiction promos KEEP the blind fiction-social editor (decision 10b2 stands); the
+  never-passing Phase 0 record expecting a blanket refusal was stale and was rewritten. Doing so
+  exposed the real bug: the untreated control shipped `request.originalInput` instead of the
+  server-owned approved body.
+- Housekeeping: `AGENTS.md` → `## Slice protocol` is 26179 B, over its 24576 B cap. Trim it at the
+  next closeout.
+- Details: `## Progress log` → 2026-09-10 (6T); `SLICE-6T-LOG.md`.
 - Everything below is history; read only packet-cited headings.
 
 ## Standing constraints
@@ -48,6 +53,57 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-10 (6T) — Pass D goes green, and an untreated control stops shipping unapproved wording
+
+Ran SLICE-6T. Two prior mid-tier worker attempts at this material had failed, so the coordinator
+ran it directly at high effort.
+
+Fix 1 was the packet's, unchanged: the record "Configured-generation browser pass cannot invoke a
+real model or provider" asserted `session.blockedCalls.length === 0` against an array that
+accumulates for the whole browser session and is never reset, so the file's own three earlier
+capture-classify flows made it unpassable once 6S made classify an aborted route. It now snapshots
+the count immediately before its own `POST /api/content/generate` and asserts the count is
+unchanged. Pushing a fake entry after the snapshot still flips it to `fail`, so the assertion keeps
+its teeth.
+
+Fix 2 changed shape. The packet asked for a refusal of fiction treatments; implementing it broke two
+passing tests and surfaced a contradiction. `06bd00c` (2026-08-30, PR #411) added an e2e record
+expecting that refusal and it has NEVER passed — the error string it greps for was never written
+into `src/`. Four days later `df02f09` (2026-09-04, PR #457, decision 10b2 item 2) deliberately
+built the opposite: fiction treated variants with their own blind social editor
+(`fictionSocialEditorPrompt` — it sees only finished drafts and platform limits, never the chapter,
+bible or canon, and may only tighten, reorder and cut), an `editor_pass: fiction-social-v1` stamp,
+and canon/provenance restrictions in the prompt. Muxin decided: keep the editor, fix the stale
+record. The safety property the Phase 0 record was reaching for is already held by the blind-editor
+rules plus the `review-queue.md` gate.
+
+Rewriting that record exposed the real defect it had been masking for eleven days. The untreated
+CONTROL variant was written from `request.originalInput` rather than the server-owned approved body,
+so the fiction fixture — whose `originalInput` is deliberately "Unapproved request wording must not
+become content." — shipped exactly that into a pending review row, while its treated sibling
+correctly carried the approved promotion. `src/review/jobs.ts` now computes one
+`controlBody = authoritative?.contextKind ? authoritative.body : request.originalInput` and uses it
+at both the pre-write gate site and the write site. `contextKind` is set only for the two
+server-owned contexts (fiction, Charles), so studio, human-inference and venture keep their exact
+request bytes.
+
+Codex (cross-family) audited twice. Round 1 established one P1: the first attempt substituted the
+authoritative body for every origin that had one, and because `resolveConfiguredProvenance` compares
+only trimmed values, a studio request whose approved input differed in surrounding whitespace would
+have silently shipped renormalized bytes on a path whose whole point is byte-exactness. Fixed by
+scoping to `contextKind`, with a negative-mutation proof. Round 2: P1 closed, no established
+defects. All three of its verification gaps closed — the new test asserts whole-body equality rather
+than containment, asserts `engineExecution === "disposable-injected"`, and now covers all five
+origins including padded-whitespace human-inference and venture cases.
+
+`content-generation.test.ts` 61/61 exit 0 (+1 test). `e2e/isolation.test.ts` 12/12 exit 0.
+`npm run test:e2e` twice solo, unsandboxed: Pass D configured-content-generation 8/8 both runs,
+including both target records. `npm run check` 4377/4379, exit 1, 2m26s — the two failures are
+SLICE-6R's real-child `.env` tests and reproduce with everything stashed (the worktree has no
+`.env`). The suite still exits 1 on one Pass A and one Pass B "Content grouped approval" failure,
+both reproduced on clean `main` and left alone as the next slice. SLICE-6S's retained diff was
+applied unmodified per `## Depends on` and ships in this commit. Full record: `SLICE-6T-LOG.md`.
 
 ### 2026-09-10 (6R) — the six remaining agent-CLI spawn sites stop inheriting `.env` secrets
 
