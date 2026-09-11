@@ -161,32 +161,28 @@ Use the `### Closeout gate disposition` form in `docs/operations/slice-protocol-
 the binding is `none`, so record a `**PASS**` line with a date here, or the explicit leftover
 list, before this slice closes. No command belongs in this slot.
 
-Preflight: every template field present; candidate is the working-tree edit to `AGENTS.md` plus the
-new `SLICE-6V-LOG.md`; ownership is the single lane above; every acceptance item maps to a `## Verify`
-command or a named artifact in the log; exit codes recorded per command; audit policy fixed under
-Families, evidence set = two section texts, diff, inventory; no open prerequisite once it returns.
-Gate cost: `npm run check`, run unsandboxed on the candidate. Measured local runtime at 6U was
-173 s for 4379 passing tests; expect the same order here since no test input changes. One run.
-No rerun without a relevant change or failure, and no paperwork-only rerun.
+**PASS** — 2026-09-11. Gate binding is `none`; nothing left over. Section is 24560 B (≤ 24576),
+17 subsection titles byte-identical in order, rule inventory resolves every pre-trim normative
+statement, `npm run check` exited 0. Only the ≤ 24000 stretch target (non-blocking) is unmet.
+Cross-family audit ran twice, found four defects total; all repaired and re-verified — disposition
+in `SLICE-6V-LOG.md`.
 
-Use the `### Hygiene disposition` form in `docs/operations/slice-protocol-environment.md` for
-the hygiene item — not a bare exit code. Four other-session items were already listed at 6U
-(worktrees `wt-slice-6m`, `wt-slice-6s`; merged branches `slice-6m-worker`, `slice-6s-worker`);
-expect them again, name them, leave them in place.
+Preflight satisfied: candidate = working-tree edit to `AGENTS.md` + new `SLICE-6V-LOG.md`; single
+lane; every acceptance item mapped to a `## Verify` command or log artifact; exit codes recorded;
+audit evidence set = two section texts, diff, inventory. Gate ran once, `npm run check` unsandboxed,
+no rerun needed (no relevant change/failure after the fix).
 
-Use the `### Read-set measurement` form in `docs/operations/slice-protocol-environment.md` for
-the closeout read-set print — not an ad hoc re-derivation.
+Hygiene (`### Hygiene disposition` form): ran `bash scripts/repo-hygiene.sh --rescue`, exit 1 —
+this session's own paths (`AGENTS.md`, this packet, `SLICE-6V-LOG.md`) committed; four other-session
+items named and left in place: worktrees `wt-slice-6m`, `wt-slice-6s`; merged branches
+`slice-6m-worker`, `slice-6s-worker` (same four listed at 6U).
 
-## RESULT BLOCK (worker fills this in and returns it)
+## RESULT BLOCK
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action: <built | verified | accepted | committed; workers cannot accept/commit>
-- Usage: <local check elapsed time separately from model calls/provider-reported usage;
-  unavailable values `unknown`; prior history behind evidence pointers>
+Completed and moved to `SLICE-6V-LOG.md` at closeout, per `### Packet size discipline`. Summary:
+accepted, committed. Section 26179 B → 24560 B (≤ 24576 cap, 16 B margin). Two Codex audit rounds
+found four dropped rules total; all four repaired and independently re-verified (PASS on round 3).
+`npm run check` unsandboxed: 4379/4379 pass.
 
 ## Usage budget and handoff
 

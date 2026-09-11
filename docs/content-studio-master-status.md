@@ -5,10 +5,12 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed to `origin/main`). Master:
   `docs/content-studio-master-status.md`; rules: `AGENTS.md` -> `## Slice protocol` plus bindings in
   `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6U**, `docs/operations/launch-slices/SLICE-6U.md`, PASS. Nothing blocked.
-  `npm run test:e2e` green end to end for the first time, 50 / 0 / 16 blocked; `npm run check` 4379 / 0.
-- Next: **6V**, `docs/operations/launch-slices/SLICE-6V.md`, written and dependency-ready. Trim
-  `AGENTS.md` -> `## Slice protocol` to its 24576 B cap; it is 26179 B, carried across two closeouts.
+- Current / last accepted: **6V**, `docs/operations/launch-slices/SLICE-6V.md`, PASS. Nothing blocked.
+  `AGENTS.md` -> `## Slice protocol` trimmed 26179 B -> 24560 B (cap 24576); 17 subsections preserved,
+  rule inventory zero-dropped; two Codex audit rounds found four defects, all repaired and
+  re-verified; `npm run check` 4379 / 0.
+- Next: none written yet. A packet session should write the next slice (mid-tier/high-effort choice
+  of what to cut next is not yet made); this repo's slice cadence continues from 6V.
 - Last decision: the e2e seam stands in for the whole provider round trip, discovery included, so it
   resolves before provider selection; the disposable root never carries `.env`, the non-secret account
   identity is stated in the harness instead.
@@ -48,6 +50,34 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-11 (6V) — trimmed the runtime prompt without losing a rule, twice caught by cross-family audit
+
+Ran SLICE-6V: `AGENTS.md` -> `## Slice protocol` was 26179 B against its 24576 B cap, carried
+across the 6T and 6U closeouts. One worker (Claude, strongest tier, high effort) compressed wording
+across all 17 subsections — no subsection deleted, renamed, merged or reordered — reducing four
+cross-subsection duplicate obligations to one statement plus a pointer, and cut it to 24444 B.
+
+The cross-family audit (Codex, `codex exec --sandbox read-only`) is the reason this slice took two
+repair rounds instead of one: round 1 found three normative statements the compression had
+genuinely dropped rather than reworded — "a packet is a specification, not a session log, read in
+full at the start of every session," and the "static" half of "static or entirely local journeys."
+The worker restored all three (+104 B, to 24444 B... corrected to 24548 B after restoring both).
+A fresh full re-sweep on the repaired candidate (required because the file changed) caught a
+fourth, more subtle one: "never infer tokens or cost" had been rephrased to "never infer it," where
+"it" only bound to the preceding "usage" clause, silently dropping the explicit ban on inferring
+cost. That worker also caught and fixed a real end-of-file-newline regression from its own splice
+that neither `git diff --check` nor its own outside-section comparison had detected.
+
+Final candidate: 24560 B (16 B margin under the 24576 cap; the ≤ 24000 stretch target was left
+unmet by design — every remaining byte carries an inventoried rule, so preservation won over the
+stretch goal). `SLICE-6V-LOG.md` carries the full 142-row rule inventory and the audit disposition.
+A third re-audit round, scoped to confirm the fourth fix plus one more fresh full sweep, returned a
+clean PASS. `npm run check` unsandboxed: 4379 / 0, independently re-run by the coordinator.
+
+Takeaway for future trims of this section: a same-family reviewer (or the builder re-reading its
+own prose) would very plausibly have rubber-stamped all four drops — each one reads as clean,
+unremarkable compression. The cross-family requirement earned its cost here.
 
 ### 2026-09-11 (6U) — the e2e suite goes green, and two real defects come out from behind stale red
 
