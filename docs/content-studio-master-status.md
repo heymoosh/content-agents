@@ -2,23 +2,18 @@
 
 ## START HERE
 
-- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed to `origin/main`).
-- Master: `docs/content-studio-master-status.md`; rules: `AGENTS.md` → `## Slice protocol`,
-  plus bindings in `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6T**, `docs/operations/launch-slices/SLICE-6T.md`. It carried
-  SLICE-6S's retained diff in with it, so 6M/6S are closed out too — nothing is blocked.
-- Next: **6U** (packet not yet written). One Pass A failure ("Content opens request-grouped
-  approval before the separate Publish step") and one Pass B failure ("Content grouped approval
-  reports injected provider success and retained failure separately"), both reproduced on clean
-  `main`, are the only things keeping `npm run test:e2e` off exit 0.
-- Last decision: fiction promos KEEP the blind fiction-social editor (decision 10b2 stands); the
-  never-passing Phase 0 record expecting a blanket refusal was stale and was rewritten. Doing so
-  exposed the real bug: the untreated control shipped `request.originalInput` instead of the
-  server-owned approved body.
-- Housekeeping: `AGENTS.md` → `## Slice protocol` is 26179 B, over its 24576 B cap. Trim it at the
-  next closeout.
-- Details: `## Progress log` → 2026-09-10 (6T); `SLICE-6T-LOG.md`.
-- Everything below is history; read only packet-cited headings.
+- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed to `origin/main`). Master:
+  `docs/content-studio-master-status.md`; rules: `AGENTS.md` -> `## Slice protocol` plus bindings in
+  `docs/operations/slice-protocol-environment.md`.
+- Current / last accepted: **6U**, `docs/operations/launch-slices/SLICE-6U.md`, PASS. Nothing blocked.
+  `npm run test:e2e` green end to end for the first time, 50 / 0 / 16 blocked; `npm run check` 4379 / 0.
+- Next: **6V** (packet not yet written). Trim `AGENTS.md` -> `## Slice protocol` to its 24576 B cap;
+  it is 26179 B and has now been carried across two closeouts.
+- Last decision: the e2e seam stands in for the whole provider round trip, discovery included, so it
+  resolves before provider selection; the disposable root never carries `.env`, the non-secret account
+  identity is stated in the harness instead.
+- Housekeeping: `repo-hygiene.sh --rescue` lists four other-session items, left in place by rule.
+- Details: `## Progress log` -> 2026-09-11 (6U). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -53,6 +48,56 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-11 (6U) — the e2e suite goes green, and two real defects come out from behind stale red
+
+Ran SLICE-6U directly at high effort, diagnosis before any change: 6T's packet had been written
+without diagnosis and was wrong about its premise, so this one was written after the work.
+
+The two failures 6T left behind were stale tests, not product regressions. Both asserted the
+combined approve-and-publish action that SLICE-5S (`7c6815f`, 2026-09-07) deliberately removed.
+Dated on both sides with `git log -S`: the expectations were written 2026-09-01 (`a3ec457`), the
+UI they described was replaced six days later. Neither could ever have passed again.
+
+Fixing the Pass B record honestly meant driving the Publishing room's own Schedule action, and
+that surfaced two genuine defects the stale red had hidden for eleven days:
+
+- The hermetic seam sat after provider selection in `src/review/publishing-status.ts`, so a
+  disposable browser run attempted real provider discovery and failed before it could reach the
+  injected fake. Pre-5S the seam was hit first, which is why it had never shown.
+- `e2e/run-all.ts` copied the repository-root `.env` into every disposable root. Nothing
+  published (discovery failed on transport), but a suite whose whole claim is hermeticity was
+  reaching for a live provider with Muxin's real keys.
+
+Both fixed. The `.env` exclusion broke Pass B's delivery-policy identity check, which had been
+passing by accident off the copied secrets; the fix states
+`CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID` in the harness. That identity is a non-secret string already
+committed in `config/brand-accounts.yaml`, so the check stays genuinely exercised rather than
+bypassed — deliberately chosen over skipping `resolveDeliveryPolicy` on the injected branch, which
+would have removed a real safety check.
+
+Verification: `npm run test:e2e` exit 0 twice solo, unsandboxed, **50 pass / 0 fail / 16 blocked**
+both runs, shared worktree byte-identical after each. `npm run check` exit 0, **4379 pass / 0
+fail**, 173 s. `npx tsc --noEmit` exit 0. (6T had logged two `src/util/env.test.ts` failures; those
+were an artifact of a worktree with no `.env` and pass here on `main`.)
+
+Cross-family audit (Codex, `codex exec --sandbox read-only`) on the one product change, three
+fixed questions — reachability of the injected branch from a non-e2e caller, whether skipping
+`selectConfiguredProvider` weakens any surviving safety property, and whether the reordering
+changes the non-injected path. **No established defects.** `resolveDeliveryPolicy`,
+`markDispatchStarted` and `appendPublishingStatus` each re-derive their own evidence, and
+`selectConfiguredProvider` leaves no durable authorization state.
+
+Shipped as `cad8fae`, five files, pushed `8041668..cad8fae`. The end-to-end suite is green for the
+first time in this sequence. Packet: `docs/operations/launch-slices/SLICE-6U.md`, closed **PASS**.
+
+Leftovers, both pre-existing and neither asked for: `AGENTS.md` → `## Slice protocol` is still
+26179 B against its 24576 B cap, carried over from 6T and now due for a dedicated trim rather than
+another carry. `scripts/repo-hygiene.sh --rescue` listed four items and changed nothing, all of
+them other sessions' work left in place per the closeout rule: two stale worktrees with
+modifications (`wt-slice-6m`, snapshotted to `refs/wip/wt-slice-6m` `c0ce8b8`; `wt-slice-6s`, to
+`refs/wip/wt-slice-6s` `03a7c39`) and two merged branches safe to delete (`slice-6m-worker`,
+`slice-6s-worker`). This session created no untracked paths.
 
 ### 2026-09-10 (6T) — Pass D goes green, and an untreated control stops shipping unapproved wording
 
