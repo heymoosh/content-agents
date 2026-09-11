@@ -8,7 +8,8 @@
 - Current / last accepted: **6V**, `docs/operations/launch-slices/SLICE-6V.md`, PASS. Nothing
   blocked. Protocol section trimmed 26179 B -> 24560 B (cap 24576, 17 subsections preserved);
   `npm run check` 4379/0.
-- Next: **6W** — no packet written yet; a packet session picks scope and writes it.
+- Next: **6W**, `docs/operations/launch-slices/SLICE-6W.md`, dependency-ready — the first
+  real scheduled delivery through Studio, then one real move of it.
 - Last decision: e2e seam stands in for the whole provider round trip, resolving before provider
   selection; disposable root never carries `.env`.
 - Housekeeping: `repo-hygiene.sh --rescue` lists four other-session items, left in place by rule.
