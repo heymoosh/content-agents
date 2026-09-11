@@ -2,20 +2,17 @@
 
 ## START HERE
 
-- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed to `origin/main`). Master:
-  `docs/content-studio-master-status.md`; rules: `AGENTS.md` -> `## Slice protocol` plus bindings in
+- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed). Master:
+  `docs/content-studio-master-status.md`; rules: `AGENTS.md` -> `## Slice protocol` + bindings in
   `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6V**, `docs/operations/launch-slices/SLICE-6V.md`, PASS. Nothing blocked.
-  `AGENTS.md` -> `## Slice protocol` trimmed 26179 B -> 24560 B (cap 24576); 17 subsections preserved,
-  rule inventory zero-dropped; two Codex audit rounds found four defects, all repaired and
-  re-verified; `npm run check` 4379 / 0.
-- Next: none written yet. A packet session should write the next slice (mid-tier/high-effort choice
-  of what to cut next is not yet made); this repo's slice cadence continues from 6V.
-- Last decision: the e2e seam stands in for the whole provider round trip, discovery included, so it
-  resolves before provider selection; the disposable root never carries `.env`, the non-secret account
-  identity is stated in the harness instead.
+- Current / last accepted: **6V**, `docs/operations/launch-slices/SLICE-6V.md`, PASS. Nothing
+  blocked. Protocol section trimmed 26179 B -> 24560 B (cap 24576, 17 subsections preserved);
+  `npm run check` 4379/0.
+- Next: **6W** — no packet written yet; a packet session picks scope and writes it.
+- Last decision: e2e seam stands in for the whole provider round trip, resolving before provider
+  selection; disposable root never carries `.env`.
 - Housekeeping: `repo-hygiene.sh --rescue` lists four other-session items, left in place by rule.
-- Details: `## Progress log` -> 2026-09-11 (6U). Below is history; read only cited headings.
+- Details: `## Progress log` -> 2026-09-11 (6V). Below is history; read only cited headings.
 
 ## Standing constraints
 
