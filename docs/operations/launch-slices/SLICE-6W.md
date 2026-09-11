@@ -184,15 +184,28 @@ hygiene item — not a bare exit code. Four other-session items are already know
 
 Use the `### Read-set measurement` form in the same file for the closeout read-set print.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## Stopped
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action: <built | verified | accepted | committed; workers cannot accept/commit>
-- Usage: <local check elapsed time separately from model calls/provider-reported usage>
+Blocker: Studio's Schedule action refuses every first-time approved row —
+`approvalDispatchDisposition` returns `{kind:"legacy"}` since `approval-dispatch-safety.jsonl` is
+never populated in production (`recordNewQueueRows` runs only from a test), so
+`scheduleApprovedOnce` (`publishing-status.ts:290-298`, `approval-provenance.ts:234-246`) rejects
+it. `x-1`/`x-2` pass only via unrelated history; systemic, not row-specific.
+
+Verified: Stage 1 PASSED (hermetic + live create-and-cancel Bluesky canary, nothing left standing).
+Stage 2: `bluesky-2` confirmed `approve`, routing safe, one live Schedule click refused on the
+blocker above — no provider call made.
+
+Retained: `content/.../review-queue.md` (bluesky-2→approve, uncommitted);
+`$TMPDIR/slice-6w/canary.json`.
+
+Next action: owner decision — (a) audited fix wiring `recordNewQueueRows` into `serve.ts`, or (b)
+an audited one-off exception. Both touch `src/review/**`, outside this packet. Full write-up:
+`SLICE-6W-LOG.md` → `## Stopped — 2026-09-11`.
+
+## RESULT BLOCK
+
+See `SLICE-6W-LOG.md` → `## RESULT BLOCK — 2026-09-11`.
 
 ## Usage budget and handoff
 

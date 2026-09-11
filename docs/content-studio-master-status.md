@@ -5,15 +5,15 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed). Master:
   `docs/content-studio-master-status.md`; rules: `AGENTS.md` -> `## Slice protocol` + bindings in
   `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6V**, `docs/operations/launch-slices/SLICE-6V.md`, PASS. Nothing
-  blocked. Protocol section trimmed 26179 B -> 24560 B (cap 24576, 17 subsections preserved);
-  `npm run check` 4379/0.
-- Next: **6W**, `docs/operations/launch-slices/SLICE-6W.md`, dependency-ready — the first
-  real scheduled delivery through Studio, then one real move of it.
-- Last decision: e2e seam stands in for the whole provider round trip, resolving before provider
-  selection; disposable root never carries `.env`.
-- Housekeeping: `repo-hygiene.sh --rescue` lists four other-session items, left in place by rule.
-- Details: `## Progress log` -> 2026-09-11 (6V). Below is history; read only cited headings.
+- Current / last accepted: **6V**, PASS.
+- Blocked: **6W**, `docs/operations/launch-slices/SLICE-6W.md` (`## Stopped`). Stage 1 PASSED.
+  Stage 2 refused scheduling `bluesky-2` — Studio never populates its approval-provenance journal
+  in production, blocking every first-time approved row, not just this one. Owner decision needed:
+  audited `serve.ts` fix vs. an audited one-off exception. Detail: `SLICE-6W-LOG.md` -> Stopped.
+- Next dependency-ready: none until 6W's blocker resolves.
+- Last decision: e2e seam stands in for the provider round trip; disposable root never carries `.env`.
+- Housekeeping: hygiene lists four other-session items plus one retained uncommitted 6W path.
+- Details: `## Progress log` -> 2026-09-11. Below is history; read only cited headings.
 
 ## Standing constraints
 
