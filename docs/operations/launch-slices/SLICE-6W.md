@@ -62,6 +62,19 @@ status only), `data/publish-schedule.jsonl`, the delivery-event ledger,
 - `.env` — read by the commands, never written, never copied into a scratch root.
 - Any `review-queue.md` row other than the one Muxin names, and any other slug's content folder.
 
+Superseded 2026-09-11: the general fix (wiring a backfill into `serve.ts`'s queue-load path) was
+attempted, got two rounds of cross-family audit, and was deferred after a second **BLOCK** verdict
+(four open defects — see `SLICE-6W-LOG.md` → `## Deferred — general provenance-journal fix,
+2026-09-11`). No `src/**` file changed as a result; all worker edits were reverted uncommitted.
+
+Named exception, owner-decided 2026-09-11 ("yes, but fix it properly" deferred; narrow path
+approved for now): a new one-off script, `scripts/slice-6w-seed-provenance.ts`, may call the
+existing, already-tested `recordNewQueueRows` (`src/review/approval-provenance.ts`) directly and
+only for the row Muxin named (`bluesky-2`), to seed one real `approval-dispatch-safety.jsonl` entry
+so Studio's Schedule action stops treating it as legacy. No file under `src/**` is edited. The
+script itself gets a cross-family audit (Codex) before it is run for real, same as any other
+Stage-2-affecting change.
+
 ## Cited headings
 
 `docs/content-studio-master-status.md` → `## Standing constraints`
@@ -186,22 +199,22 @@ Use the `### Read-set measurement` form in the same file for the closeout read-s
 
 ## Stopped
 
-Blocker: Studio's Schedule action refuses every first-time approved row —
-`approvalDispatchDisposition` returns `{kind:"legacy"}` since `approval-dispatch-safety.jsonl` is
-never populated in production (`recordNewQueueRows` runs only from a test), so
-`scheduleApprovedOnce` (`publishing-status.ts:290-298`, `approval-provenance.ts:234-246`) rejects
-it. `x-1`/`x-2` pass only via unrelated history; systemic, not row-specific.
+Resolved 2026-09-11: `bluesky-2` now carries real `approval-dispatch-safety.jsonl` provenance
+(`{"kind":"fresh"}`) via the audited one-off `scripts/slice-6w-seed-provenance.ts` — see
+`SLICE-6W-LOG.md` → `## One-off provenance seed, 2026-09-11`. The general systemic gap (production
+never populates that journal for newly-approved rows) is real and still open, deferred for a future
+slice — see `SLICE-6W-LOG.md` → `## Deferred — general provenance-journal fix, 2026-09-11`.
 
 Verified: Stage 1 PASSED (hermetic + live create-and-cancel Bluesky canary, nothing left standing).
-Stage 2: `bluesky-2` confirmed `approve`, routing safe, one live Schedule click refused on the
-blocker above — no provider call made.
+Stage 2: `bluesky-2` confirmed `approve`, routing safe, provenance now seeded — ready to re-attempt
+the live Studio Schedule click (acceptance item 6).
 
 Retained: `content/.../review-queue.md` (bluesky-2→approve, uncommitted);
 `$TMPDIR/slice-6w/canary.json`.
 
-Next action: owner decision — (a) audited fix wiring `recordNewQueueRows` into `serve.ts`, or (b)
-an audited one-off exception. Both touch `src/review/**`, outside this packet. Full write-up:
-`SLICE-6W-LOG.md` → `## Stopped — 2026-09-11`.
+Next action: re-attempt Stage 2's Schedule click in Studio for `bluesky-2`, then continue the Stage
+2 command sequence (reschedule dry-run + real move, reconcile, Muxin's live confirmation,
+record-evidence). Note for closeout: this packet is 13,271 B, over the 12,288 B cap — trim then.
 
 ## RESULT BLOCK
 

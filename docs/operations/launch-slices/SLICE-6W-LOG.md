@@ -3,6 +3,79 @@
 Dated records, superseded `## Stopped` sections, and completed `RESULT BLOCK`s move here, newest
 first. No session reads this file at start; the packet's compact pointers are enough.
 
+## Deferred — general provenance-journal fix, 2026-09-11
+
+Owner decision after two cross-family audit rounds: defer the general fix (wiring
+`recordNewQueueRows`/`backfillQueueRowProvenance` into `serve.ts`'s `GET /api/queue` so every
+newly-approved row gets real `approval-dispatch-safety.jsonl` provenance automatically), in favor
+of a narrow one-off exception to unblock `bluesky-2` only (see packet `## Do not touch`). The
+general fix is real, needed work — tracked here for a future slice, not abandoned.
+
+Two rounds of Codex audit against `src/review/approval-provenance.ts` +
+`src/review/serve.ts` (+ `approval-provenance.test.ts`) got 4 of 6 original defects cleanly fixed
+(undecided-status filter, stale-snapshot approval race, per-folder failure isolation, test
+coverage: 22/22 passing). Second-round **BLOCK** verdict, four items still open for whoever
+resumes this:
+
+1. **Folder/slug key collision not actually fixed in production.** `safeFolder()`
+   (`src/review/rows.ts:82`) resolves Content folders before Outreach folders when both share a
+   bare slug; the backfill's key scheme doesn't account for this. The fix's own test
+   (`approval-provenance.test.ts:283`) uses two *different* slugs for its "two folders" case, so it
+   never reproduces the real same-basename collision — needs a same-basename fixture across
+   Content vs. Outreach before this can be called fixed.
+2. **Malformed-journal failures don't reach the Studio client.** The backfill helper now throws
+   correctly, but `GET /api/queue`'s catch (`src/review/serve.ts:1110`) logs to `console.error` and
+   still returns success to the browser. Needs to surface as a real error response.
+3. **Claim-leak risk.** `claimPublishingAttempt` can throw after creating its lock file, without
+   unlinking it, if a write/fsync fails after the lock is created (`approval-provenance.ts:172`);
+   the backfill also catches every claim-acquisition error as ordinary contention
+   (`approval-provenance.ts:148`), which would mask this. Needs cleanup-on-failure plus narrower
+   error handling.
+4. **New cross-process race.** `appendRows` (`src/publish/queue.ts:170`) writes the queue file
+   before the journal mutation lock is acquired, so the backfill could record a row's provenance
+   first and cause a later `recordNewQueueRows` call to falsely report a duplicate. Needs the write
+   and the lock acquisition reordered or unified.
+
+Codex explicitly ruled out a lock-order deadlock across these paths — not a concern, just the four
+items above. Diffs from both audit rounds (not committed, not to be reused as-is given the open
+defects) were saved only as ephemeral scratch files during this session and were not retained
+long-term; a future slice should re-derive the fix rather than hunt for that scratch output.
+
+Separately: Codex flagged that `bluesky-2` specifically, being already `approve`, would not be
+touched by the narrowed (undecided-only) filter even once the general fix lands, and explicitly
+said not to cycle it through `pending` as a workaround to mint fresh provenance. Whatever one-off
+mechanism unblocks `bluesky-2` now should not be treated as this open item's resolution.
+
+## One-off provenance seed, 2026-09-11
+
+`scripts/slice-6w-seed-provenance.ts` — new file, calls only existing tested functions in
+`src/review/approval-provenance.ts`, edits no `src/**` file, pinned to `bluesky-2` alone (full
+identity check: platform/format/asset/status, not just row id). Two Codex audit rounds:
+
+- Round 1: **BLOCK**. A lone `created` event (no approval transition) makes
+  `approvalDispatchDisposition` return `blocked`, which is *worse* than `legacy` —
+  `scheduleApprovedOnce` throws on `blocked` before its `retryBlocked` shortcut. Also: the
+  documented two-invocation flow (`--write` then separately `--write --complete-approval`) didn't
+  actually resume — the second run just reported "already seeded" and stayed blocked. Also: the
+  write callback into `commitReviewStatus` was unconditional `() => true`, which Codex proved could
+  certify a *different* derivative than the one originally fingerprinted if the file changed
+  between the creation and approval events.
+- Fixes: resumable two-invocation flow (fingerprint-checked before resuming); `unchangedRow()`
+  callback that re-reads and re-verifies platform/format/asset/status/fingerprint before allowing
+  the approval commit, failing closed on any mismatch; absolute repo-root path instead of
+  cwd-relative; full identity assertion, not just row id; abort before any write on an unreadable
+  derivative; nonzero exit unless final disposition is `fresh`; scratch temp dirs cleaned up.
+- Round 2: **PASS**. Codex independently reproduced both original bugs against the fix (two-process
+  resume works; tampered-derivative and mid-commit fault injection both fail closed with no false
+  `fresh`), ran `npm run check` (4379/0), and flagged one non-blocking item: this packet
+  (`SLICE-6W.md`, 13,271 B) is over the 12,288 B packet-size cap — trim at closeout, not a safety
+  issue.
+- Run for real, unsandboxed (the real data root is outside the sandbox write allowlist; a first
+  sandboxed attempt got `EPERM` on the lock file before anything was written, confirmed via `ls`):
+  `node --import tsx scripts/slice-6w-seed-provenance.ts --write --complete-approval` → exit 0,
+  `result {"kind":"fresh"}`, `Schedule is unblocked for this row`. `bluesky-2` alone now has real
+  `approval-dispatch-safety.jsonl` provenance; no other row or slug touched; no provider call made.
+
 ## Stopped — 2026-09-11
 
 Blocker: Studio's live Schedule action refuses every genuinely first-time approved row — not just
