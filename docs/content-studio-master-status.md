@@ -8,9 +8,10 @@
 - Current / last accepted: **6W**, `docs/operations/launch-slices/SLICE-6W.md`, PASS. Nothing
   blocked. First real Bluesky post scheduled/moved through Studio's own Schedule action, confirmed
   live by Muxin. `npm run check` 4379/0.
-- Next: **6X** — no packet written yet; a packet session picks scope and writes it. Two open items
-  to consider for it: the general provenance-journal fix, and auditing other Postiz-routed
-  channels' connection health (both deferred out of 6W's scope, detail in `SLICE-6W-LOG.md`).
+- Next: **6X**, `docs/operations/launch-slices/SLICE-6X.md` — written and dependency-ready: the
+  general provenance-journal fix, so a first-time approved row schedules in Studio without a
+  per-row one-off. The other 6W deferral, auditing Postiz-routed channels' connection health,
+  is not in 6X and still has no packet.
 - Last decision: a stale Postiz->Bluesky session token (not disabled, just expired) causes silent
   delivery failure with no detail; fixed by reconnecting the account in Postiz, not a code change.
 - Housekeeping: hygiene lists four other-session items, left in place by rule.
