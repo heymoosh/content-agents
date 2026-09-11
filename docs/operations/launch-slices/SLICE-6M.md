@@ -186,24 +186,13 @@ session created and settled, and each path left in place. Regenerated `e2e/resul
 Use the `### Read-set measurement` form in `docs/operations/slice-protocol-environment.md` for the
 closeout read-set print — not an ad hoc re-derivation.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## Stopped
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action:
-- Usage:
-
-## Usage budget and handoff
-
-Apply `AGENTS.md` → Slice protocol → Usage discipline.
-- Each extra lane: none — serial, because both files are proved by one shared suite run and a
-  second worker would duplicate that run for no independent deliverable.
-- Assignment: one Claude mid-tier worker at medium effort, fresh packet-sized context. Reuse it
-  for audit repairs on this candidate; its retained context is what makes the repairs cheap.
-- Evidence return: command, exit code, counts, candidate sha, one-line result, and pointers to the
-  Playwright output on disk. Do not paste transcripts or traces.
-- Capability boundary: closeout runs once, after acceptance of this whole capability, not after
-  each repair. Use completion notifications; do not poll an unchanged worker.
+Full RESULT BLOCK/evidence: `SLICE-6M-LOG.md` → `## Stopped — 2026-09-11` (not read at start).
+Blocker: `test:e2e` exit 1 from pre-existing `pass-d-editorial.ts`/`pass-d-content-generation.ts`
+timeouts, reproduced with this diff stashed against `main` — unrelated, out of scope here.
+Verified: both owned target records pass clean, twice; isolation clean; check/hygiene/audit
+not reached. Retained: `pass-a-reads.ts`/`pass-b-writes.ts` uncommitted in
+`wt-slice-6m` (branch `slice-6m-worker`), snapshotted to `refs/wip/wt-slice-6m` (`d881432`).
+Next: owner accepts on the narrower bar, or a new slice fixes Pass D first. Original usage budget
+and handoff moved to `SLICE-6M-LOG.md` (superseded by this stop).
