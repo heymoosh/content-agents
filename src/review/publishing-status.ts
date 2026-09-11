@@ -296,9 +296,18 @@ export async function scheduleApprovedOnce(
     if (!prior && disposition.kind !== "fresh" && disposition.kind !== "reconciled-not-created") {
       throw new Error(retryBlocked ?? "this row has no verifiable creation and approval provenance; reconcile it before scheduling");
     }
+    // Resolved before provider selection on purpose. The seam stands in for the whole external
+    // provider round trip, and discovery is part of that round trip: selecting a real provider
+    // first would make a disposable browser run reach out to a live provider (and fail on its
+    // credentials) before it ever got here. The seam's own gate is what keeps this safe — a
+    // one-run token, a marker file inside the disposable repo, and E2E_REPO_ROOT resolving to the
+    // executing checkout — so a normal server can never take this branch.
+    const injected = disposableProviderOutcome(liveRow);
     let provider: PublishingProvider;
     try {
-      provider = dispatchMode === "unscheduled-draft"
+      provider = injected
+        ? injected.provider
+        : dispatchMode === "unscheduled-draft"
         ? "typefully"
         : (schedule === scheduleApproved || selectionDeps) && kind !== "outreach-lock"
         ? (await selectConfiguredProvider(liveRow, selectionDeps)).provider
@@ -346,7 +355,6 @@ export async function scheduleApprovedOnce(
     // Once this callback begins, a thrown callback or failed terminal write must retain the
     // durable claim. A future process has to reconcile the exact fenced attempt first.
     releaseAfterAttempt = false;
-    const injected = disposableProviderOutcome(liveRow);
     const result = injected
       ? { scheduled: injected.scheduled, scheduleError: injected.scheduleError }
       : await schedule(folder, liveRow, undefined, policy, dispatchMode);

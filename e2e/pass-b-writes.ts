@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bootServer, openSession, openRoom, waitLoaded, record, results, ROOT } from "./harness.js";
 import { writeContentRequest } from "../src/review/content-request-store.js";
+import { appendRows } from "../src/publish/queue.js";
 
 const PORT = 4793;
 const SLUG = "e2e-probe-venture";
@@ -46,15 +47,23 @@ async function main(): Promise<void> {
     originalInput: "The exact disposable source for grouped Content review.", treatments: ["summary"],
     media: ["none"], platforms: ["x"], includeUntreatedControl: true,
   });
+  writeFileSync(join(contentFixture, "derivatives", "e2e-provider-success.md"), "---\nplatform: x\nvariant_kind: control\n---\n\nOriginal success draft.\n");
+  writeFileSync(join(contentFixture, "derivatives", "e2e-provider-failure.md"), "---\nplatform: x\nvariant_kind: treated\ntreatment: summary\n---\n\nOriginal failure draft.\n");
   writeFileSync(join(contentFixture, "review-queue.md"), [
     "# Review queue — E2E grouped approval request", "",
     "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |",
     "|----|----------|--------|-------|-------------|------------|-----|--------|-------|",
-    "| e2e-provider-success | x | text | derivatives/e2e-provider-success.md | 5 | 5 | no | pending | Untreated control |",
-    "| e2e-provider-failure | x | text | derivatives/e2e-provider-failure.md | 5 | 5 | no | pending | Treatment: summary |",
   ].join("\n") + "\n");
-  writeFileSync(join(contentFixture, "derivatives", "e2e-provider-success.md"), "---\nplatform: x\nvariant_kind: control\n---\n\nOriginal success draft.\n");
-  writeFileSync(join(contentFixture, "derivatives", "e2e-provider-failure.md"), "---\nplatform: x\nvariant_kind: treated\ntreatment: summary\n---\n\nOriginal failure draft.\n");
+  // The rows go in through appendRows, not a hand-written table, because SLICE-5S made dispatch
+  // require verifiable creation provenance: appendRows records the `created` event that lets a row
+  // later reach the Schedule action. Rows written straight into review-queue.md are "legacy" to
+  // `approvalDispatchDisposition` and are refused at scheduling by design, so a hand-written
+  // fixture could never exercise the publishing path at all. Derivatives are written first because
+  // the creation fingerprint is taken over the derivative bytes.
+  appendRows(contentFixture, [
+    { id: "e2e-provider-success", platform: "x", format: "text", asset: "derivatives/e2e-provider-success.md", status: "pending", notes: "Untreated control" },
+    { id: "e2e-provider-failure", platform: "x", format: "text", asset: "derivatives/e2e-provider-failure.md", status: "pending", notes: "Treatment: summary" },
+  ]);
   const server = await bootServer({}, PORT);
   let s: Awaited<ReturnType<typeof openSession>> | null = null;
 
@@ -261,10 +270,43 @@ async function main(): Promise<void> {
       status: queueState.requestId === "e2e-content-review-request" && savedBody.includes(editedBody) && success?.status === "approve" && failure?.status === "approve" ? "pass" : "fail",
       detail: `request=${queueState.requestId}; edit=${savedBody.includes(editedBody)}; approved=${success?.status}/${failure?.status}`,
     });
+    // SLICE-5S (2026-09-07) made approving a row record a decision and nothing else. Approval must
+    // therefore leave no publishing attempt behind at all: this is the half of that separation a
+    // browser pass can prove, and it is what the old single record silently lost when it began
+    // reading `undefined/undefined` off rows that had been approved but never scheduled.
     record({
-      feature: "Content grouped approval reports injected provider success and retained failure separately",
-      status: success?.publishingStatus?.state === "planned" && success.publishingStatus.providerObjectId === "e2e-provider-object" && failure?.publishingStatus?.state === "uncertain" && failure.publishingStatus.error === "injected provider timeout" ? "pass" : "fail",
-      detail: `success=${success?.publishingStatus?.state}/${success?.publishingStatus?.providerObjectId}; failure=${failure?.publishingStatus?.state}/${failure?.publishingStatus?.error}`,
+      feature: "Content approval records a decision and starts no publishing attempt",
+      status: success?.status === "approve" && failure?.status === "approve" && !success?.publishingStatus && !failure?.publishingStatus ? "pass" : "fail",
+      detail: `approved=${success?.status}/${failure?.status}; publishing after approve=${success?.publishingStatus?.state ?? "none"}/${failure?.publishingStatus?.state ?? "none"}`,
+    });
+
+    // The other half: Publishing's own Schedule action is the only thing in the GUI that reaches a
+    // provider. Drive it per row (never the "Move" control, which opens a `prompt()` dialog and
+    // would freeze the session) and prove the two injected outcomes are reported apart.
+    await page.click('#reviewSteps [data-step="4"]');
+    await page.waitForSelector("#publishedSheet:not([hidden])", { timeout: 10_000 });
+    for (const rowId of ["e2e-provider-success", "e2e-provider-failure"]) {
+      const scheduleButton = page.locator(`#publishedSheet [data-schedule-id="${rowId}"]`);
+      await scheduleButton.waitFor({ timeout: 15_000 });
+      await scheduleButton.click();
+    }
+    await page.waitForFunction(async (slug) => {
+      const response = await fetch("/api/queue");
+      const data = await response.json();
+      const piece = (data.pieces || []).find((candidate) => candidate.slug === slug);
+      return piece?.rows?.filter((row) => row.id.startsWith("e2e-provider-") && row.publishingStatus?.state).length === 2;
+    }, CONTENT_SLUG, { timeout: 20_000, polling: 250 });
+    const scheduledState = await page.evaluate(async (slug) => {
+      const response = await fetch("/api/queue");
+      const data = await response.json();
+      return (data.pieces || []).find((candidate) => candidate.slug === slug);
+    }, CONTENT_SLUG) as typeof queueState;
+    const scheduledSuccess = scheduledState.rows?.find((row) => row.id === "e2e-provider-success");
+    const scheduledFailure = scheduledState.rows?.find((row) => row.id === "e2e-provider-failure");
+    record({
+      feature: "Publishing's Schedule action reports injected provider success and retained failure separately",
+      status: scheduledSuccess?.publishingStatus?.state === "planned" && scheduledSuccess.publishingStatus.providerObjectId === "e2e-provider-object" && scheduledFailure?.publishingStatus?.state === "uncertain" && scheduledFailure.publishingStatus.error === "injected provider timeout" ? "pass" : "fail",
+      detail: `success=${scheduledSuccess?.publishingStatus?.state}/${scheduledSuccess?.publishingStatus?.providerObjectId}; failure=${scheduledFailure?.publishingStatus?.state}/${scheduledFailure?.publishingStatus?.error}`,
     });
 
     // ── Signals: recommendations are session-local and do not expose a backlog write. ──

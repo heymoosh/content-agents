@@ -179,9 +179,18 @@ async function main(): Promise<void> {
     await s.page.click('#cwSteps [data-step="3"]');
     await s.page.waitForSelector("#reviewSheet:not([hidden])", { timeout: 10_000 });
     const approvalText = ((await textOf(s.page, "#reviewSheet")) || "").replace(/\s+/g, " ").trim();
+    // SLICE-5S (2026-09-07) split approve from publish: approving records a decision and nothing
+    // else, and the Publishing room's Schedule action is the only thing that calls a provider. This
+    // record therefore asserts the sheet promises exactly that separation. The pre-5S copy it used
+    // to grep for ("Approve selected and attempt scheduling", "provider accepted or published")
+    // described the behavior that slice deliberately removed, so it could never pass again.
+    const approvalSeparates = approvalText.includes("Approve Drafts")
+      && approvalText.includes("Approve selected")
+      && approvalText.includes("Schedule approved drafts from Publishing")
+      && !/attempt scheduling|provider accepted or published/i.test(approvalText);
     record({
       feature: "Content opens request-grouped approval before the separate Publish step",
-      status: approvalText.includes("Approve Drafts") && approvalText.includes("Approve selected and attempt scheduling") && approvalText.includes("provider accepted or published") ? "pass" : "fail",
+      status: approvalSeparates ? "pass" : "fail",
       detail: approvalText.slice(0, 220),
     });
 
