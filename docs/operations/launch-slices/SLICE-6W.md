@@ -206,15 +206,23 @@ never populates that journal for newly-approved rows) is real and still open, de
 slice — see `SLICE-6W-LOG.md` → `## Deferred — general provenance-journal fix, 2026-09-11`.
 
 Verified: Stage 1 PASSED (hermetic + live create-and-cancel Bluesky canary, nothing left standing).
-Stage 2: `bluesky-2` confirmed `approve`, routing safe, provenance now seeded — ready to re-attempt
-the live Studio Schedule click (acceptance item 6).
+Stage 2, done for real through Studio's own UI (not CLI): live Schedule click on `bluesky-2`
+succeeded (one `POST /api/publishing/schedule`, 200; provider object `cmtxe0dww0004mn81r740iylk`,
+first slot Sat Sep 12 6:30 PM PT, confirmed against the unified scheduler's own ledger entry, not
+hand-typed) — acceptance items 6-8. Then moved once to a different real slot via
+`npm run publish:reschedule --to 2026-09-14T01:30:00.000Z` (dry-run first, listed only this row;
+real run `ok:true`, same provider object, new `plannedFor` Sun Sep 13 6:30 PM PT), confirmed in
+Studio's own UI after the move — acceptance item 9. `npm run publish:reconcile` ran clean
+(`state:"ok"`, exit 0; 0 observations, since the slot has not passed yet) — acceptance item 10's
+mechanical half.
 
 Retained: `content/.../review-queue.md` (bluesky-2→approve, uncommitted);
 `$TMPDIR/slice-6w/canary.json`.
 
-Next action: re-attempt Stage 2's Schedule click in Studio for `bluesky-2`, then continue the Stage
-2 command sequence (reschedule dry-run + real move, reconcile, Muxin's live confirmation,
-record-evidence). Note for closeout: this packet is 13,271 B, over the 12,288 B cap — trim then.
+Next action: wait for the moved slot (2026-09-14T01:30:00.000Z / Sun Sep 13, 6:30 PM PT) to pass,
+get Muxin's live confirmation the post is on Bluesky, then `npm run publish:record-evidence`, a
+final check of item 12 (no other row changed, exactly one new post), and unsandboxed
+`npm run check` to close. Note for closeout: this packet is over the 12,288 B cap — trim then.
 
 ## RESULT BLOCK
 

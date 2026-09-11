@@ -76,6 +76,40 @@ identity check: platform/format/asset/status, not just row id). Two Codex audit 
   `result {"kind":"fresh"}`, `Schedule is unblocked for this row`. `bluesky-2` alone now has real
   `approval-dispatch-safety.jsonl` provenance; no other row or slug touched; no provider call made.
 
+## Stage 2 live run, 2026-09-11
+
+With provenance seeded (see `## One-off provenance seed` below), re-attempted Stage 2 for real,
+driving Studio's own Publishing room in-browser (claude-in-chrome), not a CLI shortcut:
+
+- Dismissed the stale error toast left over from the earlier blocked attempt.
+- Clicked **Schedule** on `bluesky-2`. Network log showed exactly two calls:
+  `POST /api/publishing/schedule` (200) and `GET /api/queue` (200) — one provider object created.
+  Studio showed `bluesky-2 / Scheduled / Sat, Sep 12, 6:30 PM PT / postiz · cmtxe0dww0004mn81r740iylk`.
+  Cross-checked against `~/.content-agents/content-agents-154a8dd69ae2/scheduler/publish-schedule.jsonl`:
+  `{"platform":"bluesky","day":"2026-09-12","time":"2026-09-13T01:30:00.000Z","asset":"derivatives/bluesky-2.md","by":"postiz"}`
+  — matches exactly, confirming the displayed time came from the unified scheduler's own slot
+  ledger, not typed by hand. (The repo-root `data/publish-schedule.jsonl` is a stale, unrelated copy
+  — last touched Sep 6 — the live server writes only to the real data root's copy above.)
+- Reschedule dry-run: `npm run publish:reschedule -- --slug 2026-09-07-the-world-s-broken-what-do-we-do-human-inference --id bluesky-2 --to 2026-09-14T01:30:00.000Z --dry-run`
+  listed exactly `{slug, id: "bluesky-2", platform: "bluesky"}` — no other row. First attempt hit a
+  sandboxed `tsx` IPC-pipe `EPERM` (`listen EPERM ... tsx-501/*.pipe`); retried unsandboxed and it ran
+  clean.
+- Real move, same command without `--dry-run`: `ok:true`, `from: "2026-09-13T01:30:00.000Z"`,
+  `to: "2026-09-14T01:30:00.000Z"`, same `providerObjectId: "cmtxe0dww0004mn81r740iylk"` (Postiz
+  moved the existing post rather than creating a new one), `publishing.state: "planned"`.
+- Reloaded Studio: `bluesky-2` now shows `Scheduled / Sun, Sep 13, 6:30 PM PT`, same provider id.
+  Screenshot saved: `screenshot-1789157605242-2.jpg` (local temp path, not repo-committed).
+- `npm run publish:reconcile` (unsandboxed): `{"state":"ok", "observations":0, ...}`, exit 0 — no
+  reconciliation work yet because the moved slot (Sun Sep 13, 6:30 PM PT) hasn't passed.
+
+No other `review-queue.md` row changed status as a side effect (checked via the Publishing room's
+own table, only `bluesky-2` shows a planned/scheduled time; `x-1`/`x-2` unchanged, still
+`Needs reconciliation`/`Pending`).
+
+Remaining before this slice can close: wait for 2026-09-14T01:30:00.000Z UTC to pass, get Muxin's
+live on-Bluesky confirmation, `npm run publish:record-evidence`, final item-12 check, unsandboxed
+`npm run check`.
+
 ## Stopped — 2026-09-11
 
 Blocker: Studio's live Schedule action refuses every genuinely first-time approved row — not just
