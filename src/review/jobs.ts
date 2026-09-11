@@ -886,6 +886,9 @@ export function assertConfiguredTreatmentPolicy(request: ContentRequest, treated
   if (treated.length && request.origin === "venture" && !request.ventureSource) {
     throw new Error("configured Venture treatment requires approved Venture source provenance");
   }
+  if (treated.length && request.origin === "fiction") {
+    throw new Error("treatments are unavailable for fiction origin; only the untreated control ships");
+  }
 }
 
 export interface ConfiguredAuthoritativeBody {

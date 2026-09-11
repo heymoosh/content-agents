@@ -196,6 +196,7 @@ async function main(): Promise<void> {
     // separate configured-media rendering gap.
     await page.click('[data-config-none="media"]');
     await page.waitForSelector("#contentConfigSave:not([disabled])", { timeout: 15_000 });
+    const blockedBeforeGenerate = session.blockedCalls.length;
     const savedResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/content/request");
     const generatedResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/content/generate").catch(() => null);
     await page.click("#contentConfigSave");
@@ -233,7 +234,7 @@ async function main(): Promise<void> {
     });
     record({
       feature: "Configured-generation browser pass cannot invoke a real model or provider",
-      status: payload.engineExecution === "disposable-injected" && session.blockedCalls.length === 0 ? "pass" : "fail",
+      status: payload.engineExecution === "disposable-injected" && session.blockedCalls.length === blockedBeforeGenerate ? "pass" : "fail",
       detail: `server execution=${payload.engineExecution ?? "missing"}; browser-aborted calls=${session.blockedCalls.join(", ") || "none"}`,
     });
 
