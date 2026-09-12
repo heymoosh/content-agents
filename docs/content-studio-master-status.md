@@ -4,6 +4,11 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
   `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
+- Latest (2026-09-12, ops, not a slice): Outstanding item 1 CLOSED. Real approved LinkedIn and
+  Mastodon rows went live, so all five text channels are proven through Studio. Open: item 2 (one
+  real media row, needs a paid render decision). New ops risk: a Postiz restart can leave its
+  backend silently dead behind a `healthy` container; fix is `docker exec postiz pm2 restart
+  backend`, and a self-healing healthcheck was prepared for Muxin to install. See `## Progress log`.
 - Current / last accepted: **7D**, `docs/operations/launch-slices/SLICE-7D.md`, PASS. Nothing
   blocked. A Typefully draft with no usable date no longer lets `--sync` release the slot claim
   sitting behind it. `npm run check` 4570/0. Shipped as `f2f9ea5`, pushed to `origin/main`.
@@ -112,14 +117,16 @@ worker holding only that section and its packet still has them.
 Everything known-broken or unproven, as of 2026-09-12. Muxin's direction: fix all of it before any
 front-end or UX pass. Ordered by what blocks trusting the Publishing room, not by size.
 
-1. **Live channel coverage is 3 of 5. PARTIALLY ADVANCED 2026-09-12, awaiting fire.** Bluesky,
-   Threads and X have each had a real post scheduled through Postiz. LinkedIn and Mastodon now have
-   their first real rows scheduled too (`linkedin-1` Sep 13 08:30 PT, `mastodon-1` Sep 13 19:00 PT,
-   both from `2026-09-07-the-world-s-broken-what-do-we-do-human-inference`), each carrying a real
-   Postiz object id and a slot claim. **This item is NOT closed.** Scheduled is not live: the doc's
-   own standing warning is that a row flipping to `published` on draft creation proves nothing about
-   public visibility. Close it only after confirming both posts are publicly visible on the accounts
-   after their slots fire.
+1. ~~**Live channel coverage is 3 of 5.**~~ **DONE 2026-09-12 for LinkedIn and Mastodon.** Two rows
+   Muxin approved in `2026-09-02-the-world-s-broken-what-do-we-do` (`linkedin-1`, `mastodon-1`)
+   were scheduled through Studio, moved with `publish:reschedule` to 18:34Z the same day, and went
+   out on time. Postiz reports both `PUBLISHED` with no error. Mastodon checked publicly without
+   logging in (`https://mastodon.social/@human_inference/117259504240530864`, visibility `public`);
+   LinkedIn (`urn:li:share:7504608270674890753`) confirmed by Muxin on the account. All five text
+   channels (Bluesky, Threads, X, LinkedIn, Mastodon) now have a real approved row through Studio.
+   The `2026-09-07` folder rows stay scheduled for Sep 13 and Sep 20. Still without a real row:
+   Instagram, Facebook, TikTok and YouTube Shorts (media only, see item 2), Substack Notes, and
+   Gmail outreach. See `## Progress log` -> 2026-09-12 (ops, live).
 2. **No REAL media row has gone through Postiz.** **Rescoped 2026-09-12** after Muxin challenged
    the original wording, which was wrong twice over. Postiz media is not unexercised and not
    unproven: a two-slide carousel was live-verified 2026-09-02 on TikTok, Mastodon, Facebook,
@@ -170,6 +177,37 @@ deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
 
+### 2026-09-12 (ops, live) — LinkedIn and Mastodon live; a restart can leave Postiz silently broken
+
+Not a slice. Closes `## Outstanding work` item 1 for LinkedIn and Mastodon.
+
+**Two Schedule refusals, both correct.** First: "This row has no verifiable creation and approval
+provenance." The `2026-09-02` rows predate the approval journal, so they were `legacy` and Schedule
+fails closed. Adopted with `scripts/reconcile-approval-provenance.ts` (dry run, then `--write
+--expect-fingerprint`; linkedin-1 `e00624d7...`, mastodon-1 `f1512340...`), which certifies the bytes
+on disk and refuses anything not `approve`. Second: "provider selection failed before dispatch; no
+provider request was made: Postiz capability discovery failed ... (502)". No request was sent.
+
+**The 502 was a new failure mode.** The timer test above restarted the stack at 17:59Z. The Postiz
+backend lost a DNS race on boot (`[ioredis] ... getaddrinfo ENOTFOUND postiz-redis`) and never
+listened on :3000. pm2 still showed it online, and the container healthcheck only probed nginx on
+:5000, so Docker reported `healthy` for 25 minutes while every API call returned 502. The
+orchestrator was unaffected, so already scheduled posts would still have fired; only new scheduling
+was blocked. Fixed by `pm2 restart backend` inside the container (Muxin ran it; the classifier
+refused it for the coordinator). This corrects the entry above: the stack does not reliably
+self-recover.
+
+**Result.** Both rows rescheduled to 18:34Z and published on time: Postiz `state PUBLISHED`, no
+`error`, `releaseURL`s recorded in item 1. Mastodon verified public without logging in; LinkedIn
+verified by Muxin.
+
+**Prevention (prepared, applied by Muxin).** A replacement healthcheck,
+`postiz-docker-compose/overrides/healthcheck.sh`, probes both :5000 and :3000 and, if only the
+backend has been silent for 6 checks (~3 minutes, against a normal ~30s boot), restarts just the
+backend. Installed by a script Muxin runs, because it recreates the `postiz` container; the compose
+file keeps a `.bak-2026-09-12` copy. That directory is not in this repo and not backed up to
+Muxin's GitHub.
+
 ### 2026-09-12 (ops) — a missed publish slot fires late, it is not lost
 
 Not a slice. An operational finding from Muxin's question "Postiz has to be left on, right?", worth
@@ -198,7 +236,8 @@ every post timer 22h+ out, so no live post could fire during it.
 resident (postiz 2.5GB, elasticsearch 780MB, temporal 475MB), so a Pi would need the 8GB or 16GB
 model at roughly $140 to $185 all-in, against a failure mode that is now known to be lateness rather
 than loss. Every container is `restart: always`, so ticking "Start Docker Desktop when you sign in"
-covers the common case for free. Revisit only if slots start slipping by more than a day.
+covers the common case for free. **Corrected the same day:** `restart: always` brings the containers
+back, but not always a working API. See 2026-09-12 (ops, live) below. Revisit only if slots start slipping by more than a day.
 
 **Residual, untested:** the test proves the *timer* fires, not that the *post* succeeds. A provider
 may reject a stale scheduled request, and the failure mode of a post appearing at an unintended hour
