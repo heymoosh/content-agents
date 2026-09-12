@@ -19,8 +19,8 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { readLedger, type Claim } from "./slots.js";
-import { syncLedger, reconcile, type QueueItem } from "./queue-view.js";
-import { fetchScheduledDrafts } from "./typefully.js";
+import { syncLedger, reconcile, listTypefully, type QueueItem } from "./queue-view.js";
+import { fetchScheduledDrafts, type TypefullyDraftRecord } from "./typefully.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TEST_LEDGER = join(repoRoot, "data", ".test-publish-schedule.queue-view.jsonl");
@@ -377,4 +377,114 @@ test("CLI prints the configured scheduler ledger path with repository .env reads
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
+});
+
+// SLICE-7D: a Typefully draft with no scheduled_date is dropped from the scheduled list, which made
+// the live list INCOMPLETE while listTypefully still reported ok: true. `ok` is the only thing
+// standing between a future claim and releaseClaims(), so `--sync` could free a slot that a real
+// (merely undated) draft was sitting behind, and a later run could then schedule a second post into
+// it. These tests prove the incompleteness now routes the claim to `uncheckable` instead, and that
+// a genuinely orphaned claim is still released so --sync does not freeze.
+describe("queue-view.ts: a dateless Typefully draft makes the live list incomplete", () => {
+  const DATELESS_LEDGER = join(mkdtempSync(join(tmpdir(), "content-agents-queue-view-dateless-")), "ledger.jsonl");
+  const originalKey = process.env.TYPEFULLY_API_KEY;
+  const originalLedger = process.env.CONTENT_AGENTS_TEST_LEDGER;
+
+  before(() => {
+    process.env.CONTENT_AGENTS_TEST_LEDGER = DATELESS_LEDGER;
+    process.env.TYPEFULLY_API_KEY = "test-key";
+  });
+
+  after(() => {
+    if (originalLedger === undefined) delete process.env.CONTENT_AGENTS_TEST_LEDGER;
+    else process.env.CONTENT_AGENTS_TEST_LEDGER = originalLedger;
+    if (originalKey === undefined) delete process.env.TYPEFULLY_API_KEY;
+    else process.env.TYPEFULLY_API_KEY = originalKey;
+    rmSync(dirname(DATELESS_LEDGER), { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    writeFileSync(DATELESS_LEDGER, "");
+  });
+
+  function seedLedgerAt(path: string, claims: Claim[]): void {
+    writeFileSync(path, claims.length ? claims.map((c) => JSON.stringify(c)).join("\n") + "\n" : "");
+  }
+
+  function record(over: Partial<TypefullyDraftRecord> = {}): TypefullyDraftRecord {
+    return { id: "d-1", whenIso: "2026-08-02T17:00:00.000Z", platforms: ["x"], title: "a draft", status: "scheduled", ...over };
+  }
+
+  const liveFrom = (r: { items: QueueItem[] }): QueueItem[] => r.items;
+  const okFrom = (r: { ok: boolean }): Record<string, boolean> => ({ ...ALL_OK, typefully: r.ok });
+
+  test("listTypefully reports ok: false and counts the dateless drafts", async () => {
+    const result = await listTypefully(async () => [
+      record({ id: "dated" }),
+      record({ id: "no-date-1", whenIso: null, status: "draft" }),
+      record({ id: "no-date-2", whenIso: null, status: "draft" }),
+    ]);
+    assert.equal(result.ok, false, "an incomplete live list must never license a claim release");
+    assert.match(result.note ?? "", /2 draft\(s\) have no scheduled date/);
+    assert.doesNotMatch(result.note ?? "", /—/, "no em dashes in copy a human reads");
+    assert.deepEqual(result.items.map((i) => i.title), ["a draft"], "the genuinely scheduled drafts are still listed");
+  });
+
+  test("listTypefully reports ok: true with no note when every draft has a date", async () => {
+    const result = await listTypefully(async () => [record({ id: "dated" })]);
+    assert.equal(result.ok, true);
+    assert.equal(result.note, null);
+  });
+
+  test("a future claim whose Typefully draft is dateless is NOT released, and is reported uncheckable", async () => {
+    const behindADatelessDraft = claim({ asset: "dateless-draft/x" });
+    seedLedgerAt(DATELESS_LEDGER, [behindADatelessDraft]);
+
+    const tf = await listTypefully(async () => [
+      record({ id: "the-real-draft", whenIso: null, status: "draft", title: "the-real-draft" }),
+    ]);
+    const live = liveFrom(tf);
+    const ok = okFrom(tf);
+
+    const { claimedNotLive, uncheckable } = reconcile(live, [behindADatelessDraft], ok);
+    assert.deepEqual(claimedNotLive, [], "an incomplete list can never conclude a claim is an orphan");
+    assert.deepEqual(uncheckable, [behindADatelessDraft], "it belongs in the existing not-cross-checked bucket");
+
+    const result = syncLedger(live, ok, NOW);
+    assert.deepEqual(result.releasedOrphans, [], "releaseClaims must never be handed this claim");
+    assert.deepEqual(readLedger(), [behindADatelessDraft], "the claim stays in the ledger, so the slot stays taken");
+  });
+
+  // The production gate, not just the flag: a draft whose date is present but unusable (whitespace
+  // here) is dropped by the scheduled filter exactly like a null-dated one, so it has to mark the
+  // list incomplete for the same reason. If it did not, syncLedger would free the slot this draft is
+  // sitting behind and a later run could schedule a second post into it.
+  test("a whitespace-dated draft blocks release the same way a null-dated one does", async () => {
+    const behindAGarbageDate = claim({ asset: "whitespace-date/x" });
+    seedLedgerAt(DATELESS_LEDGER, [behindAGarbageDate]);
+
+    // fetchAllDrafts maps an unusable date to null, so this is what the real fetch would hand over.
+    const tf = await listTypefully(async () => [
+      record({ id: "whitespace-date", whenIso: null, status: "scheduled", title: "whitespace-date" }),
+    ]);
+    assert.equal(tf.ok, false, "a date that does not parse leaves the live list incomplete");
+    assert.match(tf.note ?? "", /1 draft\(s\) have no scheduled date/);
+
+    const result = syncLedger(liveFrom(tf), okFrom(tf), NOW);
+    assert.deepEqual(result.releasedOrphans, [], "releaseClaims must never be handed this claim");
+    assert.deepEqual(readLedger(), [behindAGarbageDate], "the slot stays taken");
+  });
+
+  test("a genuinely orphaned future claim is STILL released when the live list is complete", async () => {
+    const orphan = claim({ asset: "orphan/x" });
+    seedLedgerAt(DATELESS_LEDGER, [orphan]);
+
+    // A complete live list: one dated draft, on a different day, and nothing dateless.
+    const tf = await listTypefully(async () => [record({ id: "unrelated", whenIso: "2026-08-05T17:00:00.000Z" })]);
+    assert.equal(tf.ok, true);
+
+    const result = syncLedger(liveFrom(tf), okFrom(tf), NOW);
+    assert.deepEqual(result.releasedOrphans, [orphan], "the fix must not freeze --sync");
+    assert.deepEqual(readLedger(), [], "an orphaned claim still frees its slot");
+  });
 });

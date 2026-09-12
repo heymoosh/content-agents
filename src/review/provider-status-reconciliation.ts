@@ -9,7 +9,7 @@ import {
   type PublishingStatus,
 } from "./publishing-status.js";
 import { createPostizTransport, readPostizPost, type PostizTransport } from "../publish/postiz.js";
-import { fetchScheduledDrafts } from "../publish/typefully.js";
+import { fetchAllDrafts, selectScheduled } from "../publish/typefully.js";
 import { fetchScheduledPosts } from "../publish/postpeer-status.js";
 import { listScheduledUploads } from "../publish/youtube.js";
 
@@ -23,7 +23,9 @@ function observationChanged(previous: PublishingStatus, next: PublishingStatus):
 
 export interface DefaultStatusReaderDeps {
   postizTransport?: PostizTransport;
-  fetchTypefully?: typeof fetchScheduledDrafts;
+  // All drafts, not only the scheduled ones: a draft with no date is absent from the scheduled list
+  // but is right there in Typefully and readable, and the reader must be able to tell those apart.
+  fetchTypefully?: typeof fetchAllDrafts;
   fetchPostpeer?: typeof fetchScheduledPosts;
   fetchYoutube?: typeof listScheduledUploads;
 }
@@ -48,10 +50,23 @@ export function createDefaultProviderStatusReaders(deps: DefaultStatusReaderDeps
     postiz: async (status) => readPostizPost(deps.postizTransport ?? createPostizTransport(), status.providerObjectId ?? status.ref ?? "", status.plannedFor),
     typefully: async (status) => {
       const id = comparableProviderId("typefully", status.providerObjectId ?? status.ref);
-      const item = (await (deps.fetchTypefully ?? fetchScheduledDrafts)()).find((entry) => comparableProviderId("typefully", entry.id) === id);
-      return item
-        ? { ...item, id: item.id, status: "scheduled", scheduledFor: item.whenIso }
-        : { id, status: "unknown", reconciliationError: "Typefully scheduled-list absence cannot distinguish live, canceled, deleted, or failed; human reconciliation is required" };
+      const item = (await (deps.fetchTypefully ?? fetchAllDrafts)()).find((entry) => comparableProviderId("typefully", entry.id) === id);
+      // Three distinct answers, never collapsed into one. Found and genuinely scheduled is
+      // "scheduled". Found WITHOUT a date is a different fact entirely: the draft is present and
+      // readable, it simply has no time, so it will never publish on its own. Reporting that as
+      // "unknown" would send a reviewer hunting for a lost post instead of setting a date, and
+      // reporting it as "scheduled" would claim a publish that is never going to happen. Every
+      // other case, genuine absence included, keeps the original wording unchanged.
+      const scheduled = item ? selectScheduled([item])[0] : undefined;
+      if (scheduled) return { ...item, id: scheduled.id, status: "scheduled", scheduledFor: scheduled.whenIso };
+      if (item && item.whenIso === null) {
+        return {
+          id: item.id,
+          status: "unscheduled",
+          reconciliationError: "This Typefully draft exists but has no scheduled date, so it will not publish on its own. Set a date in Typefully or cancel the draft.",
+        };
+      }
+      return { id, status: "unknown", reconciliationError: "Typefully scheduled-list absence cannot distinguish live, canceled, deleted, or failed; human reconciliation is required" };
     },
     postpeer: async (status) => {
       const id = comparableProviderId("postpeer", status.providerObjectId ?? status.ref);

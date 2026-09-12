@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDraftPayload, buildPosts, cancelDraft, createDraft, fetchScheduledDrafts, parseTypefullyCliInvocation, runTypefullyCli } from "./typefully.js";
+import { buildDraftPayload, buildPosts, cancelDraft, createDraft, datelessDrafts, fetchAllDrafts, fetchScheduledDrafts, parseTypefullyCliInvocation, runTypefullyCli } from "./typefully.js";
 import { readQueue, writeCell } from "./queue.js";
 import { commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "../review/approval-provenance.js";
 import { appendPublishingStatus, readPublishingStatuses } from "../review/publishing-status.js";
@@ -541,5 +541,79 @@ describe("cancelDraft", () => {
     }) as typeof fetch;
     await assert.rejects(() => cancelDraft("draft-123"), /TYPEFULLY_API_KEY missing/);
     assert.equal(called, false);
+  });
+});
+
+// SLICE-7D: a draft with no scheduled_date used to be dropped by fetchScheduledDrafts with no
+// signal to the caller, which read the result as a complete picture of the account. The scheduled
+// queue is still the right thing to return there (queue-view sorts it by time), so the dropped
+// drafts are exposed through the all-drafts path instead of being smuggled into it.
+describe("typefully: a dateless draft is excluded from the scheduled queue but reachable through fetchAllDrafts", () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.TYPEFULLY_API_KEY;
+  const originalSetId = process.env.TYPEFULLY_SOCIAL_SET_ID;
+
+  after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.TYPEFULLY_API_KEY;
+    else process.env.TYPEFULLY_API_KEY = originalKey;
+    if (originalSetId === undefined) delete process.env.TYPEFULLY_SOCIAL_SET_ID;
+    else process.env.TYPEFULLY_SOCIAL_SET_ID = originalSetId;
+  });
+
+  function stubDrafts(drafts: unknown[]): void {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ results: drafts, next: null }), { status: 200 })) as typeof fetch;
+  }
+
+  test("the dateless draft is absent from fetchScheduledDrafts and present in fetchAllDrafts", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    const when = new Date(Date.now() + 3_600_000).toISOString();
+    stubDrafts([
+      { id: 1, draft_title: "dated", scheduled_date: when, status: "scheduled", x_post_enabled: true },
+      { id: 2, draft_title: "dateless", scheduled_date: null, status: "draft", x_post_enabled: true },
+    ]);
+
+    const scheduled = await fetchScheduledDrafts();
+    assert.deepEqual(scheduled.map((d) => d.id), ["1"], "a draft with no date must stay out of the scheduled queue");
+
+    const all = await fetchAllDrafts();
+    assert.deepEqual(all.map((d) => d.id).sort(), ["1", "2"], "the all-drafts path must still see the dateless draft");
+    assert.deepEqual(datelessDrafts(all).map((d) => d.id), ["2"]);
+    assert.equal(all.find((d) => d.id === "2")?.whenIso, null, "a dateless draft carries a null time, never a fabricated one");
+    assert.equal(all.find((d) => d.id === "1")?.whenIso, when);
+  });
+
+  // A date is only a date if it parses. Empty, whitespace and outright garbage all have to count as
+  // NO date: if any of them keeps a non-null whenIso, datelessDrafts() misses the draft while
+  // selectScheduled() still drops it (an Invalid Date fails the `>` comparison), and the live list
+  // reads as complete while a real draft is missing from it. That is the fail-open this slice closes.
+  for (const [label, rawDate] of [
+    ["an empty string", ""],
+    ["whitespace only", "  "],
+    ["an unparseable string", "not-a-date"],
+  ] as const) {
+    test(`${label} scheduled_date counts as dateless, not as a real time`, async () => {
+      process.env.TYPEFULLY_API_KEY = "test-key";
+      process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+      stubDrafts([{ id: 3, draft_title: "bad date", scheduled_date: rawDate, status: "draft", x_post_enabled: true }]);
+
+      assert.deepEqual(await fetchScheduledDrafts(), [], "a date that does not parse must not enter the scheduled queue");
+      const all = await fetchAllDrafts();
+      assert.deepEqual(datelessDrafts(all).map((d) => d.id), ["3"], "it must be visible as dateless, not silently gone");
+      assert.equal(all[0].whenIso, null);
+    });
+  }
+
+  // status "scheduled" must not rescue an unparseable date. The old code returned this draft with
+  // the garbage string as its whenIso, which sorts as NaN and can never match a ledger claim.
+  test("a draft claiming status scheduled with an unparseable date leaves the queue and marks it incomplete", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    stubDrafts([{ id: 4, draft_title: "garbage time", scheduled_date: "not-a-date", status: "scheduled", x_post_enabled: true }]);
+
+    assert.deepEqual(await fetchScheduledDrafts(), [], "a garbage time is not a schedule, whatever status claims");
+    assert.deepEqual(datelessDrafts(await fetchAllDrafts()).map((d) => d.id), ["4"]);
   });
 });

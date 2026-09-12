@@ -94,3 +94,64 @@ test("every provider can reach a truthful terminal outcome through recorded huma
     assert.equal(latest[`${provider}/r`]?.evidenceKind, "human");
   }
 });
+
+// SLICE-7D: a Typefully draft with no scheduled date is absent from the scheduled list, so the
+// reader used to report it as `unknown` with the "cannot distinguish live, canceled, deleted, or
+// failed" string. That string is true for a deleted draft and misleading for this one, which is
+// right there in Typefully and readable. The three cases must stay distinguishable by id.
+test("the Typefully reader tells found-and-scheduled, found-but-dateless, and genuinely absent apart", async () => {
+  const readers = createDefaultProviderStatusReaders({
+    fetchTypefully: async () => [
+      { id: "tf-dated", whenIso: "2026-01-02T00:00:00Z", platforms: ["x"], title: "dated", status: "scheduled" },
+      { id: "tf-dateless", whenIso: null, platforms: ["x"], title: "dateless", status: "draft" },
+      // What fetchAllDrafts produces for a draft whose scheduled_date did not parse.
+      { id: "tf-garbage-time", whenIso: null, platforms: ["x"], title: "garbage time", status: "scheduled" },
+    ],
+  });
+  const base = { slug: "p", rowId: "r", provider: "typefully" as const, state: "planned" as const, at: "2026-01-01Z" };
+
+  const dated = await readers.typefully!({ ...base, providerObjectId: "typefully draft tf-dated" }) as Record<string, unknown>;
+  assert.equal(dated.status, "scheduled");
+  assert.equal(dated.scheduledFor, "2026-01-02T00:00:00Z");
+  assert.equal(dated.reconciliationError, undefined);
+
+  const dateless = await readers.typefully!({ ...base, providerObjectId: "typefully draft tf-dateless" }) as Record<string, unknown>;
+  assert.equal(dateless.id, "tf-dateless");
+  assert.notEqual(dateless.status, "scheduled", "a draft with no time will not auto-publish, so it is never 'scheduled'");
+  assert.equal(dateless.status, "unscheduled");
+  assert.match(dateless.reconciliationError as string, /exists but has no scheduled date/);
+  assert.doesNotMatch(dateless.reconciliationError as string, /—/, "no em dashes in copy a human reads");
+
+  // fetchAllDrafts nulls an unparseable time, so a draft carrying one lands on the same
+  // found-but-dateless branch instead of falsely taking the genuine-absence wording.
+  const unparseable = await readers.typefully!({ ...base, providerObjectId: "typefully draft tf-garbage-time" }) as Record<string, unknown>;
+  assert.equal(unparseable.status, "unscheduled", "a found draft with an unusable time is unscheduled, not absent");
+  assert.match(unparseable.reconciliationError as string, /exists but has no scheduled date/);
+
+  const absent = await readers.typefully!({ ...base, providerObjectId: "typefully draft tf-gone" }) as Record<string, unknown>;
+  assert.equal(absent.status, "unknown");
+  assert.equal(
+    absent.reconciliationError,
+    "Typefully scheduled-list absence cannot distinguish live, canceled, deleted, or failed; human reconciliation is required",
+    "genuine absence keeps its existing wording byte for byte",
+  );
+});
+
+// The dateless observation must survive normalization as non-terminal evidence: "unscheduled" is
+// not a state normalizeProviderStatus knows, so it lands on `uncertain` and carries the explanation
+// through to the row's error, rather than reading as a planned publish that is going to happen.
+test("a found-but-dateless Typefully draft records uncertain evidence, never a planned publish", async () => {
+  const root = mkdtempSync(join(tmpdir(), "provider-reconcile-dateless-")); roots.push(root);
+  const path = join(root, "events.jsonl");
+  writeFileSync(path, JSON.stringify({
+    slug: "dateless", rowId: "r-1", provider: "typefully", state: "planned",
+    at: "2026-01-01T00:00:00.000Z", providerObjectId: "tf-dateless",
+  }) + "\n");
+
+  const [event] = await reconcileProviderStatuses(createDefaultProviderStatusReaders({
+    fetchTypefully: async () => [{ id: "tf-dateless", whenIso: null, platforms: ["x"], title: "dateless", status: "draft" }],
+  }), path, () => new Date("2026-01-03T00:00:00.000Z"));
+
+  assert.equal(event.state, "uncertain");
+  assert.match(event.error ?? "", /exists but has no scheduled date/);
+});

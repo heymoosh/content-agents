@@ -215,12 +215,41 @@ export async function cancelDraft(draftId: string): Promise<void> {
 // (row-id-derived) isn't guaranteed unique across different content folders.
 export type TypefullyScheduled = { id: string; whenIso: string; platforms: string[]; title: string };
 
+// EVERY draft the social set holds, including ones Typefully is holding with no scheduled date.
+// `whenIso` is null exactly for those. `TypefullyScheduled` is the narrowed view of this (whenIso
+// non-nullable), so a caller that only wants the scheduled queue keeps the old shape and a caller
+// that needs to know the scheduled queue is INCOMPLETE can see the dateless drafts it excludes.
+export type TypefullyDraftRecord = {
+  id: string;
+  whenIso: string | null;
+  platforms: string[];
+  title: string;
+  status?: string;
+};
+
+// A time that does not parse is not a time. Treat it as no date at all, so the draft shows up in
+// datelessDrafts() and marks the live list incomplete, instead of silently vanishing from the
+// scheduled queue while the list still claims to be complete. This covers null, undefined, "",
+// whitespace and outright garbage in one place, where the old truthiness test caught only the
+// first three.
+//
+// Deliberate behavior change: a draft with status "scheduled" AND an unparseable date used to come
+// back from fetchScheduledDrafts carrying that garbage as its whenIso. It now leaves the scheduled
+// queue and marks the list incomplete instead. That is the safe direction — a garbage time sorts as
+// NaN and cannot be reconciled against a claim anyway, and suppressing release is exactly right
+// when we cannot tell what the draft is.
+function usableTime(v: unknown): string | null {
+  return typeof v === "string" && v.trim() && Number.isFinite(new Date(v).getTime()) ? v : null;
+}
+
 // Typefully v2 uses limit/offset pagination ({ count, limit, offset, next, previous, results },
 // max limit 50 per their API docs) — a bare array response has no `next` and is always a single page.
 const DRAFTS_PAGE_LIMIT = 50;
 const DRAFTS_MAX_PAGES = 10; // sane upper bound so a pathological account can't loop forever / hammer the API
 
-export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
+// The ONE fetch/pagination/dedup path. Everything else in this module and in queue-view.ts derives
+// from it, so there is no second paging loop to drift out of sync with this one.
+export async function fetchAllDrafts(): Promise<TypefullyDraftRecord[]> {
   const setId = await socialSetId();
   const all: TypefullyDraft[] = [];
   let offset = 0;
@@ -239,7 +268,7 @@ export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
         // way a network failure already does (caller marks the source unreachable / uncheckable)
         // instead of silently handing back a partial list that looks complete.
         throw new Error(
-          `fetchScheduledDrafts: hit the ${DRAFTS_MAX_PAGES}-page cap (${all.length} drafts fetched) — more scheduled drafts exist and were not fetched`
+          `fetchAllDrafts: hit the ${DRAFTS_MAX_PAGES}-page cap (${all.length} drafts fetched) — more drafts exist and were not fetched`
         );
       }
       continue;
@@ -249,25 +278,44 @@ export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
   // Dedup by draft id: offset-based pagination against a live, mutating draft list can return the
   // same draft twice if one is created/rescheduled between page fetches.
   const deduped = [...new Map(all.map((d) => [String(d.id), d] as const)).values()];
-  return deduped
-    .filter((d) => d.scheduled_date && (d.status === "scheduled" || new Date(d.scheduled_date) > new Date()))
-    .sort((a, b) => new Date(a.scheduled_date!).getTime() - new Date(b.scheduled_date!).getTime())
-    .map((d) => ({
-      id: String(d.id),
-      whenIso: d.scheduled_date!,
-      platforms: (
-        [
-          ["x", d.x_post_enabled],
-          ["linkedin", d.linkedin_post_enabled],
-          ["bluesky", d.bluesky_post_enabled],
-          ["threads", d.threads_post_enabled],
-          ["mastodon", d.mastodon_post_enabled],
-        ] as const
-      )
-        .filter(([, v]) => v)
-        .map(([k]) => k),
-      title: String(d.draft_title ?? d.id),
-    }));
+  return deduped.map((d) => ({
+    id: String(d.id),
+    whenIso: usableTime(d.scheduled_date),
+    platforms: (
+      [
+        ["x", d.x_post_enabled],
+        ["linkedin", d.linkedin_post_enabled],
+        ["bluesky", d.bluesky_post_enabled],
+        ["threads", d.threads_post_enabled],
+        ["mastodon", d.mastodon_post_enabled],
+      ] as const
+    )
+      .filter(([, v]) => v)
+      .map(([k]) => k),
+    title: String(d.draft_title ?? d.id),
+    ...(d.status ? { status: d.status } : {}),
+  }));
+}
+
+// A dateless draft will not auto-publish, so it is not part of the scheduled queue. It is still a
+// real draft sitting in Typefully, which is why fetchAllDrafts keeps it and only this narrowing
+// drops it. Callers that treat the result as a COMPLETE picture of the account must check
+// datelessDrafts() too, or they will read an incomplete list as proof nothing is there.
+export function selectScheduled(drafts: readonly TypefullyDraftRecord[]): TypefullyScheduled[] {
+  return drafts
+    .filter((d): d is TypefullyDraftRecord & { whenIso: string } =>
+      d.whenIso !== null && (d.status === "scheduled" || new Date(d.whenIso) > new Date())
+    )
+    .sort((a, b) => new Date(a.whenIso).getTime() - new Date(b.whenIso).getTime())
+    .map((d) => ({ id: d.id, whenIso: d.whenIso, platforms: d.platforms, title: d.title }));
+}
+
+export function datelessDrafts(drafts: readonly TypefullyDraftRecord[]): TypefullyDraftRecord[] {
+  return drafts.filter((d) => d.whenIso === null);
+}
+
+export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
+  return selectScheduled(await fetchAllDrafts());
 }
 
 // Read-only: list what's currently scheduled in Typefully (sanity-check the queue). No writes.

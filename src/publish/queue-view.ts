@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { ledgerPath, readLedger, pruneLedger, releaseClaims, fmtLa, type Claim } from "./slots.js";
 import { fetchWithRetry } from "../util/fetch-retry.js";
-import { fetchScheduledDrafts } from "./typefully.js";
+import { fetchAllDrafts, selectScheduled, datelessDrafts } from "./typefully.js";
 import { listScheduledUploads } from "./youtube.js";
 
 // The UNIFIED publish queue — one chronological view of everything scheduled across every channel,
@@ -59,17 +59,35 @@ function platformKey(p: string): string {
 
 // --- live sources --------------------------------------------------------------------------------
 
-async function listTypefully(): Promise<SourceResult> {
+// Exported so its incompleteness handling is unit-testable without main()'s live Promise.all.
+// `fetchDrafts` is the injection seam; production always uses the real one.
+export async function listTypefully(fetchDrafts: typeof fetchAllDrafts = fetchAllDrafts): Promise<SourceResult> {
   if (!process.env.TYPEFULLY_API_KEY) {
     return { items: [], note: "Typefully: TYPEFULLY_API_KEY not set — skipped", ok: false };
   }
   try {
-    const drafts = await fetchScheduledDrafts();
+    const all = await fetchDrafts();
+    const drafts = selectScheduled(all);
     const items = drafts.flatMap((d) =>
       (d.platforms.length ? d.platforms : ["?"]).map(
         (p): QueueItem => ({ whenIso: d.whenIso, platform: platformKey(p), media: "text", title: d.title, source: "typefully" })
       )
     );
+    // A dateless draft is a real draft that the scheduled list cannot show, because it has no time
+    // to show it at. That makes this live list incomplete, and `ok` is the ONLY thing standing
+    // between a future claim and releaseClaims() below: reconcile() reads a successful return as a
+    // complete picture and releases every claim it cannot match. Same reasoning as the
+    // DRAFTS_MAX_PAGES throw in typefully.ts — an incomplete list that looks complete is more
+    // dangerous than an unreachable one. So report the source as not fully checked, which routes
+    // these claims to `uncheckable` and leaves them alone.
+    const dateless = datelessDrafts(all);
+    if (dateless.length) {
+      return {
+        items,
+        note: `Typefully: ${dateless.length} draft(s) have no scheduled date, so the live list is incomplete and ledger claims were not cross-checked this run`,
+        ok: false,
+      };
+    }
     return { items, note: null, ok: true };
   } catch (e) {
     return { items: [], note: `Typefully: ${(e as Error).message}`, ok: false };
