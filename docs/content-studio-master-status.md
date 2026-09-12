@@ -10,10 +10,9 @@
 - What changed: `POSTIZ_ACCOUNT_IDS` is a comma-separated allowlist of approved account ids,
   unioned with legacy `POSTIZ_ACCOUNT_ID` (still ONE opaque id, never split). Unapproved channels
   refuse and name the id to add. Ambiguity always refuses; it never guesses an account.
-- Next: no packet written. Muxin must paste a `POSTIZ_ACCOUNT_IDS` line into `.env` before any
-  channel beyond Bluesky schedules; no agent may edit that file. The 6W deferral that blocked
-  Threads is closed by 6Y; what remains of it is per-channel connection health for the media-only
-  channels (TikTok, Instagram, YouTube), which Postiz does not advertise text for.
+- Next: no packet written. `POSTIZ_ACCOUNT_IDS` is set and all nine channels resolve. The 6W
+  deferral that blocked Threads is closed by 6Y. Unproven: no row has yet been scheduled live
+  through a channel other than Bluesky, and no media row through Postiz at all.
 - Last decision: builder family is Claude for now, Codex and Grok reserved for cross-family audits
   because quota is limited. Codex is capped until 2026-09-15.
 - Details: `## Progress log` -> 2026-09-11 (6Y). Below is history; read only cited headings.
@@ -75,9 +74,16 @@ row routes to Postiz at all. 13 new tests. Grok audited cross-family and found o
 drift, the legacy variable being comma-split too; that was repaired and a bounded delta audit
 returned CLOSED. `npm run check` 4419/0/0, e2e 55/0/16.
 
-Left for Muxin: paste a `POSTIZ_ACCOUNT_IDS` line into `.env`. Six channels are connected and
-text-capable (bluesky, threads, linkedin, x, mastodon, facebook); only the ids she lists can be
-posted to, which is the point of the guard.
+Left for Muxin: paste a `POSTIZ_ACCOUNT_IDS` line into `.env`; done, all nine ids listed.
+
+Correction worth keeping, because it cost a round trip: a first probe called
+`fetchPostizCapabilities` without the `mediaUploadVerified` flag that `studio-scheduling.ts:150`
+passes, and so reported only the six text-baseline channels and claimed TikTok, Instagram and
+YouTube were not Postiz-routable. They are. That flag defaults on (the instance's upload lifecycle
+passed live 2026-09-02), and with it the registry returns all nine channels with their full
+provider media lists: text, image and video on the six, image and video on TikTok and Instagram,
+video on YouTube. Any diagnostic that queries discovery must pass the same flag production does,
+or it under-reports the instance.
 
 ### 2026-09-11 (6X) — approved rows schedule first time, and refusals name their own fix
 
