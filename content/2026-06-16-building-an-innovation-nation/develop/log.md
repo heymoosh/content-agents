@@ -61,3 +61,5 @@ config/routing.yaml's rules block now reads `human-ai: never: [x]`, dated 2026-0
 piece's original routing pass. A routing preview run today would exclude x for human-ai, which
 would contradict the 7 already-published x-1 through x-7 posts filed under this pillar.
 civic-tech's rules already match what shipped. Worth a live re-run once the sandbox allows it.
+
+## Accepted: yard-sale-observable (r1-c4) → cuts/yard-sale-observable/cut.md

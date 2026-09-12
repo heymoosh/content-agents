@@ -13,7 +13,10 @@
           "title": "Belief under audit: shareholder value is how you measure a well-run company",
           "summary": "Reader: a LinkedIn professional/manager who assumes quarterly shareholder-value pressure is just what good governance looks like. Payoff: a citation trail (Welch, Buffett/Dimon, the 2019 Business Roundtable reversal, Ries) to name what's actually happening when long-horizon work gets cut for this quarter's number. Altitude: professional, maps to linkedin per brand.yaml altitudes. Belief under audit: maximizing shareholder value every quarter is the correct way to run a company. Observable: pull the 2019 Business Roundtable statement (181 CEOs walking back the model they endorsed since 1997) and check it against your own company's last earnings call in under 10 minutes. Not yet extracted: linkedin-1/2 use the education and judgment lines (L10, 20, 46, 104, 106, 108, 118, 120), never the governance citations themselves.",
           "lens": "shareholder-primacy",
-          "sourceLines": [57, 59],
+          "sourceLines": [
+            57,
+            59
+          ],
           "status": "open",
           "acceptedLens": null,
           "decidedAt": null
@@ -24,7 +27,9 @@
           "title": "Belief under audit: our innovation problem is a talent/idea shortage, not a funding structure",
           "summary": "Reader: a builder or PM (builder pillar) frustrated that ambitious work keeps losing to this quarter's roadmap. Payoff: a named list of exactly what quarterly incentives starve, so they can point at the pattern instead of blaming themselves or their team. Altitude: professional/technical, maps to linkedin or x per brand.yaml. Belief under audit: we already fund innovation adequately, we just lack better ideas. Observable: pick one item off the list (foundational research, workforce training, customer discovery, new-category bets, infra upkeep) and check whether your own team's current roadmap has a line item for it, or whether it's 100% feature/metric work. Not yet extracted: no existing derivative cites these five bullets.",
           "lens": "rnd-starvation-list",
-          "sourceLines": ["51-55"],
+          "sourceLines": [
+            "51-55"
+          ],
           "status": "open",
           "acceptedLens": null,
           "decidedAt": null
@@ -35,7 +40,10 @@
           "title": "Belief under audit: founders succeed because they had the right idea",
           "summary": "Reader: career-work/builder audience weighing whether they have 'what it takes.' Payoff: a concrete, learnable checklist (resilience, questioning assumptions, talking to customers before the product is ready, tolerating ambiguity) that recasts founder success as trainable behavior, not a personality you either have or don't. Altitude: professional, maps to linkedin. Belief under audit: startup success comes from having the right idea. Observable: audit your own last quarter of work against the 9-item list and count how many you actually did. Not yet extracted: no existing derivative cites the founder-lesson list itself (L44's education contrast is used, but not this list).",
           "lens": "founder-checklist",
-          "sourceLines": ["29-31", "35-43"],
+          "sourceLines": [
+            "29-31",
+            "35-43"
+          ],
           "status": "open",
           "acceptedLens": null,
           "decidedAt": null
@@ -46,10 +54,14 @@
           "title": "Belief under audit: wealth reflects merit when the game is actually fair",
           "summary": "Reader: technical/contrarian X audience skeptical of 'wealth = value created.' Payoff: a live simulation they can run themselves, not just a conclusion to take on faith. Altitude: technical, maps to x. Belief under audit: extreme inequality only happens when the game is rigged. Observable: the piece already built the cheapest possible test, a 100-agent coin-toss wealth simulation at the linked URL, that a reader can run in under a minute and watch the same extreme concentration emerge from a fair 50/50 coin toss. This is deliberately distinct from x-1 and quote-card-2, which extract the conclusion sentence (L78/L94); this angle makes the run-it-yourself simulation setup the hook instead of the punchline.",
           "lens": "yard-sale-observable",
-          "sourceLines": [81, 83, 93],
-          "status": "open",
-          "acceptedLens": null,
-          "decidedAt": null
+          "sourceLines": [
+            81,
+            83,
+            93
+          ],
+          "status": "accepted",
+          "acceptedLens": "yard-sale-observable",
+          "decidedAt": "2026-09-12T04:23:06.174Z"
         },
         {
           "id": "r1-c5",

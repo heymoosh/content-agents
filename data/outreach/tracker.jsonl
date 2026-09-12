@@ -7,3 +7,7 @@
 {"ts":"2026-07-24T17:08:31.411Z","lead":"peer-michael-carter","bucket":"peer","event":"abandoned","note":"Muxin did not confirm this intro this round -- deprioritized in favor of the oligarchy/money-in-politics focus, not disqualified by evidence."}
 {"ts":"2026-07-24T17:08:31.411Z","lead":"peer-trudy-hall","bucket":"peer","event":"abandoned","note":"Muxin only confirmed Zach Berke when offered both -- deprioritized, not disqualified by evidence."}
 {"ts":"2026-07-24T18:05:35.402Z","lead":"peer-lee-white","bucket":"peer","event":"contacted","channel":"boardy-intro","note":"Boardy confirmed the connection request was sent 2026-07-24; awaiting acceptance."}
+{"ts":"2026-09-12T01:24:46.287Z","lead":"peer-zach-berke","bucket":"peer","event":"abandoned"}
+{"ts":"2026-09-12T01:24:47.171Z","lead":"peer-pradnya-haldipur","bucket":"peer","event":"abandoned"}
+{"ts":"2026-09-12T01:24:48.871Z","lead":"peer-peter-koechley","bucket":"peer","event":"abandoned"}
+{"ts":"2026-09-12T01:24:52.382Z","lead":"peer-dino-alabre","bucket":"peer","event":"abandoned"}
