@@ -4,10 +4,32 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
   `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **7C**, `docs/operations/launch-slices/SLICE-7C.md`, PASS. Nothing
-  blocked. A reuse-guard refusal now clears its dispatch fence on EVERY route, not just Postiz, so
-  quote cards and videos are no longer permanently stuck after a refusal. `npm run check` 4558/0.
-  Shipped as `919ae2e`, pushed to `origin/main`.
+- Current / last accepted: **7D**, `docs/operations/launch-slices/SLICE-7D.md`, PASS. Nothing
+  blocked. A Typefully draft with no usable date no longer lets `--sync` release the slot claim
+  sitting behind it. `npm run check` 4570/0. Shipped as `f2f9ea5`, pushed to `origin/main`.
+- 7D in one line: `fetchAllDrafts` is now the ONE fetch/pagination/dedup path and
+  `fetchScheduledDrafts` narrows from it; a date counts only if it parses (null, "", whitespace and
+  garbage all become no date); `listTypefully` returns `ok: false` with a counting note whenever a
+  dateless draft exists. `ok` is the only gate between a future claim and `releaseClaims`, so that
+  routes the claim to the existing `uncheckable` bucket, which nothing releases.
+- The suppression is deliberately platform-wide, not per-claim. The ledger `Claim` is
+  `{ platform, day, time, asset, by }` with NO provider draft id, so a dateless draft cannot be
+  matched to a specific claim. Per-claim precision would need a ledger schema change. Operational
+  cost, accepted knowingly: while any dateless draft sits in Typefully, `--sync` will not release
+  stale x/linkedin/bluesky claims. It resumes as soon as the draft is dated or deleted.
+- The Typefully status reader now tells three cases apart by id: found and scheduled, found but
+  dateless (a new `unscheduled` reading that normalizes to `uncertain`, never to a planned
+  publish), and genuinely absent, whose wording is unchanged byte for byte.
+- Known and deliberately NOT fixed in 7D: `src/review/rows.ts:232` has the same blind spot, feeding
+  `reconcile.ts:320`, which reports `mismatch` with "no matching scheduled draft found in
+  Typefully" for a draft that is present but undated. Verified display-only: the only two consumers
+  are `page.ts:1580` (warning banner) and `page.ts:1916` ("Needs attention"). Nothing behind
+  `mismatch` releases a claim, cancels a draft, or republishes. Wrong label, not a lost post. A fix
+  needs `LiveProviderState.typefullyDrafts` retyped, pulling in `reconcile.ts`, `page.ts` and their
+  tests. Separate low-priority slice.
+- Previous: **7C**, `docs/operations/launch-slices/SLICE-7C.md`, PASS. A reuse-guard refusal now
+  clears its dispatch fence on EVERY route, not just Postiz, so quote cards and videos are no
+  longer permanently stuck after a refusal. `npm run check` 4558/0. Shipped as `919ae2e`.
 - 7C in one line: `runPublisher` and the `unscheduled-draft` branch now ask `reuseGuardVerdict`
   BEFORE invoking their publisher, so those routes can carry the strong `no-provider-request`
   refusal that is the only value permitted to clear a fence. Two call sites cover all five
@@ -23,7 +45,7 @@
   `## Adjudication` of the packet. Every claim kept, each re-aimed at a scenario that still reaches
   the recovery branch, each also gaining the new assertion, assertion count up in all four. The
   rationale lives in `SLICE-7C-LOG.md`.
-- Previous: **7B**, PASS. A Postiz channel never silently downgrades to Typefully, and Studio can
+- Before that: **7B**, PASS. A Postiz channel never silently downgrades to Typefully, and Studio can
   see and cancel Postiz rows. `npm run check` 4543/0, `npm run test:e2e` 55/0/16.
 - What changed, in two commits. `41003a4`: `selectDeliveryRoute` drops `text` from the
   x/linkedin/bluesky Typefully fallback and keeps `image`, so a text row with no Postiz channel is
@@ -37,9 +59,11 @@
   canceled from never-created. An already-published post is not offered a cancel button.
 - Both audited by Grok, cross-family. 7B's second commit returned one P1, an already-published post
   being cancelable, fixed before integration.
-- Next: **item 4**, reconcile blind to dateless Typefully drafts. Small and self-contained, no
-  packet written yet. Then items 1, 2 and 5 together as one live-proving pass, which 7C's fence fix
-  now makes safe to attempt: a refused row can be retried instead of needing hand repair.
+- Next: **items 1, 2 and 5 together as one live-proving pass** (LinkedIn and Mastodon never
+  posted live; no media row has ever gone through Postiz; no deferral has run live). These are the
+  only Outstanding items left. 7C's fence fix makes the pass safe to attempt: a refused row can be
+  retried instead of needing hand repair. All three need real provider calls, so they are the
+  coordinator's to run, never a worker's.
   Muxin's direction on 2026-09-12: fix all of `## Outstanding work` before any front-end or UX
   pass, because an untrusted Publishing room cannot be design-reviewed honestly.
 - Open questions for Muxin, neither blocking: the em dash in every `### date` progress-log heading
@@ -48,7 +72,7 @@
   `data/outreach/tracker.jsonl` with no note, where every earlier entry explains itself.
 - Last decision: builder family is Claude for now, Codex and Grok reserved for cross-family audits
   because quota is limited. Codex is capped until 2026-09-15.
-- Details: `## Progress log` -> 2026-09-12 (7B). Below is history; read only cited headings.
+- Details: `## Progress log` -> 2026-09-12 (7D). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -100,9 +124,14 @@ front-end or UX pass. Ordered by what blocks trusting the Publishing room, not b
    `no-provider-request`. Cross-family audit (grok-4.5) returned zero P0 and zero P1. See
    `## Progress log` -> 2026-09-12 (7C).
 
-4. **Reconcile is blind to a dateless Typefully draft.** `fetchScheduledDrafts` filters on
-   `scheduled_date`, so a draft without one is invisible to the reconciler and reports `uncertain`
-   forever. A reviewer cannot tell that from a real failure.
+4. ~~**Reconcile is blind to a dateless Typefully draft.**~~ **DONE 2026-09-12, SLICE-7D,
+   `f2f9ea5`.** The recorded symptom understated it. A dateless draft was dropped from the live
+   list while the fetch still reported success, so `--sync` read an incomplete list as complete and
+   RELEASED the slot claim behind that draft, freeing the slot for a second post. Fixed by making a
+   date count only if it parses and reporting the source as not fully checked whenever one is
+   missing, which routes the claim to the existing uncheckable bucket. Cross-family audit
+   (grok-4.5) rejected the first candidate, accepted after the fix. See `## Progress log` ->
+   2026-09-12 (7D).
 5. **No deferral has run live.** The deferral path is unproven end to end.
 
 Recorded, not defects: the Postiz read window is a +/-45 day list scan because there is no
@@ -110,6 +139,80 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (7D) — a dateless Typefully draft stops releasing a live slot claim
+
+Closes `## Outstanding work` item 4, and the real defect was worse than the recorded symptom. The
+doc said reconcile reports `uncertain` forever, which is only annoying. Reading the actual call
+path found the dangerous half: `fetchScheduledDrafts` dropped any draft without a usable
+`scheduled_date` and then RETURNED NORMALLY, so `listTypefully` reported `ok: true` on a list that
+was missing a real draft. `reconcile()` reads `ok: true` as "this live list is complete" and hands
+every unmatched future claim to `releaseClaims()`. So `--sync` could free the slot a real but
+undated draft was sitting behind, and a later run could schedule a second post into it. Two lines
+above that filter, the `DRAFTS_MAX_PAGES` throw already spells out why a truncated list is more
+dangerous than an unreachable one, for exactly this reason. The dateless filter did the forbidden
+thing, silently, two lines below the comment forbidding it.
+
+The fix, in three parts. `fetchAllDrafts()` is now the ONE fetch/pagination/dedup path and
+`fetchScheduledDrafts` is `selectScheduled(await fetchAllDrafts())`, so there is no second paging
+loop to drift out of sync. `usableTime()` makes a date count only if it is a non-blank string that
+parses to a finite time, so null, undefined, `""`, whitespace and outright garbage all become no
+date. `listTypefully` returns `ok: false` with a counting note whenever `datelessDrafts()` is
+non-empty.
+
+The release argument, stated explicitly because it is the safety claim of the slice. The chain is
+`main()` -> `ok.typefully = listTypefully().ok` -> `reconcile()` -> `syncLedger()` ->
+`releaseClaims()`. The single line that stops it is `queue-view.ts:282`,
+`if (srcs.every((s) => ok[s])) claimedNotLive.push(c); else uncheckable.push(c);` — only
+`claimedNotLive` reaches `releaseClaims` (`queue-view.ts:314`). For x, linkedin and bluesky,
+`possibleSources()` returns exactly `["typefully"]`, so the test reduces to `ok.typefully`. The
+property does NOT depend on matching the dateless draft to the right claim, which cannot be proved
+because the draft has no time to match on. It depends only on the list being known-incomplete.
+
+The suppression is therefore platform-wide and deliberately blunt. The ledger `Claim` is
+`{ platform, day, time, asset, by }` with no provider draft id, so per-claim precision is not
+buildable without a ledger schema change. Operational cost, accepted knowingly and flagged to
+Muxin: while any dateless draft sits in Typefully, `--sync` will not release stale
+x/linkedin/bluesky claims. It resumes the moment the draft is dated or deleted. A test proves the
+converse still works, so `--sync` is not frozen in general.
+
+The Typefully status reader gained a third answer. Found and scheduled is `scheduled`; found but
+dateless is a new `unscheduled` reading that `normalizeProviderStatus` does not recognize and so
+lands on `uncertain`, never on a planned publish; genuinely absent keeps its existing "cannot
+distinguish live, canceled, deleted, or failed" wording byte for byte. Reporting a present-but-
+undated draft as `unknown` would send a reviewer hunting for a lost post instead of setting a date.
+
+Cross-family audit, grok-4.5, two rounds. Round one REJECTED with a P1 the coordinator confirmed
+independently: the first candidate used `d.scheduled_date || null`, which caught null and `""` but
+not whitespace or an unparseable string, so `{ scheduled_date: "  " }` still produced a non-null
+`whenIso`, was missed by `datelessDrafts()`, was still dropped by `selectScheduled()`, and left
+`ok: true` on an incomplete list. The exact fail-open the slice exists to close, reached by a
+different door. It was pre-existing rather than introduced, but it sits inside what the slice
+claims to close. `usableTime()` fixed it and closed both dependent P2s. Round two ACCEPTED. Its one
+remaining finding is a P2 left unfixed on purpose: `usableTime` tests emptiness on the trimmed
+string but parses the untrimmed one, so a whitespace-padded ISO reads as dateless. Typefully does
+not emit padded ISO, and the direction is fail-closed (it suppresses release rather than permitting
+it), so it does not meet the P0/P1 fix bar.
+
+Verified by the coordinator, not taken on the worker's word: the call chain from `listTypefully`
+to `releaseClaims` read end to end; `possibleSources` confirmed to return `["typefully"]` alone for
+the three text platforms; `normalizeProviderStatus` read to confirm `unscheduled` falls through to
+`uncertain`; the `Claim` shape read to confirm per-claim precision is genuinely unavailable; the
+new test ledger confirmed to honor `CONTENT_AGENTS_TEST_LEDGER` into a `mkdtemp` directory rather
+than writing under `data/`; the diff frozen before each audit round; and the post-fix delta
+confirmed to touch only `typefully.ts` plus tests, leaving the two already-audited source files
+byte-identical.
+
+Checks, unsandboxed: focused 50/50, `npm run check` 4570/4570. Shipped as `f2f9ea5`.
+
+Also found and deliberately NOT fixed: `src/review/rows.ts:232` is a third caller with the same
+blind spot. Its result feeds `reconcile.ts:320`, which reports `mismatch` with "no matching
+scheduled draft found in Typefully" for a draft that is present but undated. Verified display-only:
+the only two consumers of that state are `page.ts:1580` (warning banner) and `page.ts:1916` ("Needs
+attention"). Nothing behind `mismatch` releases a claim, cancels a draft, or republishes. It fails
+closed on the dangerous axis and is merely wrong on the informative axis. A fix needs
+`LiveProviderState.typefullyDrafts` retyped, pulling in `reconcile.ts`, `page.ts` and their tests,
+which is outside 7D's owned file list. Separate low-priority slice.
 
 ### 2026-09-12 (7C) — a reuse-guard refusal clears its fence on every route, not just Postiz
 
