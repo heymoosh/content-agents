@@ -6,7 +6,7 @@
   `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
 - Latest (2026-09-12, ops, not a slice): Outstanding item 1 CLOSED. Real approved LinkedIn and
   Mastodon rows went live, so all five text channels are proven through Studio. Open: item 2 (one
-  real media row, needs a paid render decision). New ops risk: a Postiz restart can leave its
+  real media row; the quote card renders free, needs Muxin's approval). New ops risk: a Postiz restart can leave its
   backend silently dead behind a `healthy` container; fix is `docker exec postiz pm2 restart
   backend`, and a self-healing healthcheck was prepared for Muxin to install. See `## Progress log`.
 - Current / last accepted: **7D**, `docs/operations/launch-slices/SLICE-7D.md`, PASS. Nothing
@@ -137,10 +137,14 @@ front-end or UX pass. Ordered by what blocks trusting the Publishing room, not b
    row kinds: `/atomize` quote-card rows route to Typefully, configured-media rows route to Postiz.
    The real remaining gap is narrower and is already stated in this file's own capability table:
    **"Run one real carousel through Studio."** Only a synthetic canary has taken the path, never a
-   row Muxin approved in `review-queue.md`. Blocked on a decision, not an approval: the quote-card
-   image for the human-inference folder was never rendered (`images/` does not exist; the rows say
-   "render intentionally skipped (zero-cost run)"), so proving this costs money to render, and
-   rule 6 says offer the choice rather than auto-upgrade. **Process note:** the stale wording
+   row Muxin approved in `review-queue.md`. **Corrected 2026-09-12 (later the same day): this does NOT cost money.** The earlier
+wording said proving it needs a paid render. Wrong. Quote cards are purely typographic
+(`src/video/render.ts:80`, Muxin's June 2026 call "just quotes, not illustrations"): the PNG is a
+local Remotion still and the animated companion is local HyperFrames, both $0. Only the optional
+`--with-image` illustration costs anything, and `config/providers.yaml` sets `image: none` in
+favour of attended Codex art (subscription, $0 marginal). The human-inference folder's card was
+simply never rendered ("render intentionally skipped (zero-cost run)"). So item 2 is blocked only
+on rendering the free card and Muxin approving the row. **Process note:** the stale wording
    survived several sessions because it was re-read as a summary line and never re-derived from
    the capability table sixteen hundred lines below, which had already recorded the canary. A
    summary that contradicts the detail section is not evidence, it is an unrefreshed cache.
