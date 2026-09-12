@@ -110,6 +110,13 @@ export function findLoggedRef(logText: string, rowId: string): LoggedRef | null 
 // in this exact shape when that happens; detect it here and report a live day-count instead. Pure:
 // only reads the row's own notes string and does date arithmetic, no fs/network — same contract as
 // the rest of this module.
+//
+// This reader covers the REFUSAL case only, which is the one the guard still produces: re-placing
+// the SAME row inside its platform's `min_reuse_days`. The guard's other window, a DIFFERENT
+// derivative of the same piece inside `min_variant_days`, is a deferral, not a refusal: that row is
+// scheduled past the window and never lands here with a blocked note at all. The deferral's own
+// wording deliberately carries neither "blocked by reuse guard" nor "min_reuse_days", so it cannot
+// be mistaken for a refusal and reported with a countdown it does not have.
 const REUSE_GUARD_NOTE = /blocked by reuse guard, last placed to (\S+) (\S+) \(min_reuse_days: (\d+)\)/;
 
 function reuseGuardEligibility(notes: string): string | null {

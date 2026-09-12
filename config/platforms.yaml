@@ -22,6 +22,14 @@
 # and publish:cards before claiming slots).
 min_reuse_days: 30
 
+# Minimum days between placing two DIFFERENT derivatives of the same content slug to one platform.
+# `min_reuse_days` above still governs re-placing the SAME row, which stays a refusal. A different
+# derivative is a different post, so it is spaced rather than refused: the reuse guard hands the
+# unified scheduler this floor and the post takes the first free slot past it. A platform may
+# override this with its own `min_variant_days:` the same way it overrides `min_reuse_days`.
+# 7 is a starting value to tune here, not a number argued in code.
+min_variant_days: 7
+
 # REHOOK (Muxin, 2026-08-22): the storytelling re-hook/re-order pass now runs on EVERY platform.
 # It used to be hard-coded to X and LinkedIn only in src/atomize/spin.ts; Muxin widened it to all
 # platforms on 2026-08-22. Optional per-platform `rehook: false` opts a channel back out. Absent

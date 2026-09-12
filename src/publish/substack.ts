@@ -7,7 +7,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { claimSlots, readLedger, releaseClaims, fmtLa, type Claim } from "./slots.js";
-import { checkReuse } from "./reuse-guard.js";
+import { checkReuseForRow } from "./reuse-guard.js";
 import { launchPlatform } from "../pull/browser.js";
 import { captureDiagnostics, looksLikeAuthWall } from "../pull/diagnose.js";
 import { PullError, classifyUnknown, CULPRIT, type PullFailureKind } from "../pull/errors.js";
@@ -180,12 +180,27 @@ export async function publishSubstack(
   }
   const deliveryDecision = assertProviderDispatch(folder, "substack", opts.deliveryPolicy);
 
-  // Reuse guard: skip if this slug was published to Substack too recently (config/platforms.yaml
-  // substack.min_reuse_days). Checked even on a dry run, so --dry-run honestly reports a block.
+  // Reuse guard, two windows (config/platforms.yaml substack.min_reuse_days and min_variant_days).
+  // Checked even on a dry run, so --dry-run honestly reports a block. The SAME row again inside
+  // min_reuse_days is refused; a DIFFERENT derivative of this piece inside min_variant_days is
+  // spaced, by starting the shared scheduler's phase-1 claim from the instant the window opens.
   const slug = basename(folder);
-  const reuseCheck = checkReuse(slug, "substack", undefined, deliveryDecision.brand!);
-  if (!reuseCheck.allowed) {
-    console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
+  let spacingFloorMs: number | undefined;
+  const refused = new Set<string>();
+  for (const r of approved) {
+    const res = checkReuseForRow(slug, "substack", { rowId: r.id, brandId: deliveryDecision.brand! });
+    if (res.allowed) continue;
+    const floorMs = res.deferrable && res.earliestAllowedAt ? Date.parse(res.earliestAllowedAt) : NaN;
+    if (res.deferrable && !Number.isNaN(floorMs)) {
+      spacingFloorMs = spacingFloorMs === undefined ? floorMs : Math.max(spacingFloorMs, floorMs);
+      console.log(`reuse guard: ${res.reason}`);
+      continue;
+    }
+    console.warn(`reuse guard: ${res.reason}, skipping ${r.id}`);
+    refused.add(r.id);
+  }
+  approved = approved.filter((r) => !refused.has(r.id));
+  if (approved.length === 0) {
     console.log("no rows to publish: substack blocked by the reuse guard");
     return [];
   }
@@ -218,14 +233,23 @@ export async function publishSubstack(
     // PHASE 1 — no claim yet: claim a FUTURE slot from the unified scheduler (records it in the
     // shared ledger) and stop. Nothing posts on this run.
     if (!existing) {
+      // A spaced row starts the SAME scheduler from the guard's floor instead of `now`, so the
+      // claimed slot is already past the variant window.
+      const claimNow = spacingFloorMs !== undefined ? new Date(Math.max(now.getTime(), spacingFloorMs)) : now;
       const { times, labels } = claimSlots({
         windowKey: WINDOW_KEY,
         conflictPlatforms: [WINDOW_KEY],
         count: 1,
         asset,
         by: WINDOW_KEY,
-        now,
+        now: claimNow,
       });
+      // Fail closed: a spaced row with no real slot is reported as unplaced, never claimed as
+      // "next-free-slot" (which would leave the timing to a later run with no floor at all).
+      if (spacingFloorMs !== undefined && (!times[0] || times[0] === "next-free-slot")) {
+        console.warn(`reuse guard: could not place ${row.id}, no free substack slot on or after ${fmtLa(new Date(spacingFloorMs))}`);
+        continue;
+      }
       const when = labels[0] ?? "next-free-slot";
       appendPublishLog(folder, `${row.id} → substack slot claimed for ${when} (not yet posted)`);
       console.log(`claimed: ${row.id} → substack ${when} (will post once the slot arrives)`);

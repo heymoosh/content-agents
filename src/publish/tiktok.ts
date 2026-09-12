@@ -7,7 +7,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { claimSlots, fmtLa } from "./slots.js";
-import { checkReuse } from "./reuse-guard.js";
+import { checkReuseForRow } from "./reuse-guard.js";
 import { fetchWithRetry } from "../util/fetch-retry.js";
 
 // Schedule approved `tiktok` rows to TikTok via PostPeer (a sanctioned API relay that holds
@@ -35,17 +35,30 @@ function apiKey(): string {
 // validates `scheduledFor` as RFC3339 (must carry the `Z`/offset); we send full UTC ISO + timezone
 // "UTC". Precedence: TIKTOK_SCHEDULE_AT (explicit ISO, manual one-off) → the "tiktok" cadence in
 // config/platforms.yaml → TIKTOK_SCHEDULE_LEAD_MIN out (default 60) when no cadence is configured.
-function resolveTimes(count: number, asset: string): string[] {
+// `earliestMs` is the reuse guard's spacing floor when a DIFFERENT derivative of this piece went to
+// TikTok recently. It is handed to the same shared scheduler as its `now`, so the slot comes back
+// past the window. Entries are null where no acceptable time exists; the caller drops those rows
+// rather than posting them early.
+function resolveTimes(count: number, asset: string, earliestMs?: number): (string | null)[] {
   const at = process.env.TIKTOK_SCHEDULE_AT?.trim();
   if (at) {
     const when = new Date(at);
     if (Number.isNaN(when.getTime())) throw new Error(`TIKTOK_SCHEDULE_AT is not a valid ISO date: ${at}`);
     if (when.getTime() <= Date.now()) throw new Error(`TIKTOK_SCHEDULE_AT is in the past: ${at} — TikTok needs a future time`);
+    // A manual one-off override must not land inside a spacing window the guard just opened.
+    if (earliestMs !== undefined && when.getTime() < earliestMs) return Array(count).fill(null);
     return Array(count).fill(when.toISOString());
   }
-  const { times } = claimSlots({ windowKey: "tiktok", conflictPlatforms: ["tiktok"], count, asset, by: "tiktok" });
-  return times.map((t, i) => {
+  const { times } = claimSlots({
+    windowKey: "tiktok", conflictPlatforms: ["tiktok"], count, asset, by: "tiktok",
+    ...(earliestMs !== undefined ? { now: new Date(Math.max(Date.now(), earliestMs)) } : {}),
+  });
+  return Array.from({ length: count }, (_, i) => {
+    const t = times[i];
     if (t && t !== "next-free-slot") return t; // got a cadence slot from the shared scheduler
+    // The lead-time fallback posts about an hour out, which is inside any spacing window. A spaced
+    // row takes no time at all rather than a time that defeats the spacing.
+    if (earliestMs !== undefined) return null;
     const leadMin = Number(process.env.TIKTOK_SCHEDULE_LEAD_MIN ?? "60"); // no tiktok cadence → lead-time fallback
     if (Number.isNaN(leadMin) || leadMin <= 0) {
       throw new Error(`TIKTOK_SCHEDULE_LEAD_MIN must be a positive number, got: ${process.env.TIKTOK_SCHEDULE_LEAD_MIN}`);
@@ -176,11 +189,26 @@ export async function publishTikTok(
   }
   const deliveryDecision = assertProviderDispatch(folder, "postpeer", opts.deliveryPolicy);
 
-  // Reuse guard: skip if this slug was published to TikTok too recently.
+  // Reuse guard, two windows. The SAME row again inside min_reuse_days is refused; a DIFFERENT
+  // derivative of this piece inside min_variant_days is spaced, by starting the shared scheduler
+  // from the instant the guard says the window opens.
   const slug = basename(folder);
-  const reuseCheck = checkReuse(slug, "tiktok", undefined, deliveryDecision.brand!);
-  if (!reuseCheck.allowed) {
-    console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
+  let spacingFloorMs: number | undefined;
+  const refused = new Set<string>();
+  for (const r of approved) {
+    const res = checkReuseForRow(slug, "tiktok", { rowId: r.id, brandId: deliveryDecision.brand! });
+    if (res.allowed) continue;
+    const floorMs = res.deferrable && res.earliestAllowedAt ? Date.parse(res.earliestAllowedAt) : NaN;
+    if (res.deferrable && !Number.isNaN(floorMs)) {
+      spacingFloorMs = spacingFloorMs === undefined ? floorMs : Math.max(spacingFloorMs, floorMs);
+      console.log(`reuse guard: ${res.reason}`);
+      continue;
+    }
+    console.warn(`reuse guard: ${res.reason}, skipping ${r.id}`);
+    refused.add(r.id);
+  }
+  approved = approved.filter((r) => !refused.has(r.id));
+  if (approved.length === 0) {
     console.log("no rows to publish: tiktok blocked by the reuse guard");
     return [];
   }
@@ -198,11 +226,17 @@ export async function publishTikTok(
     ? splitFrontmatter(readFileSync(scriptPath, "utf8"))
     : { fm: {} as Record<string, unknown> };
 
-  const times = resolveTimes(approved.length, `${basename(folder)}/tiktok`);
+  const times = resolveTimes(approved.length, `${basename(folder)}/tiktok`, spacingFloorMs);
   const results: ScheduledTikTok[] = [];
   for (let i = 0; i < approved.length; i++) {
     const row = approved[i];
     const scheduledFor = times[i];
+    // No acceptable time past the spacing window. Leave the row approved and say so, rather than
+    // reporting a scheduled post that was never created.
+    if (!scheduledFor) {
+      console.warn(`reuse guard: could not place ${row.id}, no free tiktok slot on or after ${fmtLa(new Date(spacingFloorMs!))}`);
+      continue;
+    }
     const ref = await scheduleToTikTok(videoPath, caption, scheduledFor);
     setStatus(folder, row, "published");
     appendPublishLog(folder, `${row.id} → tiktok ${ref} (scheduled ${scheduledFor})`);

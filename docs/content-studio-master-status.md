@@ -4,18 +4,20 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
   `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6Y**, `docs/operations/launch-slices/SLICE-6Y.md`, PASS. Nothing
-  blocked. Every Postiz channel Muxin approves is schedulable, not just the one pinned account.
-  `npm run check` 4419/0, `npm run test:e2e` 55/0/16.
-- What changed: `POSTIZ_ACCOUNT_IDS` is a comma-separated allowlist of approved account ids,
-  unioned with legacy `POSTIZ_ACCOUNT_ID` (still ONE opaque id, never split). Unapproved channels
-  refuse and name the id to add. Ambiguity always refuses; it never guesses an account.
-- Next: no packet written. `POSTIZ_ACCOUNT_IDS` is set and all nine channels resolve. The 6W
-  deferral that blocked Threads is closed by 6Y. Unproven: no row has yet been scheduled live
-  through a channel other than Bluesky, and no media row through Postiz at all.
+- Current / last accepted: **6Z**, `docs/operations/launch-slices/SLICE-6Z.md`, PASS. Nothing
+  blocked. The reuse guard spaces a different derivative of one essay instead of refusing it.
+  `npm run check` 4459/0.
+- What changed: two windows keyed on row identity. The SAME row inside `min_reuse_days` still
+  refuses, message and value unchanged. A DIFFERENT row inside the new `min_variant_days` (7,
+  `config/platforms.yaml`, per-platform overridable) is spaced: the guard returns the instant the
+  window opens and the existing scheduler takes the first free slot past it. Unknown row identity
+  and a non-positive window both fall to the strict side.
+- Next: no packet written. Muxin can now schedule bluesky-1, which should defer about a week out
+  rather than refuse. Unproven: no row has yet been scheduled live through a channel other than
+  Bluesky and Threads, no media row through Postiz at all, and no deferral has run live.
 - Last decision: builder family is Claude for now, Codex and Grok reserved for cross-family audits
   because quota is limited. Codex is capped until 2026-09-15.
-- Details: `## Progress log` -> 2026-09-11 (6Y). Below is history; read only cited headings.
+- Details: `## Progress log` -> 2026-09-11 (6Z). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -50,6 +52,41 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-11 (6Z) — the reuse guard spaces variants instead of refusing them
+
+Muxin approved bluesky-1 and the Publishing room refused it: bluesky-2, a DIFFERENT derivative of
+the same essay, had been placed the day before, and bluesky's `min_reuse_days: 21` applied. The
+guard's row-matching regex used a wildcard over the row id, so "this exact post again" and "another
+post from the same piece" were one case. Muxin's call: re-posting an identical row should stay rare
+and keep the long window, ordinary fan-out deserves a short one, and the answer to "too soon" is a
+later date, not an error.
+
+Two windows now, keyed on row identity. SAME row inside `min_reuse_days` refuses exactly as before,
+same wording, same value. DIFFERENT row inside the new top-level `min_variant_days` (7, per-platform
+overridable in `config/platforms.yaml`) is spaced: `checkReuseForRow` returns the instant the window
+opens, each caller hands that to the existing unified scheduler as its `now`, and the post takes the
+first free cadence slot past it with a plain spacing note. No second slot picker was written;
+`slots.ts` and the ledger are untouched. No slot past the floor refuses and claims nothing. No
+existing window value changed. `cards.ts` and `youtube.ts` pass no row id and keep the merged
+behavior.
+
+Grok's first audit returned FAIL on two fail-open defects and both were repaired before integration.
+A row id that was blank, whitespace, or differently cased could not match the Placed log, so it was
+read as a different derivative and given the SHORT window; unknown identity now takes the strict
+merged window, and same-row matching folds case, which can only ever move a case toward the longer
+window. Separately, `min_variant_days: 0` or negative removed spacing entirely; it is now
+`.positive()` in both schema slots and a value that is not finite and positive reads as absent to
+the resolver and to the test override. The delta audit returned CLOSED.
+
+Known and accepted, not a regression: the guard spaces against the Placed log, so two variants
+approved in the SAME run carry no log rows yet and are spaced only by ordinary cadence. That was
+equally true before this slice. A deferral also no longer raises a red banner, and rendering the
+spacing note as visible text in the room needs `src/review/page.ts`, which this slice did not own.
+
+`npm run check` 4459/0 unsandboxed, run by the coordinator independently of the worker's own seven
+green runs. One earlier run reported a single failure whose name was not captured and which has not
+recurred; it is recorded as unidentified rather than dismissed.
 
 ### 2026-09-11 (6Y) — every approved Postiz channel schedules, not just the pinned one
 

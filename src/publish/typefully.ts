@@ -15,7 +15,7 @@ import {
   resolvePrimaryCtaDestination,
 } from "./cta.js";
 import { claimSlots, fmtLa, cadenceSourceFor } from "./slots.js";
-import { checkReuse } from "./reuse-guard.js";
+import { checkReuseForRow } from "./reuse-guard.js";
 import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
 import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 import type { UnifiedPublishOptions } from "./unified-cli.js";
@@ -335,25 +335,50 @@ export async function publishText(
   // UNSCHEDULED and will NOT auto-post — they sit in Typefully until a human schedules them.
   const noSchedule = opts.noSchedule ?? false;
 
-  // Reuse guard: skip platforms where this slug was published too recently.
+  // Reuse guard, two windows. Re-placing the SAME row inside its platform's min_reuse_days is still
+  // refused. A DIFFERENT derivative of the same piece inside min_variant_days is SPACED instead: the
+  // guard hands back the instant the window opens, and that becomes the floor the unified scheduler
+  // starts from below. Keyed per row, since row identity is what tells the two cases apart, while
+  // the spacing floor is per platform (every row of one platform is spaced from the same last
+  // placement).
   const slug = basename(folder);
   const forceReuse = opts.forceReuse ?? false;
+  const spacingFloorByPlatform = new Map<string, number>(); // platform → earliest allowed epoch ms
   if (forceReuse) {
     console.log("reuse guard bypassed via --force-reuse, proceeding with publish");
   } else {
-    const reuseByPlatform = new Map<string, ReturnType<typeof checkReuse>>();
+    const refused = new Set<string>();
     for (const r of approved) {
-      if (!reuseByPlatform.has(r.platform)) {
-        reuseByPlatform.set(r.platform, checkReuse(slug, r.platform, undefined, deliveryDecision.brand!));
+      const res = checkReuseForRow(slug, r.platform, { rowId: r.id, brandId: deliveryDecision.brand! });
+      if (res.allowed) continue;
+      const floorMs = res.deferrable && res.earliestAllowedAt ? Date.parse(res.earliestAllowedAt) : NaN;
+      if (res.deferrable && !Number.isNaN(floorMs)) {
+        const prior = spacingFloorByPlatform.get(r.platform);
+        if (prior === undefined || floorMs > prior) spacingFloorByPlatform.set(r.platform, floorMs);
+        console.log(`reuse guard: ${res.reason}`);
+        continue;
       }
+      console.warn(`reuse guard: ${res.reason}, skipping ${r.id}`);
+      refused.add(r.id);
     }
-    for (const [, res] of reuseByPlatform) {
-      if (!res.allowed) console.warn(`reuse guard: ${res.reason} — skipping`);
-    }
-    approved = approved.filter((r) => reuseByPlatform.get(r.platform)?.allowed !== false);
+    approved = approved.filter((r) => !refused.has(r.id));
     if (approved.length === 0) {
       console.log("no rows to publish: all platforms blocked by the reuse guard");
       return [];
+    }
+    // An unscheduled draft carries no publish time at all, so there is nothing to space. Fail
+    // closed rather than saving a draft that a human could fire inside the spacing window.
+    if ((opts.noSchedule ?? false) && spacingFloorByPlatform.size > 0) {
+      const spaced = new Set(spacingFloorByPlatform.keys());
+      approved = approved.filter((r) => {
+        if (!spaced.has(r.platform)) return true;
+        console.warn(`reuse guard: ${r.id} needs spacing from an earlier post from this piece, and an unscheduled draft has no time to space. Schedule it instead.`);
+        return false;
+      });
+      if (approved.length === 0) {
+        console.log("no rows to publish: every remaining row needs a scheduled time to space it from an earlier post");
+        return [];
+      }
     }
   }
 
@@ -377,23 +402,46 @@ export async function publishText(
   // appendBetPlacement below stamps it onto the Placed-log row so tag-source.ts can persist it to
   // posts.cadence_source. Only this text-platform path determines it (see queue.ts's comment).
   const cadenceSourceByRow = new Map<string, "override" | "default">();
+  /** Deferred rows the scheduler could find no slot for. They are dropped, never sent unspaced. */
+  const unplaceable = new Set<string>();
   if (noSchedule) {
     console.log("Unscheduled-draft mode (--no-schedule): no slots claimed, drafts saved without a publish time.");
   } else {
     for (const [platform, rowsP] of Object.entries(byPlatform)) {
+      // A deferred platform starts the SAME scheduler from the spacing floor instead of now, so the
+      // slot it returns is already past the variant window. No second slot-picking logic here.
+      const floorMs = spacingFloorByPlatform.get(platform);
       const { times, labels } = claimSlots({
         windowKey: platform,
         conflictPlatforms: [platform],
         count: rowsP.length,
         asset: `${basename(folder)}/${platform}`,
         by: "typefully",
+        ...(floorMs !== undefined ? { now: new Date(Math.max(Date.now(), floorMs)) } : {}),
       });
       const cadenceSource = cadenceSourceFor(platform);
       rowsP.forEach((r, i) => {
-        slotByRow.set(r.id, times[i] ?? "next-free-slot");
+        const time = times[i];
+        // Fail closed for a deferred row: "next-free-slot" hands the timing back to Typefully, which
+        // is exactly the spacing this row was deferred to get. Say it could not be placed rather
+        // than reporting a schedule that was never achieved.
+        if (floorMs !== undefined && (!time || time === "next-free-slot")) {
+          console.warn(`reuse guard: could not place ${r.id}, no free ${platform} slot on or after ${fmtLa(new Date(floorMs))}`);
+          unplaceable.add(r.id);
+          return;
+        }
+        slotByRow.set(r.id, time ?? "next-free-slot");
         whenByRow.set(r.id, labels[i] ?? "next-free-slot");
         cadenceSourceByRow.set(r.id, cadenceSource);
       });
+    }
+    if (unplaceable.size > 0) {
+      approved = approved.filter((r) => !unplaceable.has(r.id));
+      for (const key of Object.keys(byPlatform)) byPlatform[key] = byPlatform[key].filter((r) => !unplaceable.has(r.id));
+      if (approved.length === 0) {
+        console.log("no rows to publish: no free slot was available past the reuse guard's spacing window");
+        return [];
+      }
     }
     console.log("Cadence schedule (PT):");
     for (const [platform, rowsP] of Object.entries(byPlatform)) {

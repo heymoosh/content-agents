@@ -13,6 +13,13 @@ import { loadYamlConfig } from "./load.js";
 export const platformRuleSchema = z
   .object({
     min_reuse_days: z.number().optional(),
+    // Minimum days between placing two DIFFERENT derivatives of the same slug to this platform
+    // (src/publish/reuse-guard.ts). Absent means the top-level `min_variant_days:` below, then the
+    // guard's own named fallback. Typed here rather than left to `.passthrough()` so a string or a
+    // typo fails loudly instead of silently skipping the spacing window. `.positive()` for the same
+    // reason max_slots_per_day below has it: 0 or a negative window makes the guard's
+    // `daysSince < minVariantDays` test always false, which removes variant spacing entirely.
+    min_variant_days: z.number().positive().optional(),
     max_chars: z.number().optional(),
     max_words: z.number().optional(),
     derivative_count: z.array(z.number()).optional(),
@@ -61,9 +68,14 @@ const communitySchema = z
 // key type accepts silently, letting a config typo land under e.g. platforms[""] with no error.
 const nonEmptyKey = z.string().min(1);
 
-const platformsConfigSchema = z
+// Exported alongside platformRuleSchema so the top-level keys' own validation is unit-testable
+// without writing a fixture into Muxin's live config/platforms.yaml.
+export const platformsConfigSchema = z
   .object({
     min_reuse_days: z.number().optional(),
+    // Positive for the same reason as the per-platform key above: a 0 or negative default would
+    // silently disable variant spacing for every platform that does not override it.
+    min_variant_days: z.number().positive().optional(),
     platforms: z.record(nonEmptyKey, platformRuleSchema).optional(),
     communities: z.record(nonEmptyKey, communitySchema).optional(),
     home_brand: homeBrandSchema.optional(),
@@ -77,6 +89,7 @@ export type SpinAngle = z.infer<typeof spinAngleSchema>;
 
 export interface PlatformsConfig {
   min_reuse_days?: number;
+  min_variant_days?: number;
   platforms: Record<string, PlatformRule>;
   communities: Record<string, z.infer<typeof communitySchema>>;
   home_brand?: HomeBrand;
@@ -104,6 +117,7 @@ export function loadPlatforms(): PlatformsConfig {
     const raw = loadYamlConfig(CONFIG_PATH, platformsConfigSchema, {});
     cached = {
       min_reuse_days: raw.min_reuse_days,
+      min_variant_days: raw.min_variant_days,
       platforms: raw.platforms ?? {},
       communities: raw.communities ?? {},
       home_brand: raw.home_brand,

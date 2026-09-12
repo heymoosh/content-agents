@@ -7,7 +7,7 @@ import { publishCards, isQuoteCardRow, cardTarget, basePlatform, cardCopy, isCon
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
 import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
-import { checkReuse } from "../publish/reuse-guard.js";
+import { checkReuseForRow } from "../publish/reuse-guard.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
 import { assertProviderDispatch, resolveDeliveryIntent, resolveDeliveryPolicy, writeReadyToPaste, type DeliveryBrand, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
@@ -91,7 +91,9 @@ export interface SchedulerDeps {
   /** Test/embedding seam; production always uses the persisted content-request origin. */
   resolveDeliveryPolicy?: typeof resolveDeliveryPolicy;
   fetchPostizRegistry?: () => Promise<PostizCapabilityRegistry>;
-  publishPostiz?: (folder: string, row: QueueRow, capability: PostizCapability, policy: DeliveryPolicyDecision) => Promise<unknown>;
+  /** `earliestAt` is the reuse guard's spacing floor for a deferred row: the slot claim must land
+   *  at or after it. Absent means no floor, today's behavior. */
+  publishPostiz?: (folder: string, row: QueueRow, capability: PostizCapability, policy: DeliveryPolicyDecision, earliestAt?: string) => Promise<unknown>;
   postizEnv?: NodeJS.ProcessEnv;
 }
 const DEFAULT_SCHEDULER_DEPS: SchedulerDeps = {
@@ -365,12 +367,35 @@ async function uploadSingleMedia(folder: string, assetRelPath: string, transport
   return uploadPostizMedia(transport, { bytes: new Uint8Array(readFileSync(mediaPath)), filename: basename(mediaPath), mime });
 }
 
-export async function defaultPublishPostiz(folder: string, row: QueueRow, capability: PostizCapability, policy: DeliveryPolicyDecision, transportFactory: () => PostizTransport = createPostizTransport): Promise<unknown> {
+export async function defaultPublishPostiz(
+  folder: string,
+  row: QueueRow,
+  capability: PostizCapability,
+  policy: DeliveryPolicyDecision,
+  transportFactory: () => PostizTransport = createPostizTransport,
+  // The reuse guard's spacing floor for a deferred row. Handed to the SAME unified scheduler every
+  // other claim goes through, as its `now`, so the first free slot it returns is already past the
+  // variant window. There is deliberately no second slot-picking implementation here: cadence,
+  // per-day caps and the shared ledger stay entirely slots.ts's job.
+  earliestAt?: string,
+): Promise<unknown> {
   assertProviderDispatch(folder, "postiz", policy);
   const shape = postizShape(row);
   if (!shape) throw new Error(`Postiz does not recognize destination/media for ${row.id}`);
-  const { times, labels } = claimSlots({ windowKey: shape.destination, conflictPlatforms: [shape.destination], count: 1, asset: row.asset, by: "postiz" });
-  if (!times[0] || times[0] === "next-free-slot") throw new Error(`Postiz requires an explicit future slot for ${shape.destination}`);
+  const floorMs = earliestAt ? Date.parse(earliestAt) : NaN;
+  if (earliestAt && Number.isNaN(floorMs)) throw new Error(`the reuse guard handed back an unreadable spacing date for ${row.id}: ${earliestAt}`);
+  const { times, labels } = claimSlots({
+    windowKey: shape.destination, conflictPlatforms: [shape.destination], count: 1, asset: row.asset, by: "postiz",
+    ...(earliestAt ? { now: new Date(Math.max(Date.now(), floorMs)) } : {}),
+  });
+  // Fails closed for a deferral too: "next-free-slot" means the provider would pick the time, which
+  // is exactly the spacing this row was deferred to get. No slot means say so, never report a
+  // schedule that was not achieved.
+  if (!times[0] || times[0] === "next-free-slot") {
+    throw new Error(earliestAt
+      ? `could not place ${row.id}, no free ${shape.destination} slot on or after ${fmtLa(new Date(floorMs))}`
+      : `Postiz requires an explicit future slot for ${shape.destination}`);
+  }
   const transport: PostizTransport = transportFactory();
   let plan: Awaited<ReturnType<typeof planPostizDispatch>>;
   let post: Awaited<ReturnType<typeof createPostizPost>>;
@@ -387,9 +412,15 @@ export async function defaultPublishPostiz(folder: string, row: QueueRow, capabi
   // Placed row (CTA destination included) so grading and tag-source see this placement.
   setStatus(folder, row, "published");
   const placeNote = plan.ctaCount > 0 ? `, cta→${plan.placement}` : "";
-  appendPublishLog(folder, `${row.id} → postiz post ${post.id} (${shape.destination}, ${labels[0]}${placeNote})`);
+  // Plain spacing note for a deferred row, so the Studio result and the folder's own publish log
+  // both say why this one landed a week out instead of tomorrow.
+  const spacingNote = earliestAt
+    ? `Spaced from an earlier post from this piece on ${shape.destination}. First free slot past the spacing window is ${labels[0]}.`
+    : undefined;
+  appendPublishLog(folder, `${row.id} → postiz post ${post.id} (${shape.destination}, ${labels[0]}${placeNote})${spacingNote ? ` ${spacingNote}` : ""}`);
   appendBetPlacement(folder, row.id, shape.destination, `postiz post ${post.id} @ ${labels[0]}`, plan.fm, plan.body, plan.ctaDestination);
   return {
+    ...(spacingNote ? { spacingNote } : {}),
     id: row.id, platform: shape.destination, when: labels[0], ref: post.id,
     providerObjectId: post.id, providerAccountId: capability.accountId,
     canonicalUrl: post.url ?? undefined, plannedFor: post.scheduledAt ?? times[0],
@@ -427,32 +458,59 @@ function reuseGuardPlatform(kind: ScheduleKind, row: QueueRow): string | null {
 const REUSE_GUARD_UNSPECIFIED = "not scheduled: blocked by the reuse guard (check the server log for the reason)";
 
 /**
- * The reuse guard's verdict for ONE row, as the `scheduleError` string it should come back with, or
- * null when placement is allowed (or when no guard key exists for the kind — outreach-lock).
+ * The reuse guard's verdict for ONE row: allowed, refused outright, or deferred to a date.
  *
  * One function serves both callers on purpose: the Postiz PRE-FLIGHT in scheduleApproved (which must
- * refuse before anything is claimed or created) and runPublisher's after-the-fact recovery (which
+ * decide before anything is claimed or created) and runPublisher's after-the-fact recovery (which
  * explains a publisher that already skipped silently). Keying and wording therefore cannot drift
  * into two versions, and the Content page reads one message however the refusal was reached.
+ *
+ * `deferred` is the different-derivative case: same slug, same platform, a DIFFERENT row inside
+ * `min_variant_days`. It is not a refusal, it is a date. Only the pre-flight can act on it (it owns
+ * the slot claim); the recovery branch turns it into an honest "not scheduled" message, because by
+ * then the publisher has already declined.
  */
-function reuseGuardBlock(folder: string, kind: ScheduleKind, row: QueueRow, brand: DeliveryBrand | null): string | null {
+type GuardVerdict =
+  | { kind: "allowed" }
+  | { kind: "refused"; message: string }
+  | { kind: "deferred"; platform: string; earliestAt: string; lastPlacedAt: string; minVariantDays: number };
+
+function reuseGuardVerdict(folder: string, kind: ScheduleKind, row: QueueRow, brand: DeliveryBrand | null): GuardVerdict {
   const platform = reuseGuardPlatform(kind, row);
-  if (!platform) return null;
+  if (!platform) return { kind: "allowed" };
   // The brand comes from the delivery policy decision already in scope at both call sites, never
-  // from checkReuse's own `human-inference` default: reading Charles's rows against Human
+  // from the guard's own `human-inference` default: reading Charles's rows against Human
   // Inference's Placed log is the silent-substitution bug this parameter exists to close. A
   // decision that resolved no brand fails CLOSED rather than falling back — every route that
   // reaches the guard has already passed the policy's provider/account checks, so a null here is a
   // caller bug, not a Muxin path.
-  if (!brand) return "not scheduled: the delivery policy resolved no brand, so the reuse guard has no Placed log to check";
-  const reuse = checkReuse(basename(folder), platform, undefined, brand);
-  if (reuse.allowed) return null;
+  if (!brand) return { kind: "refused", message: "not scheduled: the delivery policy resolved no brand, so the reuse guard has no Placed log to check" };
+  // row.id is what splits the two windows: the same row again keeps min_reuse_days and is refused,
+  // a different derivative of the same piece gets min_variant_days and is spaced.
+  const reuse = checkReuseForRow(basename(folder), platform, { rowId: row.id, brandId: brand });
+  if (reuse.allowed) return { kind: "allowed" };
+  if (reuse.deferrable && reuse.earliestAllowedAt && reuse.lastPlacedAt && reuse.minVariantDays !== undefined) {
+    return { kind: "deferred", platform, earliestAt: reuse.earliestAllowedAt, lastPlacedAt: reuse.lastPlacedAt, minVariantDays: reuse.minVariantDays };
+  }
   // Machine-parseable shape: reconcile.ts's reuseGuardEligibility re-derives "eligible again in N
   // days" from this exact string, read back off the row's own notes days later with no fs/network
   // call of its own. Do not reword it without updating that reader.
-  return reuse.lastPlacedAt !== undefined && reuse.minDays !== undefined
-    ? `blocked by reuse guard, last placed to ${platform} ${reuse.lastPlacedAt} (min_reuse_days: ${reuse.minDays})`
-    : REUSE_GUARD_UNSPECIFIED;
+  return {
+    kind: "refused",
+    message: reuse.lastPlacedAt !== undefined && reuse.minDays !== undefined
+      ? `blocked by reuse guard, last placed to ${platform} ${reuse.lastPlacedAt} (min_reuse_days: ${reuse.minDays})`
+      : REUSE_GUARD_UNSPECIFIED,
+  };
+}
+
+function reuseGuardBlock(folder: string, kind: ScheduleKind, row: QueueRow, brand: DeliveryBrand | null): string | null {
+  const verdict = reuseGuardVerdict(folder, kind, row, brand);
+  if (verdict.kind === "allowed") return null;
+  if (verdict.kind === "refused") return verdict.message;
+  // Reached only from the recovery branch, and only for a publisher that does not yet understand
+  // deferral (it returned [] rather than spacing the post itself). Reporting the real reason beats
+  // the generic wording, and it never claims a schedule that did not happen.
+  return `not scheduled: another post from this piece already went to ${verdict.platform} on ${verdict.lastPlacedAt}. This one can go out from ${verdict.earliestAt} (min_variant_days: ${verdict.minVariantDays})`;
 }
 
 type ScheduleOutcome = { scheduled: unknown; scheduleError: string | null };
@@ -607,12 +665,19 @@ export async function scheduleApproved(
       //     block means do not place this row ANYWHERE, not try the other provider.
       // Non-Postiz routes are deliberately not gated here: their own publishers already check, and a
       // second check would be exactly the double-gating this dispatch must not add.
-      const reuseBlock = reuseGuardBlock(folder, kind, row, resolvedBrand);
-      if (reuseBlock) return { scheduled: null, scheduleError: reuseBlock };
+      //
+      // A DEFERRED verdict is not a refusal. Re-placing the same row still stops here; a different
+      // derivative of the same piece carries on with a spacing floor, and the existing scheduler
+      // picks the first free slot past it.
+      const verdict = reuseGuardVerdict(folder, kind, row, resolvedBrand);
+      if (verdict.kind === "refused") return { scheduled: null, scheduleError: verdict.message };
+      const earliestAt = verdict.kind === "deferred" ? verdict.earliestAt : undefined;
       const capability = selected.postizCapability;
       if (!capability) return { scheduled: null, scheduleError: "configured Postiz capability was not retained for scheduling" };
       try {
-        return { scheduled: await (deps.publishPostiz ?? defaultPublishPostiz)(folder, row, capability, policy), scheduleError: null };
+        const publishPostizFn = deps.publishPostiz
+          ?? ((f: string, r: QueueRow, c: PostizCapability, p: DeliveryPolicyDecision, e?: string) => defaultPublishPostiz(f, r, c, p, undefined, e));
+        return { scheduled: await publishPostizFn(folder, row, capability, policy, earliestAt), scheduleError: null };
       } catch (e) {
         // Trigger 3 of 3, and the ONLY one that runs after Postiz was actually contacted: a
         // rate-limit rejection, whose guard runs before the create controller, so nothing was

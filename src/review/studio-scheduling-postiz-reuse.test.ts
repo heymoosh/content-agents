@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
 import { scheduleApproved, defaultPublishPostiz, type SchedulerDeps } from "./studio-scheduling.js";
 import type { QueueRow } from "../publish/queue.js";
-import type { DeliveryPolicyDecision } from "../publish/delivery-policy.js";
+import { resolveDeliveryPolicy, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
 import { PostizRateLimitError, type PostizCapabilityRegistry, type PostizDestination, type PostizMedia, type PostizTransport } from "../publish/postiz.js";
 
 // SLICE-5K — the Postiz path consults the reuse guard BEFORE it creates.
@@ -147,8 +147,11 @@ describe("the Postiz path refuses a row the reuse guard blocks", () => {
   // ── Acceptance: blocked row is not created, claims nothing, and stays pending with the reason ───
   test("a guard-blocked row creates no Postiz post, claims no slot, and keeps its approve status", async () => {
     const { folder, slug } = liveFolder();
-    // Placed to x yesterday; config/platforms.yaml gives x min_reuse_days: 14.
-    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-9", "x", YESTERDAY)}`);
+    // The SAME row placed to x yesterday; config/platforms.yaml gives x min_reuse_days: 14.
+    // SLICE-6Z: the row id has to match the row being scheduled for this to stay a refusal. A
+    // DIFFERENT row id is now the variant case, which is spaced rather than refused (covered by
+    // its own suite below), so the old "x-9" fixture would have been testing the other window.
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
     // An UNRELATED reservation already standing in the ledger. Byte-identity against an empty file
     // would only prove nothing was appended to nothing; against this it also proves the refusal path
     // does not disturb calendar space someone else is holding.
@@ -282,5 +285,183 @@ describe("the Postiz path refuses a row the reuse guard blocks", () => {
     const result = await scheduleApproved("/tmp/outreach-slug", textRow({ id: "om-1", platform: "email", format: "outreach-message", asset: "outreach/om-1.md" }), deps);
     assert.deepEqual(locked, ["lock"]);
     assert.equal(result.scheduleError, null);
+  });
+});
+
+// ── SLICE-6Z: the guard spaces a DIFFERENT derivative instead of refusing it ─────────────────────
+//
+// Two derivatives of one essay are two different posts. The guard used to match `[slug/<any row>]`,
+// so placing bluesky-2 locked out bluesky-1 for bluesky's full 21-day min_reuse_days window. Now the
+// same row inside min_reuse_days still refuses, while a different row inside min_variant_days is
+// handed to the SAME unified scheduler with an earliest-allowed floor and comes back scheduled.
+//
+// Everything below asserts the observable outcome: whether a post was created, what time the shared
+// ledger actually holds, and what came back as scheduled/scheduleError.
+describe("SLICE-6Z: a different derivative of the same piece is spaced, not refused", () => {
+  const saved: Record<string, string | undefined> = {};
+  const scratch = mkdtempSync(join(tmpdir(), "variant-defer-"));
+  const dirs: string[] = [scratch];
+
+  /** One hour ago, the real gap Muxin hit: bluesky-2 placed, bluesky-1 scheduled an hour later. */
+  const AN_HOUR_AGO = new Date(Date.now() - 3_600_000).toISOString();
+  const VARIANT_DAYS = 7; // config/platforms.yaml top-level min_variant_days
+  const floorMs = (iso: string): number => Date.parse(iso) + VARIANT_DAYS * 86_400_000;
+
+  before(() => {
+    for (const k of ENV_KEYS) saved[k] = process.env[k];
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = join(scratch, "bets.md");
+    process.env.CONTENT_AGENTS_TEST_LEDGER = join(scratch, "publish-schedule.jsonl");
+    process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID = "human-inference/postiz";
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH, "# Placed log\n");
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER, "");
+  });
+
+  after(() => {
+    for (const k of ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  });
+
+  /** A real content folder with ONE approved bluesky row, plus an isolated empty ledger. */
+  function blueskyFolder(rowId: string): { folder: string; slug: string } {
+    const folder = mkdtempSync(join(tmpdir(), "variant-defer-folder-"));
+    dirs.push(folder);
+    mkdirSync(join(folder, "derivatives"), { recursive: true });
+    writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+    writeFileSync(
+      join(folder, "review-queue.md"),
+      `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n` +
+        `|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n` +
+        `| ${rowId} | bluesky | text | derivatives/${rowId}.md | 4 | 5 | no | approve | studio text row | from studio |\n`
+    );
+    writeFileSync(join(folder, "derivatives", `${rowId}.md`), "---\ncta: none\n---\nA line Muxin wrote.\n");
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!, "");
+    return { folder, slug: basename(folder) };
+  }
+
+  /** The REAL defaultPublishPostiz, with the spacing floor forwarded (production passes it too). */
+  function liveBlueskyDeps(calls: string[]): SchedulerDeps {
+    const transport: PostizTransport = {
+      async request(path) {
+        calls.push(path);
+        if (path === "/api/public/v1/posts") return { postId: "pz-defer" };
+        throw new Error(`unexpected Postiz path ${path}`);
+      },
+    };
+    return {
+      publishText: async () => { calls.push("typefully-text"); return [{ ref: "typefully draft text-1" }]; },
+      publishCards: async () => { calls.push("typefully-card"); return [{ ref: "typefully draft card-1" }]; },
+      publishTikTok: async () => [], publishShorts: async () => [], publishSubstack: async () => [],
+      lockOutreachMessage: async () => [],
+      postizEnv: { POSTIZ_ACCOUNT_ID: "acct-1" },
+      fetchPostizRegistry: async () => takes("bluesky", ["text"]),
+      publishPostiz: (f, r, c, p, e) => { calls.push("publishPostiz"); return defaultPublishPostiz(f, r, c, p, () => transport, e); },
+    };
+  }
+
+  test("the case that prompted this slice: bluesky-1 an hour after bluesky-2 is SCHEDULED, past the variant window", async () => {
+    const { folder, slug } = blueskyFolder("bluesky-1");
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "bluesky-2", "bluesky", AN_HOUR_AGO)}`);
+
+    const calls: string[] = [];
+    const result = await scheduleApproved(folder, textRow({ id: "bluesky-1", platform: "bluesky", asset: "derivatives/bluesky-1.md" }), liveBlueskyDeps(calls));
+
+    assert.equal(result.scheduleError, null, "no refusal, and no red banner for Muxin");
+    const scheduled = result.scheduled as { providerObjectId: string; plannedFor: string; spacingNote?: string };
+    assert.equal(scheduled.providerObjectId, "pz-defer", "the post really was created");
+    assert.deepEqual(calls, ["publishPostiz", "/api/public/v1/posts"]);
+    assert.ok(
+      Date.parse(scheduled.plannedFor) >= floorMs(AN_HOUR_AGO),
+      `scheduled ${scheduled.plannedFor} must be at or after lastPlacement + ${VARIANT_DAYS}d (${new Date(floorMs(AN_HOUR_AGO)).toISOString()})`
+    );
+    assert.match(scheduled.spacingNote ?? "", /^Spaced from an earlier post from this piece on bluesky\. First free slot past the spacing window is /);
+    assert.doesNotMatch(scheduled.spacingNote ?? "", /—/, "config/voice.yaml bans em dashes");
+
+    // The date came from the shared ledger's own claim, not a second calculation.
+    const { readLedger } = await import("../publish/slots.js");
+    const ledger = readLedger();
+    assert.equal(ledger.length, 1, `exactly one claim: ${JSON.stringify(ledger)}`);
+    assert.equal(ledger[0].platform, "bluesky");
+    assert.equal(ledger[0].time, scheduled.plannedFor, "the scheduler picked the time, nothing else did");
+    assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /\| published \|/);
+  });
+
+  test("the SAME row an hour after its own placement still refuses, with today's message and window", async () => {
+    const { folder, slug } = blueskyFolder("bluesky-1");
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "bluesky-1", "bluesky", AN_HOUR_AGO)}`);
+    const ledgerBefore = readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!);
+
+    const calls: string[] = [];
+    const result = await scheduleApproved(folder, textRow({ id: "bluesky-1", platform: "bluesky", asset: "derivatives/bluesky-1.md" }), liveBlueskyDeps(calls));
+
+    assert.equal(result.scheduled, null);
+    assert.deepEqual(calls, [], "nothing was created, and no backup route ran");
+    assert.equal(result.scheduleError, `blocked by reuse guard, last placed to bluesky ${AN_HOUR_AGO} (min_reuse_days: 21)`);
+    assert.deepEqual(readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!), ledgerBefore, "no slot consumed");
+    assert.doesNotMatch(readFileSync(join(folder, "review-queue.md"), "utf8"), /\| published \|/);
+  });
+
+  test("platforms stay independent: a bluesky placement does not defer or block an x row", async () => {
+    const { folder, slug } = blueskyFolder("x-1");
+    writeFileSync(
+      join(folder, "review-queue.md"),
+      `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n` +
+        `|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n` +
+        `| x-1 | x | text | derivatives/x-1.md | 4 | 5 | no | approve | studio text row | from studio |\n`
+    );
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "bluesky-2", "bluesky", AN_HOUR_AGO)}`);
+
+    const calls: string[] = [];
+    const deps = liveBlueskyDeps(calls);
+    deps.fetchPostizRegistry = async () => takes("x", ["text"]);
+    const result = await scheduleApproved(folder, textRow(), deps);
+
+    assert.equal(result.scheduleError, null);
+    const scheduled = result.scheduled as { plannedFor: string; spacingNote?: string };
+    assert.equal(scheduled.spacingNote, undefined, "an x row is not spaced by a bluesky placement");
+    assert.ok(Date.parse(scheduled.plannedFor) < floorMs(AN_HOUR_AGO), "x took its normal next slot, not a spaced one");
+  });
+
+  test("a slug with no prior placement schedules immediately, unchanged", async () => {
+    const { folder } = blueskyFolder("bluesky-1");
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
+
+    const calls: string[] = [];
+    const result = await scheduleApproved(folder, textRow({ id: "bluesky-1", platform: "bluesky", asset: "derivatives/bluesky-1.md" }), liveBlueskyDeps(calls));
+
+    assert.equal(result.scheduleError, null);
+    const scheduled = result.scheduled as { plannedFor: string; spacingNote?: string };
+    assert.equal(scheduled.spacingNote, undefined);
+    assert.ok(Date.parse(scheduled.plannedFor) < floorMs(AN_HOUR_AGO), "no spacing floor was applied");
+  });
+
+  // Acceptance item 5: a deferral that cannot find a slot REFUSES and says so. `facebook` is a real
+  // Postiz destination with no cadence entry in config/platforms.yaml, so the shared scheduler
+  // answers "next-free-slot" — which hands the timing back to the provider and would defeat the
+  // spacing. Fail closed: no slot means say it could not be placed.
+  test("a deferral the scheduler cannot place refuses, and never reports a schedule it did not achieve", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "variant-defer-noslot-"));
+    dirs.push(folder);
+    mkdirSync(join(folder, "configured-media", "cm-1"), { recursive: true });
+    writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!, "");
+    const ledgerBefore = readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!);
+
+    const row = textRow({ id: "cm-1", platform: "facebook", format: "image", asset: "configured-media/cm-1/card.png" });
+    const policy = resolveDeliveryPolicy(folder, "postiz");
+    const capability = takes("facebook", ["image"]).capabilities[0];
+    const earliestAt = new Date(floorMs(AN_HOUR_AGO)).toISOString();
+
+    await assert.rejects(
+      () => defaultPublishPostiz(folder, row, capability, policy, () => { throw new Error("the transport must never be reached"); }, earliestAt),
+      (error: Error) => {
+        assert.match(error.message, /^could not place cm-1, no free facebook slot on or after /);
+        assert.doesNotMatch(error.message, /—/, "config/voice.yaml bans em dashes");
+        return true;
+      }
+    );
+    assert.deepEqual(readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!), ledgerBefore, "no slot was claimed for a post that was not placed");
   });
 });

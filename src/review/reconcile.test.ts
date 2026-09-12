@@ -241,6 +241,20 @@ describe("reconcileRow — the actual GOAL_CONDITION scenario", () => {
     assert.match(result.reason ?? "", /no logged Typefully draft id/);
   });
 
+  // SLICE-6Z: the guard's second window produces a DEFERRAL, not a refusal, so it carries no
+  // countdown for this reader to report. Its wording deliberately shares neither "blocked by reuse
+  // guard" nor "min_reuse_days", so a deferral note can never be dressed up as an "eligible again
+  // in N days" refusal it is not.
+  test("a variant-spacing note is not read as a reuse-guard refusal", () => {
+    const anHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    const inAWeek = new Date(Date.now() + 6 * 86_400_000).toISOString();
+    const notes = `not scheduled: another post from this piece already went to bluesky on ${anHourAgo}. This one can go out from ${inAWeek} (min_variant_days: 7)`;
+    const result = reconcileRow(row({ id: "bluesky-1", platform: "bluesky", status: "approve", notes }), { text: "" }, NO_LIVE);
+    assert.equal(result.state, "mismatch");
+    assert.match(result.reason ?? "", /no logged Typefully draft id/);
+    assert.doesNotMatch(result.reason ?? "", /eligible again in/);
+  });
+
   test("notes with no reuse-guard marker (or none at all) fall back to the generic mismatch, never crash", () => {
     const result = reconcileRow(row({ id: "x-1", platform: "x", status: "approve", notes: "some unrelated note" }), { text: "" }, NO_LIVE);
     assert.equal(result.state, "mismatch");
