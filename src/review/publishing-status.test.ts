@@ -1,13 +1,13 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { after, afterEach, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { disposableProviderOutcome, publishingRetryBlock, readPublishingHistory, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce } from "./publishing-status.js";
+import { appendPublishingStatus, disposableProviderOutcome, publishingRetryBlock, readPublishingHistory, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce } from "./publishing-status.js";
 import { readQueue, writeCell, type QueueRow } from "../publish/queue.js";
-import { commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "./approval-provenance.js";
+import { approvalDispatchDisposition, commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "./approval-provenance.js";
 
 const roots: string[] = [];
 const priorAccount = process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
@@ -342,5 +342,228 @@ appendPublishingStatus({ slug: "child", rowId: process.argv[2], provider: "manua
     assert.equal(result.publishing.providerAccountId, "acct-real");
     assert.equal(result.publishing.canonicalUrl, "https://social.test/pz-7");
     assert.equal(readPublishingStatuses(path)["piece/x-1"]?.providerPublishedAt, "2026-01-03T00:00:00Z");
+  });
+});
+
+// ── SLICE-7A: a refusal must not leave a permanent dispatch fence, and must not leave a clearable
+//    one either ──────────────────────────────────────────────────────────────────────────────────
+//
+// Observed on bluesky-1 (2026-09-12): the reuse guard refused the row before Postiz was contacted
+// at all, yet the attempt left `dispatch_started` with no `dispatch_resolved`, so every later
+// Schedule click died on "this row already has a durable dispatch fence". The row was bricked.
+//
+// The opposite error is worse, so it gets equal weight here. A refusal recovered AFTER a publisher
+// already ran proves nothing about provider state. If such a row were recorded `uncertain` it would
+// become resolve-eligible, and a human could clear its fence and re-send a post the provider may
+// already hold. So both kinds of refusal record `blocked`, and only the pre-dispatch kind clears a
+// fence.
+//
+// Everything below asserts observable state: what the publishing ledger holds, what the approval
+// safety journal holds, whether a retry is permitted, whether reconciliation is accepted, and
+// whether a second Schedule actually reaches the scheduler again.
+describe("SLICE-7A: refusals clear a fence only when nothing reached the provider", () => {
+  const approved = { ...row, status: "approve" as const };
+  const outcome = (message: string, refusal: "no-provider-request" | "publisher-declined") =>
+    async () => ({ scheduled: null, scheduleError: message, refusal });
+  function journalEvents(path: string): Record<string, unknown>[] {
+    const journal = journalPathForLedger(path);
+    if (!existsSync(journal)) return [];
+    return readFileSync(journal, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line));
+  }
+
+  /** The four refusal strings, each keyed to the producer that can actually emit it.
+   *  Pre-flight strings are raised before any create or slot claim; recovery-branch strings are
+   *  rebuilt after a publisher already ran. The same-row wording appears on BOTH sides, which is
+   *  exactly why the discriminant, not the text, decides. */
+  const REFUSALS: { name: string; message: string; refusal: "no-provider-request" | "publisher-declined" }[] = [
+    { name: "pre-flight, same row inside min_reuse_days", refusal: "no-provider-request",
+      message: "blocked by reuse guard, last placed to bluesky 2026-09-11T00:00:00.000Z (min_reuse_days: 21)" },
+    { name: "pre-flight, unspecified guard refusal", refusal: "no-provider-request",
+      message: "not scheduled: blocked by the reuse guard (check the server log for the reason)" },
+    { name: "pre-flight, no brand resolved", refusal: "no-provider-request",
+      message: "not scheduled: the delivery policy resolved no brand, so the reuse guard has no Placed log to check" },
+    { name: "recovery, same row inside min_reuse_days", refusal: "publisher-declined",
+      message: "blocked by reuse guard, last placed to x 2026-09-11T00:00:00.000Z (min_reuse_days: 14)" },
+    { name: "recovery, unspecified guard refusal", refusal: "publisher-declined",
+      message: "not scheduled: blocked by the reuse guard (check the server log for the reason)" },
+    { name: "recovery, another derivative inside min_variant_days", refusal: "publisher-declined",
+      message: "not scheduled: another post from this piece already went to bluesky on 2026-09-11T00:00:00.000Z."
+        + " This one can go out from 2026-09-18T00:00:00.000Z (min_variant_days: 7)" },
+  ];
+
+  for (const item of REFUSALS) {
+    test(`records blocked, and clears its fence only when pre-dispatch — ${item.name}`, async () => {
+      const path = ledger();
+      const folder = approvedContentFolder(path);
+      const result = await scheduleApprovedOnce(folder, "piece", row, outcome(item.message, item.refusal), path);
+
+      assert.equal(result.publishing.state, "blocked", "every guard refusal is blocked, never uncertain");
+      assert.equal(result.publishing.error, item.message);
+
+      const resolved = journalEvents(path).filter((e) => e.kind === "dispatch_resolved");
+      const disposition = approvalDispatchDisposition(folder, "piece", approved, path);
+      if (item.refusal === "no-provider-request") {
+        assert.equal(resolved.length, 1, "nothing reached the provider, so the fence must clear");
+        assert.equal(resolved[0].resolution, "not-created", "never `exists`: there is no object to point at");
+        assert.equal(disposition.kind, "reconciled-not-created", `no durable fence survives: ${JSON.stringify(disposition)}`);
+      } else {
+        assert.equal(resolved.length, 0, "a publisher already ran, so its fence must be retained");
+        assert.equal(disposition.kind, "blocked");
+        assert.match((disposition as { reason: string }).reason, /durable dispatch fence/);
+      }
+    });
+  }
+
+  test("a pre-dispatch refusal is schedulable again with no hand repair", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    const message = REFUSALS[0].message;
+    let calls = 0;
+    const refuse = async () => { calls++; return { scheduled: null, scheduleError: message, refusal: "no-provider-request" as const }; };
+
+    const first = await scheduleApprovedOnce(folder, "piece", row, refuse, path);
+    assert.equal(first.publishing.state, "blocked");
+    assert.equal(publishingRetryBlock("piece", approved, path), null, "the row stays retryable");
+
+    // The second Schedule reaches the guard again instead of dying on a fence.
+    const second = await scheduleApprovedOnce(folder, "piece", approved, refuse, path);
+    assert.equal(calls, 2, "the scheduler really ran a second time");
+    assert.equal(second.scheduleError, message, "refused by the guard again, not by the fence");
+
+    // And once the window opens, the same row schedules. No coordinator, no resolveDispatchFence.
+    const third = await scheduleApprovedOnce(folder, "piece", approved, async () => ({
+      scheduled: { draftId: "tf-window-open", when: "Tomorrow" }, scheduleError: null,
+    }), path);
+    assert.equal(third.publishing.state, "planned");
+    assert.equal(third.publishing.providerObjectId, "tf-window-open");
+  });
+
+  test("a publisher-declined row cannot be reconciled clear and cannot be rescheduled", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    let calls = 0;
+    const declined = async () => { calls++; return { scheduled: null, scheduleError: REFUSALS[3].message, refusal: "publisher-declined" as const }; };
+    const first = await scheduleApprovedOnce(folder, "piece", row, declined, path);
+    assert.equal(first.publishing.state, "blocked");
+
+    // `blocked` is deliberately NOT resolve-eligible. This is the door that would otherwise let a
+    // human clear the fence and re-send a post the publisher may already have created.
+    assert.throws(() => resolvePublishingAttempt("piece", "x-1", "not-created", {}, path), /no uncertain/i);
+    // And the retained fence stops a second dispatch outright.
+    await assert.rejects(() => scheduleApprovedOnce(folder, "piece", approved, declined, path), /durable dispatch fence/i);
+    assert.equal(calls, 1, "the scheduler must not run a second time");
+  });
+
+  test("the discriminant is typed: wording is never what decides", async () => {
+    // A refusal nobody has written yet still clears the fence, because the discriminant carries it.
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    const reworded = await scheduleApprovedOnce(folder, "piece", row,
+      outcome("the reuse guard said no, in wording that has not been written yet", "no-provider-request"), path);
+    assert.equal(reworded.publishing.state, "blocked");
+    assert.equal(approvalDispatchDisposition(folder, "piece", approved, path).kind, "reconciled-not-created");
+
+    // The mirror image, and the load-bearing half: today's exact guard wording with NO discriminant
+    // stays uncertain and stays fenced. A reader that sniffed the prefix would fail here.
+    const textOnlyPath = ledger();
+    const textOnlyFolder = approvedContentFolder(textOnlyPath);
+    const textOnly = await scheduleApprovedOnce(textOnlyFolder, "piece", row, async () => ({
+      scheduled: null, scheduleError: REFUSALS[0].message,
+    }), textOnlyPath);
+    assert.equal(textOnly.publishing.state, "uncertain", "the message alone proves nothing about a network call");
+    const fenced = approvalDispatchDisposition(textOnlyFolder, "piece", approved, textOnlyPath);
+    assert.equal(fenced.kind, "blocked");
+    assert.match((fenced as { reason: string }).reason, /durable dispatch fence/);
+  });
+
+  test("fails closed: a generic provider error keeps uncertain and keeps its fence", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    const result = await scheduleApprovedOnce(folder, "piece", row, async () => ({
+      scheduled: null, scheduleError: "connection reset by peer",
+    }), path);
+    assert.equal(result.publishing.state, "uncertain");
+    assert.equal(journalEvents(path).filter((e) => e.kind === "dispatch_resolved").length, 0, "no fence may be cleared");
+    const disposition = approvalDispatchDisposition(folder, "piece", approved, path);
+    assert.equal(disposition.kind, "blocked");
+    assert.match((disposition as { reason: string }).reason, /durable dispatch fence/);
+    assert.match(publishingRetryBlock("piece", approved, path) ?? "", /uncertain/);
+  });
+
+  test("fails closed: a thrown scheduler callback keeps its fence", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    await assert.rejects(() => scheduleApprovedOnce(folder, "piece", row, async () => {
+      throw new Error("socket hang up after the request left");
+    }, path), /socket hang up/);
+    assert.equal(readPublishingStatuses(path)["piece/x-1"]?.state, "uncertain");
+    assert.equal(journalEvents(path).filter((e) => e.kind === "dispatch_resolved").length, 0, "no fence may be cleared");
+    const disposition = approvalDispatchDisposition(folder, "piece", approved, path);
+    assert.equal(disposition.kind, "blocked");
+    assert.match((disposition as { reason: string }).reason, /durable dispatch fence/);
+  });
+
+  test("a Postiz rate limit is unchanged: still failed, still fence-resolved as not-created", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    const message = "Postiz rate limit reached (429): the create-post endpoint allows 90 requests per hour across the whole instance,"
+      + " and each schedule or move counts as one. Nothing was created. Studio resumes the waiting rows automatically after 2026-09-02T19:10:00.000Z.";
+    const result = await scheduleApprovedOnce(folder, "piece", row, async () => ({ scheduled: null, scheduleError: message }), path);
+    assert.equal(result.publishing.state, "failed", "a throttle is not a guard refusal and keeps its own state");
+    const resolved = journalEvents(path).filter((e) => e.kind === "dispatch_resolved");
+    assert.equal(resolved.length, 1);
+    assert.equal(resolved[0].resolution, "not-created");
+  });
+
+  test("a successful schedule is unchanged: terminal provider state, no fence resolution", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    const result = await scheduleApprovedOnce(folder, "piece", row, async () => ({
+      scheduled: { draftId: "tf-ok", when: "Monday 9:00 AM", plannedFor: "2026-09-01T16:00:00.000Z" }, scheduleError: null,
+    }), path);
+    assert.equal(result.publishing.state, "planned");
+    assert.equal(journalEvents(path).filter((e) => e.kind === "dispatch_resolved").length, 0,
+      "a real provider object must keep its fence");
+  });
+
+  // Ordering across the two files. The ledger event and the journal event live in separate
+  // append-only logs, so their recorded instants are the only cross-file evidence available: a
+  // resolution stamped before its own terminal ledger event would mean the fence was cleared first,
+  // which is the sequence that could leave a bare clearance with no record of what happened.
+  test("the fence resolution is recorded no earlier than the terminal ledger event, and only after the fence opened", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    await scheduleApprovedOnce(folder, "piece", row, outcome(REFUSALS[0].message, "no-provider-request"), path);
+
+    const terminal = readPublishingHistory(path).filter((e) => e.slug === "piece" && e.rowId === "x-1" && e.state === "blocked");
+    assert.equal(terminal.length, 1, "exactly one terminal ledger event for this attempt");
+    const dispatch = journalEvents(path).filter((e) => e.kind === "dispatch_started" || e.kind === "dispatch_resolved");
+    assert.deepEqual(dispatch.map((e) => e.kind), ["dispatch_started", "dispatch_resolved"], "a fence is opened before it is resolved");
+    assert.ok(
+      Date.parse(String(dispatch[1].at)) >= Date.parse(terminal[0].at),
+      `dispatch_resolved ${dispatch[1].at} must not predate the terminal ledger event ${terminal[0].at}`,
+    );
+  });
+
+  test("a legacy row that never fenced takes the same refusal path without throwing", async () => {
+    const path = ledger();
+    // An approved row with a prior ledger event but NO approval journal at all: markDispatchStarted
+    // never ran for it, so there is no fence to resolve. resolveDispatchFence must not be reached
+    // and nothing may throw.
+    const root = mkdtempSync(join(tmpdir(), "publishing-legacy-")); roots.push(root);
+    const folder = join(root, "piece");
+    mkdirSync(join(folder, "derivatives"), { recursive: true });
+    writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+    writeFileSync(join(folder, "derivatives", "x-1.md"), "---\nplatform: x\n---\n\nApproved body.\n");
+    writeFileSync(join(folder, "review-queue.md"),
+      "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n" +
+      "|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n" +
+      "| x-1 | x | text | derivatives/x-1.md | — | — | — | approve | | from GUI queue |\n");
+    appendPublishingStatus({ slug: "piece", rowId: "x-1", provider: "typefully", state: "blocked", at: new Date().toISOString(), error: "an earlier refusal" }, path);
+
+    const result = await scheduleApprovedOnce(folder, "piece", row, outcome(REFUSALS[0].message, "no-provider-request"), path);
+    assert.equal(result.publishing.state, "blocked");
+    assert.equal(journalEvents(path).length, 0, "a legacy row opens no fence and clears none");
+    assert.equal(publishingRetryBlock("piece", approved, path), null);
   });
 });

@@ -465,3 +465,149 @@ describe("SLICE-6Z: a different derivative of the same piece is spaced, not refu
     assert.deepEqual(readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!), ledgerBefore, "no slot was claimed for a post that was not placed");
   });
 });
+
+// ── SLICE-7A: which side of dispatch a refusal came from ─────────────────────────────────────────
+//
+// Both sides emit the SAME wording. `reuseGuardVerdict` builds the same-row refusal string for the
+// Postiz pre-flight, and `reuseGuardBlock` rebuilds it in the recovery branches after a publisher
+// has already run. Message text therefore cannot tell them apart, which is the whole reason the
+// outcome carries a typed discriminant instead.
+//
+//   "no-provider-request" — pre-flight only. Provably ahead of every create and every slot claim.
+//   "publisher-declined"  — the publisher already ran. Nothing here proves it created nothing.
+//
+// Getting this backwards is the dangerous direction: it would let a human clear the dispatch fence
+// on a row whose publisher may already hold a provider object, and re-send it.
+describe("SLICE-7A: a refusal says which side of dispatch it came from", () => {
+  const saved: Record<string, string | undefined> = {};
+  const scratch = mkdtempSync(join(tmpdir(), "refusal-side-"));
+  const dirs: string[] = [scratch];
+
+  before(() => {
+    for (const k of ENV_KEYS) saved[k] = process.env[k];
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = join(scratch, "bets.md");
+    process.env.CONTENT_AGENTS_TEST_LEDGER = join(scratch, "publish-schedule.jsonl");
+    process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID = "human-inference/postiz";
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH, "# Placed log\n");
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER, "");
+  });
+
+  after(() => {
+    for (const k of ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  });
+
+  test("the pre-flight same-row refusal is no-provider-request, and nothing ran to contradict it", async () => {
+    const slug = "side-preflight-same-row";
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!, "");
+    const ledgerBefore = readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!);
+
+    const { deps, routes } = stubDeps({ fetchPostizRegistry: async () => takes("x", ["text"]) });
+    const result = await scheduleApproved(`/tmp/${slug}`, textRow(), deps);
+
+    assert.equal(result.scheduleError, `blocked by reuse guard, last placed to x ${YESTERDAY} (min_reuse_days: 14)`);
+    assert.equal(result.refusal, "no-provider-request");
+    assert.deepEqual(routes, [], "the claim is true: no publisher ran");
+    assert.deepEqual(readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!), ledgerBefore, "and no slot was claimed");
+  });
+
+  test("the pre-flight no-brand refusal is no-provider-request too", async () => {
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
+    const brandless = (_folder: string, provider: DeliveryPolicyDecision["provider"]): DeliveryPolicyDecision => ({
+      ...policyFor(_folder, provider), brand: null,
+    });
+    const { deps, routes } = stubDeps({ fetchPostizRegistry: async () => takes("x", ["text"]), resolveDeliveryPolicy: brandless });
+    const result = await scheduleApproved("/tmp/side-preflight-no-brand", textRow(), deps);
+
+    assert.equal(result.scheduleError, "not scheduled: the delivery policy resolved no brand, so the reuse guard has no Placed log to check");
+    assert.equal(result.refusal, "no-provider-request");
+    assert.deepEqual(routes, []);
+  });
+
+  // ── The P0 this discriminant exists for. Same wording as the pre-flight, opposite provenance. ──
+  test("the recovery branch emits the SAME same-row wording but is publisher-declined", async () => {
+    const slug = "side-recovery-same-row";
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    // Discovery says Postiz cannot take x/text, so this row routes to Typefully. Its publisher runs
+    // and returns [], and the recovery branch rebuilds the identical refusal string.
+    const ran: string[] = [];
+    const { deps } = stubDeps({
+      fetchPostizRegistry: async () => takes("youtube", ["video"]),
+      publishText: async () => { ran.push("typefully-text"); return []; },
+    });
+    const result = await scheduleApproved(`/tmp/${slug}`, textRow(), deps);
+
+    assert.deepEqual(ran, ["typefully-text"], "the publisher really was invoked");
+    assert.equal(result.scheduleError, `blocked by reuse guard, last placed to x ${YESTERDAY} (min_reuse_days: 14)`,
+      "byte-identical to the pre-flight wording, which is why text can never decide this");
+    assert.equal(result.refusal, "publisher-declined", "an empty result is not proof that nothing was created");
+  });
+
+  test("the recovery branch's unspecified fallback is publisher-declined as well", async () => {
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
+    const { deps } = stubDeps({ fetchPostizRegistry: async () => takes("youtube", ["video"]), publishText: async () => [] });
+    const result = await scheduleApproved("/tmp/side-recovery-unspecified", textRow(), deps);
+
+    assert.equal(result.scheduleError, "not scheduled: blocked by the reuse guard (check the server log for the reason)");
+    assert.equal(result.refusal, "publisher-declined");
+  });
+
+  test("the recovery branch's variant-spacing wording is publisher-declined", async () => {
+    const slug = "side-recovery-variant";
+    const anHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    // A DIFFERENT row of the same slug placed an hour ago: the guard defers rather than refuses, and
+    // only the recovery branch turns a deferral into a "not scheduled" message.
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-2", "x", anHourAgo)}`);
+    const { deps } = stubDeps({ fetchPostizRegistry: async () => takes("youtube", ["video"]), publishText: async () => [] });
+    const result = await scheduleApproved(`/tmp/${slug}`, textRow(), deps);
+
+    assert.match(result.scheduleError ?? "", /^not scheduled: another post from this piece already went to x /);
+    assert.equal(result.refusal, "publisher-declined");
+  });
+
+  test("the unscheduled-draft route's recovery branch is publisher-declined too", async () => {
+    const slug = "side-unscheduled-draft";
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    const ran: string[] = [];
+    const { deps } = stubDeps({ publishText: async () => { ran.push("typefully-text"); return []; } });
+    const result = await scheduleApproved(`/tmp/${slug}`, textRow(), deps, undefined, "unscheduled-draft");
+
+    assert.deepEqual(ran, ["typefully-text"], "publishText already ran on this route as well");
+    assert.match(result.scheduleError ?? "", /^blocked by reuse guard, last placed to x /);
+    assert.equal(result.refusal, "publisher-declined", "the second post-publisher site must not be left unmarked");
+  });
+
+  test("fails closed: a Postiz create failure carries no discriminant at all", async () => {
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
+    const { deps, routes } = stubDeps({
+      fetchPostizRegistry: async () => takes("x", ["text"]),
+      publishPostiz: async () => { routes.push("postiz"); throw new Error("socket hang up after the request left"); },
+    });
+    const result = await scheduleApproved("/tmp/side-create-failed", textRow(), deps);
+
+    assert.deepEqual(routes, ["postiz"], "Postiz really was contacted");
+    assert.equal(result.scheduleError, "socket hang up after the request left");
+    assert.equal(result.refusal, undefined, "an ambiguous create failure is not a guard refusal of either kind");
+  });
+
+  test("a successful schedule, and a deferred derivative, carry no discriminant", async () => {
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
+    const clean = stubDeps({ fetchPostizRegistry: async () => takes("x", ["text"]) });
+    const shipped = await scheduleApproved("/tmp/side-success", textRow(), clean.deps);
+    assert.equal(shipped.scheduleError, null);
+    assert.equal(shipped.refusal, undefined);
+
+    const slug = "side-deferred";
+    const anHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-2", "x", anHourAgo)}`);
+    const spaced = stubDeps({ fetchPostizRegistry: async () => takes("x", ["text"]) });
+    const deferred = await scheduleApproved(`/tmp/${slug}`, textRow(), spaced.deps);
+    assert.equal(deferred.scheduleError, null, "deferral is a date, not a refusal");
+    assert.equal(deferred.refusal, undefined);
+    assert.deepEqual(spaced.routes, ["postiz"]);
+  });
+});

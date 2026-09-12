@@ -513,7 +513,30 @@ function reuseGuardBlock(folder: string, kind: ScheduleKind, row: QueueRow, bran
   return `not scheduled: another post from this piece already went to ${verdict.platform} on ${verdict.lastPlacedAt}. This one can go out from ${verdict.earliestAt} (min_variant_days: ${verdict.minVariantDays})`;
 }
 
-type ScheduleOutcome = { scheduled: unknown; scheduleError: string | null };
+export type ScheduleOutcome = {
+  scheduled: unknown;
+  scheduleError: string | null;
+  /**
+   * SLICE-7A. Why this attempt failed, as a typed discriminant rather than message text. It says
+   * what is PROVEN about provider state, never merely that the reuse guard spoke.
+   *
+   * `"no-provider-request"` — provably ahead of every call that could create, schedule or modify a
+   *   provider object, and ahead of every slot claim: no publisher invoked, no create sent.
+   *   Read-only capability discovery may already have run, the same boundary
+   *   `publishing-status.ts` already calls "no provider request was made" for a failure during
+   *   provider selection. Effect: ledger `blocked`, and the durable dispatch fence resolves
+   *   `not-created`.
+   *
+   * `"publisher-declined"` — the reuse guard is the reason, but the publisher was ALREADY invoked
+   *   and returned nothing. Provider state is NOT proven: an empty result is not evidence that no
+   *   object was created. Effect: ledger `blocked`, and the fence is RETAINED. This value must
+   *   never reach `resolveDispatchFence`. `blocked` is deliberately resolve-ineligible, so no
+   *   human can clear the fence and re-run a publisher that may already hold an object.
+   *
+   * Absent is the safe default and must stay that way: `uncertain`, fence retained.
+   */
+  refusal?: "no-provider-request" | "publisher-declined";
+};
 type FolderPublisher = (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
 
 /**
@@ -562,7 +585,12 @@ async function runPublisher(
       // publishCards): those publishers own their own guard call, so this branch is the only thing
       // that turns their silent skip into a reason. The Postiz pre-flight below does NOT make it
       // dead — a publisher can return [] for reasons the guard knows nothing about.
-      return { scheduled: null, scheduleError: reuseGuardBlock(folder, kind, row, brand) ?? REUSE_GUARD_UNSPECIFIED };
+      // `publisher-declined`, never `no-provider-request`: `fn` already ran. This branch emits the
+      // SAME same-row refusal wording the pre-flight does, so without the discriminant a reader
+      // could not tell a refusal raised before any dispatch from one recovered after a publisher
+      // was invoked. It keeps the row at `blocked`, which is resolve-ineligible, and keeps its
+      // fence, so nobody can clear it and re-run a publisher that may already hold an object.
+      return { scheduled: null, scheduleError: reuseGuardBlock(folder, kind, row, brand) ?? REUSE_GUARD_UNSPECIFIED, refusal: "publisher-declined" };
     }
     return { scheduled: done[0], scheduleError: null };
   } catch (e) {
@@ -599,7 +627,7 @@ export async function scheduleApproved(
   deps: SchedulerDeps = DEFAULT_SCHEDULER_DEPS,
   policyDecision?: DeliveryPolicyDecision,
   dispatchMode: DispatchMode = "scheduled",
-): Promise<{ scheduled: unknown; scheduleError: string | null }> {
+): Promise<ScheduleOutcome> {
   const kind = scheduleKind(row);
   if (!kind) return { scheduled: null, scheduleError: null };
   if (dispatchMode === "unscheduled-draft" && kind !== "text") {
@@ -670,7 +698,13 @@ export async function scheduleApproved(
       // derivative of the same piece carries on with a spacing floor, and the existing scheduler
       // picks the first free slot past it.
       const verdict = reuseGuardVerdict(folder, kind, row, resolvedBrand);
-      if (verdict.kind === "refused") return { scheduled: null, scheduleError: verdict.message };
+      // The one site in this file that is provably ahead of every provider create: it returns
+      // before publishPostizFn, before defaultPublishPostiz claims a slot, and before any backup
+      // route opens. So it can carry the typed no-provider-request signal, which is what lets
+      // publishing-status.ts record `blocked` and clear the dispatch fence instead of stranding
+      // the row. runPublisher's recovery branch deliberately does NOT set it: by the time it runs
+      // the publisher was already invoked, and an empty result is not proof it created nothing.
+      if (verdict.kind === "refused") return { scheduled: null, scheduleError: verdict.message, refusal: "no-provider-request" };
       const earliestAt = verdict.kind === "deferred" ? verdict.earliestAt : undefined;
       const capability = selected.postizCapability;
       if (!capability) return { scheduled: null, scheduleError: "configured Postiz capability was not retained for scheduling" };
@@ -713,7 +747,10 @@ export async function scheduleApproved(
         deferNoScheduleCompletion: true,
         ...(policyDecision ? { deliveryPolicy: policyDecision } : {}),
       });
-      if (done.length === 0) return { scheduled: null, scheduleError: reuseGuardBlock(folder, kind, row, resolvedBrand) ?? REUSE_GUARD_UNSPECIFIED };
+      // The second post-publisher recovery site, and the same rule as runPublisher's: publishText
+      // has already been invoked here, so this is `publisher-declined`. Leaving it unmarked would
+      // reopen the same defect at this route.
+      if (done.length === 0) return { scheduled: null, scheduleError: reuseGuardBlock(folder, kind, row, resolvedBrand) ?? REUSE_GUARD_UNSPECIFIED, refusal: "publisher-declined" };
       return { scheduled: done[0], scheduleError: null };
     } catch (error) {
       return { scheduled: null, scheduleError: error instanceof Error ? error.message : String(error) };

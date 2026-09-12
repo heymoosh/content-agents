@@ -5,7 +5,7 @@ import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { approvalDispatchDisposition, claimPublishingAttempt, clearPublishingClaim, legacyApprovalRecovery, markDispatchStarted, publishingClaimIsActive, resolveDispatchFence } from "./approval-provenance.js";
-import { scheduleApproved, scheduleKind, selectConfiguredProvider, type DispatchMode, type ScheduleKind, type SchedulerDeps } from "./studio-scheduling.js";
+import { scheduleApproved, scheduleKind, selectConfiguredProvider, type DispatchMode, type ScheduleKind, type ScheduleOutcome, type SchedulerDeps } from "./studio-scheduling.js";
 import { postizRateLimitRetryAt } from "../publish/postiz.js";
 import { resolveDeliveryPolicy, type DeliveryBrand, type DeliveryMode, type DeliveryProvider as PolicyDeliveryProvider } from "../publish/delivery-policy.js";
 import {
@@ -365,16 +365,35 @@ export async function scheduleApprovedOnce(
     // Once this callback begins, a thrown callback or failed terminal write must retain the
     // durable claim. A future process has to reconcile the exact fenced attempt first.
     releaseAfterAttempt = false;
-    const result = injected
+    const result: ScheduleOutcome = injected
       ? { scheduled: injected.scheduled, scheduleError: injected.scheduleError }
       : await schedule(folder, liveRow, undefined, policy, dispatchMode);
+    // Fails closed by construction, and the two questions are kept apart on purpose. Message text
+    // is never evidence about whether a network call happened, so both answers come from the
+    // outcome's typed discriminant, and only on an outcome that actually failed.
+    //
+    //   guardRefused      — the reuse guard is the reason, so the row is `blocked`. `blocked` is
+    //                       resolve-ineligible, which is what keeps a human from clearing a fence
+    //                       on a row whose publisher may already hold an object.
+    //   noProviderRequest — the STRONGER claim, and the only one that may clear a fence: nothing
+    //                       reached the provider at all.
+    //
+    // A failure carrying neither — a generic provider error, a thrown callback, a caller that
+    // predates the field — keeps `uncertain` and keeps its dispatch fence, exactly as before.
+    const refusal = result.scheduleError !== null ? result.refusal : undefined;
+    const noProviderRequest = refusal === "no-provider-request";
+    const guardRefused = noProviderRequest || refusal === "publisher-declined";
     const status: PublishingStatus = result.scheduleError
       ? {
           slug, rowId: liveRow.id, provider,
+          // A guard refusal is `blocked` whichever side of dispatch it came from: either nothing
+          // reached the provider, or a publisher declined and provider state is unproven. Both are
+          // truthful as `blocked`, and neither is resolve-eligible. Only the fence decision below
+          // distinguishes them.
           // A Postiz 429 comes from the throttler guard ahead of the controller: nothing was created,
           // so `failed` is truthful and keeps the row retry-eligible for the background drainer.
           // Any other failure stays `uncertain` because the provider may have accepted the call.
-          state: result.scheduleError.startsWith("blocked by reuse guard") ? "blocked"
+          state: guardRefused ? "blocked"
             : postizRateLimitRetryAt(result.scheduleError) ? "failed" : "uncertain",
           at: new Date().toISOString(), error: result.scheduleError,
           ...audit,
@@ -391,12 +410,22 @@ export async function scheduleApprovedOnce(
       const providerEvidence = created ? `provider returned ${provider} object ${created}` : `provider returned a result`;
       throw new Error(`${providerEvidence}, but terminal publishing-status persistence failed; do not retry automatically and reconcile this exact attempt: ${error instanceof Error ? error.message : String(error)}`);
     }
-    if (fencedAttempt && postizRateLimitRetryAt(result.scheduleError)) {
-      // Postiz's documented throttle response proves this exact call created nothing.
+    if (fencedAttempt && (noProviderRequest || postizRateLimitRetryAt(result.scheduleError))) {
+      // Two proofs that this exact attempt created nothing, and only these two: the schedule
+      // outcome's `no-provider-request` discriminant, raised ahead of any provider call, or Postiz's
+      // documented throttle response, whose guard runs ahead of its create controller. Note what is
+      // absent: `publisher-declined` never reaches here, because a publisher that returned nothing
+      // has not proven it created nothing. Always
+      // `not-created`, never `exists` — neither proof can see a provider object, and `exists`
+      // would permanently block the row.
+      //
+      // Deliberately after the terminal ledger append above: a crash between the two leaves a
+      // retained fence, which is visible and repairable, rather than a cleared fence with no
+      // record of what happened.
       resolveDispatchFence(slug, liveRow.id, "not-created", path);
     }
     releaseAfterAttempt = true;
-    return { ...result, publishing: status };
+    return { scheduled: result.scheduled, scheduleError: result.scheduleError, publishing: status };
   } finally {
     if (releaseAfterAttempt) releaseClaim();
   }

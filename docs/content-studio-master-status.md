@@ -4,20 +4,26 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
   `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6Z**, `docs/operations/launch-slices/SLICE-6Z.md`, PASS. Nothing
-  blocked. The reuse guard spaces a different derivative of one essay instead of refusing it.
-  `npm run check` 4459/0.
-- What changed: two windows keyed on row identity. The SAME row inside `min_reuse_days` still
-  refuses, message and value unchanged. A DIFFERENT row inside the new `min_variant_days` (7,
-  `config/platforms.yaml`, per-platform overridable) is spaced: the guard returns the instant the
-  window opens and the existing scheduler takes the first free slot past it. Unknown row identity
-  and a non-positive window both fall to the strict side.
-- Next: no packet written. Muxin can now schedule bluesky-1, which should defer about a week out
-  rather than refuse. Unproven: no row has yet been scheduled live through a channel other than
-  Bluesky and Threads, no media row through Postiz at all, and no deferral has run live.
+- Current / last accepted: **7A**, `docs/operations/launch-slices/SLICE-7A.md`, PASS. Nothing
+  blocked. A reuse-guard refusal no longer bricks its own row. `npm run check` 4482/0.
+- What changed: `ScheduleOutcome` carries a typed
+  `refusal?: "no-provider-request" | "publisher-declined"` instead of a message-prefix test. The
+  Postiz pre-flight refusal, provably ahead of every provider call and slot claim, sets
+  `no-provider-request`: ledger `blocked`, and it resolves its own durable dispatch fence
+  `not-created`, so the row schedules again once its window opens with no hand repair. Both
+  post-publisher recovery sites set `publisher-declined`: ledger `blocked`, fence RETAINED, because
+  an empty publisher result is not proof nothing was created. A failure carrying neither is
+  unchanged: `uncertain`, fence retained. No refusal wording changed.
+- Watch this: a non-Postiz route refused by its own publisher still keeps its fence permanently and
+  is not resolve-eligible, exactly as before. That is deliberate, not an oversight. Clearing it
+  safely needs proof from each publisher's own pre-create guard. Candidate for the next packet.
+- Next: no packet written. `bluesky-1` is live-scheduled for 2026-09-19 18:30 PT, `min_variant_days`
+  spacing past `bluesky-2`, postiz object `cmtxv04og000nmn813w2ib6p6`. Unproven: no row has been
+  scheduled live through a channel other than Bluesky and Threads, no media row through Postiz at
+  all, and no deferral has run live.
 - Last decision: builder family is Claude for now, Codex and Grok reserved for cross-family audits
   because quota is limited. Codex is capped until 2026-09-15.
-- Details: `## Progress log` -> 2026-09-11 (6Z). Below is history; read only cited headings.
+- Details: `## Progress log` -> 2026-09-11 (7A). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -52,6 +58,49 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-11 (7A) — a guard refusal clears its own dispatch fence
+
+Packet `docs/operations/launch-slices/SLICE-7A.md`, PASS. Full record in `SLICE-7A-LOG.md`.
+
+Muxin hit `this row already has a durable dispatch fence; reconcile its provider state before
+retrying` on `bluesky-1` and had no way out. The journal held a `dispatch_started` with no
+`dispatch_resolved`; `resolvePublishingAttempt` accepts only `uncertain` or `scheduling`, and the
+GUI shows "Needs reconciliation" only for `uncertain`, so a fenced-but-`blocked` row had neither an
+API path nor a button. The row was cleared by hand. Nothing had been posted.
+
+Two defects in `scheduleApprovedOnce`: the fence was resolved only for a Postiz rate limit, and the
+ledger state came from `result.scheduleError.startsWith("blocked by reuse guard")`. Only one of the
+four guard refusal strings matched that prefix, so the other three recorded `uncertain`, which
+falsely claims the provider may hold a draft.
+
+Now `ScheduleOutcome` carries a typed `refusal?: "no-provider-request" | "publisher-declined"`.
+`no-provider-request` is set only at the Postiz pre-flight, provably ahead of every provider call
+and slot claim: ledger `blocked`, fence resolved `not-created`. `publisher-declined` is set at both
+post-publisher recovery sites: ledger `blocked`, fence retained, never reaching
+`resolveDispatchFence`. Absent is unchanged. The terminal ledger event is still appended before the
+fence resolves, so a crash between them leaves a visible fence rather than a bare clearance.
+
+The Grok audit earned its keep. Round 1 came back FAIL on a real P0: `reuseGuardBlock` rebuilds the
+byte-identical same-row string the pre-flight emits, so the post-publisher recovery branch could
+emit it too. The old prefix sniff caught that and recorded `blocked`, which is resolve-ineligible,
+leaving the row stuck but safe. The first candidate had no signal there and let it fall to
+`uncertain`, which is resolve-eligible, so a human could have cleared a fence and re-sent a post a
+publisher may already have held. Strictly more permissive than before. The repair split the one
+boolean into the two-value discriminant above, and the builder found a second such site on the
+`unscheduled-draft` route unprompted. Round 2 delta audit: CLOSED.
+
+Two strings are now deliberately stricter than before: on the recovery branches
+`REUSE_GUARD_UNSPECIFIED` and the `min_variant_days` wording record `blocked` where they used to
+record `uncertain`. Both keep their fence either way.
+
+Gate unsandboxed: `npm run check` 0, 4482/0/0. Focused 0, 70/0/0. `tsc` 0. `test:e2e` journeys
+55/0/16 with `failures: []`; the harness exits 1 on its own shared-worktree isolation check because
+other sessions write this checkout.
+
+Still open, and now recorded as design rather than oversight: a non-Postiz route refused by its own
+publisher keeps its fence permanently. Clearing it safely needs proof from each publisher's own
+pre-create guard.
 
 ### 2026-09-11 (6Z) — the reuse guard spaces variants instead of refusing them
 
