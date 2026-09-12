@@ -4,26 +4,27 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
   `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **7A**, `docs/operations/launch-slices/SLICE-7A.md`, PASS. Nothing
-  blocked. A reuse-guard refusal no longer bricks its own row. `npm run check` 4482/0.
-- What changed: `ScheduleOutcome` carries a typed
-  `refusal?: "no-provider-request" | "publisher-declined"` instead of a message-prefix test. The
-  Postiz pre-flight refusal, provably ahead of every provider call and slot claim, sets
-  `no-provider-request`: ledger `blocked`, and it resolves its own durable dispatch fence
-  `not-created`, so the row schedules again once its window opens with no hand repair. Both
-  post-publisher recovery sites set `publisher-declined`: ledger `blocked`, fence RETAINED, because
-  an empty publisher result is not proof nothing was created. A failure carrying neither is
-  unchanged: `uncertain`, fence retained. No refusal wording changed.
-- Watch this: a non-Postiz route refused by its own publisher still keeps its fence permanently and
-  is not resolve-eligible, exactly as before. That is deliberate, not an oversight. Clearing it
-  safely needs proof from each publisher's own pre-create guard. Candidate for the next packet.
-- Next: no packet written. `bluesky-1` is live-scheduled for 2026-09-19 18:30 PT, `min_variant_days`
-  spacing past `bluesky-2`, postiz object `cmtxv04og000nmn813w2ib6p6`. Unproven: no row has been
-  scheduled live through a channel other than Bluesky and Threads, no media row through Postiz at
-  all, and no deferral has run live.
+- Current / last accepted: **7B**, `docs/operations/launch-slices/SLICE-7B.md`, PASS. Nothing
+  blocked. A Postiz channel never silently downgrades to Typefully, and Studio can see and cancel
+  Postiz rows. `npm run check` 4543/0, `npm run test:e2e` 55/0/16.
+- What changed, in two commits. `41003a4`: `selectDeliveryRoute` drops `text` from the
+  x/linkedin/bluesky Typefully fallback and keeps `image`, so a text row with no Postiz channel is
+  refused by destination name instead of handed to a different provider. A half-configured Postiz
+  (exactly one of `POSTIZ_BASE_URL` / `POSTIZ_API_KEY`) is refused too. `28ec3ce`: Studio's in-page
+  reconciler learns Postiz. `findLoggedRef` reads the `postiz post <id>` shape, `reconcileRow`
+  gains a Postiz branch ahead of the platform split, cancel dispatches per provider instead of
+  falling through an `else` to PostPeer, and lookups center the read window on the recovered
+  planned time. Absence, fetch failure, config failure and not-yet-fetched all read `uncertain`,
+  because Postiz soft-deletes and filters deleted rows out, so absence cannot tell live from
+  canceled from never-created. An already-published post is not offered a cancel button.
+- Both audited by Grok, cross-family. 7B's second commit returned one P1, an already-published post
+  being cancelable, fixed before integration.
+- Next: no packet written. Pick from `## Outstanding work` below. Muxin's direction on 2026-09-12:
+  fix all of it before any front-end or UX pass, because an untrusted Publishing room cannot be
+  design-reviewed honestly.
 - Last decision: builder family is Claude for now, Codex and Grok reserved for cross-family audits
   because quota is limited. Codex is capped until 2026-09-15.
-- Details: `## Progress log` -> 2026-09-11 (7A). Below is history; read only cited headings.
+- Details: `## Progress log` -> 2026-09-12 (7B). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -57,7 +58,77 @@ worker holding only that section and its packet still has them.
   divider between one thought and the next; errors that stay on screen until read; and the page
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
+## Outstanding work
+
+Everything known-broken or unproven, as of 2026-09-12. Muxin's direction: fix all of it before any
+front-end or UX pass. Ordered by what blocks trusting the Publishing room, not by size.
+
+1. **Live channel coverage is 3 of 5.** Bluesky, Threads and X have each had a real post scheduled
+   through Postiz. **LinkedIn and Mastodon never have.** Until they do, their Studio rows are an
+   untested guess, and 7B's whole defect class (a channel quietly taking a different route than its
+   siblings) is exactly what hides in an unexercised channel. Needs one live row each.
+2. **No media row has ever gone through Postiz.** Quote cards route to Typefully by design
+   (`selectDeliveryRoute`, the image leg 7B deliberately left alone), so the Postiz media path is
+   entirely unexercised. Same for any local-media upload leg.
+3. **The non-Postiz publisher fence never clears.** A row refused by Typefully, PostPeer, YouTube or
+   Substack keeps its durable dispatch fence permanently and is not resolve-eligible, so it can
+   never retry and needs hand repair. 7A made this deliberate rather than accidental: an empty
+   publisher result is not proof nothing was created, and only Postiz currently has a pre-flight
+   refusal provably ahead of every provider call. Clearing it safely needs an equivalent pre-create
+   guard per publisher. This is the widest-reach item, since it covers every card and every video.
+4. **Reconcile is blind to a dateless Typefully draft.** `fetchScheduledDrafts` filters on
+   `scheduled_date`, so a draft without one is invisible to the reconciler and reports `uncertain`
+   forever. A reviewer cannot tell that from a real failure.
+5. **No deferral has run live.** The deferral path is unproven end to end.
+
+Recorded, not defects: the Postiz read window is a +/-45 day list scan because there is no
+read-by-id route, and Postiz soft-deletes, so absence can never distinguish live from canceled from
+deleted from never-created. Both are provider facts, not bugs to fix here.
+
 ## Progress log
+
+### 2026-09-12 (7B) — a Postiz channel never downgrades, and Studio can see its own Postiz rows
+
+Two defects, one packet, shipped as `41003a4` and `28ec3ce` on top of the packet commit `bd5c806`.
+
+The first was a silent provider downgrade. Two paths handed an x, linkedin or bluesky text row to
+Typefully when Postiz discovery did not list that destination. No error, no ledger signal, no
+Studio message. The row scheduled on a different provider with different scheduling behavior from
+its siblings in the same piece, and nothing said so. `selectDeliveryRoute` now drops `text` from
+that fallback and keeps `image`, which is the configured-media backup route `cards.ts` already owns
+and accepted 6-series behavior. `selectConfiguredProvider` refuses an unsupported text route by
+destination name, and refuses a half-configured Postiz where exactly one of `POSTIZ_BASE_URL` and
+`POSTIZ_API_KEY` is set. Eight tests encoded the old rule: one contract rewrite, renamed and
+re-asserted and still load-bearing against reverted production, and seven fixture-only repairs with
+names and assertions byte-identical.
+
+The second was that Studio's in-page reconciler had zero Postiz handling, while the CLI reconciler
+run by `npm run publish:reconcile` was already Postiz-aware. The two had drifted. A Postiz row
+therefore never reconciled, never rendered a cancel button, since that renders only on
+`reconciled.state === "scheduled"`, and a cancel attempt fell through an `else` to PostPeer, the
+wrong provider entirely. `findLoggedRef` now reads the `postiz post <id>` shape, `reconcileRow`
+gains a Postiz branch ahead of the platform split, cancel dispatches per provider through
+`selectCancelAdapter`, lookups center the read window on the recovered planned time, and a single
+failing ref no longer blanks the whole channel. Absence, fetch failure, config failure and
+not-yet-fetched all read `uncertain`, never a false negative, because Postiz soft-deletes and
+filters deleted rows out of its list response.
+
+One worker deviation, adjudicated and accepted: told to map an already-published post to
+`mismatch`, the worker checked `page.ts` and refused, because `mismatch` renders "not found at
+postiz", which is self-contradictory for a post that did publish, and sets the row pill to "Needs
+attention" for the full 45-day window. It used the existing `unavailable` state instead. Both
+claims verified in `page.ts` before acceptance.
+
+Verification, unsandboxed: `npx tsc --noEmit` 0, `npm run check` exit 0 with 4543 pass, 0 fail, 0
+skipped across 513 suites, `npm run test:e2e` exit 0 with 55 pass, 0 fail, 16 blocked, isolation
+byte-identical. Audited by Grok, cross-family, on both commits. The second returned one P1, an
+already-published post still being offered a cancel button, plus five P2s. All fixed before
+integration.
+
+Also this session: `3d79af9` committed three runs of pipeline output that had drifted uncommitted,
+including the Placed log, which the repo conventions say ships every cycle. The unfinished SLICE-6T
+work that survived only as a stash is now the pushed branch `slice-6t-wip`, and two worktree
+registrations orphaned by a reboot were pruned.
 
 ### 2026-09-11 (7A) — a guard refusal clears its own dispatch fence
 
