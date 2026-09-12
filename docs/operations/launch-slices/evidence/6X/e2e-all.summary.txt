@@ -1,0 +1,10 @@
+npm run test:e2e   (unsandboxed)   exit 0
+55 pass, 0 fail, 16 blocked
+Pass F: approval provenance and recovery -- 5 ok, 0 failing
+  [PASS] A first-time Studio approval schedules while a zero-event row dispatches nothing
+  [PASS] The legacy refusal names the general adoption path and stays until read
+  [PASS] The error flash renders the refusal at a readable size -- computed font-size 18px (floor 18px)
+  [PASS] Publishing refusal layout is readable at 1280px
+  [PASS] Publishing refusal layout is readable at 768px
+E2E isolation: shared worktree byte-identical after disposable passes.
+Fixture backend only. No live provider call, so live integration is not applicable.

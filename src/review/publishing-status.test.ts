@@ -14,6 +14,13 @@ const priorAccount = process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
 const priorPostizAccount = process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID;
 const priorPostpeerAccount = process.env.CONTENT_AGENTS_POSTPEER_ACCOUNT_ID;
 const priorYoutubeAccount = process.env.CONTENT_AGENTS_YOUTUBE_ACCOUNT_ID;
+
+test("the scheduling disposition branch is exhaustively narrowed after blocked and legacy cases", () => {
+  const source = readFileSync(new URL("./publishing-status.ts", import.meta.url), "utf8");
+  assert.match(source, /const _never:\s*never\s*=\s*disposition/);
+  assert.doesNotMatch(source, /disposition\.kind !== "fresh" && disposition\.kind !== "adopted"/);
+});
+
 before(() => {
   process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = "human-inference/typefully";
   process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID = "human-inference/postiz";

@@ -4,7 +4,7 @@ import { repoRoot } from "../db/db.js";
 import { migrateLegacyDataFile } from "../runtime/data-root.js";
 import { withFileLock } from "../runtime/file-lock.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
-import { approvalDispatchDisposition, claimPublishingAttempt, clearPublishingClaim, markDispatchStarted, publishingClaimIsActive, resolveDispatchFence } from "./approval-provenance.js";
+import { approvalDispatchDisposition, claimPublishingAttempt, clearPublishingClaim, legacyApprovalRecovery, markDispatchStarted, publishingClaimIsActive, resolveDispatchFence } from "./approval-provenance.js";
 import { scheduleApproved, scheduleKind, selectConfiguredProvider, type DispatchMode, type ScheduleKind, type SchedulerDeps } from "./studio-scheduling.js";
 import { postizRateLimitRetryAt } from "../publish/postiz.js";
 import { resolveDeliveryPolicy, type DeliveryBrand, type DeliveryMode, type DeliveryProvider as PolicyDeliveryProvider } from "../publish/delivery-policy.js";
@@ -293,8 +293,18 @@ export async function scheduleApprovedOnce(
     if (disposition.kind === "blocked") throw new Error(disposition.reason);
     const retryBlocked = publishingRetryBlock(slug, liveRow, path);
     if (prior && retryBlocked) throw new Error(retryBlocked);
-    if (!prior && disposition.kind !== "fresh" && disposition.kind !== "reconciled-not-created") {
-      throw new Error(retryBlocked ?? "this row has no verifiable creation and approval provenance; reconcile it before scheduling");
+    if (!prior) {
+      if (disposition.kind === "legacy") throw new Error(legacyApprovalRecovery(slug, liveRow.id));
+      switch (disposition.kind) {
+        case "fresh":
+        case "adopted":
+        case "reconciled-not-created":
+          break;
+        default: {
+          const _never: never = disposition;
+          throw new Error(`unreachable approval disposition ${JSON.stringify(_never)}`);
+        }
+      }
     }
     // Resolved before provider selection on purpose. The seam stands in for the whole external
     // provider round trip, and discovery is part of that round trip: selecting a real provider
@@ -336,7 +346,7 @@ export async function scheduleApprovedOnce(
       appendPublishingStatus(status, path);
       return { scheduled: null, scheduleError: status.error ?? null, publishing: status };
     }
-    const fencedAttempt = disposition.kind === "fresh" || disposition.kind === "reconciled-not-created"
+    const fencedAttempt = disposition.kind === "fresh" || disposition.kind === "adopted" || disposition.kind === "reconciled-not-created"
       ? markDispatchStarted(folder, slug, liveRow, path)
       : null;
     // This fsynced uncertain event is the pre-callback fence for known-safe retries. For fresh

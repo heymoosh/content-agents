@@ -1,5 +1,5 @@
 import "../util/env.js";
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join, basename } from "node:path";
@@ -266,6 +266,8 @@ export async function runDraft(
     /** Selected adapter provenance for the zero-cost execution log; CLI calls default to Claude. */
     engine?: string;
     callClaude?: (prompt: string) => Promise<string>;
+    /** Test and recovery isolation for the provenance journal. Production uses the canonical path. */
+    journalPath?: string;
   } = {},
 ): Promise<DraftResult> {
   const absDir = dirArg.startsWith("/") ? dirArg : join(repoRoot, dirArg);
@@ -352,20 +354,23 @@ export async function runDraft(
     `status: draft   # draft | approved | locked\n` +
     `---\n`;
 
-  // Append the queue row BEFORE writing the message body: if the process dies between these two
-  // writes, a "pending" row pointing at a not-yet-written asset is a visible, diagnosable gap
-  // (the GUI / outreach:status shows the row; opening it surfaces the missing file). The reverse
-  // order risks an orphaned message file with no queue trail at all -- invisible to both.
-  appendRow(absDir, {
-    id: messageId,
-    platform: channel,
-    format: "outreach-message",
-    asset: `messages/${messageId}.md`,
-    status: "pending", // NEVER "approve" on creation -- CLAUDE.md rule 2 analog, Muxin reviews first
-    origin: "from /outreach draft",
-  });
-
   writeFileSync(messageFile, `${frontmatter}\n${messageBody}\n`);
+  try {
+    // Creation provenance fingerprints the finished message bytes, so the asset must exist before
+    // its queue row is appended. Roll it back if the canonical append fails, preserving the prior
+    // no-orphan behavior without manufacturing a legacy row.
+    appendRow(absDir, {
+      id: messageId,
+      platform: channel,
+      format: "outreach-message",
+      asset: `messages/${messageId}.md`,
+      status: "pending", // NEVER "approve" on creation -- CLAUDE.md rule 2 analog, Muxin reviews first
+      origin: "from /outreach draft",
+    }, opts.journalPath);
+  } catch (error) {
+    rmSync(messageFile, { force: true });
+    throw error;
+  }
 
   logCost({ step: "outreach:draft", detail: leadName, costUsd: 0, engine: opts.engine ?? "claude" });
 

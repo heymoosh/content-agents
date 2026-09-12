@@ -1,0 +1,120 @@
+I'll start by reading the full audit prompt and the candidate code, then answer the seven questions from the diff only.The prompt was truncated mid-diff. I'll pull the rest of it and the live source around the safety gate.I have the disposition and adoption paths. Next I’ll inspect scheduling, retry blocks, and the `stampOrigin` call sites that could still fail open.# SLICE-6X audit (read-only)
+
+Fail-closed holds on the automatic dispatch path. The only new way a row becomes schedulable without `created` + `approval_intent`/`approval_committed` is the coordinator `adopted` event, and that still requires live `approve` plus a current-byte fingerprint match. I did not find an unattended path that posts twice.
+
+## Q1. Non-`legacy` without creation/adoption and a completed approval?
+
+**No, not on the automatic path.**
+
+`approvalDispatchDisposition` still refuses empty history as `legacy`, and refuses a `created` row until journal status is `approve` with an `approvalId`:
+
+```267:276:src/review/approval-provenance.ts
+  if (!matching.length) return { kind: "legacy" };
+  // ...
+  if (row.status !== "approve" || derived.state.currentStatus !== "approve" || !derived.state.approvalId) return { kind: "blocked", reason: "this row lacks a complete valid latest approval transition; reconcile it before scheduling" };
+```
+
+A `created` event starts `currentStatus: "pending"` and `approvalId: null` (`approval-provenance.ts:199-211`). That cannot become `fresh` until `approval_committed`.
+
+The new exception is `adopted`. `deriveJournalState` treats that one event as both origin and approval (`currentStatus: "approve"`, `approvalId` from the event). `approvalSchedulingBlock` and `markDispatchStarted` then treat `adopted` like `fresh` (`approval-provenance.ts:367`, `377`; `publishing-status.ts:298-301`, `349-350`).
+
+That is the designed recovery, not a silent skip: `adoptApprovedQueueRow` refuses anything except live `approve`, a matching fingerprint, and zero prior journal events (`approval-provenance.ts:297-307`).
+
+## Q2. Adoption of bytes that changed after approval? Stale / attacker / mistaken `--expect-fingerprint`?
+
+**Yes, current bytes can be adopted. A stale hash cannot. A mistaken current hash can.**
+
+Trace:
+
+1. CLI fingerprints the file on disk now (`scripts/reconcile-approval-provenance.ts:59-70`).
+2. `--write` requires `--expect-fingerprint` (`:79-80`).
+3. `adoptApprovedQueueRow` recomputes inside the mutation lock and refuses a mismatch (`approval-provenance.ts:300-302`).
+
+So:
+
+- **Changed after markdown approval:** there is no approval-time hash for pre-journal rows. Adoption binds to **current** `{id, platform, format, asset, assetSha256}` (`approval-provenance.ts:92-101`). Preview shows mtime and the first five lines (`reconcile-approval-provenance.ts:62-64`); it does not compare against the original approved bytes.
+- **Stale hash:** TOCTOU between preview and write is refused (`asset fingerprint changed`).
+- **Wrong hash for different current bytes:** refused. The expected value is not a secret; it must equal the live composite.
+- **Operator mistake:** copying the printed current hash without noticing a post-approval edit **will** adopt those bytes. That is coordinator trust, not an automatic bypass.
+- **Attacker-chosen:** anyone who can run `--write` on a `content/` or `outreach/` folder can adopt any zero-event `approve` row by using the printed hash. Folder is constrained (`reconcile-approval-provenance.ts:42-49`). Direct journal writes would also work. This is not a remote forge of a different asset.
+
+After adoption, scheduling still requires the live fingerprint to match the adopted one (`approval-provenance.ts:270-271`). A later edit blocks; it does not dispatch the old bytes.
+
+## Q3. Did a former refusal become dead?
+
+**No scheduling refusal was retired except the new, explicit `adopted` permit.**
+
+Still reachable: parse error → `blocked` (`265`); no events → `legacy` (`267`); derive error → `blocked` (`269`); fingerprint mismatch (`271`); incomplete approval (`272`); active attempt (`273`); provider `exists` (`274`); `legacy` throw when there is no publishing prior (`publishing-status.ts:296-297`).
+
+What changed:
+
+- `recordNewQueueRows` no longer throws on a known identity; it `continue`s (`approval-provenance.ts:127`). That was a creation-time abort, not a schedule permit. Covered in Q4.
+- `scheduleApprovedOnce` replaced `kind !== "fresh" && kind !== "reconciled-not-created"` with an allowlist that includes `adopted` (`publishing-status.ts:298-307`). That is the new permit, not a dead old branch.
+
+The `if (!prior)` wrapper around that allowlist is unchanged in shape. A publishing-status prior still skips the provenance allowlist; `blocked` is still thrown first (`293`). That skip is pre-existing, not introduced here.
+
+## Q4. `recordNewQueueRows`: throw → skip, and `known` includes `adopted`
+
+**Skip cannot emit a second `created` for a known identity, and cannot grant a usable capability to an already-created or already-adopted row.**
+
+```117:129:src/review/approval-provenance.ts
+    const known = new Set(parsed.events.filter((event) => event.kind === "created" || event.kind === "adopted").map((event) => key(event.slug, event.rowId)));
+    // ...
+      if (known.has(key(slug, row.id))) continue;
+      appendFsynced(journalPath, { version: 1, kind: "created", ... });
+      known.add(key(slug, row.id));
+```
+
+This runs under the mutation lock (`113`). `continue` means **do not append**. Including `adopted` in `known` is the strict direction: it prevents `created` after `adopted`, which `deriveJournalState` would otherwise reject as conflicting creation evidence (`199-200`).
+
+What the skip **does** allow is later unknown ids in the same scan to get their one `created` event. That is the continue/rescan behavior. Those rows still need `approval_committed` before they are schedulable.
+
+Orphan events without `created`/`adopted` are not in `known`, so a `created` could be appended after them. Derive then fails with activity-before-creation and disposition is `blocked`. Fail closed.
+
+## Q5. `stampOrigin` `status !== "approve"` filter and `preserveExisting`
+
+**`preserveExisting` is not a provenance hole. The `approve` filter does what it claims for `approve`. It is too narrow for other already-shipped statuses.**
+
+`preserveExisting` only skips rewriting a filled origin cell (`queue.ts:220-221`). Provenance recording still runs on every non-`approve` row (`233`). Origin is not read by `approvalDispatchDisposition`.
+
+Already-**approved** rows cannot acquire `created` via `stampOrigin` (`233`). That keeps them `legacy` and adoptable, as the comment says (`229-232`).
+
+Already-**published** (and any other non-`approve` status) **can** acquire `created` on a continue stamp. `/publish` does set queue status to `published` (`src/publish/typefully.ts:455` and the other publishers). Continue calls `stampOrigin` on the whole existing folder (`jobs.ts:2310`). Adoption then refuses because journal events exist (`approval-provenance.ts:305-307`).
+
+If that row is later set back to `approve` through `/api/status` → `commitReviewStatus` (`serve.ts:1142-1164`), `approveBlockReason` does not care about prior `published`, and a `created` row with `currentStatus: "pending"` **will** receive `approval_committed` (`approval-provenance.ts:347-359`). Disposition becomes `fresh` without the reconcile CLI.
+
+That is not unattended double-post: someone must approve and click Schedule, and `publishingRetryBlock` still refuses a `planned`/`uncertain`/… ledger row (`publishing-status.ts:146-155`). It **is** a back door around “pre-existing rows get one explicit adoption path.”
+
+`preserveExisting` does not cause that. The status filter does.
+
+## Q6. `parseStrict` 64-hex `approvalId` — fail open?
+
+**No. Tightening fails closed.**
+
+A non-hex `approvalId` on `adopted` / `approval_intent` / `approval_committed` / `dispatch_started` returns a parse error and **empty** events (`approval-provenance.ts:73-78`). Callers that schedule check `error` first and return `blocked` (`265`), not `legacy` and not `fresh`. `assertApprovalJournalReadable` throws before a queue append (`87-89`, `queue.ts:155`). Adoption throws on parse error (`303-304`).
+
+The already-verified live journal already matches `/^[a-f0-9]{64}$/`. A non-conforming historical journal would brick scheduling until repaired, not dispatch.
+
+`commitReviewStatus` still `write()`s on parse error (`344`). That can mark markdown `approve` while the journal is unreadable. Scheduling remains `blocked`. Strict for dispatch, opaque for the UI.
+
+## Q7. Swallowing `stampOrigin` errors in `jobs.ts`
+
+**Correct for dispatch. It hides the miss from job status.**
+
+New-folder (`jobs.ts:2683-2687`) and continue (`2309-2313`) catch `stampOrigin` and still mark the job `done`. If recording fails, there is no `created` event. Disposition stays `legacy`. `commitReviewStatus` on a no-state row `write()`s without granting a capability (`348`). Schedule refuses until adoption.
+
+Swallowing does **not** treat the row as schedulable. It **does** hide a provenance failure behind a successful job, so the first signal is a later Schedule refusal. That is fail-closed, not fail-open.
+
+# Findings (safety only)
+
+| Sev | Status | Finding |
+| --- | --- | --- |
+| HIGH | CONFIRMED (capability); PLAUSIBLE (actual second post) | **Q5.** `stampOrigin` records `created` for every status except `approve` (`queue.ts:233`). A continue run can mint `created` on a legacy `published` row, which blocks adoption (`approval-provenance.ts:305-307`) and lets a later `/api/status` approve complete a `fresh` capability without `--write --expect-fingerprint`. Remaining gates: human approve + Schedule, and ledger retry if a terminal publishing event exists. |
+| LOW | CONFIRMED | **Q2.** Adoption confirms **current** bytes, not the original approved bytes. `--expect-fingerprint` cannot be stale; it can be the current hash copied without noticing a post-approval edit. Coordinator-gated, TOCTOU-closed. |
+| LOW | CONFIRMED | **Q7.** Swallowed `stampOrigin` errors leave rows unschedulable (correct) but leave the job `done`, so the miss is invisible until Schedule. |
+
+No CRITICAL finding: I cannot point at a branch that dispatches twice with no further human action.
+
+Need (only if you want the HIGH item closed as defect vs. accepted limitation): whether Studio actually offers Approve on `published` rows, and whether `/publish` always writes a retry-blocking publishing-status event for those rows. I used `serve.ts:1142-1164` and `rows.ts:109-130` for the API; I did not audit every publisher’s ledger write.
+
+VERDICT: PASS WITH FINDINGS

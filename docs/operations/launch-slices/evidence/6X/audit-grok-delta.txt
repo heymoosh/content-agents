@@ -1,0 +1,67 @@
+I'll audit only the round-6 repair against the HIGH finding: the new allowlist, the unfiltered append paths, and whether the four tests actually pin the old defect.The predicate is in place. Next I’ll read the tests and every `appendRow`/`recordNewQueueRows` caller to see whether the defect actually moved.I have the predicate. Next I’ll inspect every production `appendRow`/`appendRows` caller and the dispatch/adopt path so I can answer D2–D4 with line evidence.The HIGH finding is closed. The folder-wide rescan no longer mints a `created` event for a settled row, so a later Studio re-approval cannot complete a fresh capability on already-published content.
+
+**D1. CLOSED.**  
+`stampOrigin` still rescans the whole folder, but creation provenance is now an allowlist, not a denylist:
+
+```193:196:src/publish/queue.ts
+function statusAllowsCreationProvenance(status: string): boolean {
+  const value = status.trim();
+  return value === "" || value === "pending";
+}
+```
+
+That predicate is the only filter on the rescan:
+
+```246:246:src/publish/queue.ts
+  recordNewQueueRows(folder, readQueue(folder).rows.filter((row) => statusAllowsCreationProvenance(row.status)), journalPath);
+```
+
+A `published` (or `discard`, `approve`, or unknown) row is skipped. With zero journal events it stays `legacy` (`approval-provenance.ts:267`). `commitReviewStatus` still lets Muxin change the queue cell, but a row with no journal state never gains a scheduling capability (`approval-provenance.ts:347-348`). `adoptApprovedQueueRow` still requires zero prior events (`approval-provenance.ts:305-307`), so the recovery path stays intact. The original chain — continue-run stamp → `created` on a published row → re-approval → `fresh` → second dispatch — is cut at the first step.
+
+**D2. No new permissive path.**  
+Old rule: grant unless status is `approve`. New rule: grant only `pending` or a blank cell. That set is strictly smaller. `published`, `discard`, `revise`, `approve`, and any future value are now skipped.
+
+Blank is not a widening. `readQueue` already lowercases the cell (`queue.ts:73`); the predicate then trims (`queue.ts:194`). A blank cell was already granted by the denylist. After a `created` event the row still cannot schedule until a later `approve` transition (`approval-provenance.ts:272`). That is first-time publish of something awaiting review, not a second post.
+
+A leftover `pending` row from an earlier run can still receive `created` on a continue rescan. That is the same grant the denylist already made, and it is unpublished content. It is not the HIGH finding.
+
+**D3. Leaving `recordNewQueueRows` / `appendRow` / `appendRows` unfiltered is correct.**  
+`recordNewQueueRows` never sees status. Its argument type is only `id | platform | format | asset` (`approval-provenance.ts:110`). The filter belongs at the rescan.
+
+`appendRows` does not rescan. It records only the rows it just appended, and it refuses any id that already exists:
+
+```160:176:src/publish/queue.ts
+    if (!row.id.trim() || existingIds.has(row.id) || requestedIds.has(row.id)) {
+      throw new Error(`queue identity ${row.id || "(empty)"} already exists or is invalid`);
+    }
+    // ...
+  recordNewQueueRows(folder, rows, journalPath);
+```
+
+So a legacy `published` row cannot be re-granted `created` through this path. Every production caller appends `status: "pending"`:
+
+| Caller | Line | Status |
+|---|---|---|
+| `src/atomize/reply-draft.ts` | 244 | `"pending"` |
+| `src/outreach/draft.ts` | 367 | `"pending"` |
+| `src/grow/experiment-queue-handoff.ts` | 121 | `"pending"` (what `appendRows` receives at 212) |
+| `src/review/jobs.ts` configured generation | 1444 | `"pending"` |
+| `src/review/jobs.ts` `duplicateToPlatform` | 2976 | `"pending"` |
+
+The defect did not move.
+
+**D4. The four tests pin the fix. I agree they would fail under the old denylist.**  
+Old denylist: skip only `approve`. Each of these rows is not `approve`, so the old code would mint `created` and fail the assertion.
+
+1. `queue.test.ts:391-404` (`published`): asserts `createdRowIds === []` and disposition `{ kind: "legacy" }`. Old code would write `created` for `x-1`; both assertions fail.
+2. Same loop (`discard`): same failure. The denylist did not know `discard`.
+3. `queue.test.ts:406-423` (mixed folder): asserts only `x-2` is created and `x-1` stays `legacy`. Old code would create both.
+4. `jobs.test.ts:2272-2298` (`settleContinueRun`): the actual continue-run call site. Asserts created ids `["x-2"]` and the published row stays `legacy`. Old code would create `x-1` and `x-2`.
+
+They pin `published` and `discard` at the predicate, and pin the continue-run wiring. They do not pin an unknown future status; the code already skips those (`queue.ts:192-195`). That is leftover coverage, not a hole in the HIGH finding.
+
+**D5. No new defect.**  
+The change is stricter. Fail-closed on unknown status is the right bias: a skipped row stays unschedulable until reconcile; a wrongly granted `created` event is what posts twice.
+
+CLOSED  
+VERDICT: PASS

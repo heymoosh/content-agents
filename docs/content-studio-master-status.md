@@ -2,20 +2,19 @@
 
 ## START HERE
 
-- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main, pushed). Master:
-  `docs/content-studio-master-status.md`; rules: `AGENTS.md` -> `## Slice protocol` + bindings in
-  `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6W**, `docs/operations/launch-slices/SLICE-6W.md`, PASS. Nothing
-  blocked. First real Bluesky post scheduled/moved through Studio's own Schedule action, confirmed
-  live by Muxin. `npm run check` 4379/0.
-- Next: **6X**, `docs/operations/launch-slices/SLICE-6X.md` — written and dependency-ready: the
-  general provenance-journal fix, so a first-time approved row schedules in Studio without a
-  per-row one-off. The other 6W deferral, auditing Postiz-routed channels' connection health,
-  is not in 6X and still has no packet.
-- Last decision: a stale Postiz->Bluesky session token (not disabled, just expired) causes silent
-  delivery failure with no detail; fixed by reconnecting the account in Postiz, not a code change.
-- Housekeeping: hygiene lists four other-session items, left in place by rule.
-- Details: `## Progress log` -> 2026-09-11 (6W). Below is history; read only cited headings.
+- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
+  `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
+- Current / last accepted: **6X**, `docs/operations/launch-slices/SLICE-6X.md`, PASS. Nothing
+  blocked. Approving a row in Studio's Publishing room and scheduling it now works the first time,
+  no per-row seeding script. `npm run check` 4405/0, `npm run test:e2e` 55/0/16.
+- What changed: every production path that creates a queue row records provenance; pre-existing
+  rows have one adoption path, `scripts/reconcile-approval-provenance.ts` (needs `--write
+  --expect-fingerprint`). A row with no provenance is still refused and names its own recovery.
+- Next: no packet written. Open 6W deferral is auditing Postiz-routed channels' connection health
+  (TikTok, LinkedIn, X, Threads, Mastodon); it needs a packet before any work starts.
+- Last decision: builder family is Claude for now, Codex and Grok reserved for cross-family audits
+  because quota is limited. Codex is capped until 2026-09-15.
+- Details: `## Progress log` -> 2026-09-11 (6X). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -50,6 +49,33 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-11 (6X) — approved rows schedule first time, and refusals name their own fix
+
+6W had shipped one Bluesky post only by hand-seeding that row's safety journal. 6X generalizes it.
+Every production path in `src/` that appends a row to a `review-queue.md` now records a `created`
+event: five direct `appendRow`/`appendRows` callers plus the two `stampOrigin` paths the GUI uses.
+Rows that predate the journal get one explicit adoption route,
+`scripts/reconcile-approval-provenance.ts`, which requires `--write --expect-fingerprint <64-hex>`
+and refuses when the fingerprint cannot be computed, when the row already has journal events, or
+when its status is not `approve`. A row with no provenance is still refused, never silently treated
+as approved, and the refusal now tells Muxin exactly what to run.
+
+The double-dispatch invariant held under audit. Grok returned PASS WITH FINDINGS on one HIGH
+defect: creation provenance was granted by denylist, so a continue run rescanning an older folder
+could mint a `created` event on an already-published row, destroying its adoption path and letting
+a later re-approval make published content schedulable a second time. Replaced with an allowlist
+(only `pending` or an empty status cell), so unknown future statuses fail closed. Delta audit:
+CLOSED, PASS. Two LOW findings accepted as named risks: adoption certifies the bytes on disk now
+because legacy rows have no approved-at hash, and a swallowed `stampOrigin` error leaves the job
+marked done so a provenance miss only surfaces at the later Schedule refusal.
+
+Two process notes. Codex hit its usage cap mid-slice and stranded a repair round, so on Muxin's
+instruction Claude built the remainder and the cross-family models are now reserved for auditing;
+the cross-family rule stayed intact, Claude built and Grok audited. A builder round also deleted a
+pre-existing test to resolve a contradiction; it was restored, because the old rule was correct for
+the call site it was written for and this slice had added a second one. Preserve-versus-overwrite
+became a per-call-site option instead of a reversal. Full dated record: `SLICE-6X-LOG.md`.
 
 ### 2026-09-11 (6W) — the first real scheduled delivery through Studio, live and confirmed
 

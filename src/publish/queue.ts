@@ -3,7 +3,7 @@ import { join, basename, dirname } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { readFileSync as readText } from "node:fs";
 import { brandForOrigin, type BrandId } from "../identity/brand.js";
-import { recordNewQueueRows } from "../review/approval-provenance.js";
+import { assertApprovalJournalReadable, recordNewQueueRows } from "../review/approval-provenance.js";
 
 // Parse and update the review-queue.md markdown table.
 // Columns: | id | platform | format | asset | native | brand | cta | status | notes | origin |
@@ -143,13 +143,16 @@ export interface NewQueueRow {
   origin?: QueueOrigin;
 }
 
-export function appendRow(folder: string, row: NewQueueRow): void {
-  appendRows(folder, [row]);
+export function appendRow(folder: string, row: NewQueueRow, journalPath?: string): void {
+  appendRows(folder, [row], journalPath);
 }
 
 /** Append a validated batch with one queue-file write so configured variants cannot land partially. */
 export function appendRows(folder: string, rows: readonly NewQueueRow[], journalPath?: string): void {
   const path = join(folder, "review-queue.md");
+  // A malformed shared safety journal blocks before the queue changes. Otherwise callers would
+  // observe a thrown append while the row had in fact landed without provenance.
+  assertApprovalJournalReadable(journalPath);
   const text = readFileSync(path, "utf8").replace(/\n*$/, "\n");
   const existingIds = new Set(readQueue(folder).rows.map((row) => row.id));
   const requestedIds = new Set<string>();
@@ -182,12 +185,39 @@ export function storyboardRowStatus(folder: string): string | null {
   return row ? row.status : null;
 }
 
-// Force every row in folder's review-queue.md to carry `origin`, overwriting whatever the
-// /atomize subprocess wrote (or failed to write) for it. Called right after a GUI-triggered
-// atomize job finishes, on a folder we know with certainty came from that job — a code-side
-// guarantee that doesn't depend on the SKILL.md-driven run correctly detecting ATOMIZE_ORIGIN
-// and hand-transcribing it into every row it authors.
-export function stampOrigin(folder: string, origin: QueueOrigin): void {
+// stampOrigin rescans an entire folder, including rows it did not create: a continue run
+// re-stamps a folder that also holds rows from earlier runs. So creation provenance is granted by
+// allowlist, never by denylist. A row a run just created can only be awaiting review, so only
+// `pending` (or a status cell nothing has filled in yet) may be granted a creation event. Every
+// other status is skipped, including a status value this code does not know about today.
+function statusAllowsCreationProvenance(status: string): boolean {
+  const value = status.trim();
+  return value === "" || value === "pending";
+}
+
+export interface StampOriginOptions {
+  journalPath?: string;
+  /** Keep an origin a row already records. Continue runs re-stamp folders that also hold rows from
+   *  earlier runs, and overwriting those erases real history. */
+  preserveExisting?: boolean;
+}
+
+// Stamp the `origin` cell of every row in folder's review-queue.md. Two call sites, two truths
+// about the folder, so the caller says which one it is:
+//
+//   default (no preserveExisting) — overwrite every row. Used right after a GUI-triggered atomize
+//   job creates a brand-new folder, where every row came from this run. It is a code-side
+//   guarantee that doesn't depend on the SKILL.md-driven subprocess correctly detecting
+//   ATOMIZE_ORIGIN and hand-transcribing it into every row it authors, so whatever the subprocess
+//   happened to write is replaced outright.
+//
+//   preserveExisting: true — fill only the rows with no origin yet. Used by a continue run, which
+//   re-stamps an existing folder that also holds rows from earlier runs. Overwriting those would
+//   erase real history.
+//
+// Legacy rows with no origin column at all get the column inserted on both paths.
+export function stampOrigin(folder: string, origin: QueueOrigin, options: StampOriginOptions = {}): void {
+  const { journalPath, preserveExisting = false } = options;
   const path = join(folder, "review-queue.md");
   const lines = readFileSync(path, "utf8").split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -197,10 +227,23 @@ export function stampOrigin(folder: string, origin: QueueOrigin): void {
     if (cells.length < 11) continue; // not a data row
     const stamped = ` ${origin} `;
     if (cells.length === 11) cells.splice(cells.length - 1, 0, stamped); // legacy row: insert the column
-    else cells[cells.length - 2] = stamped; // already has one: overwrite it
+    else if (!preserveExisting || !cells[cells.length - 2].trim()) cells[cells.length - 2] = stamped;
+    else continue; // continue run: leave an already-recorded origin alone
     lines[i] = cells.join("|");
   }
   writeFileSync(path, lines.join("\n"));
+  // GUI atomize writes its rows through a restricted subprocess, then calls this function for the
+  // newly-created folder. Record the completed rows only after the deterministic origin stamp.
+  // A crash before this point leaves legacy rows, which scheduling still refuses.
+  //
+  // Only a row in a status a freshly created row can actually be in gets creation provenance. A
+  // row already approved, published or discarded is never a row this run created: a run cannot
+  // produce a row a human has already acted on. Recording creation provenance for one would
+  // replace its adoptable legacy disposition with one the reconcile script refuses to adopt,
+  // stranding the row, and a later re-approval could dispatch already-published content a second
+  // time. Skipping fails closed, because a row without a creation event stays refused by
+  // approvalSchedulingBlock until scripts/reconcile-approval-provenance.ts adopts it.
+  recordNewQueueRows(folder, readQueue(folder).rows.filter((row) => statusAllowsCreationProvenance(row.status)), journalPath);
 }
 
 export function appendPublishLog(folder: string, entry: string): void {

@@ -2287,6 +2287,7 @@ export function settleContinueRun(
   resolution: ContinueResolution,
   before: ContinueArtifacts | null,
   failure: string | null,
+  journalPath?: string,
 ): void {
   if (resolution.kind === "refused") {
     job.status = "failed";
@@ -2302,6 +2303,14 @@ export function settleContinueRun(
   if (job.status === "done") {
     if (target) {
       job.slugs = [basename(target.folderAbs)]; // enables the jobs pill's "→ review" jump link
+      // Continue runs re-stamp a folder that also holds rows from earlier runs, so an origin
+      // already on a row is real history and stays put. The new-folder branch of drain() stamps
+      // the same folder-wide value but overwrites, because there every row came from that run.
+      try {
+        stampOrigin(target.folderAbs, "from GUI queue", { journalPath, preserveExisting: true });
+      } catch {
+        // Provenance is fail-closed: a missed record leaves the row legacy and unschedulable.
+      }
       try {
         stampFolderEngine(target.folderAbs, job.engine ?? "claude");
       } catch {
@@ -2669,8 +2678,14 @@ async function dispatchJob(job: Job): Promise<void> {
     // rather than trusting the subprocess's own SKILL.md-driven bookkeeping to have landed it
     // (e.g. if `echo $ATOMIZE_ORIGIN` wasn't an allowlisted Bash command in that run).
     for (const slug of job.slugs) {
+      // Two separate try blocks on purpose: sharing one would let a throw from the origin stamp
+      // silently skip the engine tag, same as settleContinueRun does for its own pair.
       try {
         stampOrigin(join(CONTENT, slug), "from GUI queue");
+      } catch {
+        // Provenance is fail-closed: a missed record leaves the row legacy and unschedulable.
+      }
+      try {
         stampFolderEngine(join(CONTENT, slug), job.engine ?? "claude");
       } catch {
         // best-effort tagging only — never fail the job over it

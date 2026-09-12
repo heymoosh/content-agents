@@ -5,13 +5,14 @@ import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addJob, addVideoJob, addDevelopFolderJob, atomizeSpawnPrompt, videoSpawnPrompt, developSpawnPrompt, setSkillSpawn, BRANDLESS_JOB_ERROR, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, configuredPlatformLimit, type GitState } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addJob, addVideoJob, addDevelopFolderJob, atomizeSpawnPrompt, videoSpawnPrompt, developSpawnPrompt, setSkillSpawn, BRANDLESS_JOB_ERROR, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, settleContinueRun, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, configuredPlatformLimit, type GitState } from "./jobs.js";
 // SLICE-5H: the configured card path — one drafted string no longer does both jobs.
 import { CARD_CONTEXT_RULE, configuredCardQuote, configuredContentPrompt, configuredTreatmentInstruction, generateConfiguredContent, isConfiguredCardVariantId, repairConfiguredCardQuotes, runClaudeSpawn } from "./jobs.js";
 import { configuredCardQuoteDerivative, configuredCardRenderDerivative, configuredCardSourceLine, isConfiguredCardRenderName } from "./configured-media.js";
 import { buildContentRequest } from "./content-request.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { readQueue } from "../publish/queue.js";
+import { readQueue, stampOrigin, writeCell } from "../publish/queue.js";
+import { approvalDispatchDisposition, approvalFingerprint, approvalSchedulingBlock, commitReviewStatus, journalPathForLedger } from "./approval-provenance.js";
 import { repoRoot } from "../db/db.js";
 import { resolveAngle } from "../atomize/spin.js";
 import { assertCharlesDraftPolicy, captureCharlesDraftState, restoreCharlesDraftState, validateCharlesDraftMutation } from "./charles-jobs.js";
@@ -2200,6 +2201,109 @@ test("SLICE-5N: a notes-picker continue job carries its brand through the real q
     setSkillSpawn(null);
     jobs.length = 0;
   }
+});
+
+test("a successful continue run records its new row and preserves existing provenance", () => {
+  const root = mkdtempSync(join(tmpdir(), "continue-provenance-"));
+  const folder = join(root, "content", "fixture");
+  mkdirSync(folder, { recursive: true });
+  const ledger = join(root, "publishing-status.jsonl");
+  const journal = journalPathForLedger(ledger);
+  mkdirSync(join(folder, "derivatives"));
+  writeFileSync(join(folder, "derivatives", "x-1.md"), "Existing derivative.\n");
+  writeFileSync(join(folder, "review-queue.md"), "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | approve | | from /cycle |\n");
+  try {
+    const oldBefore = readQueue(folder).rows[0]!;
+    assert.deepEqual(approvalDispatchDisposition(folder, basename(folder), oldBefore, ledger, journal), { kind: "legacy" });
+    writeFileSync(join(folder, "derivatives", "x-2.md"), "Continue derivative.\n");
+    writeFileSync(join(folder, "review-queue.md"), readFileSync(join(folder, "review-queue.md"), "utf8") + "| x-2 | x | text | derivatives/x-2.md | — | — | — | pending | | |\n");
+    const job = { id: "continue-proof", arg: "--continue content/fixture", engine: "claude" as const, status: "running" as const, slugs: [] as string[], error: null as string | null };
+    settleContinueRun(job, { kind: "ok", target: { folder: "content/fixture", folderAbs: folder } }, { rows: 1, derivatives: 1 }, null, journal);
+    assert.equal(job.status, "done");
+    const events = readFileSync(journal, "utf8").trim().split("\n").map((line) => JSON.parse(line) as { kind: string; rowId: string });
+    assert.deepEqual(events.filter((event) => event.kind === "created").map((event) => event.rowId), ["x-2"]);
+    const oldAfter = readQueue(folder).rows.find((candidate) => candidate.id === "x-1")!;
+    assert.equal(oldAfter.origin, "from /cycle");
+    assert.deepEqual(approvalDispatchDisposition(folder, basename(folder), oldAfter, ledger, journal), { kind: "legacy" });
+    const expected = approvalFingerprint(folder, oldAfter)!;
+    execFileSync(process.execPath, ["--import", "tsx", "scripts/reconcile-approval-provenance.ts", "--folder", folder, "--row", "x-1", "--ledger", ledger, "--write", "--expect-fingerprint", expected], {
+      cwd: process.cwd(), env: { ...process.env, NODE_TEST_CONTEXT: "1", CONTENT_AGENTS_TEST_ADOPTION_REPO_ROOT: root },
+    });
+    assert.deepEqual(approvalDispatchDisposition(folder, basename(folder), oldAfter, ledger, journal), { kind: "adopted" });
+    assert.equal(commitReviewStatus(folder, basename(folder), "x-2", "approve", () => writeCell(folder, "x-2", { status: "approve" }), ledger, journal), true);
+    const row = readQueue(folder).rows.find((candidate) => candidate.id === "x-2")!;
+    assert.equal(approvalSchedulingBlock(folder, basename(folder), row, ledger, journal), null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The wiring, not just the helper: settleContinueRun is the one call site that must pass
+// preserveExisting, because a continue run re-stamps a folder that also holds rows from earlier
+// runs. The new-folder branch of drain() deliberately keeps the overwrite default.
+test("settleContinueRun keeps an older row's origin while stamping the row this run added", () => {
+  const root = mkdtempSync(join(tmpdir(), "continue-preserve-"));
+  const folder = join(root, "content", "fixture");
+  mkdirSync(join(folder, "derivatives"), { recursive: true });
+  const journal = journalPathForLedger(join(root, "publishing-status.jsonl"));
+  writeFileSync(join(folder, "derivatives", "x-1.md"), "Earlier run derivative.\n");
+  writeFileSync(join(folder, "derivatives", "x-2.md"), "Continue derivative.\n");
+  writeFileSync(
+    join(folder, "review-queue.md"),
+    "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n" +
+      "|---|---|---|---|---|---|---|---|---|---|\n" +
+      "| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | from /cycle |\n" +
+      "| x-2 | x | text | derivatives/x-2.md | — | — | — | pending | | |\n",
+  );
+  try {
+    const job = { id: "continue-preserve", arg: "--continue content/fixture", engine: "claude" as const, status: "running" as const, slugs: [] as string[], error: null as string | null };
+    settleContinueRun(job, { kind: "ok", target: { folder: "content/fixture", folderAbs: folder } }, { rows: 1, derivatives: 1 }, null, journal);
+    assert.equal(job.status, "done");
+    assert.deepEqual(readQueue(folder).rows.map((candidate) => candidate.origin), ["from /cycle", "from GUI queue"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// Regression (SLICE-6X repair round 6): the continue run is the call site that re-stamps a folder
+// holding rows from earlier runs, so it is where a denylist filter leaked creation provenance onto
+// an already-published row. The new row still gets its creation event; the published one must not,
+// so it stays legacy, stays refused by scheduling, and stays adoptable through the reconcile CLI.
+test("a continue run leaves a legacy published row without provenance while stamping the new row", () => {
+  const root = mkdtempSync(join(tmpdir(), "continue-published-"));
+  const folder = join(root, "content", "fixture");
+  mkdirSync(join(folder, "derivatives"), { recursive: true });
+  const ledger = join(root, "publishing-status.jsonl");
+  const journal = journalPathForLedger(ledger);
+  writeFileSync(join(folder, "derivatives", "x-1.md"), "Already published derivative.\n");
+  writeFileSync(join(folder, "derivatives", "x-2.md"), "Continue derivative.\n");
+  writeFileSync(
+    join(folder, "review-queue.md"),
+    "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n" +
+      "|---|---|---|---|---|---|---|---|---|---|\n" +
+      "| x-1 | x | text | derivatives/x-1.md | — | — | — | published | | from /cycle |\n" +
+      "| x-2 | x | text | derivatives/x-2.md | — | — | — | pending | | |\n",
+  );
+  try {
+    const job = { id: "continue-published", arg: "--continue content/fixture", engine: "claude" as const, status: "running" as const, slugs: [] as string[], error: null as string | null };
+    settleContinueRun(job, { kind: "ok", target: { folder: "content/fixture", folderAbs: folder } }, { rows: 1, derivatives: 1 }, null, journal);
+    assert.equal(job.status, "done");
+    const created = readFileSync(journal, "utf8").trim().split("\n").map((line) => JSON.parse(line) as { kind: string; rowId: string })
+      .filter((event) => event.kind === "created").map((event) => event.rowId);
+    assert.deepEqual(created, ["x-2"], "only the row this run added may be granted creation provenance");
+    const published = readQueue(folder).rows.find((candidate) => candidate.id === "x-1")!;
+    assert.deepEqual(approvalDispatchDisposition(folder, basename(folder), published, ledger, journal), { kind: "legacy" });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("new-folder atomize stamps provenance and engine independently", () => {
+  const source = readFileSync(new URL("./jobs.ts", import.meta.url), "utf8");
+  const start = source.indexOf("for (const slug of job.slugs)");
+  const end = source.indexOf("} else {", start);
+  const branch = source.slice(start, end);
+  assert.match(branch, /try\s*\{\s*stampOrigin[\s\S]*?\}\s*catch\s*\{[\s\S]*?\}\s*try\s*\{\s*stampFolderEngine/);
 });
 
 // ── SLICE-5N R5/R5b: what the SUBPROCESS is handed, and what its argv actually becomes ──────────

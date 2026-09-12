@@ -29,6 +29,7 @@ const PASSES = [
   { name: "D-content-generation", script: "pass-d-content-generation.ts", title: "Pass D — configured Content generation with a disposable injected engine" },
   { name: "D-outreach-generation", script: "pass-d-outreach-generation.ts", title: "Pass D — Outreach draft and revise with a disposable injected engine" },
   { name: "E-notcovered", script: "pass-d-notcovered.ts", title: "Pass E — deliberately NOT covered (model-job routes)" },
+  { name: "F-provenance", script: "pass-f-provenance.ts", title: "Pass F — approval provenance and recovery" },
 ];
 
 type DisposableRepo = { root: string; home: string; parent: string };
@@ -127,7 +128,7 @@ function main(): void {
           // `config/brand-accounts.yaml`, not a credential. It used to arrive by accident, from the
           // `.env` the disposable copy no longer carries; stating it here keeps the delivery-policy
           // identity check genuinely exercised without the suite depending on a real key file.
-          ...(p.name === "B-writes"
+          ...(p.name === "B-writes" || p.name === "F-provenance"
             ? { CONTENT_AGENTS_E2E_SCHEDULING_TOKEN: schedulingToken, CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID: "human-inference/typefully" }
             : {}),
           ...(p.name === "D-content-generation" ? { CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: configuredEngineToken } : {}),

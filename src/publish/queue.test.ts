@@ -1,7 +1,7 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { basename, join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
   readQueue,
@@ -10,11 +10,13 @@ import {
   writeCell,
   storyboardRowStatus,
   appendRow,
+  appendRows,
   appendBetPlacement,
   cutRowId,
   rowLens,
   type QueueRow,
 } from "./queue.js";
+import { approvalDispatchDisposition, journalPathForLedger } from "../review/approval-provenance.js";
 
 // Origin source-tags (Muxin, 2026-07-04): every row awaiting review carries an origin — one of
 // QUEUE_ORIGINS — set at the pipeline that created it. Rows written before this change have no
@@ -113,6 +115,24 @@ test("stampOrigin overwrites whatever origin value a row already carries", () =>
   const { rows } = readQueue(dir);
   assert.deepEqual(rows.map((r) => r.origin), ["from GUI queue", "from GUI queue"]);
   assert.equal(rows[1].notes, "note");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+// The continue path is the other half of the same function. It re-stamps a folder that also holds
+// rows from earlier runs, so unlike the new-folder path above it fills only the empty cells.
+test("stampOrigin with preserveExisting keeps a recorded origin and fills only missing values", () => {
+  const dir = tmpFolder(
+    `| id | platform | format | asset | native | brand | cta | status | notes | origin |\n` +
+      `|---|---|---|---|---|---|---|---|---|---|\n` +
+      `| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | from /cycle |\n` +
+      `| x-2 | x | text | derivatives/x-2.md | — | — | — | pending | | |\n`,
+  );
+  mkdirSync(join(dir, "derivatives"));
+  writeFileSync(join(dir, "derivatives", "x-1.md"), "Existing derivative.\n");
+  writeFileSync(join(dir, "derivatives", "x-2.md"), "New derivative.\n");
+  const journal = journalPathForLedger(join(dir, "publishing-status.jsonl"));
+  stampOrigin(dir, "from GUI queue", { journalPath: journal, preserveExisting: true });
+  assert.deepEqual(readQueue(dir).rows.map((row) => row.origin), ["from /cycle", "from GUI queue"]);
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -295,6 +315,142 @@ test("appendRow strips stray pipes/newlines out of notes so column boundaries ca
   const { rows } = readQueue(dir);
   assert.equal(rows[0].notes, "line one line two   with a pipe");
   rmSync(dir, { recursive: true, force: true });
+});
+
+test("appendRow and appendRows both record created provenance for completed assets", () => {
+  for (const append of [
+    (folder: string, journal: string) => appendRow(folder, { id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending" }, journal),
+    (folder: string, journal: string) => appendRows(folder, [{ id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending" }], journal),
+  ]) {
+    const dir = tmpFolder("| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n");
+    const journal = journalPathForLedger(join(dir, "publishing-status.jsonl"));
+    const derivativeDir = join(dir, "derivatives");
+    mkdirSync(derivativeDir);
+    writeFileSync(join(derivativeDir, "x-1.md"), "A completed derivative.\n");
+    append(dir, journal);
+    const event = JSON.parse(readFileSync(journal, "utf8")) as { kind?: string; rowId?: string };
+    assert.deepEqual({ kind: event.kind, rowId: event.rowId }, { kind: "created", rowId: "x-1" });
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("stampOrigin records created provenance for rows produced by a new-folder GUI atomize run", () => {
+  const dir = tmpFolder("| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | |\n");
+  mkdirSync(join(dir, "derivatives"));
+  writeFileSync(join(dir, "derivatives", "x-1.md"), "A completed subprocess derivative.\n");
+  const journal = journalPathForLedger(join(dir, "publishing-status.jsonl"));
+  stampOrigin(dir, "from GUI queue", { journalPath: journal });
+  const event = JSON.parse(readFileSync(journal, "utf8")) as { kind?: string; rowId?: string };
+  assert.deepEqual({ kind: event.kind, rowId: event.rowId }, { kind: "created", rowId: "x-1" });
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("stampOrigin is idempotent for a folder whose rows already have creation provenance", () => {
+  const dir = tmpFolder("| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | |\n");
+  mkdirSync(join(dir, "derivatives"));
+  writeFileSync(join(dir, "derivatives", "x-1.md"), "A completed subprocess derivative.\n");
+  const journal = journalPathForLedger(join(dir, "publishing-status.jsonl"));
+  stampOrigin(dir, "from GUI queue", { journalPath: journal });
+  const before = readFileSync(journal, "utf8");
+  assert.doesNotThrow(() => stampOrigin(dir, "from GUI queue", { journalPath: journal }));
+  assert.equal(readFileSync(journal, "utf8"), before);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("stampOrigin records a later row while preserving a previously recorded row", () => {
+  const dir = tmpFolder("| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | |\n");
+  mkdirSync(join(dir, "derivatives"));
+  writeFileSync(join(dir, "derivatives", "x-1.md"), "First completed derivative.\n");
+  const journal = journalPathForLedger(join(dir, "publishing-status.jsonl"));
+  stampOrigin(dir, "from GUI queue", { journalPath: journal });
+  writeFileSync(join(dir, "derivatives", "x-2.md"), "Second completed derivative.\n");
+  writeFileSync(join(dir, "review-queue.md"), readFileSync(join(dir, "review-queue.md"), "utf8") + "| x-2 | x | text | derivatives/x-2.md | — | — | — | pending | | |\n");
+  stampOrigin(dir, "from GUI queue", { journalPath: journal });
+  const created = readFileSync(journal, "utf8").trim().split("\n").map((line) => JSON.parse(line) as { kind: string; rowId: string });
+  assert.deepEqual(created.map(({ kind, rowId }) => ({ kind, rowId })), [
+    { kind: "created", rowId: "x-1" },
+    { kind: "created", rowId: "x-2" },
+  ]);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+// Regression (SLICE-6X repair round 6): stampOrigin rescans the WHOLE folder, and since the
+// continue-run wiring it runs over folders holding rows from earlier runs. A denylist that skipped
+// only `approve` still minted a creation event for a legacy `published` row, which both stripped
+// that row of its one recovery path (adoptApprovedQueueRow needs zero prior events) and let a
+// later re-approval dispatch already-published content a second time. Only a creatable status may
+// be granted creation provenance.
+function createdRowIds(journal: string): string[] {
+  if (!existsSync(journal)) return [];
+  return readFileSync(journal, "utf8").trim().split("\n").filter(Boolean)
+    .map((line) => JSON.parse(line) as { kind: string; rowId: string })
+    .filter((event) => event.kind === "created")
+    .map((event) => event.rowId);
+}
+
+for (const settled of ["published", "discard"]) {
+  test(`stampOrigin records no creation provenance for a legacy ${settled} row, which stays adoptable`, () => {
+    const dir = tmpFolder(`| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | ${settled} | | |\n`);
+    mkdirSync(join(dir, "derivatives"));
+    writeFileSync(join(dir, "derivatives", "x-1.md"), "A derivative from an earlier run.\n");
+    const ledger = join(dir, "publishing-status.jsonl");
+    const journal = journalPathForLedger(ledger);
+    stampOrigin(dir, "from GUI queue", { journalPath: journal });
+    assert.deepEqual(createdRowIds(journal), [], `a ${settled} row must not be granted creation provenance`);
+    const row = readQueue(dir).rows.find((candidate) => candidate.id === "x-1")!;
+    assert.deepEqual(approvalDispatchDisposition(dir, basename(dir), row, ledger, journal), { kind: "legacy" });
+    rmSync(dir, { recursive: true, force: true });
+  });
+}
+
+test("stampOrigin records the pending row of a mixed folder and leaves the published row alone", () => {
+  const dir = tmpFolder(
+    "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n" +
+      "|---|---|---|---|---|---|---|---|---|---|\n" +
+      "| x-1 | x | text | derivatives/x-1.md | — | — | — | published | | |\n" +
+      "| x-2 | x | text | derivatives/x-2.md | — | — | — | pending | | |\n",
+  );
+  mkdirSync(join(dir, "derivatives"));
+  writeFileSync(join(dir, "derivatives", "x-1.md"), "An earlier run's derivative.\n");
+  writeFileSync(join(dir, "derivatives", "x-2.md"), "This run's derivative.\n");
+  const ledger = join(dir, "publishing-status.jsonl");
+  const journal = journalPathForLedger(ledger);
+  stampOrigin(dir, "from GUI queue", { journalPath: journal });
+  assert.deepEqual(createdRowIds(journal), ["x-2"]);
+  const published = readQueue(dir).rows.find((candidate) => candidate.id === "x-1")!;
+  assert.deepEqual(approvalDispatchDisposition(dir, basename(dir), published, ledger, journal), { kind: "legacy" });
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("production queue-row writers use the provenance helpers and no source file appends a table row directly", () => {
+  const callers = [
+    "src/atomize/reply-draft.ts",
+    "src/grow/experiment-queue-handoff.ts",
+    "src/outreach/draft.ts",
+    "src/review/jobs.ts",
+  ];
+  for (const path of callers) {
+    const source = readFileSync(join(process.cwd(), path), "utf8");
+    assert.match(source, /\b(?:appendRows?|stampOrigin)\s*\(/, `${path} must use a provenance-recording queue helper`);
+    assert.match(source, /from ["'][^"']*publish\/queue\.js["']/, `${path} must import the canonical queue helper`);
+  }
+
+  const sourceFiles = (root: string): string[] => readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(root, entry.name);
+    return entry.isDirectory() ? sourceFiles(path) : entry.isFile() && path.endsWith(".ts") && !path.endsWith(".test.ts") ? [path] : [];
+  });
+  for (const path of sourceFiles(join(process.cwd(), "src"))) {
+    if (path.endsWith(join("src", "publish", "queue.ts"))) continue;
+    const source = readFileSync(path, "utf8");
+    assert.doesNotMatch(source, /appendFileSync\s*\([\s\S]{0,500}?review-queue\.md[\s\S]{0,500}?[`"']\|\s*\$?\{?[\w-]+/, `${path} must not append a pipe-delimited review row outside queue.ts`);
+  }
+});
+
+test("the E2E registry gives every pass a distinct display title", () => {
+  const source = readFileSync(join(process.cwd(), "e2e", "run-all.ts"), "utf8");
+  const titles = [...source.matchAll(/title:\s*"([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(titles.filter((title) => /^Pass E\b/.test(title)).length, 1);
+  assert.equal(titles.filter((title) => /^Pass F\b/.test(title)).length, 1);
 });
 
 // appendBetPlacement's ctaDestination param (card d80411bc, strategy lever E scaffold): the

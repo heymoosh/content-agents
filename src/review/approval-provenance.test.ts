@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFile } from "node:child_process";
@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { after, afterEach, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { appendRows, readQueue, writeCell } from "../publish/queue.js";
-import { approvalSchedulingBlock, commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "./approval-provenance.js";
+import { adoptApprovedQueueRow, approvalDispatchDisposition, approvalFingerprint, approvalSchedulingBlock, commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "./approval-provenance.js";
 import { appendPublishingStatus, resolvePublishingAttempt, scheduleApprovedOnce } from "./publishing-status.js";
 
 const roots: string[] = [];
@@ -33,6 +33,135 @@ function approve(item: ReturnType<typeof fixture>): void {
   const ok = commitReviewStatus(item.folder, item.slug, "x-1", "approve", () => writeCell(item.folder, "x-1", { status: "approve" }), item.ledger, item.journal);
   assert.equal(ok, true);
 }
+
+function legacyFixture(status: "pending" | "approve" = "approve", withAsset = true): ReturnType<typeof fixture> {
+  const folder = mkdtempSync(join(tmpdir(), "approval-adoption-")); roots.push(folder);
+  const slug = folder.split("/").at(-1)!;
+  mkdirSync(join(folder, "derivatives"));
+  writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+  if (withAsset) writeFileSync(join(folder, "derivatives", "x-1.md"), "---\nplatform: x\n---\n\nLegacy approved body.\n");
+  writeFileSync(join(folder, "review-queue.md"), `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | ${status} | | from GUI queue |\n`);
+  const ledger = join(folder, "ledger.jsonl");
+  return { folder, slug, ledger, journal: journalPathForLedger(ledger) };
+}
+
+function journalBytes(path: string): string | null {
+  return existsSync(path) ? readFileSync(path, "utf8") : null;
+}
+
+test("appendRows followed by commitReviewStatus gives a first-time approved row scheduling provenance", () => {
+  const item = legacyFixture("pending");
+  writeFileSync(join(item.folder, "review-queue.md"), "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n");
+  appendRows(item.folder, [{ id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", origin: "from GUI queue" }], item.journal);
+  assert.equal(commitReviewStatus(item.folder, item.slug, "x-1", "approve", () => writeCell(item.folder, "x-1", { status: "approve" }), item.ledger, item.journal), true);
+  const approved = readQueue(item.folder).rows[0]!;
+  assert.deepEqual(approvalDispatchDisposition(item.folder, item.slug, approved, item.ledger, item.journal), { kind: "fresh" });
+  assert.equal(approvalSchedulingBlock(item.folder, item.slug, approved, item.ledger, item.journal), null);
+});
+
+test("a row with zero journal events stays legacy and names the explicit recovery action", () => {
+  const item = legacyFixture();
+  const row = readQueue(item.folder).rows[0]!;
+  assert.deepEqual(approvalDispatchDisposition(item.folder, item.slug, row, item.ledger, item.journal), { kind: "legacy" });
+  assert.equal(
+    approvalSchedulingBlock(item.folder, item.slug, row, item.ledger, item.journal),
+    `This row has no verifiable creation and approval provenance. Ask the coordinator to run scripts/reconcile-approval-provenance.ts for ${item.slug}/x-1, then try Schedule again.`,
+  );
+  assert.equal(existsSync(item.journal), false);
+});
+
+test("adoption refuses an unreadable asset fingerprint without appending a journal event", () => {
+  const item = legacyFixture("approve", false);
+  const before = journalBytes(item.journal);
+  assert.throws(() => adoptApprovedQueueRow(item.folder, item.slug, "x-1", "a".repeat(64), item.ledger, item.journal), /fingerprint cannot be computed/i);
+  assert.equal(journalBytes(item.journal), before);
+});
+
+test("adoption refuses a row that already has journal events without appending another", () => {
+  const item = legacyFixture("pending");
+  const row = readQueue(item.folder).rows[0]!;
+  recordNewQueueRows(item.folder, [row], item.journal);
+  writeCell(item.folder, "x-1", { status: "approve" });
+  const fingerprint = approvalFingerprint(item.folder, readQueue(item.folder).rows[0]!)!;
+  const before = journalBytes(item.journal);
+  assert.throws(() => adoptApprovedQueueRow(item.folder, item.slug, "x-1", fingerprint, item.ledger, item.journal), /already has.*journal events/i);
+  assert.equal(journalBytes(item.journal), before);
+});
+
+test("adoption refuses a row whose status is not approve without appending a journal event", () => {
+  const item = legacyFixture("pending");
+  const fingerprint = approvalFingerprint(item.folder, readQueue(item.folder).rows[0]!)!;
+  const before = journalBytes(item.journal);
+  assert.throws(() => adoptApprovedQueueRow(item.folder, item.slug, "x-1", fingerprint, item.ledger, item.journal), /status pending, not approve/i);
+  assert.equal(journalBytes(item.journal), before);
+});
+
+test("adoption refuses when the asset changes after fingerprint preview", () => {
+  const item = legacyFixture();
+  const expected = approvalFingerprint(item.folder, readQueue(item.folder).rows[0]!)!;
+  writeFileSync(join(item.folder, "derivatives", "x-1.md"), "Changed after the coordinator reviewed the fingerprint.\n");
+  const before = journalBytes(item.journal);
+  assert.throws(() => adoptApprovedQueueRow(item.folder, item.slug, "x-1", expected, item.ledger, item.journal), /fingerprint changed/i);
+  assert.equal(journalBytes(item.journal), before);
+});
+
+test("the coordinator adoption CLI previews a fingerprint, requires confirmation, and unblocks Schedule", async () => {
+  const root = mkdtempSync(join(tmpdir(), "approval-adoption-root-")); roots.push(root);
+  const folder = join(root, "content", "legacy-row");
+  mkdirSync(join(folder, "derivatives"), { recursive: true });
+  writeFileSync(join(folder, "derivatives", "x-1.md"), "Opening line one.\nOpening line two.\nThird line.\n");
+  writeFileSync(join(folder, "review-queue.md"), "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | approve | | from GUI queue |\n");
+  const item = { folder, slug: "legacy-row", ledger: join(root, "ledger.jsonl"), journal: join(root, "approval-dispatch-safety.jsonl") };
+  const base = ["--import", "tsx", "scripts/reconcile-approval-provenance.ts", "--folder", item.folder, "--row", "x-1", "--ledger", item.ledger];
+  const env = { ...process.env, NODE_TEST_CONTEXT: "1", CONTENT_AGENTS_TEST_ADOPTION_REPO_ROOT: root };
+  const preview = await execFileAsync(process.execPath, base, { cwd: process.cwd(), env });
+  const fingerprint = /fingerprint ([a-f0-9]{64})/.exec(preview.stdout)?.[1];
+  assert.ok(fingerprint);
+  assert.match(preview.stdout, /modified\s+\d{4}-\d\d-\d\dT/);
+  assert.match(preview.stdout, /opening\s+Opening line one\.\n\s+Opening line two\./);
+  assert.equal(existsSync(item.journal), false, "preview writes no journal event");
+  const applied = await execFileAsync(process.execPath, [...base, "--write", "--expect-fingerprint", fingerprint], { cwd: process.cwd(), env });
+  assert.match(applied.stdout, /Adoption recorded\. Schedule is ready for this row\./);
+  const row = readQueue(item.folder).rows[0]!;
+  assert.deepEqual(approvalDispatchDisposition(item.folder, item.slug, row, item.ledger, item.journal), { kind: "adopted" });
+  assert.equal(approvalSchedulingBlock(item.folder, item.slug, row, item.ledger, item.journal), null);
+  assert.match(readFileSync(item.journal, "utf8"), new RegExp(`"kind":"adopted".*"fingerprint":"${fingerprint}"`));
+});
+
+test("the adoption CLI refuses a byte-identical folder outside the repository content and outreach roots", async () => {
+  const root = mkdtempSync(join(tmpdir(), "approval-adoption-root-")); roots.push(root);
+  const outside = join(root, "copied-elsewhere", "legacy-row");
+  mkdirSync(join(outside, "derivatives"), { recursive: true });
+  writeFileSync(join(outside, "derivatives", "x-1.md"), "Same bytes as a real row.\n");
+  writeFileSync(join(outside, "review-queue.md"), "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | approve | | from GUI queue |\n");
+  const ledger = join(root, "ledger.jsonl");
+  const journal = journalPathForLedger(ledger);
+  const before = journalBytes(journal);
+  await assert.rejects(
+    execFileAsync(process.execPath, ["--import", "tsx", "scripts/reconcile-approval-provenance.ts", "--folder", outside, "--row", "x-1", "--ledger", ledger], {
+      cwd: process.cwd(), env: { ...process.env, NODE_TEST_CONTEXT: "1", CONTENT_AGENTS_TEST_ADOPTION_REPO_ROOT: root },
+    }),
+    /inside the repository's content or outreach root/i,
+  );
+  assert.equal(journalBytes(journal), before);
+});
+
+test("an invalid approvalId line blocks scheduling and prevents a canonical queue append", () => {
+  const item = fixture();
+  const malformed = JSON.parse(readFileSync(item.journal, "utf8").trim()) as Record<string, unknown>;
+  writeFileSync(item.journal, JSON.stringify({ ...malformed, kind: "approval_committed", approvalId: "not-a-hash" }) + "\n");
+  const row = readQueue(item.folder).rows[0]!;
+  const block = approvalSchedulingBlock(item.folder, item.slug, row, item.ledger, item.journal) ?? "";
+  assert.match(block, /malformed at line 1/i);
+  assert.match(block, /Ask the coordinator to repair approval-dispatch-safety\.jsonl, then try again\./);
+  writeFileSync(join(item.folder, "derivatives", "x-2.md"), "Second derivative.\n");
+  const beforeQueue = readFileSync(join(item.folder, "review-queue.md"), "utf8");
+  assert.throws(
+    () => appendRows(item.folder, [{ id: "x-2", platform: "x", format: "text", asset: "derivatives/x-2.md", status: "pending" }], item.journal),
+    /Ask the coordinator to repair approval-dispatch-safety\.jsonl, then try again\./,
+  );
+  assert.equal(readFileSync(join(item.folder, "review-queue.md"), "utf8"), beforeQueue, "malformed safety history blocks before the queue mutates");
+});
 
 test("a supported newly-created approval is fenced before its first scheduler callback and is one-time", async () => {
   const item = fixture(); approve(item); let calls = 0;
@@ -178,7 +307,9 @@ test("an ordinary unattempted edit can be reapproved without treating an appende
     calls++; return { scheduled: { draftId: "edited" }, scheduleError: null };
   }, item.ledger);
   assert.equal(calls, 1);
-  assert.throws(() => recordNewQueueRows(item.folder, readQueue(item.folder).rows, item.journal), /already created/i);
+  const journalBefore = readFileSync(item.journal, "utf8");
+  assert.doesNotThrow(() => recordNewQueueRows(item.folder, readQueue(item.folder).rows, item.journal));
+  assert.equal(readFileSync(item.journal, "utf8"), journalBefore);
 });
 
 test("a callback crash retains its claim through a simulated restart until exact reconciliation", async () => {
@@ -201,9 +332,11 @@ test("a callback crash retains its claim through a simulated restart until exact
   assert.equal(calls, 1);
 });
 
-test("reused identities cannot be issued a second creation record", () => {
+test("re-recording an existing identity is an idempotent no-op and cannot issue a second creation event", () => {
   const item = fixture();
-  assert.throws(() => recordNewQueueRows(item.folder, readQueue(item.folder).rows, item.journal), /already created/i);
+  const before = readFileSync(item.journal, "utf8");
+  assert.doesNotThrow(() => recordNewQueueRows(item.folder, readQueue(item.folder).rows, item.journal));
+  assert.equal(readFileSync(item.journal, "utf8"), before);
   assert.match(approvalSchedulingBlock(item.folder, item.slug, readQueue(item.folder).rows[0]!, item.ledger, item.journal) ?? "", /latest approval/i);
 });
 

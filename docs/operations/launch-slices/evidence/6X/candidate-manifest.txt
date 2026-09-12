@@ -1,0 +1,28 @@
+SLICE-6X candidate manifest
+generated 2026-09-12T00:02:17Z
+base commit: 6daffaae4dc644bae8bf20f078a478a24bd0f220  (docs(master): START HERE points 6X at its written, dependency-ready packet)
+
+changed tracked paths (sha256 of working-tree content):
+  a59ce9dbe3cba98b  docs/operations/launch-slices/SLICE-6X.md
+  ddc735eefbb81154  e2e/run-all.ts
+  94118c828b6b2743  scripts/slice-6w-seed-provenance.ts
+  18f2e087711654a6  src/outreach/draft.test.ts
+  f1d721d7fca6dea9  src/outreach/draft.ts
+  30e611635effc1f8  src/publish/queue.test.ts
+  a67a78f95d6c73aa  src/publish/queue.ts
+  78f5b31bad8f5e94  src/review/approval-provenance.test.ts
+  d0798c6cf89f08f5  src/review/approval-provenance.ts
+  f875934ea5530e4b  src/review/jobs.test.ts
+  f81bbd5b693d1ba3  src/review/jobs.ts
+  8277448443010506  src/review/publishing-status.test.ts
+  06555d5c65c55a2c  src/review/publishing-status.ts
+  b615f5ba47fdb43d  src/review/serve.test.ts
+  3871e3a04465f6bd  src/review/serve.ts
+
+new untracked paths:
+  54d8450b56f7db18  e2e/pass-f-provenance.ts
+  a711632e375ee134  scripts/reconcile-approval-provenance.ts
+
+lane A ownership: every path above is listed in the packet's Lane A block except
+  src/outreach/draft.ts, src/outreach/draft.test.ts, src/review/jobs.ts, src/review/jobs.test.ts
+  which are the recorded Lane A scope extension (acceptance item 2).

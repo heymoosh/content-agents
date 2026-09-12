@@ -56,7 +56,7 @@ same conclusion, so it adds coordination cost with no independent deliverable.
 - `src/review/publishing-status.test.ts`
 - `scripts/slice-6w-seed-provenance.ts`
 - `scripts/reconcile-approval-provenance.ts` (new, if the adoption path lands as a script)
-- `e2e/pass-e-provenance.ts` (new, if a new pass file is used)
+- `e2e/pass-f-provenance.ts` (new, if a new pass file is used)
 - `e2e/run-all.ts` (registration line only)
 - this packet, and `docs/operations/launch-slices/SLICE-6X-LOG.md` if dated records accrue
 
@@ -169,6 +169,8 @@ Closeout gate: this repository's binding is `none`. Record a line beginning `**P
 the date, or an explicit list of what is left, in this packet before the slice closes. Do not put
 a command in this slot.
 
+**PASS** 2026-09-11
+
 Preflight: every acceptance item above maps to a named committed test, a quoted string, a recorded
 exit code or a recorded design pass/fail; the candidate is pinned and its changed paths listed;
 Lane A owns every changed path; the cross-family audit has a verdict; no final-gate prerequisite is
@@ -189,13 +191,136 @@ Read-set print: use the `### Read-set measurement` commands in
 ## RESULT BLOCK (worker fills this in and returns it)
 
 - Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action: <built | verified | accepted | committed; workers cannot accept/commit>
-- Usage: <local check elapsed time separately from model calls/provider-reported usage;
-  unavailable values `unknown`; prior history behind evidence pointers>
+  - `src/review/approval-provenance.ts`, `src/review/approval-provenance.test.ts`
+  - `src/publish/queue.ts`, `src/publish/queue.test.ts`
+  - `src/review/serve.ts`, `src/review/serve.test.ts`
+  - `src/review/publishing-status.ts`, `src/review/publishing-status.test.ts`
+  - `src/review/jobs.ts`, `src/review/jobs.test.ts` (scope extension, below)
+  - `src/outreach/draft.ts`, `src/outreach/draft.test.ts` (scope extension, below)
+  - `scripts/slice-6w-seed-provenance.ts` (superseded banner)
+  - `scripts/reconcile-approval-provenance.ts` (new, the adoption CLI)
+  - `e2e/pass-f-provenance.ts` (new), `e2e/run-all.ts` (registration line only)
+  - this packet
+- Outcome: delivered. Muxin can approve a queue row in the Publishing room and schedule it first
+  time, with no per-row seeding script. A row with no creation-and-approval provenance is still
+  refused and now names its own recovery.
+
+- Acceptance items:
+  1. PASS. `appendRows` then `commitReviewStatus` yields `approvalSchedulingBlock(...) === null`,
+     pinned in `src/review/approval-provenance.test.ts`, no seeding script involved.
+  2. PASS. Every production path in `src/` that appends a row to a content folder's
+     `review-queue.md` records a `created` event:
+     - `src/atomize/reply-draft.ts:240` (`appendRow`)
+     - `src/grow/experiment-queue-handoff.ts:212` (`appendRows`)
+     - `src/review/jobs.ts:1446` (configured generation, `appendRows`)
+     - `src/review/jobs.ts:2971` (`duplicateToPlatform`, `appendRow`)
+     - `src/outreach/draft.ts:362` (`appendRow`)
+     - `src/review/jobs.ts:2684` (new-folder GUI atomize, via `stampOrigin`)
+     - `src/review/jobs.ts:2310` (continue run, via `stampOrigin`)
+     Proving tests: `appendRow and appendRows both record created provenance for completed assets`,
+     `stampOrigin records created provenance for rows produced by a new-folder GUI atomize run`,
+     `stampOrigin records a later row while preserving a previously recorded row`,
+     `settleContinueRun keeps an older row's origin while stamping the row this run added`
+     (all `src/publish/queue.test.ts` except the last, `src/review/jobs.test.ts`), plus the
+     repo-wide structural guard `production queue-row writers use the provenance helpers and no
+     source file appends a table row directly` (`src/publish/queue.test.ts:425`), which also
+     asserts no file outside `src/publish/queue.ts` writes a pipe-delimited row directly.
+  3. PASS. A zero-event row returns `{ kind: "legacy" }` and a non-null `approvalSchedulingBlock`.
+     Adoption is never automatic. Pinned in `src/review/approval-provenance.test.ts`.
+  4. PASS. `scripts/reconcile-approval-provenance.ts` is the explicit adoption path. It requires
+     `--write --expect-fingerprint <64-hex>` and refuses, with no journal append, when the
+     fingerprint cannot be computed, when the row already has journal events, and when the row's
+     status is not `approve`. Each refusal is pinned by a committed test around
+     `adoptApprovedQueueRow` in `src/review/approval-provenance.test.ts`.
+  5. PASS. `scripts/slice-6w-seed-provenance.ts` still exists; its first two lines state it is
+     superseded and name `scripts/reconcile-approval-provenance.ts`.
+  6. PASS. Exact string shown in the Publishing room:
+     `This row has no verifiable creation and approval provenance. Ask the coordinator to run
+     scripts/reconcile-approval-provenance.ts for <slug>/<rowId>, then try Schedule again.`
+     (`src/review/approval-provenance.ts:315`). The malformed-journal sibling is
+     `The approval safety journal is malformed at line <n>. Ask the coordinator to repair
+     approval-dispatch-safety.jsonl, then try again.` (`src/review/approval-provenance.ts:58`).
+  7. PASS. Neither string contains an em dash or an AI tell per `config/voice.yaml`.
+  8. Design sanity check, confirmed from rendered HTML and re-asserted programmatically by Pass F
+     at both viewports, not from intent:
+     - body type at least 1.125rem, line height at least 1.5: PASS (18px / 28.8px, ratio 1.6)
+     - Muxin's content first, ids and slugs demoted to muted lines: PASS (`bodyFirst` true,
+       meta type 11px)
+     - one clear divider between one thought and the next: PASS (`divider` solid)
+     - the refusal stays on screen until read: PASS (still visible after 1.7s, no auto-dismiss)
+     - scannable at arm's length without zoom: PASS (no viewport overflow at 1280 or 768)
+  9. PASS. `npm run check` exit 0: 4405 tests, 495 suites, 4405 pass, 0 fail, 0 skipped, 0 todo.
+  10. PASS. `npm run test:e2e` exit 0: 55 pass, 0 fail, 16 blocked. Journey: `Pass F: approval
+      provenance and recovery`, 5 ok, 0 failing.
+  11. PASS. `git status --porcelain -- data` is empty.
+
+- Checks run and results (all unsandboxed, on the candidate):
+  - `npm run typecheck` exit 0
+  - focused six-file run exit 0: 367 pass, 0 fail, 0 skipped
+  - `npm run check` exit 0: 4405 pass, 0 fail; measured local elapsed 159s
+  - `npm run test:e2e` exit 0: 55 pass, 0 fail, 16 blocked; worktree byte-identical afterwards
+  - `git status --porcelain -- data` empty; `git diff --check` exit 0
+  - Fixture backend only. No live provider call was made, so live integration is not applicable
+    and is recorded as such.
+
+- Cross-family audit: Grok family (builder was Claude, see family substitution below).
+  Round 1 verdict PASS WITH FINDINGS, one HIGH and two LOW. Delta round on the HIGH repair:
+  CLOSED, VERDICT PASS.
+  - HIGH, fixed: `stampOrigin` granted creation provenance by denylist (`status !== "approve"`).
+    Since this slice also calls it from the continue run, which rescans a folder holding rows from
+    earlier runs, a legacy `published` row could be minted a `created` event. That destroyed its
+    adoption path and let a later re-approval complete a `fresh` capability, making already
+    published content schedulable a second time without the reconcile CLI. Replaced with an
+    allowlist: only `pending` or an empty status cell may be granted creation provenance, so any
+    unknown future status fails closed. Four regression tests pin it, confirmed load-bearing by
+    reverting the predicate and observing exactly those four fail.
+  - LOW, accepted and named (this is finding B3 from the earlier audit rounds, independently
+    re-raised by Grok): for a legacy row no record of the approved-at bytes exists, so adoption
+    certifies whatever is on disk now. The fingerprint check closes the preview-to-write window
+    but cannot bind to bytes that were never hashed. Mitigated by the CLI's preview, which prints
+    fingerprint, mtime and the first five asset lines for the coordinator to read before writing.
+  - LOW, accepted and named: a swallowed `stampOrigin` error leaves the job marked `done`, so a
+    provenance miss is invisible until the later Schedule refusal. Fail-closed but quiet.
+  - No CRITICAL finding. The auditor could not identify any branch that dispatches twice without
+    further human action.
+
+- Coordinator scope decisions recorded here:
+  - Lane A scope extension: `src/review/jobs.ts`, `src/review/jobs.test.ts`, `src/outreach/draft.ts`
+    and `src/outreach/draft.test.ts` are not in the packet's Lane A block but were changed.
+    Acceptance item 2 requires every production row-appending path to record provenance, and those
+    four files hold three of the seven such paths. The item cannot close without them. No other
+    lane was active, so the disjoint-write condition still holds.
+  - Builder family substitution: the `## Families` line names Codex / GPT as builder. Codex hit its
+    usage cap mid-slice (reset 2026-09-15) and stranded a repair round. On Muxin's instruction,
+    recorded 2026-09-11, Claude built the remainder and the cross-family models are reserved for
+    auditing. The cross-family rule is intact: Claude built, so Grok audited, never a same-family
+    reviewer.
+  - A pre-existing test, `stampOrigin overwrites whatever origin value a row already carries`, was
+    deleted by a builder round and restored by coordinator instruction. The overwrite rule was
+    correct for the only call site that existed before this slice. What actually broke was that
+    this slice added a second call site over folders holding older rows, so preserve-versus-
+    overwrite became a per-call-site choice (`preserveExisting`) rather than a reversal.
+  - `recordNewQueueRows` changed from throwing on a re-record to skipping a known identity. The
+    invariant "no identity can gain a second creation event" is unchanged; only the failure mode
+    moved from throw to no-op, which the renamed test states openly. The `known` set now also
+    includes `adopted`, so an adopted row cannot later be granted a `created` event.
+
+- Evidence locations: `docs/operations/launch-slices/evidence/6X/`
+  - `candidate-manifest.txt`, `read-set-bytes.txt`
+  - `npm-check.summary.txt`, `focused-tests.summary.txt`, `e2e-all.summary.txt`
+  - `rendered-studio.html` (the rendered evidence the design items are judged from)
+  - `audit-grok-round1.txt`, `audit-grok-delta.txt`
+  - `voice-copy-check.txt`, `data-untouched.txt`, `diff-check.txt`, `hygiene.log`
+  Raw logs were replaced by summaries; the 996KB `npm-check.log` and its siblings are not kept in
+  the tree, per the protocol's pointers-and-summaries rule.
+
+- Unresolved: none blocking. The two LOW audit findings above are accepted, named risks, not open
+  work.
+- Delivery state and next action: committed by the coordinator together with the master doc.
+- Usage: local checks measured separately from model calls. `npm run check` 159s local elapsed;
+  `npm run test:e2e` and the focused run are recorded in their summary files. Model-call and
+  provider-reported usage across the builder and auditor rounds: unknown. Prior history sits
+  behind the evidence pointers above.
 
 ## Usage budget and handoff
 

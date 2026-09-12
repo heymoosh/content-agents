@@ -1,3 +1,5 @@
+// Superseded by scripts/reconcile-approval-provenance.ts.
+// Keep this pinned 6W helper only as retained delivery evidence for bluesky-2.
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

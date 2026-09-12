@@ -2,7 +2,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   buildDraftPrompt, selectEvidenceForDraft, runDraft,
   fenceSafeDirection, findUnauthorizedOutreachClaims, DIRECTION_FENCE_OPEN, DIRECTION_FENCE_CLOSE,
@@ -10,6 +10,8 @@ import {
 import type { EvidenceItem } from "./qualify.js";
 import { costLogPath } from "../util/cost-log.js";
 import { repoRoot } from "../db/db.js";
+import { readQueue, writeCell } from "../publish/queue.js";
+import { approvalSchedulingBlock, commitReviewStatus, journalPathForLedger } from "../review/approval-provenance.js";
 
 const GREENFIELD_ITEM: EvidenceItem = {
   id: "E1",
@@ -464,6 +466,22 @@ describe("runDraft guard clauses (no subprocess reached)", () => {
       assert.ok(promptSeen.includes("Acme Co"), "the real prompt reached the injected callClaude");
       const written = readFileSync(result.messageFile, "utf8");
       assert.match(written, /the injected draft body/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a real outreach draft path records creation provenance and becomes schedulable after approval", async () => {
+    const dir = makeLeadDir(leadFixture());
+    writeFileSync(join(dir, "review-queue.md"), `| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n`);
+    const ledger = join(dir, "publishing-status.jsonl");
+    const journal = journalPathForLedger(ledger);
+    try {
+      const drafted = await runDraft(dir, { callClaude: async () => "the injected draft body", journalPath: journal });
+      assert.match(readFileSync(journal, "utf8"), new RegExp(`"kind":"created".*"rowId":"${drafted.messageId}"`));
+      assert.equal(commitReviewStatus(dir, basename(dir), drafted.messageId, "approve", () => writeCell(dir, drafted.messageId, { status: "approve" }), ledger, journal), true);
+      const row = readQueue(dir).rows.find((candidate) => candidate.id === drafted.messageId)!;
+      assert.equal(approvalSchedulingBlock(dir, basename(dir), row, ledger, journal), null);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -139,6 +139,26 @@ export type { ScheduleKind, SchedulerDeps } from "./studio-scheduling.js";
 
 const PORT = Number(process.env.REVIEW_PORT ?? 4600);
 
+const PUBLISHING_PROVENANCE_STYLES = `<style id="publishing-provenance-styles">
+#publishedSheet { overflow-wrap:anywhere; }
+#publishedSheet .publish-row > * { min-width:0; }
+#flash.flash.error { font-size:1.125rem; line-height:1.5; overflow-wrap:anywhere; }
+@media (max-width:800px) {
+  #publishedSheet .publish-row.head { display:none; }
+  #publishedSheet .publish-row:not(.head) { grid-template-columns:minmax(0,1fr) auto; }
+  #publishedSheet .publish-row:not(.head) > :first-child,
+  #publishedSheet .publish-row:not(.head) > :nth-child(3),
+  #publishedSheet .publish-row:not(.head) > :nth-child(4) { grid-column:1 / -1; }
+}
+</style>`;
+
+/** Add the Publishing room's narrow-screen and persistent-refusal readability rules. */
+export function renderReviewPage(options: Parameters<typeof renderPage>[0]): string {
+  const html = renderPage(options);
+  if (!html.includes("</head>")) throw new Error("Studio page is missing its head element");
+  return html.replace("</head>", `${PUBLISHING_PROVENANCE_STYLES}\n</head>`);
+}
+
 /** File-writing and tool-using routes deliberately exclude the plain local Ollama runner. */
 export function requestEngine(value: unknown): Engine {
   if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is paused; choose Claude, Grok, or GPT (Codex)");
@@ -1084,7 +1104,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     }
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE, fixtures: FIXTURES_ON }));
+      res.end(renderReviewPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE, fixtures: FIXTURES_ON }));
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/engines") {

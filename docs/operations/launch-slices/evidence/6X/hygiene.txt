@@ -1,0 +1,58 @@
+== uncommitted work ==
+  /Users/Muxin/Documents/GitHub/content-agents
+     M docs/content-studio-master-status.md
+     M docs/operations/launch-slices/SLICE-6X.md
+     M e2e/run-all.ts
+     M scripts/slice-6w-seed-provenance.ts
+     M src/outreach/draft.test.ts
+     M src/outreach/draft.ts
+     M src/publish/queue.test.ts
+     M src/publish/queue.ts
+     M src/review/approval-provenance.test.ts
+     M src/review/approval-provenance.ts
+     M src/review/jobs.test.ts
+     M src/review/jobs.ts
+     M src/review/publishing-status.test.ts
+     M src/review/publishing-status.ts
+     M src/review/serve.test.ts
+     M src/review/serve.ts
+    ?? docs/operations/launch-slices/SLICE-6X-LOG.md
+    ?? docs/operations/launch-slices/evidence/
+    ?? e2e/pass-f-provenance.ts
+    ?? scripts/reconcile-approval-provenance.ts
+    -> snapshotted to refs/wip/content-agents (a9c5f17)
+  /private/tmp/claude/content-agents-worktrees/wt-slice-6m
+     M e2e/pass-a-reads.ts
+     M e2e/pass-b-writes.ts
+    -> snapshotted to refs/wip/wt-slice-6m (5dc2ff5)
+  /private/tmp/claude/content-agents-worktrees/wt-slice-6s
+     M e2e/harness.ts
+     M e2e/pass-d-editorial.ts
+    -> snapshotted to refs/wip/wt-slice-6s (0b87383)
+== prunable worktrees ==
+  (none)
+== merged branches (safe to delete) ==
+  slice-6m-worker
+  slice-6s-worker
+  -> git branch -d <name>
+== unpushed, unmerged branches (local-only work) ==
+  (none)
+
+4 item(s) need a decision. Nothing was changed.
+
+--- coordinator assertions (SLICE-6X closeout) ---
+1. The command was run: bash scripts/repo-hygiene.sh --rescue, exit 1 (non-zero expected while
+   other sessions have pending work).
+2. Its output was reviewed. Four items needed a decision; each is named below.
+3. Every path this session created was committed: docs/operations/launch-slices/SLICE-6X-LOG.md,
+   docs/operations/launch-slices/evidence/6X/ (all files), e2e/pass-f-provenance.ts,
+   scripts/reconcile-approval-provenance.ts, plus the 14 modified tracked files. Nothing this
+   session created was deleted.
+4. Every other path it listed was named and left in place:
+   - /private/tmp/claude/content-agents-worktrees/wt-slice-6m: modified e2e/pass-a-reads.ts and
+     e2e/pass-b-writes.ts, another session's work, left in place.
+   - /private/tmp/claude/content-agents-worktrees/wt-slice-6s: modified e2e/harness.ts and
+     e2e/pass-d-editorial.ts, another session's work, left in place.
+   - merged branches slice-6m-worker and slice-6s-worker, reported safe to delete, left in place
+     because they belong to other sessions.
+   - prunable worktrees: none. Unpushed unmerged branches: none.

@@ -12,7 +12,7 @@ import { withFileLock } from "../runtime/file-lock.js";
  */
 export const APPROVAL_SAFETY_JOURNAL_PATH = migrateLegacyDataFile(["approval-dispatch-safety.jsonl"]);
 
-type SafetyEventKind = "created" | "revision_intent" | "revision_committed" | "approval_intent" | "approval_committed" | "status_intent" | "status_committed" | "dispatch_started" | "dispatch_resolved";
+type SafetyEventKind = "created" | "adopted" | "revision_intent" | "revision_committed" | "approval_intent" | "approval_committed" | "status_intent" | "status_committed" | "dispatch_started" | "dispatch_resolved";
 interface SafetyEvent {
   version: 1;
   kind: SafetyEventKind;
@@ -51,6 +51,14 @@ function appendFsynced(path: string, event: SafetyEvent): void {
   });
 }
 
+/**
+ * The one refusal sentence for an unreadable approval safety journal. It already names the
+ * recovery action, so callers surface it as-is rather than appending a second instruction.
+ */
+export function malformedApprovalJournalRecovery(line: number): string {
+  return `The approval safety journal is malformed at line ${line}. Ask the coordinator to repair approval-dispatch-safety.jsonl, then try again.`;
+}
+
 function parseStrict(path: string): { events: SafetyEvent[]; error: string | null } {
   if (!existsSync(path)) return { events: [], error: null };
   const events: SafetyEvent[] = [];
@@ -58,21 +66,27 @@ function parseStrict(path: string): { events: SafetyEvent[]; error: string | nul
     if (!line.trim()) continue;
     try {
       const value = JSON.parse(line) as Partial<SafetyEvent>;
-      if (value.version !== 1 || !["created", "revision_intent", "revision_committed", "approval_intent", "approval_committed", "status_intent", "status_committed", "dispatch_started", "dispatch_resolved"].includes(String(value.kind))
+      if (value.version !== 1 || !["created", "adopted", "revision_intent", "revision_committed", "approval_intent", "approval_committed", "status_intent", "status_committed", "dispatch_started", "dispatch_resolved"].includes(String(value.kind))
         || typeof value.slug !== "string" || !value.slug || typeof value.rowId !== "string" || !value.rowId
         || typeof value.fingerprint !== "string" || !/^[a-f0-9]{64}$/.test(value.fingerprint)
         || typeof value.at !== "string" || Number.isNaN(Date.parse(value.at))
-        || ((value.kind === "approval_intent" || value.kind === "approval_committed" || value.kind === "dispatch_started") && typeof value.approvalId !== "string")
+        || ((value.kind === "adopted" || value.kind === "approval_intent" || value.kind === "approval_committed" || value.kind === "dispatch_started") && (typeof value.approvalId !== "string" || !/^[a-f0-9]{64}$/.test(value.approvalId)))
         || ((value.kind === "status_intent" || value.kind === "status_committed") && typeof value.status !== "string")
         || ((value.kind === "revision_intent" || value.kind === "revision_committed") && (typeof value.previousFingerprint !== "string" || !/^[a-f0-9]{64}$/.test(value.previousFingerprint)))
         || ((value.kind === "dispatch_started" || value.kind === "dispatch_resolved") && (typeof value.attemptId !== "string" || !/^[a-f0-9]{64}$/.test(value.attemptId)))
         || (value.kind === "dispatch_resolved" && value.resolution !== "exists" && value.resolution !== "not-created")) {
-        return { events: [], error: `approval safety journal is malformed at line ${index + 1}` };
+        return { events: [], error: malformedApprovalJournalRecovery(index + 1) };
       }
       events.push(value as SafetyEvent);
-    } catch { return { events: [], error: `approval safety journal is malformed at line ${index + 1}` }; }
+    } catch { return { events: [], error: malformedApprovalJournalRecovery(index + 1) }; }
   }
   return { events, error: null };
+}
+
+/** Fail before a queue mutation when the shared safety journal is not strictly readable. */
+export function assertApprovalJournalReadable(path: string = APPROVAL_SAFETY_JOURNAL_PATH): void {
+  const parsed = parseStrict(path);
+  if (parsed.error) throw new Error(parsed.error);
 }
 
 /** Fingerprint the delivery-relevant row cells and the exact derivative bytes. */
@@ -100,14 +114,17 @@ export function recordNewQueueRows(folder: string, rows: readonly Pick<QueueRow,
     const slug = basename(folder);
     const parsed = parseStrict(journalPath);
     if (parsed.error) throw new Error(parsed.error);
-    const known = new Set(parsed.events.filter((event) => event.kind === "created").map((event) => key(event.slug, event.rowId)));
+    const known = new Set(parsed.events.filter((event) => event.kind === "created" || event.kind === "adopted").map((event) => key(event.slug, event.rowId)));
     for (const row of rows) {
       const fingerprint = approvalFingerprint(folder, row);
       // A row without a completed immutable derivative is still appended for its existing caller,
       // but it must remain untrusted. Throwing here would tempt callers to retry an append and
       // manufacture a duplicate identity; absence of a creation event is the conservative result.
       if (!fingerprint) continue;
-      if (known.has(key(slug, row.id))) throw new Error(`queue identity ${row.id} was already created and cannot gain fresh provenance`);
+      // Rescanning a completed folder is deliberate for subprocess-produced rows. A known identity
+      // already has its one creation capability, so leave it byte-for-byte alone and keep scanning
+      // for later rows that still need theirs.
+      if (known.has(key(slug, row.id))) continue;
       appendFsynced(journalPath, { version: 1, kind: "created", slug, rowId: row.id, fingerprint, at: new Date().toISOString() });
       known.add(key(slug, row.id));
     }
@@ -165,6 +182,7 @@ export function publishingClaimIsActive(slug: string, rowId: string, ledgerPath:
 }
 
 type JournalState = {
+  provenance: "created" | "adopted";
   fingerprint: string;
   currentStatus: string;
   approvalId: string | null;
@@ -178,9 +196,19 @@ type JournalState = {
 function deriveJournalState(events: SafetyEvent[]): { state: JournalState | null; error: string | null } {
   let state: JournalState | null = null;
   for (const event of events) {
-    if (event.kind === "created") {
+    if (event.kind === "created" || event.kind === "adopted") {
       if (state) return { state: null, error: "this queue identity has conflicting creation evidence" };
-      state = { fingerprint: event.fingerprint, currentStatus: "pending", approvalId: null, pendingApproval: null, pendingStatus: null, pendingRevision: null, activeAttempt: null, lastResolution: null };
+      state = {
+        provenance: event.kind,
+        fingerprint: event.fingerprint,
+        currentStatus: event.kind === "adopted" ? "approve" : "pending",
+        approvalId: event.kind === "adopted" ? event.approvalId! : null,
+        pendingApproval: null,
+        pendingStatus: null,
+        pendingRevision: null,
+        activeAttempt: null,
+        lastResolution: null,
+      };
       continue;
     }
     if (!state) return { state: null, error: "this queue identity has activity before durable creation evidence" };
@@ -227,13 +255,14 @@ function deriveJournalState(events: SafetyEvent[]): { state: JournalState | null
 export type ApprovalDispatchDisposition =
   | { kind: "legacy" }
   | { kind: "fresh" }
+  | { kind: "adopted" }
   | { kind: "reconciled-not-created" }
   | { kind: "blocked"; reason: string };
 
 /** Read the strict journal for scheduling, never treating missing provider history as approval. */
 export function approvalDispatchDisposition(folder: string, slug: string, row: QueueRow, ledgerPath: string, journalPath: string = journalPathForLedger(ledgerPath)): ApprovalDispatchDisposition {
   const parsed = parseStrict(journalPath);
-  if (parsed.error) return { kind: "blocked", reason: `${parsed.error}; reconcile it before scheduling` };
+  if (parsed.error) return { kind: "blocked", reason: parsed.error };
   const matching = parsed.events.filter((event) => event.slug === slug && event.rowId === row.id);
   if (!matching.length) return { kind: "legacy" };
   const derived = deriveJournalState(matching);
@@ -243,7 +272,48 @@ export function approvalDispatchDisposition(folder: string, slug: string, row: Q
   if (row.status !== "approve" || derived.state.currentStatus !== "approve" || !derived.state.approvalId) return { kind: "blocked", reason: "this row lacks a complete valid latest approval transition; reconcile it before scheduling" };
   if (derived.state.activeAttempt) return { kind: "blocked", reason: "this row already has a durable dispatch fence; reconcile its provider state before retrying" };
   if (derived.state.lastResolution === "exists") return { kind: "blocked", reason: "this row's latest exact provider reconciliation found an existing object" };
-  return { kind: derived.state.lastResolution === "not-created" ? "reconciled-not-created" : "fresh" };
+  if (derived.state.lastResolution === "not-created") return { kind: "reconciled-not-created" };
+  return { kind: derived.state.provenance === "adopted" ? "adopted" : "fresh" };
+}
+
+/**
+ * Explicitly adopt one already-approved row that predates the journal. The coordinator must
+ * confirm the fingerprint printed by the CLI. One committed event records both that exact
+ * fingerprint and the explicit approval adoption, so a crash cannot strand a half-adopted row.
+ */
+export function adoptApprovedQueueRow(
+  folder: string,
+  slug: string,
+  id: string,
+  expectedFingerprint: string,
+  ledgerPath: string,
+  journalPath: string = journalPathForLedger(ledgerPath),
+): string {
+  if (!/^[a-f0-9]{64}$/.test(expectedFingerprint)) throw new Error("adoption requires the full expected asset fingerprint");
+  if (basename(folder) !== slug) throw new Error("adoption slug must match the content folder name");
+  const release = claimPublishingAttempt(slug, id, ledgerPath);
+  try {
+    return withFileLock(`${journalPath}.mutation.lock`, () => {
+      const row = readQueue(folder).rows.find((item) => item.id === id);
+      if (!row) throw new Error(`queue row ${id} does not exist`);
+      if (row.status !== "approve") throw new Error(`queue row ${id} has status ${row.status || "pending"}, not approve`);
+      const fingerprint = approvalFingerprint(folder, row);
+      if (!fingerprint) throw new Error(`queue row ${id} asset fingerprint cannot be computed`);
+      if (fingerprint !== expectedFingerprint) throw new Error(`queue row ${id} asset fingerprint changed; run the adoption preview again`);
+      const parsed = parseStrict(journalPath);
+      if (parsed.error) throw new Error(parsed.error);
+      if (parsed.events.some((event) => event.slug === slug && event.rowId === id)) {
+        throw new Error(`queue row ${id} already has approval provenance journal events`);
+      }
+      const approvalId = createHash("sha256").update(`${key(slug, id)}\0${fingerprint}\0adopted\0${Date.now()}\0${process.pid}`).digest("hex");
+      appendFsynced(journalPath, { version: 1, kind: "adopted", slug, rowId: id, fingerprint, approvalId, at: new Date().toISOString() });
+      return fingerprint;
+    });
+  } finally { release(); }
+}
+
+export function legacyApprovalRecovery(slug: string, rowId: string): string {
+  return `This row has no verifiable creation and approval provenance. Ask the coordinator to run scripts/reconcile-approval-provenance.ts for ${slug}/${rowId}, then try Schedule again.`;
 }
 
 /**
@@ -294,17 +364,17 @@ export function commitReviewStatus(
 /** Return a refusal reason unless the row owns one unconsumed fresh capability. */
 export function approvalSchedulingBlock(folder: string, slug: string, row: QueueRow, ledgerPath: string, journalPath: string = journalPathForLedger(ledgerPath)): string | null {
   const disposition = approvalDispatchDisposition(folder, slug, row, ledgerPath, journalPath);
-  if (disposition.kind === "fresh") return null;
+  if (disposition.kind === "fresh" || disposition.kind === "adopted") return null;
   if (disposition.kind === "reconciled-not-created") return "this row requires its exact reconciliation path before a second dispatch";
   return disposition.kind === "legacy"
-    ? "this row has no verifiable creation and approval provenance; reconcile it before scheduling"
+    ? legacyApprovalRecovery(slug, row.id)
     : disposition.reason;
 }
 
 /** Consume fresh or exactly reconciled eligibility before any external callback. */
 export function markDispatchStarted(folder: string, slug: string, row: QueueRow, ledgerPath: string, journalPath: string = journalPathForLedger(ledgerPath)): string {
   const disposition = approvalDispatchDisposition(folder, slug, row, ledgerPath, journalPath);
-  if (disposition.kind !== "fresh" && disposition.kind !== "reconciled-not-created") throw new Error(disposition.kind === "legacy" ? "this row has no verifiable creation and approval provenance; reconcile it before scheduling" : disposition.reason);
+  if (disposition.kind !== "fresh" && disposition.kind !== "adopted" && disposition.kind !== "reconciled-not-created") throw new Error(disposition.kind === "legacy" ? legacyApprovalRecovery(slug, row.id) : disposition.reason);
   const fingerprint = approvalFingerprint(folder, row)!;
   const events = parseStrict(journalPath).events.filter((event) => event.slug === slug && event.rowId === row.id);
   const state = deriveJournalState(events).state!;
@@ -316,7 +386,7 @@ export function markDispatchStarted(folder: string, slug: string, row: QueueRow,
 /** Persist the exact human or internal proof that the latest fenced attempt did or did not create. */
 export function resolveDispatchFence(slug: string, rowId: string, resolution: "exists" | "not-created", ledgerPath: string, journalPath: string = journalPathForLedger(ledgerPath)): boolean {
   const parsed = parseStrict(journalPath);
-  if (parsed.error) throw new Error(`${parsed.error}; reconcile it before scheduling`);
+  if (parsed.error) throw new Error(parsed.error);
   const state = deriveJournalState(parsed.events.filter((event) => event.slug === slug && event.rowId === rowId));
   if (state.error) throw new Error(`${state.error}; reconcile it before scheduling`);
   if (!state.state?.activeAttempt) return false;

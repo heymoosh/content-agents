@@ -41,6 +41,7 @@ import {
   sendLockedOutreachEmail,
   reconcileLockedOutreachEmail,
   reviewRequestHandler,
+  renderReviewPage,
   setReviewSchedulingDepsForTest,
 } from "./serve.js";
 import { listFictionSeries } from "./fiction.js";
@@ -367,6 +368,14 @@ test("approval writes status without dispatching through a scheduler", () => {
   assert.doesNotMatch(route, /scheduleApproved/);
   assert.doesNotMatch(route, /scheduleApprovedOnce/);
   assert.doesNotMatch(route, /schedulingInFlight/);
+});
+
+test("the rendered Studio route carries readable persistent Publishing refusal styles", () => {
+  const html = renderReviewPage({ repoRoot: process.cwd(), isDevWorktree: false, fixtures: false });
+  assert.match(html, /id="publishing-provenance-styles"/);
+  assert.match(html, /#flash\.flash\.error \{ font-size:1\.125rem; line-height:1\.5; overflow-wrap:anywhere; \}/);
+  assert.match(html, /#publishedSheet \.publish-row:not\(\.head\) \{ grid-template-columns:minmax\(0,1fr\) auto; \}/);
+  assert.match(html, /flashStanding=true/);
 });
 
 test("POST /api/status approves a row without a publishing attempt", async () => {
