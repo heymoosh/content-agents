@@ -4,17 +4,19 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
   `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **6X**, `docs/operations/launch-slices/SLICE-6X.md`, PASS. Nothing
-  blocked. Approving a row in Studio's Publishing room and scheduling it now works the first time,
-  no per-row seeding script. `npm run check` 4405/0, `npm run test:e2e` 55/0/16.
-- What changed: every production path that creates a queue row records provenance; pre-existing
-  rows have one adoption path, `scripts/reconcile-approval-provenance.ts` (needs `--write
-  --expect-fingerprint`). A row with no provenance is still refused and names its own recovery.
-- Next: no packet written. Open 6W deferral is auditing Postiz-routed channels' connection health
-  (TikTok, LinkedIn, X, Threads, Mastodon); it needs a packet before any work starts.
+- Current / last accepted: **6Y**, `docs/operations/launch-slices/SLICE-6Y.md`, PASS. Nothing
+  blocked. Every Postiz channel Muxin approves is schedulable, not just the one pinned account.
+  `npm run check` 4419/0, `npm run test:e2e` 55/0/16.
+- What changed: `POSTIZ_ACCOUNT_IDS` is a comma-separated allowlist of approved account ids,
+  unioned with legacy `POSTIZ_ACCOUNT_ID` (still ONE opaque id, never split). Unapproved channels
+  refuse and name the id to add. Ambiguity always refuses; it never guesses an account.
+- Next: no packet written. Muxin must paste a `POSTIZ_ACCOUNT_IDS` line into `.env` before any
+  channel beyond Bluesky schedules; no agent may edit that file. The 6W deferral that blocked
+  Threads is closed by 6Y; what remains of it is per-channel connection health for the media-only
+  channels (TikTok, Instagram, YouTube), which Postiz does not advertise text for.
 - Last decision: builder family is Claude for now, Codex and Grok reserved for cross-family audits
   because quota is limited. Codex is capped until 2026-09-15.
-- Details: `## Progress log` -> 2026-09-11 (6X). Below is history; read only cited headings.
+- Details: `## Progress log` -> 2026-09-11 (6Y). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -49,6 +51,33 @@ worker holding only that section and its packet still has them.
   scannable at arm's length without zoom. A slice that fails any of the five is not accepted.
 
 ## Progress log
+
+### 2026-09-11 (6Y) — every approved Postiz channel schedules, not just the pinned one
+
+Threads would not schedule from the Publishing room. The cause was not Threads and not the route:
+`resolveConfiguredPostizCapability` read a single `POSTIZ_ACCOUNT_ID`, and Postiz issues one
+account id per connected channel, so exactly one channel could ever be selected. Bluesky held the
+pin, so Bluesky was the only channel 6W ever got working. That is the root of the open 6W deferral.
+
+Selection is now an allowlist. `POSTIZ_ACCOUNT_IDS` takes a comma-separated list of approved
+account ids and is unioned with the legacy variable, which keeps working and is read as ONE opaque
+id that is never comma-split. Blank entries are dropped, so an empty value is unset and never
+"approve everything": a channel newly connected in Postiz stays unpostable until a human adds its
+id. Two approved accounts advertising the same destination is a refusal naming both, never a pick.
+A connected but unapproved channel now names the real cause and the fix instead of claiming Postiz
+does not advertise a channel it plainly does.
+
+Every ambiguous case fails closed on purpose. A wrongly permissive selection posts under Muxin's
+byline to the wrong account with no undo; a wrongly strict one only blocks scheduling.
+
+`selectDeliveryRoute` is untouched: this changes which account a postiz route uses, not whether a
+row routes to Postiz at all. 13 new tests. Grok audited cross-family and found one permissive
+drift, the legacy variable being comma-split too; that was repaired and a bounded delta audit
+returned CLOSED. `npm run check` 4419/0/0, e2e 55/0/16.
+
+Left for Muxin: paste a `POSTIZ_ACCOUNT_IDS` line into `.env`. Six channels are connected and
+text-capable (bluesky, threads, linkedin, x, mastodon, facebook); only the ids she lists can be
+posted to, which is the point of the guard.
 
 ### 2026-09-11 (6X) — approved rows schedule first time, and refusals name their own fix
 

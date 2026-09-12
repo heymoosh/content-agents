@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { cancelPostizPost, createPostizPost, defaultProviderSettings, fetchPostizCapabilities, readPostizPost, reconcilePostizPost, reschedulePostizPost, resolveConfiguredPostizCapability, selectDeliveryRoute, supportsPostiz, createPostizTransport, updatePostizPost, uploadPostizMedia, type PostizTransport, rateLimitRetryAt, PostizRateLimitError, postizRateLimitRetryAt } from "./postiz.js";
+import { cancelPostizPost, createPostizPost, defaultProviderSettings, fetchPostizCapabilities, readPostizPost, reconcilePostizPost, reschedulePostizPost, resolveConfiguredPostizCapability, selectDeliveryRoute, supportsPostiz, createPostizTransport, updatePostizPost, uploadPostizMedia, type PostizTransport, type PostizCapabilityRegistry, type PostizDestination, type PostizMedia, rateLimitRetryAt, PostizRateLimitError, postizRateLimitRetryAt } from "./postiz.js";
 import { assertLiveCanaryGate, runPostizLifecycleCanary } from "./postiz-canary.js";
 import { runCanaryMatrix } from "./canary-matrix.js";
 
@@ -377,4 +377,153 @@ test("a 429 carries the provider's resume time when it sends one, else one hour"
   assert.equal(postizRateLimitRetryAt("Postiz POST /x failed (500)"), null);
   // Only the create endpoint is throttled; a 429 anywhere else stays an ordinary transport error.
   await assert.rejects(transport.request("/public/v1/upload", { method: "POST", body: "{}" }), /Postiz POST \/public\/v1\/upload failed \(429\)/);
+});
+
+// ── SLICE-6Y: every connected Postiz channel is schedulable, not just the one pinned id ─────────
+//
+// Postiz issues one account id per connected channel, so the old single `POSTIZ_ACCOUNT_ID` could
+// only ever name one of them and every other channel was refused with "does not advertise" for a
+// capability Postiz really did advertise. The approved-account guard stays an explicit allowlist:
+// a channel newly connected in Postiz is still unpostable until a human adds its id.
+//
+// The fixture mirrors live discovery on 2026-09-11 (mastodon, facebook, linkedin, threads, x,
+// bluesky, all text-only). Account ids here are invented; no real id or secret appears.
+describe("SLICE-6Y approved Postiz accounts", () => {
+  const ACCOUNTS: Record<string, PostizDestination> = {
+    "acct-mastodon": "mastodon", "acct-facebook": "facebook", "acct-linkedin": "linkedin",
+    "acct-threads": "threads", "acct-x": "x", "acct-bluesky": "bluesky",
+  };
+  const liveShape: PostizCapabilityRegistry = {
+    fetchedAt: "2026-09-11T12:00:00Z",
+    capabilities: Object.entries(ACCOUNTS).map(([accountId, destination]) => ({
+      destination, media: ["text"] as PostizMedia[], accountId, accountLabel: `Human Inference ${destination}`,
+    })),
+  };
+  const refusal = (destination: PostizDestination, media: PostizMedia, env: NodeJS.ProcessEnv): string => {
+    try { resolveConfiguredPostizCapability(liveShape, destination, media, env); } catch (error) { return (error as Error).message; }
+    throw new Error(`expected ${destination}/${media} to be refused`);
+  };
+
+  test("one approved id schedules its own channel and nothing else", () => {
+    const env = { POSTIZ_ACCOUNT_IDS: "acct-threads" };
+    const resolved = resolveConfiguredPostizCapability(liveShape, "threads", "text", env);
+    assert.equal(resolved.accountId, "acct-threads");
+    assert.equal(resolved.destination, "threads");
+    // Every other connected channel is still refused, so the guard did not become "pick whatever matches".
+    for (const destination of Object.values(ACCOUNTS).filter((d) => d !== "threads")) {
+      assert.match(refusal(destination, "text", env), /not approved for posting/);
+    }
+  });
+
+  test("several approved ids each resolve to their own account; an unlisted channel is refused", () => {
+    const env = { POSTIZ_ACCOUNT_IDS: "acct-threads, acct-bluesky ,acct-linkedin" };
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "threads", "text", env).accountId, "acct-threads");
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "bluesky", "text", env).accountId, "acct-bluesky");
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "linkedin", "text", env).accountId, "acct-linkedin");
+    assert.match(refusal("x", "text", env), /Postiz has x\/text connected on account acct-x, which is not approved for posting\./);
+  });
+
+  test("the legacy single variable keeps working as a one-entry allowlist", () => {
+    const env = { POSTIZ_ACCOUNT_ID: "acct-bluesky" };
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "bluesky", "text", env).accountId, "acct-bluesky");
+    for (const destination of Object.values(ACCOUNTS).filter((d) => d !== "bluesky")) {
+      assert.match(refusal(destination, "text", env), /not approved for posting/);
+    }
+  });
+
+  test("both variables set approve the union and the legacy value is not dropped", () => {
+    const env = { POSTIZ_ACCOUNT_ID: "acct-bluesky", POSTIZ_ACCOUNT_IDS: "acct-threads" };
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "bluesky", "text", env).accountId, "acct-bluesky");
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "threads", "text", env).accountId, "acct-threads");
+    assert.match(refusal("x", "text", env), /not approved for posting/);
+  });
+
+  test("two approved accounts on one channel refuse and name both ids", () => {
+    const doubled: PostizCapabilityRegistry = {
+      fetchedAt: "2026-09-11T12:00:00Z",
+      capabilities: [
+        { destination: "threads", media: ["text"], accountId: "acct-threads", accountLabel: "first" },
+        { destination: "threads", media: ["text"], accountId: "acct-threads-2", accountLabel: "second" },
+      ],
+    };
+    const env = { POSTIZ_ACCOUNT_IDS: "acct-threads,acct-threads-2" };
+    assert.throws(
+      () => resolveConfiguredPostizCapability(doubled, "threads", "text", env),
+      /2 approved Postiz accounts advertise threads\/text \(acct-threads, acct-threads-2\)\. Leave one of them in POSTIZ_ACCOUNT_IDS and remove the rest\./,
+    );
+    // With only one of the two approved there is no ambiguity, so it still resolves.
+    assert.equal(resolveConfiguredPostizCapability(doubled, "threads", "text", { POSTIZ_ACCOUNT_IDS: "acct-threads-2" }).accountId, "acct-threads-2");
+    // Neither approved names both connected ids and still refuses.
+    assert.throws(
+      () => resolveConfiguredPostizCapability(doubled, "threads", "text", { POSTIZ_ACCOUNT_IDS: "acct-bluesky" }),
+      /Postiz has threads\/text connected on accounts acct-threads, acct-threads-2, none of them approved for posting\. Add the one you want to POSTIZ_ACCOUNT_IDS to schedule this channel\./,
+    );
+  });
+
+  test("nothing configured is a refusal, and an empty list is unset rather than approve-everything", () => {
+    for (const env of [{}, { POSTIZ_ACCOUNT_IDS: "" }, { POSTIZ_ACCOUNT_IDS: "   " }, { POSTIZ_ACCOUNT_IDS: " , ,, " }, { POSTIZ_ACCOUNT_IDS: "", POSTIZ_ACCOUNT_ID: "  " }]) {
+      assert.equal(refusal("threads", "text", env), "POSTIZ_ACCOUNT_IDS or POSTIZ_ACCOUNT_ID is required to select a discovered instance account");
+    }
+  });
+
+  // Audit finding P2 (Grok, 2026-09-11): splitting the legacy variable too would widen the guard.
+  // A legacy value holding a comma used to be one opaque id that matched nothing; it must stay that
+  // way. Only POSTIZ_ACCOUNT_IDS is a list.
+  test("the legacy variable is one opaque id and is never split into a list", () => {
+    const joined = "acct-threads,acct-bluesky";
+    // Both halves are real registry ids, so a split would resolve them. It must not.
+    assert.match(refusal("threads", "text", { POSTIZ_ACCOUNT_ID: joined }), /Postiz has threads\/text connected on account acct-threads, which is not approved for posting\./);
+    assert.match(refusal("bluesky", "text", { POSTIZ_ACCOUNT_ID: joined }), /Postiz has bluesky\/text connected on account acct-bluesky, which is not approved for posting\./);
+    // The very same pair in the list variable IS approved, so the refusal above is about the
+    // legacy variable's shape and not about these two ids.
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "threads", "text", { POSTIZ_ACCOUNT_IDS: joined }).accountId, "acct-threads");
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "bluesky", "text", { POSTIZ_ACCOUNT_IDS: joined }).accountId, "acct-bluesky");
+    // A trailing comma is part of the opaque id too, so it matches nothing.
+    assert.match(refusal("threads", "text", { POSTIZ_ACCOUNT_ID: "acct-threads," }), /not approved for posting/);
+    // An untrimmed legacy id still works, because trimming is not splitting.
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "threads", "text", { POSTIZ_ACCOUNT_ID: "  acct-threads  " }).accountId, "acct-threads");
+  });
+
+  test("an approved id the registry never returned selects nothing and fabricates nothing", () => {
+    const env = { POSTIZ_ACCOUNT_IDS: "acct-ghost,acct-threads" };
+    // The ghost id is simply ignored: the real approved id still resolves...
+    assert.equal(resolveConfiguredPostizCapability(liveShape, "threads", "text", env).accountId, "acct-threads");
+    // ...and a destination the registry does not advertise at all is still refused, not invented.
+    assert.equal(refusal("instagram", "text", env), "configured Postiz account does not advertise instagram/text");
+    assert.equal(refusal("threads", "image", env), "configured Postiz account does not advertise threads/image");
+  });
+
+  test("the connected-but-unapproved refusal names the cause and the fix, and stops blaming the channel", () => {
+    const message = refusal("threads", "text", { POSTIZ_ACCOUNT_IDS: "acct-bluesky" });
+    assert.equal(message, "Postiz has threads/text connected on account acct-threads, which is not approved for posting. Add acct-threads to POSTIZ_ACCOUNT_IDS to schedule this channel.");
+    assert.ok(!/does not advertise/.test(message), "Postiz does advertise this channel, so the old wording would be a lie");
+  });
+
+  test("the guard fails closed: no capability of an unapproved account is ever returned", () => {
+    // One approved id at a time, across every connected channel. The only pair that may resolve is
+    // the one whose own account is approved; every other pair must throw.
+    for (const approved of Object.keys(ACCOUNTS)) {
+      for (const [accountId, destination] of Object.entries(ACCOUNTS)) {
+        if (accountId === approved) {
+          assert.equal(resolveConfiguredPostizCapability(liveShape, destination, "text", { POSTIZ_ACCOUNT_IDS: approved }).accountId, accountId);
+        } else {
+          assert.throws(() => resolveConfiguredPostizCapability(liveShape, destination, "text", { POSTIZ_ACCOUNT_IDS: approved }));
+        }
+      }
+    }
+  });
+
+  test("every refusal this guard can produce passes the voice rules", () => {
+    const messages = [
+      refusal("threads", "text", {}),
+      refusal("threads", "text", { POSTIZ_ACCOUNT_IDS: "acct-bluesky" }),
+      refusal("instagram", "text", { POSTIZ_ACCOUNT_IDS: "acct-bluesky" }),
+      refusal("threads", "text", { POSTIZ_ACCOUNT_IDS: "acct-ghost" }),
+    ];
+    for (const message of messages) {
+      assert.ok(!message.includes("—"), `em dash in refusal: ${message}`);
+      assert.ok(!/here's the thing|isn't just|at the end of the day|let's (dive|unpack)|leverage|seamless|robust/i.test(message), `AI tell in refusal: ${message}`);
+      assert.ok(!/[A-Za-z0-9_-]{20,}/.test(message.replace(/POSTIZ_ACCOUNT_IDS?/g, "")), `refusal looks like it carries a secret: ${message}`);
+    }
+  });
 });

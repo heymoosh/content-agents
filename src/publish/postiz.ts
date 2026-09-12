@@ -295,17 +295,64 @@ export function supportsPostiz(registry: PostizCapabilityRegistry, destination: 
   return registry.capabilities.some((entry) => entry.destination === destination && entry.media.includes(media));
 }
 
+/**
+ * The approved-account allowlist, in the order the ids were configured.
+ *
+ * Postiz issues one account id per connected channel, so a single `POSTIZ_ACCOUNT_ID` can only ever
+ * name one channel. `POSTIZ_ACCOUNT_IDS` is a comma-separated list of every account Muxin has
+ * approved for posting. `POSTIZ_ACCOUNT_ID` still works and is read as ONE opaque id, never split
+ * on commas, so a legacy value that happens to contain a comma matches no account and is refused.
+ * Splitting it too would widen the guard in the permissive direction, which this function must
+ * never do. The two are unioned, never one instead of the other. Empty and whitespace-only entries
+ * are dropped, so an empty value is unset and never "approve everything": a channel newly connected
+ * in Postiz stays unpostable until a human adds its id here.
+ */
+function approvedPostizAccountIds(env: NodeJS.ProcessEnv): string[] {
+  const approved: string[] = [];
+  const approve = (value: string): void => {
+    const id = value.trim();
+    if (id && !approved.includes(id)) approved.push(id);
+  };
+  if (typeof env.POSTIZ_ACCOUNT_IDS === "string") for (const part of env.POSTIZ_ACCOUNT_IDS.split(",")) approve(part);
+  if (typeof env.POSTIZ_ACCOUNT_ID === "string") approve(env.POSTIZ_ACCOUNT_ID);
+  return approved;
+}
+
+/**
+ * Pick the approved account that advertises this destination/media, or refuse.
+ *
+ * Every ambiguous case fails closed. A wrongly permissive selection posts real content to a real
+ * social account under Muxin's byline with no undo; a wrongly strict one only blocks scheduling,
+ * which she can fix by adding an id.
+ */
 export function resolveConfiguredPostizCapability(
   registry: PostizCapabilityRegistry,
   destination: PostizDestination,
   media: PostizMedia,
   env: NodeJS.ProcessEnv = process.env,
 ): PostizCapability {
-  const configured = env.POSTIZ_ACCOUNT_ID?.trim();
-  if (!configured) throw new Error("POSTIZ_ACCOUNT_ID is required to select a discovered instance account");
-  const match = registry.capabilities.find((entry) => entry.accountId === configured && entry.destination === destination && entry.media.includes(media));
-  if (!match) throw new Error(`configured Postiz account does not advertise ${destination}/${media}`);
-  return match;
+  const approved = approvedPostizAccountIds(env);
+  if (!approved.length) throw new Error("POSTIZ_ACCOUNT_IDS or POSTIZ_ACCOUNT_ID is required to select a discovered instance account");
+  const advertised = registry.capabilities.filter((entry) => entry.destination === destination && entry.media.includes(media));
+  const matches = advertised.filter((entry) => approved.includes(entry.accountId));
+  // Two approved accounts for one channel is a refusal, never a pick: guessing which one Muxin
+  // meant would post to the wrong account.
+  if (matches.length > 1) {
+    const ids = matches.map((entry) => entry.accountId).join(", ");
+    throw new Error(`${matches.length} approved Postiz accounts advertise ${destination}/${media} (${ids}). Leave one of them in POSTIZ_ACCOUNT_IDS and remove the rest.`);
+  }
+  if (matches.length === 1) return matches[0];
+  // The channel is connected but its account was never approved. Name the real cause and the fix,
+  // rather than blaming the channel for a capability Postiz does advertise.
+  if (advertised.length === 1) {
+    const id = advertised[0].accountId;
+    throw new Error(`Postiz has ${destination}/${media} connected on account ${id}, which is not approved for posting. Add ${id} to POSTIZ_ACCOUNT_IDS to schedule this channel.`);
+  }
+  if (advertised.length > 1) {
+    const ids = advertised.map((entry) => entry.accountId).join(", ");
+    throw new Error(`Postiz has ${destination}/${media} connected on accounts ${ids}, none of them approved for posting. Add the one you want to POSTIZ_ACCOUNT_IDS to schedule this channel.`);
+  }
+  throw new Error(`configured Postiz account does not advertise ${destination}/${media}`);
 }
 
 /** Exceptions are considered only when live registry evidence says Postiz is unsupported. */

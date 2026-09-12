@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { scheduleApproved, type SchedulerDeps } from "./studio-scheduling.js";
+import { scheduleApproved, selectConfiguredProvider, type SchedulerDeps } from "./studio-scheduling.js";
 import type { QueueRow } from "../publish/queue.js";
 import type { DeliveryBrand, DeliveryPolicyDecision } from "../publish/delivery-policy.js";
 import type { PostizCapabilityRegistry, PostizDestination, PostizMedia } from "../publish/postiz.js";
@@ -280,5 +280,43 @@ describe("explicit unscheduled Typefully drafts", () => {
     const result = await scheduleApproved("/tmp/slice-5t-refusal", textRow({ platform: "quote-card:x" }), deps, undefined, "unscheduled-draft");
     assert.match(result.scheduleError ?? "", /only supported for Typefully text rows/);
     assert.equal(calls, 0);
+  });
+});
+
+// ── SLICE-6Y: the Publishing room can schedule every approved Postiz channel ────────────────────
+//
+// The Publishing room's Schedule button runs `selectConfiguredProvider` before anything is created,
+// so this is the seam where a threads row was refused with "does not advertise" for a channel
+// Postiz really does advertise. Discovery is stubbed; no live call, no filesystem, no provider.
+describe("SLICE-6Y the Publishing room schedules any approved Postiz channel", () => {
+  const sixChannels: PostizCapabilityRegistry = {
+    fetchedAt: "2026-09-11T12:00:00Z",
+    capabilities: (["mastodon", "facebook", "linkedin", "threads", "x", "bluesky"] as PostizDestination[])
+      .map((destination) => ({ destination, media: ["text"] as PostizMedia[], accountId: `acct-${destination}`, accountLabel: `Human Inference ${destination}` })),
+  };
+  const deps = (postizEnv: NodeJS.ProcessEnv): Pick<SchedulerDeps, "fetchPostizRegistry" | "postizEnv"> =>
+    ({ postizEnv: { ...postizEnv, POSTIZ_BASE_URL: "http://postiz.test", POSTIZ_API_KEY: "unused-by-the-stub" }, fetchPostizRegistry: async () => sixChannels });
+
+  test("an approved threads row resolves to the threads account", async () => {
+    const selected = await selectConfiguredProvider(textRow({ id: "threads-1", platform: "threads" }), deps({ POSTIZ_ACCOUNT_IDS: "acct-threads,acct-bluesky" }));
+    assert.equal(selected.provider, "postiz");
+    assert.equal(selected.postizCapability?.accountId, "acct-threads");
+    assert.equal(selected.postizCapability?.destination, "threads");
+  });
+
+  test("the legacy pinned bluesky id still schedules bluesky exactly as it does today", async () => {
+    const selected = await selectConfiguredProvider(textRow({ id: "bsky-1", platform: "bluesky" }), deps({ POSTIZ_ACCOUNT_ID: "acct-bluesky" }));
+    assert.equal(selected.provider, "postiz");
+    assert.equal(selected.postizCapability?.accountId, "acct-bluesky");
+  });
+
+  test("a connected channel Muxin never approved refuses with the id she has to add", async () => {
+    await assert.rejects(
+      selectConfiguredProvider(textRow({ id: "threads-1", platform: "threads" }), deps({ POSTIZ_ACCOUNT_ID: "acct-bluesky" })),
+      (error: Error) => {
+        assert.equal(error.message, "Postiz has threads/text connected on account acct-threads, which is not approved for posting. Add acct-threads to POSTIZ_ACCOUNT_IDS to schedule this channel.");
+        return true;
+      },
+    );
   });
 });
