@@ -12,18 +12,17 @@ A row refused by the reuse guard on a NON-Postiz route resolves its durable disp
 publisher is invoked.
 
 Today `scheduleApproved` (`src/review/studio-scheduling.ts`) runs a pre-flight
-`reuseGuardVerdict` only inside the `provider === "postiz"` branch, and only that site can return
+`reuseGuardVerdict` only inside the `provider === "postiz"` branch, so only that site can return
 `refusal: "no-provider-request"` — the one discriminant `publishing-status.ts` accepts as proof
 nothing reached the provider. Every other route (Typefully text, Typefully quote cards, PostPeer
 TikTok, YouTube, Substack) invokes its publisher first and recovers the reason afterwards from
-`runPublisher`'s empty-result branch, which can only claim the weaker `publisher-declined`. That is
-correct given what it knows, and the consequence is that those rows keep their fence forever: they
-are not resolve-eligible, cannot retry, and need hand repair. This is every quote card and every
-video in the system.
+`runPublisher`'s empty-result branch, which can only claim the weaker `publisher-declined`. Those
+rows keep their fence forever: not resolve-eligible, cannot retry, hand repair only. That is every
+quote card and every video in the system.
 
 The fix is symmetry, not a new claim. Ask the guard BEFORE calling the publisher on those routes
-too. A refusal then returns without `fn` ever running, so `no-provider-request` is provable at that
-site by exactly the same argument the Postiz pre-flight already makes.
+too. A refusal then returns without `fn` ever running, so `no-provider-request` is provable there
+by exactly the argument the Postiz pre-flight already makes.
 
 What must NOT change: the fail-closed residue. If the pre-flight says allowed or deferred and the
 publisher still returns `[]`, that stays `publisher-declined` with the fence RETAINED. An empty
@@ -56,17 +55,17 @@ second lane would own no independent deliverable and would contend for the same 
 - `src/review/studio-scheduling.ts`
 - `src/review/publishing-status.test.ts`
 - `src/review/studio-scheduling-postiz-reuse.test.ts`
+- `src/review/studio-scheduling.test.ts` (added by the coordinator on 2026-09-12, see Adjudication)
 
 ## Do not touch
 
 - `.env` — do not read it, write it, print its values, or pass it to any tool or flag. Not with
-  cat, grep, sed, head, dotenv or `--env-file`. Read it, write it, or print its values and the
-  slice is void. `.env.example` is likewise not yours to edit.
+  cat, grep, sed, head, dotenv or `--env-file`. The slice is void otherwise. `.env.example` is
+  likewise not yours to edit.
 - Any live provider or network call. No Postiz, Typefully, PostPeer, YouTube, Substack, or
-  `npm run publish:*`. Stub discovery and every publisher in every test.
+  `npm run publish:*`. Stub discovery and every publisher.
 - `data/**`, `~/.content-agents/**`, `briefs/**` (the Placed log is an append-only shipping record:
-  read it, never modify it). Tests use `CONTENT_AGENTS_TEST_BETS_PATH` and
-  `CONTENT_AGENTS_TEST_BRIEFS_ROOT`.
+  read it, never modify it). Tests use `CONTENT_AGENTS_TEST_BETS_PATH`.
 - `docs/content-agents-backlog.md` and `docs/operations/launch-slices/evidence/**`.
 - `src/review/publishing-status.ts` — the fence-resolution rule is SLICE-7A's and is already
   correct. This slice changes only WHICH failures can truthfully carry `no-provider-request`; it
@@ -75,6 +74,32 @@ second lane would own no independent deliverable and would contend for the same 
 - `src/publish/*.ts` — the publishers' own internal guard calls stay exactly as they are. This
   slice adds a check ahead of them, it does not move or remove theirs.
 - Never weaken, rewrite, disable or delete an existing test to make anything pass.
+
+## Adjudication: the four pre-existing tests (coordinator, 2026-09-12)
+
+Four pre-existing tests fail. The first worker was right to stop rather than edit them. I have read
+all four; each asserts the publisher was invoked on a SAME-ROW refusal down a non-Postiz route,
+which is the premise this slice deliberately changes. They describe the old provenance, they are
+not wrong about safety, and the original packet failed to say what becomes of them. That is my
+error. Full reasoning and the four names: `SLICE-7C-LOG.md`.
+
+They are re-pointed, never weakened. Binding rules:
+
+- Not one assertion about what `publisher-declined` MEANS may be softened, and none of the four may
+  be deleted or skipped. Every existing claim keeps a live example.
+- Each of the four is rewritten so the recovery branch is still genuinely reached, using a scenario
+  the pre-flight lets through: the guard ALLOWS (or defers) and the stubbed publisher returns `[]`
+  anyway. That is still a real production case, it is still `publisher-declined`, and the fence is
+  still RETAINED. If a test cannot be re-pointed that way, stop and report it.
+- Each of the four ALSO gains the new assertion for its old scenario: the same-row case now yields
+  `refusal: "no-provider-request"`, an uninvoked publisher, and a cleared fence. Coverage strictly
+  increases; the count of assertions per test must not drop.
+- `src/review/studio-scheduling.test.ts:218` ("both guard paths produce the identical refusal")
+  still passes, but only because both paths now refuse at the pre-flight, so it no longer compares
+  two different paths. Restore its point by pairing a pre-flight refusal against a recovery-branch
+  refusal built the re-pointed way, so the wording-identity claim keeps a real two-path example.
+- Say plainly in the RESULT BLOCK whether a SAME-ROW refusal can still reach the recovery branch at
+  all. If it cannot, that is an acceptable consequence, but it must be recorded, not glossed.
 
 ## Cited headings
 
@@ -108,6 +133,8 @@ none
 - [ ] The comment block at the Postiz pre-flight that currently reads "Non-Postiz routes are
       deliberately not gated here" is corrected. It documents the old design and would otherwise
       read as a rule forbidding this change.
+- [ ] The four pre-existing failures named in Adjudication are re-pointed under its binding rules,
+      with no assertion softened and none deleted or skipped.
 - [ ] No user-facing string gains an em dash or an AI tell (`config/voice.yaml`).
 
 ## Verify
