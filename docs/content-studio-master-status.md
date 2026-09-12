@@ -59,8 +59,9 @@
   canceled from never-created. An already-published post is not offered a cancel button.
 - Both audited by Grok, cross-family. 7B's second commit returned one P1, an already-published post
   being cancelable, fixed before integration.
-- Next: **items 1, 2 and 5 together as one live-proving pass** (LinkedIn and Mastodon never
-  posted live; no media row has ever gone through Postiz; no deferral has run live). These are the
+- Next: **item 2 alone.** The live-proving pass ran 2026-09-12: item 5 closed, item 1 advanced to
+  scheduled-but-not-yet-fired, and item 2 was rescoped after the pass showed Postiz media was
+  already canary-proven (see `## Outstanding work` item 2). These are the
   only Outstanding items left. 7C's fence fix makes the pass safe to attempt: a refused row can be
   retried instead of needing hand repair. All three need real provider calls, so they are the
   coordinator's to run, never a worker's.
@@ -119,9 +120,23 @@ front-end or UX pass. Ordered by what blocks trusting the Publishing room, not b
    own standing warning is that a row flipping to `published` on draft creation proves nothing about
    public visibility. Close it only after confirming both posts are publicly visible on the accounts
    after their slots fire.
-2. **No media row has ever gone through Postiz.** Quote cards route to Typefully by design
-   (`selectDeliveryRoute`, the image leg 7B deliberately left alone), so the Postiz media path is
-   entirely unexercised. Same for any local-media upload leg.
+2. **No REAL media row has gone through Postiz.** **Rescoped 2026-09-12** after Muxin challenged
+   the original wording, which was wrong twice over. Postiz media is not unexercised and not
+   unproven: a two-slide carousel was live-verified 2026-09-02 on TikTok, Mastodon, Facebook,
+   Instagram, LinkedIn, Threads and X (schedule, reschedule, cancel, sweep clean;
+   `docs/evidence-postiz-canary-carousel-2026-09-02.json`), all nine connected accounts report
+   `mediaUploadVerified: true`, and configured-media rows are **Postiz-only** by design
+   (`studio-scheduling.ts:460`), not a secondary path. The old wording also conflated two different
+   row kinds: `/atomize` quote-card rows route to Typefully, configured-media rows route to Postiz.
+   The real remaining gap is narrower and is already stated in this file's own capability table:
+   **"Run one real carousel through Studio."** Only a synthetic canary has taken the path, never a
+   row Muxin approved in `review-queue.md`. Blocked on a decision, not an approval: the quote-card
+   image for the human-inference folder was never rendered (`images/` does not exist; the rows say
+   "render intentionally skipped (zero-cost run)"), so proving this costs money to render, and
+   rule 6 says offer the choice rather than auto-upgrade. **Process note:** the stale wording
+   survived several sessions because it was re-read as a summary line and never re-derived from
+   the capability table sixteen hundred lines below, which had already recorded the canary. A
+   summary that contradicts the detail section is not evidence, it is an unrefreshed cache.
 3. ~~**The non-Postiz publisher fence never clears.**~~ **DONE 2026-09-12, SLICE-7C, `919ae2e`.**
    Fixed by asking the reuse guard BEFORE the publisher on every non-Postiz route, so a refusal
    there is provably ahead of every provider call and every slot claim and can carry
@@ -154,6 +169,45 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (ops) — a missed publish slot fires late, it is not lost
+
+Not a slice. An operational finding from Muxin's question "Postiz has to be left on, right?", worth
+recording because it decides whether this operation needs dedicated hardware.
+
+**The question.** Postiz is self-hosted on Muxin's laptop, so the laptop is the posting server. If
+Docker is not running when a slot comes due, does the post fire late or vanish? Nobody knew. The
+honest answer mattered: "vanish" argues for an always-on box, "late" does not.
+
+**Mechanism.** Postiz drives scheduling through Temporal (five of the nine containers are Temporal,
+only three are Postiz proper; the ninth is an nginx TLS terminator for the meta host). Each
+scheduled post is one `postWorkflowV106` execution whose history is a single `TimerStarted` event.
+The LinkedIn row's timer carries `startToFireTimeout: 80267.958s` from 17:12:12Z, landing exactly on
+its 15:30Z slot. Those timers persist to `temporal-postgresql` as rows in `timer_tasks` with an
+**absolute** `visibility_timestamp`, not a relative countdown, on a durable volume. So downtime
+cannot silently reset or erase a scheduled post.
+
+**Test.** Persistence alone does not prove catch-up, so it was tested rather than asserted. A timer
+due at 17:57:33Z was targeted, the stack stopped at 17:51:10Z, the deadline allowed to pass with
+nothing running, and the stack restarted. The expired timer was processed on restart (its row is
+gone). **A missed slot fires late.** All three of Muxin's scheduled post workflows survived the
+cycle intact. The window was deliberately ~10 minutes against an internal housekeeping timer, with
+every post timer 22h+ out, so no live post could fire during it.
+
+**Decision (Muxin, 2026-09-12): keep Docker on, do not buy a Raspberry Pi.** The stack draws ~4.1GB
+resident (postiz 2.5GB, elasticsearch 780MB, temporal 475MB), so a Pi would need the 8GB or 16GB
+model at roughly $140 to $185 all-in, against a failure mode that is now known to be lateness rather
+than loss. Every container is `restart: always`, so ticking "Start Docker Desktop when you sign in"
+covers the common case for free. Revisit only if slots start slipping by more than a day.
+
+**Residual, untested:** the test proves the *timer* fires, not that the *post* succeeds. A provider
+may reject a stale scheduled request, and the failure mode of a post appearing at an unintended hour
+under Muxin's byline is bad enough that it should be observed the first time it happens rather than
+provoked deliberately.
+
+**Method note:** `docker compose stop` was refused by the auto-mode classifier as "[Interfere With
+Workloads]". Correctly so, and not worked around. The test was written to a script for Muxin to run
+herself with the `!` prefix, the same pattern the live publish command needed earlier the same day.
 
 ### 2026-09-12 (7D) — a dateless Typefully draft stops releasing a live slot claim
 
