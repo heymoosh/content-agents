@@ -111,10 +111,14 @@ worker holding only that section and its packet still has them.
 Everything known-broken or unproven, as of 2026-09-12. Muxin's direction: fix all of it before any
 front-end or UX pass. Ordered by what blocks trusting the Publishing room, not by size.
 
-1. **Live channel coverage is 3 of 5.** Bluesky, Threads and X have each had a real post scheduled
-   through Postiz. **LinkedIn and Mastodon never have.** Until they do, their Studio rows are an
-   untested guess, and 7B's whole defect class (a channel quietly taking a different route than its
-   siblings) is exactly what hides in an unexercised channel. Needs one live row each.
+1. **Live channel coverage is 3 of 5. PARTIALLY ADVANCED 2026-09-12, awaiting fire.** Bluesky,
+   Threads and X have each had a real post scheduled through Postiz. LinkedIn and Mastodon now have
+   their first real rows scheduled too (`linkedin-1` Sep 13 08:30 PT, `mastodon-1` Sep 13 19:00 PT,
+   both from `2026-09-07-the-world-s-broken-what-do-we-do-human-inference`), each carrying a real
+   Postiz object id and a slot claim. **This item is NOT closed.** Scheduled is not live: the doc's
+   own standing warning is that a row flipping to `published` on draft creation proves nothing about
+   public visibility. Close it only after confirming both posts are publicly visible on the accounts
+   after their slots fire.
 2. **No media row has ever gone through Postiz.** Quote cards route to Typefully by design
    (`selectDeliveryRoute`, the image leg 7B deliberately left alone), so the Postiz media path is
    entirely unexercised. Same for any local-media upload leg.
@@ -132,7 +136,18 @@ front-end or UX pass. Ordered by what blocks trusting the Publishing room, not b
    missing, which routes the claim to the existing uncheckable bucket. Cross-family audit
    (grok-4.5) rejected the first candidate, accepted after the fix. See `## Progress log` ->
    2026-09-12 (7D).
-5. **No deferral has run live.** The deferral path is unproven end to end.
+5. ~~**No deferral has run live.**~~ **DONE 2026-09-12.** `mastodon-2` was approved alongside
+   `mastodon-1` and the reuse guard deferred it by exactly `min_variant_days` (7), placing it at
+   Sep 20 19:00 PT instead of the next free Mastodon slot. Mastodon is configured for daily posting
+   with `max_slots_per_day: 2`, so ordinary slot allocation would have chosen Sep 13 or Sep 14; the
+   7-day gap is the variant window deciding, not spacing. Confirmed in the slot ledger (two mastodon
+   claims, days 2026-09-13 and 2026-09-20) and against Postiz (`plannedFor 2026-09-21T02:00:00Z`).
+   The deferral is recorded in plain language in the folder's own `publish-log.md`: "Spaced from an
+   earlier post from this piece on mastodon. First free slot past the spacing window is Sun, Sep 20,
+   7:00 PM PT." Note the item was already stale when written: `bluesky-1` hit the same path earlier
+   the same day (04:02Z) with the identical spacing note, so the deferral's first live run was that
+   one, not `mastodon-2`. The `~/.content-agents` dispatch journals carry no event naming a deferral;
+   the record lives only in the per-folder log. Not a defect, just where to look.
 
 Recorded, not defects: the Postiz read window is a +/-45 day list scan because there is no
 read-by-id route, and Postiz soft-deletes, so absence can never distinguish live from canceled from
