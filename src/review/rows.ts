@@ -9,6 +9,13 @@ import { readQueue, writeCell, appendPublishLog, type QueueRow } from "../publis
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { fetchScheduledDrafts, cancelDraft } from "../publish/typefully.js";
 import { fetchScheduledPosts, cancelPost } from "../publish/postpeer-status.js";
+import {
+  createPostizTransport,
+  findPostizPost,
+  cancelPostizPost,
+  type PostizPost,
+  type PostizTransport,
+} from "../publish/postiz.js";
 import { classifyThread } from "../atomize/thread-check.js";
 import { listCuts, DEFAULT_LENS } from "../atomize/cuts.js";
 import {
@@ -16,6 +23,7 @@ import {
   needsReconciliation,
   findLoggedRef,
   type LiveProviderState,
+  type LoggedRef,
   type ReconciledStatus,
   type PublishLogRead,
 } from "./reconcile.js";
@@ -170,12 +178,103 @@ async function safeFetch<T>(fn: () => Promise<T[]>): Promise<{ items: T[] | null
   }
 }
 
-// The live Typefully + PostPeer state, fetched ONCE per /api/queue request (not per row/folder) —
-// both are account-wide reads, not scoped to one content folder. Read-only: never schedules,
-// cancels, or modifies anything at either provider.
-async function fetchLiveProviderState(): Promise<LiveProviderState> {
-  const [tf, pp] = await Promise.all([safeFetch(fetchScheduledDrafts), safeFetch(fetchScheduledPosts)]);
-  return { typefullyDrafts: tf.items, typefullyError: tf.error, postpeerPosts: pp.items, postpeerError: pp.error };
+// Injectable live-read seams, so the poller's provider calls (and the gate that skips them) are
+// testable without touching a real Typefully/PostPeer/Postiz instance.
+export interface LiveFetchDeps {
+  fetchTypefully?: typeof fetchScheduledDrafts;
+  fetchPostpeer?: typeof fetchScheduledPosts;
+  makePostizTransport?: () => PostizTransport;
+  findPostiz?: (transport: PostizTransport, id: string, around?: string) => Promise<PostizPost | null>;
+}
+
+/** One Postiz post to look up, plus the planned time to centre its lookup window on. */
+export interface PostizLookup {
+  id: string;
+  around?: string;
+}
+
+// Postiz, unlike Typefully and PostPeer, has no account-wide "list my scheduled things" read this
+// module can cache: the only read it offers is a publish-date window list resolved per post id
+// (findPostizPost). So this looks up exactly the refs the queue asked for and nothing else, and a
+// pass with no Postiz refs makes no Postiz call at all (not even building a transport, which would
+// throw on missing config and report a false provider outage).
+//
+// Any lookup failure fails the whole Postiz channel to null (see safeFetch at the call site) rather
+// than returning a partial list: a partial list would let a ref that simply was not fetched look
+// exactly like a ref the provider does not have.
+async function fetchPostizPosts(lookups: readonly PostizLookup[], deps: LiveFetchDeps): Promise<PostizPost[]> {
+  const transport = (deps.makePostizTransport ?? (() => createPostizTransport()))();
+  const find = deps.findPostiz ?? ((t: PostizTransport, id: string, around?: string) => findPostizPost(t, id, around));
+  const found = await Promise.all(
+    lookups.map(async (lookup) => {
+      // One ref failing must not blank the other rows: a 503 on one post would otherwise take the
+      // cancel button away from every healthy Postiz row. A ref that fails is simply not in the
+      // list, and reconcileRow already reads a missing ref as uncertain rather than as a
+      // cancellation, so this stays fail-closed for the row that failed and costs the others nothing.
+      try {
+        return await find(transport, lookup.id, lookup.around);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return found.filter((post): post is PostizPost => post !== null);
+}
+
+// The live Typefully + PostPeer + Postiz state, fetched ONCE per poll (not per row/folder).
+// Read-only: never schedules, cancels, or modifies anything at any provider. Each provider degrades
+// on its own, so one being down leaves the other two's evidence intact.
+export async function fetchLiveProviderState(
+  postizLookups: readonly PostizLookup[] = [],
+  deps: LiveFetchDeps = {},
+): Promise<LiveProviderState> {
+  const [tf, pp, pz] = await Promise.all([
+    safeFetch(deps.fetchTypefully ?? fetchScheduledDrafts),
+    safeFetch(deps.fetchPostpeer ?? fetchScheduledPosts),
+    postizLookups.length === 0
+      ? Promise.resolve({ items: [] as PostizPost[], error: undefined })
+      : safeFetch(() => fetchPostizPosts(postizLookups, deps)),
+  ]);
+  return {
+    typefullyDrafts: tf.items,
+    typefullyError: tf.error,
+    postpeerPosts: pp.items,
+    postpeerError: pp.error,
+    postizPosts: pz.items,
+    postizError: pz.error,
+  };
+}
+
+// The Postiz posts one folder's approved rows are waiting on, read off the same publish-log parse
+// reconcileRow uses. Drives the fetch gate above: no Postiz rows, no Postiz call. Each lookup
+// carries the row's planned time so the provider's window is centred there and not on "now".
+export function postizRefsForFolder(rows: readonly QueueRow[], publishLog: PublishLogRead): PostizLookup[] {
+  if (publishLog.error) return [];
+  const lookups: PostizLookup[] = [];
+  for (const row of rows) {
+    if (!needsReconciliation(row)) continue;
+    const logged = findLoggedRef(publishLog.text, row.id);
+    if (logged?.provider !== "postiz") continue;
+    const around = logged.plannedAt ?? logged.loggedAt;
+    lookups.push({ id: logged.refId, ...(around ? { around } : {}) });
+  }
+  return lookups;
+}
+
+// Aggregate every folder's lookups into the one list the poller fetches, deduped by post id (two
+// rows can name the same Postiz post). Extracted from listPieces so the glue is unit-testable
+// without walking the real content tree.
+export function collectPostizLookups(
+  entries: readonly { folder: string; rows: readonly QueueRow[] }[],
+  publishLogs: ReadonlyMap<string, PublishLogRead>,
+): PostizLookup[] {
+  const byId = new Map<string, PostizLookup>();
+  for (const { folder, rows } of entries) {
+    for (const lookup of postizRefsForFolder(rows, publishLogs.get(folder) ?? { text: "" })) {
+      if (!byId.has(lookup.id)) byId.set(lookup.id, lookup);
+    }
+  }
+  return [...byId.values()];
 }
 
 // Exported so the reconciliation wiring (row.reconciled) is testable against the REAL code path
@@ -304,9 +403,13 @@ const LIVE_STATE_POLL_MS = 60_000;
 let liveState: LiveProviderState = { typefullyDrafts: [], postpeerPosts: [] };
 let liveStateAsOf: number | null = null;
 let livePollTimer: ReturnType<typeof setInterval> | null = null;
+// The Postiz post ids the last listPieces pass found waiting on reconciliation. Empty means the
+// poller makes no Postiz call at all. Until the first fetch lands, `liveState.postizPosts` is
+// undefined, which reconcileRow reads as "no evidence yet" (unavailable), never as a mismatch.
+let postizRefsWanted: PostizLookup[] = [];
 
 async function refreshLiveState(): Promise<void> {
-  liveState = await fetchLiveProviderState();
+  liveState = await fetchLiveProviderState(postizRefsWanted);
   liveStateAsOf = Date.now();
 }
 
@@ -353,12 +456,18 @@ export async function listPieces(): Promise<Piece[]> {
     return { slug, folder, rows: readQueueCached(folder) };
   });
   const anyNeedsReconcile = folderRows.some(({ rows }) => rows.some(needsReconciliation));
+  // Read each folder's publish-log once, up front: reconcileRow needs it anyway, and the Postiz
+  // refs it yields are what tells the poller whether a Postiz call is warranted this pass.
+  const publishLogs = new Map<string, PublishLogRead>(
+    folderRows.map(({ folder, rows }) => [folder, rows.some(needsReconciliation) ? readPublishLogSafe(folder) : { text: "" }]),
+  );
+  postizRefsWanted = collectPostizLookups(folderRows, publishLogs);
   if (anyNeedsReconcile) ensureLiveStatePolling();
   const live: LiveProviderState = anyNeedsReconcile ? liveState : { typefullyDrafts: [], postpeerPosts: [] };
 
   const publishingStatuses = readPublishingStatuses();
   const pieces = await Promise.all(folderRows.map(async ({ slug, folder, rows }) => {
-    const publishLog: PublishLogRead = rows.some(needsReconciliation) ? readPublishLogSafe(folder) : { text: "" };
+    const publishLog: PublishLogRead = publishLogs.get(folder) ?? { text: "" };
     const enriched = rows.map((r) => enrich(folder, slug, r, publishLog, live, publishingStatuses[publishingKey(slug, r.id)]));
     const request = await readContentRequest(folder).catch(() => undefined);
     return {
@@ -542,8 +651,33 @@ export function saveDerivative(slug: string, id: string, body: string): void {
 export interface CancelDeps {
   cancelTypefullyDraft: (draftId: string) => Promise<void>;
   cancelPostPeerPost: (postId: string) => Promise<void>;
+  cancelPostizPost: (postId: string) => Promise<void>;
 }
-const DEFAULT_CANCEL_DEPS: CancelDeps = { cancelTypefullyDraft: cancelDraft, cancelPostPeerPost: cancelPost };
+const DEFAULT_CANCEL_DEPS: CancelDeps = {
+  cancelTypefullyDraft: cancelDraft,
+  cancelPostPeerPost: cancelPost,
+  cancelPostizPost: async (postId) => { await cancelPostizPost(createPostizTransport(), postId); },
+};
+
+/**
+ * Pick the cancel call for a logged provider, or refuse.
+ *
+ * This is a deliberate lookup rather than an if/else chain with a trailing `else`: the old code
+ * ended in `else await deps.cancelPostPeerPost(...)`, which meant any provider that was not
+ * Typefully handed its id to PostPeer's delete route. On a live-posting path a wrong-provider
+ * delete is not recoverable, so anything not positively named here refuses instead.
+ */
+export function selectCancelAdapter(
+  provider: LoggedRef["provider"] | string,
+  deps: CancelDeps,
+): { cancel: (refId: string) => Promise<void> } | { refusal: string } {
+  if (provider === "typefully") return { cancel: deps.cancelTypefullyDraft };
+  if (provider === "postpeer") return { cancel: deps.cancelPostPeerPost };
+  if (provider === "postiz") return { cancel: deps.cancelPostizPost };
+  return {
+    refusal: `scheduled through ${provider}, which has no cancel adapter in the review GUI. Cancel it by hand at that provider`,
+  };
+}
 
 // Cancel ONE already-scheduled row's live Typefully/PostPeer draft/post — the review GUI's "Cancel"
 // action (card e4eca4a1: two stale Upload-Post jobs kept firing after the 2026-07-08 rewire because
@@ -578,9 +712,10 @@ export async function cancelScheduled(
       error: "scheduled via the retired Upload-Post provider (no live adapter since PR #130). Cancel it by hand at upload-post.com",
     };
   }
+  const adapter = selectCancelAdapter(logged.provider, deps);
+  if ("refusal" in adapter) return { ok: false, error: adapter.refusal };
   try {
-    if (logged.provider === "typefully") await deps.cancelTypefullyDraft(logged.refId);
-    else await deps.cancelPostPeerPost(logged.refId);
+    await adapter.cancel(logged.refId);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }

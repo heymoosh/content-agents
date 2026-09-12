@@ -30,14 +30,17 @@ function tmpFolder(opts: { status?: string; logLine?: string } = {}): string {
   return dir;
 }
 
-function stubDeps(): CancelDeps & { typefullyCalls: string[]; postpeerCalls: string[] } {
+function stubDeps(): CancelDeps & { typefullyCalls: string[]; postpeerCalls: string[]; postizCalls: string[] } {
   const typefullyCalls: string[] = [];
   const postpeerCalls: string[] = [];
+  const postizCalls: string[] = [];
   return {
     typefullyCalls,
     postpeerCalls,
+    postizCalls,
     cancelTypefullyDraft: async (id) => { typefullyCalls.push(id); },
     cancelPostPeerPost: async (id) => { postpeerCalls.push(id); },
+    cancelPostizPost: async (id) => { postizCalls.push(id); },
   };
 }
 
@@ -50,6 +53,7 @@ test("cancelScheduled: a Typefully row cancels the logged draft, flips to discar
     assert.deepEqual(res, { ok: true });
     assert.deepEqual(deps.typefullyCalls, ["draft-777"], "must cancel the logged draft id");
     assert.deepEqual(deps.postpeerCalls, [], "must not touch PostPeer for a Typefully row");
+    assert.deepEqual(deps.postizCalls, [], "must not touch Postiz for a Typefully row");
     assert.equal(readQueue(folder).rows[0].status, "discard", "row flips to discard, never back to pending");
     const log = readFileSync(join(folder, "publish-log.md"), "utf8");
     assert.match(log, /x-1 → canceled \(typefully ref draft-777/);
@@ -67,6 +71,7 @@ test("cancelScheduled: a PostPeer (TikTok) row cancels the logged post", async (
     assert.deepEqual(res, { ok: true });
     assert.deepEqual(deps.postpeerCalls, ["pp-42"]);
     assert.deepEqual(deps.typefullyCalls, []);
+    assert.deepEqual(deps.postizCalls, [], "must not touch Postiz for a PostPeer row");
     assert.equal(readQueue(folder).rows[0].status, "discard");
   } finally {
     rmSync(folder, { recursive: true, force: true });
@@ -83,6 +88,7 @@ test("cancelScheduled: a retired Upload-Post row degrades to a dashboard pointer
     assert.match(res.error!, /upload-post\.com/, "must point Muxin at the external dashboard");
     assert.deepEqual(deps.typefullyCalls, []);
     assert.deepEqual(deps.postpeerCalls, []);
+    assert.deepEqual(deps.postizCalls, []);
     assert.equal(readQueue(folder).rows[0].status, "approve", "must NOT flip a row it couldn't actually cancel");
   } finally {
     rmSync(folder, { recursive: true, force: true });
@@ -99,6 +105,7 @@ test("cancelScheduled: a row with no logged provider ref returns an error, no ca
     assert.match(res.error!, /no logged provider/i);
     assert.deepEqual(deps.typefullyCalls, []);
     assert.deepEqual(deps.postpeerCalls, []);
+    assert.deepEqual(deps.postizCalls, []);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -113,6 +120,8 @@ test("cancelScheduled: a non-scheduled (pending) row is rejected before any prov
     assert.equal(res.ok, false);
     assert.match(res.error!, /isn't a scheduled post/);
     assert.deepEqual(deps.typefullyCalls, []);
+    assert.deepEqual(deps.postpeerCalls, []);
+    assert.deepEqual(deps.postizCalls, []);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -124,6 +133,7 @@ test("cancelScheduled: a provider cancel that throws surfaces the error and leav
     const deps: CancelDeps = {
       cancelTypefullyDraft: async () => { throw new Error("typefully DELETE → 500 boom"); },
       cancelPostPeerPost: async () => {},
+      cancelPostizPost: async () => {},
     };
     const row = readQueue(folder).rows.find((r) => r.id === "x-1")!;
     const res = await cancelScheduled(folder, row, deps);

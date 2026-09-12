@@ -3,6 +3,7 @@ import { TEXT_PLATFORMS, type TypefullyScheduled } from "../publish/typefully.js
 import { isQuoteCardRow } from "../publish/cards.js";
 import { isTikTokRow } from "../publish/tiktok.js";
 import type { PostPeerPost } from "../publish/postpeer-status.js";
+import type { PostizPost } from "../publish/postiz.js";
 import { fmtLa } from "../publish/slots.js";
 import type { DeliveryProvider, DeliveryState } from "./delivery-event.js";
 import type { PublishingStatus } from "./publishing-status.js";
@@ -14,8 +15,8 @@ import type { PublishingStatus } from "./publishing-status.js";
 // id (readQueue()'s QueueRow has no such field — see src/publish/queue.ts). The only place a
 // provider ref is persisted at all is the free-text line publish-log.md's appendPublishLog() writes
 // at schedule time, keyed by row id — so every provider is matched the same way: findLoggedRef
-// parses the most recently logged ref for the row (`typefully draft <id>`, `postpeer post <id>`, or
-// `upload-post job <id>` — see typefully.ts, tiktok.ts, and, for quote-cards scheduled before the
+// parses the most recently logged ref for the row (`typefully draft <id>`, `postpeer post <id>`,
+// `postiz post <id>`, or `upload-post job <id>` — see typefully.ts, tiktok.ts, and, for quote-cards scheduled before the
 // 2026-07-08 Typefully rewire, cards.ts's old PostPeer/Upload-Post log lines), then we check whether
 // that exact id still shows up in the relevant provider's live list (matched by provider-assigned
 // id, never by the row-derived draft title — row ids like "x-1" repeat across content folders, so
@@ -51,6 +52,11 @@ export interface LiveProviderState {
   typefullyError?: string;
   postpeerPosts: PostPeerPost[] | null;
   postpeerError?: string;
+  // Postiz posts looked up for the refs this pass actually needed (src/review/rows.ts).
+  // undefined = not fetched yet this cycle, null = fetch failed / credentials missing. Both are
+  // "no evidence", and both report "unavailable" below, never a mismatch.
+  postizPosts?: PostizPost[] | null;
+  postizError?: string;
 }
 
 // publish-log.md's text for one folder, read once per /api/queue call (see src/review/serve.ts).
@@ -67,36 +73,87 @@ export interface PublishLogRead {
 // draft/post was later cancelled or deleted outside this pipeline.
 const APPROVED_STATUSES = new Set(["approve", "published"]);
 
+// Postiz statuses that mean the post still exists AND has not fired yet, so cancelling it is the
+// repair Muxin actually wants. "published" is deliberately NOT here: page.ts renders
+// "✕ Cancel scheduled post" on exactly state === "scheduled", and that button soft-deletes through
+// cancelPostizPost, so admitting an already-live post here would offer to delete a post that is
+// already out under Muxin's byline, with no undo.
+const POSTIZ_CANCELABLE_STATUSES = new Set(["draft", "scheduled", "private"]);
+
 export function needsReconciliation(row: QueueRow): boolean {
   if (!APPROVED_STATUSES.has(row.status)) return false;
   return TEXT_PLATFORMS.has(row.platform) || isQuoteCardRow(row.platform) || isTikTokRow(row.platform);
 }
 
 export interface LoggedRef {
-  provider: "typefully" | "postpeer" | "upload-post";
+  provider: "typefully" | "postpeer" | "postiz" | "upload-post";
   refId: string;
+  /** The ISO stamp appendPublishLog wrote on the line, i.e. when this row was scheduled. */
+  loggedAt?: string;
+  /** The planned publish time recovered from the line's human PT label, when it carries one. */
+  plannedAt?: string;
+}
+
+// appendPublishLog writes the planned time as a human PT label from fmtLa (src/publish/slots.ts):
+// "Sat, Sep 12, 6:30 PM PT". It carries no year, so the year is taken from the line's own ISO stamp.
+// This exists for ONE consumer: Postiz has no read-by-id route, only a publish-date window list, so
+// a lookup centered on "now" silently misses a post planned further out than that window and the
+// row can then never be confirmed or cancelled. The CLI reconciler centers on the planned time the
+// same way (provider-status-reconciliation.ts passes status.plannedFor).
+const PT_LABEL = /\b[A-Z][a-z]{2}, ([A-Z][a-z]{2}) (\d{1,2}), (\d{1,2}):(\d{2})\s?(AM|PM) PT\b/;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function plannedAtFromLogLine(line: string, loggedAtIso: string | undefined): string | undefined {
+  const anchor = loggedAtIso ? Date.parse(loggedAtIso) : NaN;
+  if (!Number.isFinite(anchor)) return undefined;
+  const m = line.match(PT_LABEL);
+  if (!m) return undefined;
+  const month = MONTHS.indexOf(m[1]);
+  if (month < 0) return undefined;
+  const day = Number(m[2]);
+  const minute = Number(m[4]);
+  let hour = Number(m[3]) % 12;
+  if (m[5] === "PM") hour += 12;
+  // Pick the year whose result sits closest to when the line was written: a row is always scheduled
+  // shortly before its planned time, and this also handles a December to January rollover. PT's real
+  // offset (PST vs PDT) is deliberately approximated at -08:00, because the only consumer is a
+  // 90-day-wide lookup window that one hour cannot move.
+  const baseYear = new Date(anchor).getUTCFullYear();
+  let best = Number.NaN;
+  for (const year of [baseYear - 1, baseYear, baseYear + 1]) {
+    const candidate = Date.UTC(year, month, day, hour + 8, minute);
+    if (Number.isNaN(best) || Math.abs(candidate - anchor) < Math.abs(best - anchor)) best = candidate;
+  }
+  return new Date(best).toISOString();
 }
 
 // Parse a folder's publish-log.md text for the MOST RECENT logged provider ref for one row id.
 // Every appendPublishLog() line has the shape `- <ISO> — <rowId> → ...`; the provider ref rides in
-// free text after that (`typefully draft <id>`, `postpeer post <id>`, or `upload-post job <id>`) —
-// see typefully.ts (createDraft), tiktok.ts (scheduleToTikTok), cards.ts (publishCards). Pure string
+// free text after that (`typefully draft <id>`, `postpeer post <id>`, `postiz post <id>`, or
+// `upload-post job <id>`) — see typefully.ts (createDraft), tiktok.ts (scheduleToTikTok),
+// cards.ts (publishCards), studio-scheduling.ts (the Studio Postiz scheduler). Pure string
 // parsing, no fs here — the caller supplies the log text. A row-matching line whose ref format isn't
 // recognized RESETS `found` to null rather than leaving an earlier ref in place — otherwise a row
 // rescheduled through a provider
 // this parser doesn't recognize (e.g. postpeer → upload-post) would silently keep reporting its
 // stale, superseded ref instead of reflecting what actually happened most recently.
 export function findLoggedRef(logText: string, rowId: string): LoggedRef | null {
-  const rowRe = /^-\s+\S+\s+—\s+(\S+)\s+→\s+/;
+  const rowRe = /^-\s+(\S+)\s+—\s+(\S+)\s+→\s+/;
   let found: LoggedRef | null = null;
   for (const line of logText.split("\n")) {
     const m = line.match(rowRe);
-    if (!m || m[1] !== rowId) continue;
+    if (!m || m[2] !== rowId) continue;
+    const loggedAt = m[1];
     const draftM = line.match(/typefully draft (\S+)/);
     const postM = line.match(/postpeer post (\S+)/);
+    const postizM = line.match(/postiz post (\S+)/);
     const uploadM = line.match(/upload-post job (\S+)/);
     if (draftM) found = { provider: "typefully", refId: draftM[1] };
     else if (postM) found = { provider: "postpeer", refId: postM[1] };
+    else if (postizM) {
+      const plannedAt = plannedAtFromLogLine(line, loggedAt);
+      found = { provider: "postiz", refId: postizM[1], loggedAt, ...(plannedAt ? { plannedAt } : {}) };
+    }
     else if (uploadM) found = { provider: "upload-post", refId: uploadM[1] };
     else found = null;
   }
@@ -183,6 +240,66 @@ export function reconcileRow(
     return { provider, state: "unavailable", reason: publishLog.error };
   }
   const logged = findLoggedRef(publishLog.text, row.id);
+
+  // Postiz (src/review/studio-scheduling.ts logs `postiz post <id>`) is matched the same way, by
+  // provider-assigned id, and is checked BEFORE the platform-derived typefully/postpeer split: a
+  // Postiz-scheduled bluesky/threads/x row is a text platform, so without this it would fall into
+  // the Typefully branch and report a false "no logged Typefully draft id" mismatch.
+  //
+  // Postiz has no read-by-id route. The only read it offers is a publish-date window list, and a
+  // deleted post is soft-deleted and filtered out of that list, so absence there cannot tell a live
+  // post from a canceled, deleted, or never-created one. Absence is reported as "unavailable" and
+  // never as a mismatch or a confirmed cancellation, the same posture the CLI reconciler takes
+  // (src/review/provider-status-reconciliation.ts).
+  if (logged?.provider === "postiz") {
+    const base = { provider: "postiz" as const, providerObjectId: logged.refId };
+    if (live.postizPosts === null || live.postizPosts === undefined) {
+      return {
+        ...base,
+        state: "unavailable",
+        deliveryState: "uncertain",
+        reason: live.postizError ?? "could not reach Postiz",
+      };
+    }
+    const match = live.postizPosts.find((p) => p.id === logged.refId);
+    if (!match) {
+      return {
+        ...base,
+        state: "unavailable",
+        deliveryState: "uncertain",
+        reason:
+          "Postiz did not list this post. Postiz hides deleted posts from that list, so absence cannot tell a live post from a canceled one. Check it by hand in Postiz.",
+      };
+    }
+    if (match.status === "unknown") {
+      return {
+        ...base,
+        state: "unavailable",
+        deliveryState: "uncertain",
+        reason: "Postiz listed this post with a status this pipeline does not recognize",
+      };
+    }
+    // Already live. There is nothing scheduled left to cancel, so this must not reach "scheduled".
+    if (match.status === "published") {
+      return {
+        ...base,
+        state: "unavailable",
+        deliveryState: "live",
+        ...(match.accountId ? { providerAccountId: match.accountId } : {}),
+        ...(match.url ? { canonicalUrl: match.url } : {}),
+        reason: "Postiz already published this post, so there is no scheduled post left to cancel",
+      };
+    }
+    if (!POSTIZ_CANCELABLE_STATUSES.has(match.status)) {
+      return { ...base, state: "mismatch", reason: `Postiz reports this post as ${match.status}` };
+    }
+    return {
+      ...base,
+      state: "scheduled",
+      ...(match.accountId ? { providerAccountId: match.accountId } : {}),
+      when: safeWhen(match.scheduledAt ?? undefined),
+    };
+  }
 
   // A quote-card row's MOST RECENT log line is still a pre-rewire PostPeer/Upload-Post entry (old
   // published data) — reconcile it via the legacy branch below instead of reporting a false
