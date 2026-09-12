@@ -4,9 +4,27 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
   `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **7B**, `docs/operations/launch-slices/SLICE-7B.md`, PASS. Nothing
-  blocked. A Postiz channel never silently downgrades to Typefully, and Studio can see and cancel
-  Postiz rows. `npm run check` 4543/0, `npm run test:e2e` 55/0/16.
+- Current / last accepted: **7C**, `docs/operations/launch-slices/SLICE-7C.md`, PASS. Nothing
+  blocked. A reuse-guard refusal now clears its dispatch fence on EVERY route, not just Postiz, so
+  quote cards and videos are no longer permanently stuck after a refusal. `npm run check` 4558/0.
+  Shipped as `919ae2e`, pushed to `origin/main`.
+- 7C in one line: `runPublisher` and the `unscheduled-draft` branch now ask `reuseGuardVerdict`
+  BEFORE invoking their publisher, so those routes can carry the strong `no-provider-request`
+  refusal that is the only value permitted to clear a fence. Two call sites cover all five
+  non-Postiz routes. Four executable lines total. Both pre-flights sit OUTSIDE their try/catch so a
+  throwing guard cannot be flattened into a generic `scheduleError` that loses the discriminant.
+  `deferred` is deliberately still not a refusal, and no `earliestAt` reaches a non-Postiz
+  publisher. Fail-closed residue unchanged: allowed-or-deferred plus an empty publisher result is
+  still `publisher-declined`, ledger `blocked`, fence RETAINED.
+- Ordering proved by evidence, not assertion: every `claimSlots` site on these routes lives INSIDE
+  the publisher `fn` names (`typefully.ts:414`, `cards.ts:308`, `tiktok.ts:52`, `youtube.ts:148`,
+  `substack.ts:239`). Verified independently by the coordinator and by the auditor.
+- 7C's four pre-existing test failures were RE-POINTED, not weakened, under the binding rules in
+  `## Adjudication` of the packet. Every claim kept, each re-aimed at a scenario that still reaches
+  the recovery branch, each also gaining the new assertion, assertion count up in all four. The
+  rationale lives in `SLICE-7C-LOG.md`.
+- Previous: **7B**, PASS. A Postiz channel never silently downgrades to Typefully, and Studio can
+  see and cancel Postiz rows. `npm run check` 4543/0, `npm run test:e2e` 55/0/16.
 - What changed, in two commits. `41003a4`: `selectDeliveryRoute` drops `text` from the
   x/linkedin/bluesky Typefully fallback and keeps `image`, so a text row with no Postiz channel is
   refused by destination name instead of handed to a different provider. A half-configured Postiz
@@ -19,9 +37,15 @@
   canceled from never-created. An already-published post is not offered a cancel button.
 - Both audited by Grok, cross-family. 7B's second commit returned one P1, an already-published post
   being cancelable, fixed before integration.
-- Next: no packet written. Pick from `## Outstanding work` below. Muxin's direction on 2026-09-12:
-  fix all of it before any front-end or UX pass, because an untrusted Publishing room cannot be
-  design-reviewed honestly.
+- Next: **item 4**, reconcile blind to dateless Typefully drafts. Small and self-contained, no
+  packet written yet. Then items 1, 2 and 5 together as one live-proving pass, which 7C's fence fix
+  now makes safe to attempt: a refused row can be retried instead of needing hand repair.
+  Muxin's direction on 2026-09-12: fix all of `## Outstanding work` before any front-end or UX
+  pass, because an untrusted Publishing room cannot be design-reviewed honestly.
+- Open questions for Muxin, neither blocking: the em dash in every `### date` progress-log heading
+  in this file (matches ~40 siblings, conflicts with the repo-wide no-em-dash rule, offer standing
+  to convert the lot); and the 4 outreach leads marked `abandoned` at 01:24 in
+  `data/outreach/tracker.jsonl` with no note, where every earlier entry explains itself.
 - Last decision: builder family is Claude for now, Codex and Grok reserved for cross-family audits
   because quota is limited. Codex is capped until 2026-09-15.
 - Details: `## Progress log` -> 2026-09-12 (7B). Below is history; read only cited headings.
@@ -70,12 +94,12 @@ front-end or UX pass. Ordered by what blocks trusting the Publishing room, not b
 2. **No media row has ever gone through Postiz.** Quote cards route to Typefully by design
    (`selectDeliveryRoute`, the image leg 7B deliberately left alone), so the Postiz media path is
    entirely unexercised. Same for any local-media upload leg.
-3. **The non-Postiz publisher fence never clears.** A row refused by Typefully, PostPeer, YouTube or
-   Substack keeps its durable dispatch fence permanently and is not resolve-eligible, so it can
-   never retry and needs hand repair. 7A made this deliberate rather than accidental: an empty
-   publisher result is not proof nothing was created, and only Postiz currently has a pre-flight
-   refusal provably ahead of every provider call. Clearing it safely needs an equivalent pre-create
-   guard per publisher. This is the widest-reach item, since it covers every card and every video.
+3. ~~**The non-Postiz publisher fence never clears.**~~ **DONE 2026-09-12, SLICE-7C, `919ae2e`.**
+   Fixed by asking the reuse guard BEFORE the publisher on every non-Postiz route, so a refusal
+   there is provably ahead of every provider call and every slot claim and can carry
+   `no-provider-request`. Cross-family audit (grok-4.5) returned zero P0 and zero P1. See
+   `## Progress log` -> 2026-09-12 (7C).
+
 4. **Reconcile is blind to a dateless Typefully draft.** `fetchScheduledDrafts` filters on
    `scheduled_date`, so a draft without one is invisible to the reconciler and reports `uncertain`
    forever. A reviewer cannot tell that from a real failure.
@@ -86,6 +110,68 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (7C) — a reuse-guard refusal clears its fence on every route, not just Postiz
+
+Closes `## Outstanding work` item 3, the widest-reach item: it covered every quote card and every
+video in the system. Shipped as `919ae2e` on top of packet commits `e8553db`, `5af82fd`, `8c734c3`.
+Pushed to `origin/main`.
+
+**The defect.** Only the `provider === "postiz"` branch of `scheduleApproved` ran a pre-flight
+`reuseGuardVerdict`, so only Postiz rows could carry the typed `no-provider-request` refusal. Every
+other route (Typefully text, Typefully quote cards, PostPeer TikTok, YouTube, Substack) invoked its
+publisher first and recovered the reason from `runPublisher`'s empty-result branch, which can only
+ever claim `publisher-declined`. That is the weak claim: the publisher already ran, an empty result
+is not proof nothing was created, so the fence is RETAINED and `blocked` is deliberately
+resolve-ineligible. Those rows could never retry and needed hand repair.
+
+**The fix is symmetry, not a new claim.** Ask the guard before calling the publisher on those
+routes, and `no-provider-request` becomes provable there by the same argument the Postiz pre-flight
+already makes. Two call sites cover everything: one in `runPublisher`, which all five non-Postiz
+publishers pass through (including the media backup via `scheduleMediaViaTypefully`), and one in
+the `dispatchMode === "unscheduled-draft"` branch, which calls `deps.publishText` directly. Four
+executable lines in the whole implementation; everything else in the diff is tests and comments.
+
+**What was deliberately preserved.** `deferred` is not a refusal: control falls through to the
+publisher unchanged and no `earliestAt` is handed to a non-Postiz publisher, because those
+publishers compute their own spacing. The fail-closed residue is untouched: an allowed or deferred
+pre-flight plus an empty publisher result is still `publisher-declined`, ledger `blocked`, fence
+RETAINED. Both pre-flights sit outside their try/catch so a throwing guard propagates instead of
+being laundered into a generic `scheduleError` that loses the discriminant and silently keeps a
+fence. The Postiz pre-flight is untouched.
+
+**The ordering argument**, which is the entire safety claim, was proved by grepping every
+`claimSlots` call site rather than by assertion. Each one lives inside the publisher function that
+`fn` names, so none is reachable without entering `fn`, and the pre-flight returns before `fn` is
+entered: `typefully.ts:414`, `cards.ts:308` (`cards.ts:171` is a `dryRun` preview that claims
+nothing), `tiktok.ts:52`, `youtube.ts:148`, `substack.ts:239`. `studio-scheduling.ts:411` is inside
+`defaultPublishPostiz`, which these routes never enter. Verified independently by the coordinator
+from the call-site direction and by the auditor from the route direction.
+
+**Four pre-existing tests were re-pointed, not weakened.** They asserted the publisher had run on a
+same-row refusal down a non-Postiz route, which is the exact premise this slice changes. Binding
+rules, written into the packet's `## Adjudication` before any edit: no assertion about what
+`publisher-declined` means may be softened, none deleted or skipped, each re-pointed at a scenario
+the pre-flight still lets through (guard allows or defers, publisher returns `[]` anyway) so every
+claim keeps a live example, each also gaining the new same-row assertion, and assertion count per
+test must not drop. All four satisfied; count went up in all four. `both guard paths produce the
+identical refusal` was restored to a real two-path comparison rather than one comparing the
+pre-flight with itself. Full rationale in `SLICE-7C-LOG.md`.
+
+**Audit.** grok-4.5, cross-family, zero P0 and zero P1. One P2: the discriminant's plain-English
+claim is scoped to the route each pre-flight guards, and the media rate-limit backup path arrives
+with an earlier Postiz attempt and a released slot behind it. The clear is still sound there
+because `isPostizNothingCreated` admits only the typed `PostizRateLimitError`, whose throttler runs
+ahead of Postiz's create controller. One P3: stale test prose describing the old design. Both
+closed as comment and wording changes with no behavior effect, re-verified after.
+
+**Checks.** `npm run check` unsandboxed, run by the coordinator and not merely reported: 4558 tests,
+4558 pass, 0 fail, 515 suites.
+
+**Process note worth keeping.** The packet as first written was incomplete: it did not say what
+becomes of tests encoding the old provenance, and did not own `src/review/studio-scheduling.test.ts`.
+The worker correctly stopped rather than edit tests it had no mandate for. Adjudicating that is the
+coordinator's call and belongs in the packet before the worker starts, not after.
 
 ### 2026-09-12 (7B) — a Postiz channel never downgrades, and Studio can see its own Postiz rows
 
