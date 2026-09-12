@@ -601,14 +601,38 @@ async function runPublisher(
   brand: DeliveryBrand | null,
   deliveryPolicy?: DeliveryPolicyDecision,
 ): Promise<ScheduleOutcome> {
+  // SLICE-7C PRE-FLIGHT reuse guard, the non-Postiz twin of the one in scheduleApproved below, and
+  // the reason every route can now make the same claim. It sits OUTSIDE the try on purpose, ahead
+  // of the only call in this function that can reach a provider: `fn` is the folder publisher, and
+  // nothing before it creates, schedules or modifies a provider object or claims a slot. So a
+  // refusal here is provably ahead of every one of those, exactly as the Postiz pre-flight is, and
+  // carries the same typed no-provider-request signal.
+  //
+  // A DEFERRED verdict is not a refusal and deliberately does nothing here: these publishers own
+  // their own spacing, so control falls through unchanged and no earliest-allowed floor is handed
+  // to them. The recovery branch below still turns their silent skip into an honest message.
+  //
+  // Scope of "ahead of every provider call": it is ahead of every call on THE ROUTE THIS PRE-FLIGHT
+  // GUARDS, which is the route `fn` names. One compound path reaches here with an earlier attempt
+  // already behind it: a media row whose Postiz pre-flight allowed, whose create then failed with
+  // PostizRateLimitError, and which took SLICE-5J's Typefully backup into scheduleMediaViaTypefully
+  // and so into this function. On that path Postiz was contacted and defaultPublishPostiz did claim
+  // a slot before releasing it. A refusal here is still truthfully no-provider-request for the whole
+  // attempt, but the reason is the backup's own entry condition rather than anything this line
+  // knows: isPostizNothingCreated admits ONLY the typed rate-limit rejection, whose throttler runs
+  // ahead of Postiz's create controller, and the claim was released on the way out. So nothing was
+  // created, no slot is held, and `fn` has not run. Widen that entry condition and this scoping
+  // note stops holding.
+  const preflight = reuseGuardVerdict(folder, kind, row, brand);
+  if (preflight.kind === "refused") return { scheduled: null, scheduleError: preflight.message, refusal: "no-provider-request" };
   try {
     const done = await fn(folder, { onlyIds: [row.id], ...(deliveryPolicy ? { deliveryPolicy } : {}) });
     if (done.length === 0) {
       // The publisher didn't throw, so recompute the check it silently skipped on to find out WHY.
-      // Still reached for every non-Postiz route (and for the Postiz media row that falls back to
-      // publishCards): those publishers own their own guard call, so this branch is the only thing
-      // that turns their silent skip into a reason. The Postiz pre-flight below does NOT make it
-      // dead — a publisher can return [] for reasons the guard knows nothing about.
+      // Still reached, and still necessary, with the pre-flight above in place: a publisher can
+      // return [] for reasons the guard knows nothing about, and a DEFERRED row reaches the
+      // publisher by design and may still be declined by it. What the pre-flight removes from this
+      // branch is only the refused case, which can no longer get this far.
       // `publisher-declined`, never `no-provider-request`: `fn` already ran. This branch emits the
       // SAME same-row refusal wording the pre-flight does, so without the discriminant a reader
       // could not tell a refusal raised before any dispatch from one recovered after a publisher
@@ -715,8 +739,10 @@ export async function scheduleApproved(
       //   - before the try/catch below, so a refusal can never be mistaken for SLICE-5J's
       //     "Postiz provably created nothing" and re-sent down the Typefully backup route. A guard
       //     block means do not place this row ANYWHERE, not try the other provider.
-      // Non-Postiz routes are deliberately not gated here: their own publishers already check, and a
-      // second check would be exactly the double-gating this dispatch must not add.
+      // SLICE-7C: non-Postiz routes are gated too, but in runPublisher rather than here, because
+      // that is the one place all of them pass through. Their own publishers still check as well;
+      // the earlier ask is what makes a refusal provably pre-dispatch on those routes instead of
+      // only recoverable after the fact.
       //
       // A DEFERRED verdict is not a refusal. Re-placing the same row still stops here; a different
       // derivative of the same piece carries on with a spacing floor, and the existing scheduler
@@ -764,6 +790,11 @@ export async function scheduleApproved(
     : kind === "outreach-lock" ? deps.lockOutreachMessage
     : deps.publishShorts;
   if (dispatchMode === "unscheduled-draft") {
+    // SLICE-7C: this branch calls deps.publishText directly rather than through runPublisher, so it
+    // needs the pre-flight in its own right. Same argument, same place in the order: ahead of the
+    // only provider call on the route, and ahead of any slot claim (publishText claims its own).
+    const preflight = reuseGuardVerdict(folder, kind, row, resolvedBrand);
+    if (preflight.kind === "refused") return { scheduled: null, scheduleError: preflight.message, refusal: "no-provider-request" };
     try {
       const done = await deps.publishText(folder, {
         onlyIds: [row.id],
@@ -773,7 +804,9 @@ export async function scheduleApproved(
       });
       // The second post-publisher recovery site, and the same rule as runPublisher's: publishText
       // has already been invoked here, so this is `publisher-declined`. Leaving it unmarked would
-      // reopen the same defect at this route.
+      // reopen the same defect at this route. Reached now only when the pre-flight above allowed or
+      // deferred the row and publishText declined it anyway, which proves nothing about what it
+      // created.
       if (done.length === 0) return { scheduled: null, scheduleError: reuseGuardBlock(folder, kind, row, resolvedBrand) ?? REUSE_GUARD_UNSPECIFIED, refusal: "publisher-declined" };
       return { scheduled: done[0], scheduleError: null };
     } catch (error) {

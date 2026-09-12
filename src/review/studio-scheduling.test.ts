@@ -52,6 +52,11 @@ const BRIEFS_BEFORE = briefsTreeDigest();
  *  be asserted whole rather than around its timestamp. */
 const YESTERDAY = new Date(Date.now() - 86_400_000).toISOString();
 
+/** One hour ago: inside x's min_variant_days window, so a DIFFERENT derivative of the same piece is
+ *  deferred rather than refused. SLICE-7C needs that case, because a deferral is the refusal shape
+ *  that still reaches a publisher. */
+const AN_HOUR_AGO = new Date(Date.now() - 3_600_000).toISOString();
+
 /** A bets.md Placed row in the exact shape reuse-guard.ts scans for. */
 const placed = (slug: string, rowId: string, platform: string, iso: string): string =>
   `- placed ${iso} [${slug}/${rowId}] ${platform} → postiz post pz-0 @ earlier\n`;
@@ -142,6 +147,15 @@ describe("the Content page's reuse guard checks a row against its own brand's pl
     writeFileSync(join(CHARLES_DIR, "bets.md"), `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
   }
 
+  /** Charles placed a DIFFERENT derivative of this slug an hour ago (deferrable), while Human
+   *  Inference placed THIS row yesterday (a flat refusal). The two answers are different SHAPES, not
+   *  just different dates, so a guard reading the wrong brand's log cannot pass the assertions that
+   *  use this: it would refuse outright where Charles's own log only defers. */
+  function charlesVariantPlacedOnly(slug: string): void {
+    writeFileSync(join(HI_DIR, "bets.md"), `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    writeFileSync(join(CHARLES_DIR, "bets.md"), `# Placed log\n${placed(slug, "x-2", "x", AN_HOUR_AGO)}`);
+  }
+
   // ── Postiz PRE-FLIGHT path (studio-scheduling.ts, the `provider === "postiz"` branch) ───────────
 
   test("Postiz pre-flight: a Charles row is ALLOWED while only Human Inference placed this slug", async () => {
@@ -201,20 +215,45 @@ describe("the Content page's reuse guard checks a row against its own brand's pl
     );
   });
 
+  // SLICE-7C re-pointed the fixture, not the claim. A SAME-ROW Charles placement is now refused
+  // ahead of the publisher, so the recovery branch is reached here with the DEFERRABLE case — a
+  // different Charles derivative of the same piece, inside min_variant_days. What is asserted is
+  // unchanged: whatever explains the skip must come from Charles's own Placed log and carry
+  // Charles's own date, never Human Inference's. Both halves below are checked against a Human
+  // Inference log holding a contradicting placement, so reading the wrong brand fails them.
   test("recovery path: a Charles row IS explained by Charles's own placement", async () => {
     const slug = "slice5n-recovery-charles";
-    charlesPlacedOnly(slug);
+    charlesVariantPlacedOnly(slug);
     const ran: string[] = [];
 
     const result = await scheduleApproved(`/tmp/${slug}`, textRow(), recoveryDeps("charles", ran));
 
     assert.deepEqual(ran, ["typefully-text"]);
     assert.equal(result.scheduled, null);
-    assert.equal(result.scheduleError, `blocked by reuse guard, last placed to x ${YESTERDAY} (min_reuse_days: 14)`);
+    assert.match(result.scheduleError ?? "", /^not scheduled: another post from this piece already went to x /,
+      "Charles's own log defers; Human Inference's would have refused outright");
+    assert.ok(result.scheduleError?.includes(AN_HOUR_AGO), "and the date quoted is Charles's placement, not Human Inference's");
+    assert.equal(result.refusal, "publisher-declined", "the publisher ran, so provider state stays unproven");
+
+    // The scenario this test used to carry, now decided one step earlier: Charles's own same-row
+    // placement, refused ahead of the publisher, still quoting Charles's own date.
+    charlesPlacedOnly(slug);
+    const preflightRan: string[] = [];
+    const refused = await scheduleApproved(`/tmp/${slug}`, textRow(), recoveryDeps("charles", preflightRan));
+
+    assert.deepEqual(preflightRan, [], "refused before publishText ran");
+    assert.equal(refused.scheduled, null);
+    assert.equal(refused.scheduleError, `blocked by reuse guard, last placed to x ${YESTERDAY} (min_reuse_days: 14)`);
+    assert.equal(refused.refusal, "no-provider-request");
   });
 
   // ── The two paths cannot drift apart ────────────────────────────────────────────────────────────
 
+  // SLICE-7C: after the gate moved ahead of every publisher, both of these rows would refuse at a
+  // PRE-FLIGHT, and the test would have kept passing while quietly comparing one path with itself.
+  // The recovery side is therefore built the way the recovery branch is actually reached now: the
+  // publisher places the row (appendBetPlacement, as a real one does) and still returns []. Two
+  // genuinely different paths, one string.
   test("both guard paths produce the identical refusal for the identical brand and placement", async () => {
     const slug = "slice5n-no-drift";
     charlesPlacedOnly(slug);
@@ -222,11 +261,24 @@ describe("the Content page's reuse guard checks a row against its own brand's pl
     const recoveryRan: string[] = [];
 
     const preflight = await scheduleApproved(`/tmp/${slug}`, textRow(), postizDeps("charles", preflightRan));
-    const recovery = await scheduleApproved(`/tmp/${slug}`, textRow(), recoveryDeps("charles", recoveryRan));
 
+    writeFileSync(join(CHARLES_DIR, "bets.md"), "# Placed log\n");
+    const recovery = await scheduleApproved(`/tmp/${slug}`, textRow(), {
+      ...recoveryDeps("charles", recoveryRan),
+      publishText: async () => {
+        recoveryRan.push("typefully-text");
+        writeFileSync(join(CHARLES_DIR, "bets.md"), `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+        return [];
+      },
+    });
+
+    assert.deepEqual(preflightRan, [], "the pre-flight side refused before any publisher ran");
+    assert.deepEqual(recoveryRan, ["typefully-text"], "the recovery side really did run one");
     assert.equal(preflight.scheduleError, recovery.scheduleError);
     assert.equal(preflight.scheduled, null);
     assert.equal(recovery.scheduled, null);
+    assert.equal(preflight.refusal, "no-provider-request");
+    assert.equal(recovery.refusal, "publisher-declined", "identical text, opposite provenance");
   });
 
   // ── The suite never touches Muxin's own placement log ───────────────────────────────────────────

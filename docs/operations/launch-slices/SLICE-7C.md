@@ -187,7 +187,7 @@ audit, and never integrate while a required review is pending.
 
 Use the `### Closeout gate disposition` form in `docs/operations/slice-protocol-environment.md`.
 
-Preflight: changed paths limited to the three owned files; every acceptance item above mapped to a
+Preflight: changed paths limited to the four owned files; every acceptance item above mapped to a
 named test or a cited diff hunk; both check exit codes recorded with counts; the audit returned and
 every P0/P1 finding fixed or the candidate stopped.
 Gate cost: `npm run check`, unsandboxed, once at the end. No paperwork-only rerun.

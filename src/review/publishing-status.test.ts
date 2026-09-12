@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { appendPublishingStatus, disposableProviderOutcome, publishingRetryBlock, readPublishingHistory, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce } from "./publishing-status.js";
 import { readQueue, writeCell, type QueueRow } from "../publish/queue.js";
 import { approvalDispatchDisposition, commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "./approval-provenance.js";
+import { scheduleApproved, type SchedulerDeps } from "./studio-scheduling.js";
 
 const roots: string[] = [];
 const priorAccount = process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
@@ -575,5 +576,122 @@ describe("SLICE-7A: refusals clear a fence only when nothing reached the provide
     assert.equal(result.publishing.state, "blocked");
     assert.equal(journalEvents(path).length, 0, "a legacy row opens no fence and clears none");
     assert.equal(publishingRetryBlock("piece", approved, path), null);
+  });
+});
+
+// ── SLICE-7C: a NON-Postiz refusal clears its fence, end to end ──────────────────────────────────
+//
+// SLICE-7A proved the fence rule against an injected `refusal`. That leaves the question this slice
+// exists for untested: which routes can actually produce `no-provider-request` in the first place.
+// Before SLICE-7C only the Postiz branch could, so every quote card and every video refused by the
+// reuse guard kept its dispatch fence forever and needed hand repair.
+//
+// These run the REAL `scheduleApproved` with stubbed publishers, so the discriminant is the one the
+// production code computes rather than one the test supplies. Every publisher is a stub and no
+// network call is made. Observable state only: the publishing ledger, the approval safety journal,
+// whether reconciliation is accepted, and whether a second Schedule reaches the scheduler again.
+describe("SLICE-7C: a non-Postiz reuse-guard refusal is re-dispatchable end to end", () => {
+  const scratch = mkdtempSync(join(tmpdir(), "slice-7c-fence-"));
+  const savedBets = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+  const betsFile = join(scratch, "bets.md");
+  const YESTERDAY = new Date(Date.now() - 86_400_000).toISOString();
+
+  before(() => { process.env.CONTENT_AGENTS_TEST_BETS_PATH = betsFile; writeFileSync(betsFile, "# Placed log\n"); });
+  after(() => {
+    if (savedBets === undefined) delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+    else process.env.CONTENT_AGENTS_TEST_BETS_PATH = savedBets;
+    rmSync(scratch, { recursive: true, force: true });
+  });
+
+  /** A bets.md Placed row in the exact shape reuse-guard.ts scans for. */
+  const placed = (rowId: string, platform: string): string =>
+    `- placed ${YESTERDAY} [piece/${rowId}] ${platform} → postiz post pz-0 @ earlier\n`;
+  const journalEvents = (path: string): Record<string, unknown>[] => {
+    const journal = journalPathForLedger(path);
+    if (!existsSync(journal)) return [];
+    return readFileSync(journal, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line));
+  };
+  const resolutions = (path: string) => journalEvents(path).filter((e) => e.kind === "dispatch_resolved");
+
+  /** The real scheduler, with every publisher replaced. Postiz is left unconfigured so each row
+   *  takes the legacy route this slice is about. */
+  const via = (over: Partial<SchedulerDeps>): typeof scheduleApproved =>
+    (folder, liveRow, _deps, policyDecision, dispatchMode) => scheduleApproved(folder, liveRow, {
+      publishText: async () => [], publishCards: async () => [], publishTikTok: async () => [],
+      publishShorts: async () => [], publishSubstack: async () => [], lockOutreachMessage: async () => [],
+      postizEnv: {}, ...over,
+    }, policyDecision, dispatchMode);
+
+  const cardRow: QueueRow = { id: "quote-card-1-x", platform: "quote-card:x", format: "image", asset: "images/quote-card-1.png", status: "pending", notes: "", lineIndex: 2 };
+  const tiktokRow: QueueRow = { id: "tt-1", platform: "tiktok", format: "video", asset: "video/short.mp4", status: "pending", notes: "", lineIndex: 2 };
+
+  test("a quote card refused by the guard clears its fence and schedules again once the window opens", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path, cardRow);
+    writeFileSync(betsFile, `# Placed log\n${placed(cardRow.id, "x")}`);
+    let calls = 0;
+
+    const first = await scheduleApprovedOnce(folder, "piece", cardRow,
+      via({ publishCards: async () => { calls++; return []; } }), path);
+
+    assert.equal(calls, 0, "publishCards was never invoked, which is the entire basis of the fence claim");
+    assert.equal(first.publishing.state, "blocked");
+    assert.match(first.scheduleError ?? "", /^blocked by reuse guard, last placed to x /);
+    const resolved = resolutions(path);
+    assert.equal(resolved.length, 1, "nothing reached the provider, so the fence must clear");
+    assert.equal(resolved[0].resolution, "not-created", "never `exists`: there is no object to point at");
+    const approvedCard = { ...cardRow, status: "approve" as const };
+    assert.equal(approvalDispatchDisposition(folder, "piece", approvedCard, path).kind, "reconciled-not-created");
+    assert.equal(publishingRetryBlock("piece", approvedCard, path), null, "the row stays retryable with no hand repair");
+
+    // And once the reuse window opens, the same row schedules. No coordinator, no fence surgery.
+    writeFileSync(betsFile, "# Placed log\n");
+    const second = await scheduleApprovedOnce(folder, "piece", approvedCard,
+      via({ publishCards: async () => [{ draftId: "tf-window-open", when: "Tomorrow" }] }), path);
+    assert.equal(second.scheduleError, null);
+    assert.equal(second.publishing.state, "planned");
+    assert.equal(second.publishing.providerObjectId, "tf-window-open");
+  });
+
+  test("a TikTok video refused by the guard clears its fence too, so the fix is route-general", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path, tiktokRow);
+    writeFileSync(betsFile, `# Placed log\n${placed(tiktokRow.id, "tiktok")}`);
+    let calls = 0;
+
+    const result = await scheduleApprovedOnce(folder, "piece", tiktokRow,
+      via({ publishTikTok: async () => { calls++; return []; } }), path);
+
+    assert.equal(calls, 0, "publishTikTok was never invoked");
+    assert.equal(result.publishing.state, "blocked");
+    assert.equal(result.publishing.provider, "postpeer", "a genuinely different route from the card above");
+    assert.match(result.scheduleError ?? "", /^blocked by reuse guard, last placed to tiktok /);
+    const resolved = resolutions(path);
+    assert.equal(resolved.length, 1);
+    assert.equal(resolved[0].resolution, "not-created");
+    assert.equal(approvalDispatchDisposition(folder, "piece", { ...tiktokRow, status: "approve" }, path).kind, "reconciled-not-created");
+  });
+
+  // ── The negative, and the half that must not move. ───────────────────────────────────────────
+  test("a non-Postiz publisher that declines DESPITE an allowed pre-flight keeps its fence", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path, cardRow);
+    writeFileSync(betsFile, "# Placed log\n"); // the guard allows: nothing was ever placed
+    let calls = 0;
+    const declining = () => via({ publishCards: async () => { calls++; return []; } });
+
+    const first = await scheduleApprovedOnce(folder, "piece", cardRow, declining(), path);
+
+    assert.equal(calls, 1, "the pre-flight allowed it, so the publisher really did run");
+    assert.equal(first.publishing.state, "blocked");
+    assert.equal(resolutions(path).length, 0, "a publisher already ran, so its fence must be retained");
+    const approvedCard = { ...cardRow, status: "approve" as const };
+    const disposition = approvalDispatchDisposition(folder, "piece", approvedCard, path);
+    assert.equal(disposition.kind, "blocked");
+    assert.match((disposition as { reason: string }).reason, /durable dispatch fence/);
+    assert.throws(() => resolvePublishingAttempt("piece", cardRow.id, "not-created", {}, path), /no uncertain/i,
+      "`blocked` stays resolve-ineligible: nobody may clear a fence on a publisher that already ran");
+    await assert.rejects(() => scheduleApprovedOnce(folder, "piece", approvedCard, declining(), path), /durable dispatch fence/i);
+    assert.equal(calls, 1, "and the scheduler must not run a second time");
   });
 });

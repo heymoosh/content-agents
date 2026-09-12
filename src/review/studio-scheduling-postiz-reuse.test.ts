@@ -244,31 +244,58 @@ describe("the Postiz path refuses a row the reuse guard blocks", () => {
     });
   }
 
-  // ── Acceptance: the five direct publishers are unaffected, and the recovery branch still works ──
-  test("a legacy route is not gated by the Postiz pre-flight: its own publisher still runs and still decides", async () => {
+  // ── Acceptance: the five direct publishers still decide for themselves, and the recovery branch
+  // still works.
+  //
+  // SLICE-7C re-pointed this test and renamed it. "Not gated by the pre-flight" stopped being true:
+  // the gate now covers non-Postiz routes too. What survives, and is what this test was really
+  // protecting, is that the gate only ever stops a row the guard genuinely REFUSES, and never
+  // stands in for the publisher's own decision on a row the guard allows or defers. The old fixture
+  // also leaned on a stub that ignored the guard — a real publishText would have refused that row
+  // itself — so an allowing fixture is the more faithful one for the "still runs" half. ──────────
+  test("a legacy route's own publisher still runs and still decides whatever the pre-flight allows", async () => {
     const slug = "legacy-route-untouched";
     const folder = `/tmp/${slug}`;
-    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    // A decoy placement under a neighbouring platform: the guard allows, so nothing below can be
+    // mistaken for the gate waving a refused row through.
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "linkedin", YESTERDAY)}`);
 
     // SLICE-7B moved the vehicle, not the subject. A text row no longer falls back to Typefully
     // when discovery lacks the channel, so the legacy route is reached the way the packet keeps
     // working: no Postiz configured at all. `selectConfiguredProvider` returns the identical
     // `{ provider: "typefully" }`, so everything downstream of it is the same code path.
-    // Typefully's own pre-flight still owns the decision, and the new gate must not short-circuit it.
+    // SLICE-7C gates this route as well, so the claim is no longer "the gate does not reach here".
+    // It is narrower and is what the assertions below pin: the gate stops a row only when the guard
+    // genuinely REFUSES it, and on any other verdict Typefully's own pre-flight still owns the call.
     const reached = stubDeps({ postizEnv: {} });
     const result = await scheduleApproved(folder, textRow(), reached.deps);
     assert.deepEqual(reached.routes, ["typefully-text"], "publishText still runs and still makes its own call");
-    assert.equal(result.scheduleError, null, "the pre-flight did not veto a route it does not own");
+    assert.equal(result.scheduleError, null, "the guard allows this row, so the gate hands it on untouched");
 
     // And when that publisher silently skips (its own guard), runPublisher's `done.length === 0`
     // recovery branch is still reached and still explains why — the pre-flight has not made it dead.
+    // A DEFERRED row is the case that still gets this far by design: the pre-flight hands it on, and
+    // only the publisher can decline it.
+    const anHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-2", "x", anHourAgo)}`);
     const skipped = stubDeps({
       postizEnv: {},
       publishText: async () => [],
     });
     const recovered = await scheduleApproved(folder, textRow(), skipped.deps);
     assert.equal(recovered.scheduled, null);
-    assert.match(recovered.scheduleError ?? "", /^blocked by reuse guard, last placed to x /);
+    assert.match(recovered.scheduleError ?? "", /^not scheduled: another post from this piece already went to x /);
+    assert.equal(recovered.refusal, "publisher-declined", "the publisher ran, so provider state stays unproven");
+
+    // SLICE-7C, the scenario this test used to carry: the SAME row inside min_reuse_days. It is now
+    // refused ahead of the publisher, so it never reaches the recovery branch at all, and it carries
+    // the stronger discriminant.
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    const gated = stubDeps({ postizEnv: {} });
+    const refused = await scheduleApproved(folder, textRow(), gated.deps);
+    assert.deepEqual(gated.routes, [], "a row the guard refuses outright never reaches its publisher");
+    assert.match(refused.scheduleError ?? "", /^blocked by reuse guard, last placed to x /);
+    assert.equal(refused.refusal, "no-provider-request");
   });
 
   test("the recovery branch still explains a publisher that skips for a reason the guard knows nothing about", async () => {
@@ -532,9 +559,15 @@ describe("SLICE-7A: a refusal says which side of dispatch it came from", () => {
   });
 
   // ── The P0 this discriminant exists for. Same wording as the pre-flight, opposite provenance. ──
+  //
+  // SLICE-7C re-pointed the fixture, not the claim. A standing same-row placement no longer reaches
+  // any publisher, so the only way the recovery branch can still produce the SAME-ROW wording is for
+  // the placement to land WHILE the publisher runs — which is exactly what a real publisher does
+  // when it places a row (appendBetPlacement) and precisely the case `publisher-declined` exists
+  // for: the publisher may well hold the object. Pre-flight allows, publisher places and returns [].
   test("the recovery branch emits the SAME same-row wording but is publisher-declined", async () => {
     const slug = "side-recovery-same-row";
-    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
     // No Postiz configured, so this row routes to Typefully (SLICE-7B: a text row no longer falls
     // back to Typefully from an authoritative registry that lacks the channel, and this test is
     // about recovery provenance, not about which route got here). Its publisher runs and returns [],
@@ -542,7 +575,11 @@ describe("SLICE-7A: a refusal says which side of dispatch it came from", () => {
     const ran: string[] = [];
     const { deps } = stubDeps({
       postizEnv: {},
-      publishText: async () => { ran.push("typefully-text"); return []; },
+      publishText: async () => {
+        ran.push("typefully-text");
+        writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+        return [];
+      },
     });
     const result = await scheduleApproved(`/tmp/${slug}`, textRow(), deps);
 
@@ -550,6 +587,21 @@ describe("SLICE-7A: a refusal says which side of dispatch it came from", () => {
     assert.equal(result.scheduleError, `blocked by reuse guard, last placed to x ${YESTERDAY} (min_reuse_days: 14)`,
       "byte-identical to the pre-flight wording, which is why text can never decide this");
     assert.equal(result.refusal, "publisher-declined", "an empty result is not proof that nothing was created");
+
+    // SLICE-7C: the identical string from the OTHER side, on the same non-Postiz route. Same text,
+    // opposite provenance, and only the discriminant can tell them apart. This is the live two-sided
+    // example the wording-identity claim above rests on.
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    const preflightRan: string[] = [];
+    const gated = stubDeps({
+      postizEnv: {},
+      publishText: async () => { preflightRan.push("typefully-text"); return []; },
+    });
+    const preflight = await scheduleApproved(`/tmp/${slug}`, textRow(), gated.deps);
+
+    assert.deepEqual(preflightRan, [], "a placement already standing refuses before the publisher runs");
+    assert.equal(preflight.scheduleError, result.scheduleError, "byte-identical on both sides of dispatch");
+    assert.equal(preflight.refusal, "no-provider-request");
   });
 
   test("the recovery branch's unspecified fallback is publisher-declined as well", async () => {
@@ -576,14 +628,33 @@ describe("SLICE-7A: a refusal says which side of dispatch it came from", () => {
 
   test("the unscheduled-draft route's recovery branch is publisher-declined too", async () => {
     const slug = "side-unscheduled-draft";
-    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    // SLICE-7C re-point, same construction as the route above and for the same reason: this branch
+    // is gated ahead of publishText now, so the recovery site is reached by the publisher placing
+    // the row mid-call and still returning [].
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
     const ran: string[] = [];
-    const { deps } = stubDeps({ publishText: async () => { ran.push("typefully-text"); return []; } });
+    const { deps } = stubDeps({
+      publishText: async () => {
+        ran.push("typefully-text");
+        writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+        return [];
+      },
+    });
     const result = await scheduleApproved(`/tmp/${slug}`, textRow(), deps, undefined, "unscheduled-draft");
 
     assert.deepEqual(ran, ["typefully-text"], "publishText already ran on this route as well");
     assert.match(result.scheduleError ?? "", /^blocked by reuse guard, last placed to x /);
     assert.equal(result.refusal, "publisher-declined", "the second post-publisher site must not be left unmarked");
+
+    // SLICE-7C: and the same route with the placement already standing refuses ahead of publishText,
+    // which is the defect this slice closes for the unscheduled-draft branch.
+    const preflightRan: string[] = [];
+    const gated = stubDeps({ publishText: async () => { preflightRan.push("typefully-text"); return []; } });
+    const preflight = await scheduleApproved(`/tmp/${slug}`, textRow(), gated.deps, undefined, "unscheduled-draft");
+
+    assert.deepEqual(preflightRan, [], "publishText is not invoked at all on this route now");
+    assert.equal(preflight.scheduleError, result.scheduleError);
+    assert.equal(preflight.refusal, "no-provider-request");
   });
 
   test("fails closed: a Postiz create failure carries no discriminant at all", async () => {
@@ -614,5 +685,185 @@ describe("SLICE-7A: a refusal says which side of dispatch it came from", () => {
     assert.equal(deferred.scheduleError, null, "deferral is a date, not a refusal");
     assert.equal(deferred.refusal, undefined);
     assert.deepEqual(spaced.routes, ["postiz"]);
+  });
+});
+
+// ── SLICE-7C: the pre-flight is not Postiz-shaped ────────────────────────────────────────────────
+//
+// Only the Postiz branch used to ask the guard ahead of its publisher, so only a Postiz row could
+// truthfully report `no-provider-request`. Every other route — quote cards, TikTok, YouTube Shorts,
+// Substack, Typefully text, and the media backup — invoked its publisher first and recovered the
+// reason afterwards, which is `publisher-declined` and keeps the durable dispatch fence forever.
+// Asking the guard BEFORE the publisher on those routes too makes the stronger claim provable
+// there by exactly the argument the Postiz pre-flight already makes.
+//
+// The residue is deliberately unchanged: an allowed-or-deferred pre-flight plus an empty publisher
+// result is still `publisher-declined`, still fenced. An empty result is not proof of anything.
+//
+// Everything below asserts the observable outcome: whether the publisher was invoked at all (a
+// counter on the stub, which is the entire basis of the fence claim), what the slot ledger holds,
+// and what came back as scheduled/scheduleError/refusal.
+describe("SLICE-7C: a reuse-guard refusal is pre-dispatch on every route", () => {
+  const saved: Record<string, string | undefined> = {};
+  const scratch = mkdtempSync(join(tmpdir(), "route-general-preflight-"));
+  const dirs: string[] = [scratch];
+
+  before(() => {
+    for (const k of ENV_KEYS) saved[k] = process.env[k];
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = join(scratch, "bets.md");
+    process.env.CONTENT_AGENTS_TEST_LEDGER = join(scratch, "publish-schedule.jsonl");
+    process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID = "human-inference/postiz";
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH, "# Placed log\n");
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER, "");
+  });
+
+  after(() => {
+    for (const k of ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  });
+
+  /** Every publisher shares ONE counter and returns []. If a pre-flight refusal ever let control
+   *  through, the counter is 1 and the old `publisher-declined` wording comes back — so these
+   *  tests cannot pass by accident on a route that simply has no publisher wired. Postiz is left
+   *  unconfigured so each row takes its own legacy route. */
+  function counted(over: Partial<SchedulerDeps> = {}): { deps: SchedulerDeps; calls: () => number } {
+    let calls = 0;
+    const bump = async (): Promise<unknown[]> => { calls++; return []; };
+    const deps: SchedulerDeps = {
+      publishText: bump,
+      publishCards: bump,
+      publishTikTok: bump,
+      publishShorts: bump,
+      publishSubstack: bump,
+      lockOutreachMessage: async () => [],
+      resolveDeliveryPolicy: policyFor,
+      postizEnv: {},
+      ...over,
+    };
+    return { deps, calls: () => calls };
+  }
+
+  // Five routes, five different publishers, five different guard keys. `card` and `tiktok` alone
+  // would satisfy the two-kind requirement; the rest are here because a Typefully-shaped fix that
+  // missed publishShorts or publishSubstack would look identical on those two.
+  const ROUTES: { name: string; row: QueueRow; key: string; window: number }[] = [
+    { name: "a quote card (cards.ts)", key: "x", window: 14,
+      row: textRow({ id: "quote-card-1-x", platform: "quote-card:x", format: "image", asset: "images/quote-card-1.png" }) },
+    { name: "a TikTok video (tiktok.ts)", key: "tiktok", window: 14,
+      row: textRow({ id: "tt-1", platform: "tiktok", format: "video", asset: "video/short.mp4" }) },
+    { name: "a YouTube Short (youtube.ts)", key: "youtube", window: 30,
+      row: textRow({ id: "yt-1", platform: "x", format: "short", asset: "video/short.mp4" }) },
+    { name: "a Substack post (substack.ts)", key: "substack", window: 7,
+      row: textRow({ id: "sub-1", platform: "substack", format: "text", asset: "derivatives/sub-1.md" }) },
+    { name: "a Typefully text post (typefully.ts)", key: "x", window: 14, row: textRow() },
+  ];
+
+  for (const r of ROUTES) {
+    test(`refused before its publisher is invoked — ${r.name}`, async () => {
+      const slug = `preflight-route-${r.row.id}`;
+      writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, r.row.id, r.key, YESTERDAY)}`);
+      writeFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!, "");
+      const ledgerBefore = readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!);
+
+      const { deps, calls } = counted();
+      const result = await scheduleApproved(`/tmp/${slug}`, r.row, deps);
+
+      assert.equal(calls(), 0, "the publisher was never invoked, which is the whole basis of the fence claim");
+      assert.equal(result.scheduled, null);
+      assert.equal(result.scheduleError, `blocked by reuse guard, last placed to ${r.key} ${YESTERDAY} (min_reuse_days: ${r.window})`);
+      assert.equal(result.refusal, "no-provider-request");
+      assert.deepEqual(readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!), ledgerBefore, "and no slot was claimed");
+    });
+  }
+
+  test("the unscheduled-draft route is gated ahead of publishText as well", async () => {
+    const slug = "preflight-unscheduled-draft";
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
+    const { deps, calls } = counted();
+    const result = await scheduleApproved(`/tmp/${slug}`, textRow(), deps, undefined, "unscheduled-draft");
+
+    assert.equal(calls(), 0, "the second post-publisher site is now a pre-flight site too");
+    assert.equal(result.scheduleError, `blocked by reuse guard, last placed to x ${YESTERDAY} (min_reuse_days: 14)`);
+    assert.equal(result.refusal, "no-provider-request");
+  });
+
+  test("the media backup route is covered through runPublisher, not a second bespoke call site", async () => {
+    const slug = "preflight-media-backup";
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "cm-1", "linkedin", YESTERDAY)}`);
+    const row = textRow({ id: "cm-1", platform: "linkedin", format: "image", asset: "configured-media/cm-1/card.png" });
+    const { deps, calls } = counted();
+    const result = await scheduleApproved(`/tmp/${slug}`, row, deps);
+
+    assert.equal(calls(), 0, "scheduleMediaViaTypefully reaches publishCards through runPublisher, so it inherits the gate");
+    assert.equal(result.scheduleError, `blocked by reuse guard, last placed to linkedin ${YESTERDAY} (min_reuse_days: 60)`);
+    assert.equal(result.refusal, "no-provider-request");
+  });
+
+  test("an outreach-message row still has no guard key and is untouched by the new gate", async () => {
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed("preflight-outreach", "om-1", "email", YESTERDAY)}`);
+    const locked: string[] = [];
+    const { deps } = counted({ lockOutreachMessage: async () => { locked.push("lock"); return [{ ref: "locked" }]; } });
+    const row = textRow({ id: "om-1", platform: "email", format: "outreach-message", asset: "outreach/om-1.md" });
+    const result = await scheduleApproved("/tmp/preflight-outreach", row, deps);
+
+    assert.deepEqual(locked, ["lock"], "approve still means lock");
+    assert.equal(result.scheduleError, null);
+    assert.equal(result.refusal, undefined);
+  });
+
+  // ── The residue. This is the half that must NOT move. ────────────────────────────────────────
+  test("allowed pre-flight plus an empty publisher result is still publisher-declined", async () => {
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
+    const { deps, calls } = counted();
+    const row = textRow({ id: "quote-card-1-x", platform: "quote-card:x", format: "image", asset: "images/quote-card-1.png" });
+    const result = await scheduleApproved("/tmp/preflight-residue-allowed", row, deps);
+
+    assert.equal(calls(), 1, "the pre-flight allowed it, so the publisher really did run");
+    assert.equal(result.scheduleError, "not scheduled: blocked by the reuse guard (check the server log for the reason)");
+    assert.equal(result.refusal, "publisher-declined", "an empty result is still not proof that nothing was created");
+  });
+
+  test("a deferred verdict is not a refusal: control falls through, and no earliestAt is handed to a non-Postiz publisher", async () => {
+    const slug = "preflight-deferred-falls-through";
+    const anHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    // A DIFFERENT derivative of the same piece an hour ago: the guard defers rather than refuses.
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "quote-card-2-x", "x", anHourAgo)}`);
+    const seen: string[][] = [];
+    const { deps } = counted({
+      publishCards: async (_folder, opts) => { seen.push(Object.keys(opts).sort()); return [{ ref: "typefully draft card-1" }]; },
+    });
+    const row = textRow({ id: "quote-card-1-x", platform: "quote-card:x", format: "image", asset: "images/quote-card-1.png" });
+    const result = await scheduleApproved(`/tmp/${slug}`, row, deps);
+
+    assert.equal(result.scheduleError, null, "deferral is a date, not a refusal");
+    assert.equal(result.refusal, undefined);
+    assert.deepEqual(seen, [["onlyIds"]], "publishCards computes its own spacing; a floor must not be smuggled in");
+  });
+
+  test("a deferred verdict that the publisher then declines is still publisher-declined", async () => {
+    const slug = "preflight-deferred-declined";
+    const anHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "quote-card-2-x", "x", anHourAgo)}`);
+    const { deps, calls } = counted();
+    const row = textRow({ id: "quote-card-1-x", platform: "quote-card:x", format: "image", asset: "images/quote-card-1.png" });
+    const result = await scheduleApproved(`/tmp/${slug}`, row, deps);
+
+    assert.equal(calls(), 1, "a deferral must reach the publisher");
+    assert.match(result.scheduleError ?? "", /^not scheduled: another post from this piece already went to x /);
+    assert.equal(result.refusal, "publisher-declined");
+  });
+
+  test("a row with no prior placement still schedules, unchanged", async () => {
+    writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
+    const { deps } = counted({ publishTikTok: async () => [{ ref: "postpeer-1" }] });
+    const row = textRow({ id: "tt-1", platform: "tiktok", format: "video", asset: "video/short.mp4" });
+    const result = await scheduleApproved("/tmp/preflight-no-placement", row, deps);
+
+    assert.equal(result.scheduleError, null);
+    assert.equal(result.refusal, undefined);
+    assert.deepEqual(result.scheduled, { ref: "postpeer-1" });
   });
 });
