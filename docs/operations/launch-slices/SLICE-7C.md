@@ -26,8 +26,7 @@ by exactly the argument the Postiz pre-flight already makes.
 
 What must NOT change: the fail-closed residue. If the pre-flight says allowed or deferred and the
 publisher still returns `[]`, that stays `publisher-declined` with the fence RETAINED. An empty
-publisher result is still not proof that nothing was created, and no widening of that rule is in
-scope.
+publisher result is still not proof nothing was created. Widening that rule is out of scope.
 
 ## Difficulty
 
@@ -47,8 +46,8 @@ before the coordinator's gate.
 
 ## Owned files
 
-Parallel-safe: no. One behavior in one function, and its tests assert on that exact behavior. A
-second lane would own no independent deliverable and would contend for the same two files.
+Parallel-safe: no. One behavior in one function; every owned test asserts on it, so a second lane
+would own nothing independent and would contend for the same files.
 
 ### Lane A — the pre-flight, and its proof
 
@@ -135,7 +134,7 @@ none
       read as a rule forbidding this change.
 - [ ] The four pre-existing failures named in Adjudication are re-pointed under its binding rules,
       with no assertion softened and none deleted or skipped.
-- [ ] No user-facing string gains an em dash or an AI tell (`config/voice.yaml`).
+- [ ] No user-facing string gains an em dash or AI tell (`config/voice.yaml`).
 
 ## Verify
 
@@ -155,7 +154,7 @@ node --import tsx --test src/review/publishing-status.test.ts src/review/studio-
 npm run check
 ```
 
-Record exact pass/fail/skip counts for both, and the candidate commit-free diff identity.
+Record exact pass/fail/skip counts for both, and the diff identity.
 
 ## Observable result
 
@@ -175,8 +174,8 @@ pre-flight genuinely ahead of every call that could create, schedule or modify a
 and of every slot claim, on each route it now covers? Name any route where it is not.
 Prior accepted evidence: SLICE-7A's fence-resolution rule and SLICE-7B's route selection are
 accepted and are not reopened by this slice.
-On reviewer outage: mark the candidate review-blocked and stop. Do not integrate a candidate whose
-required cross-family review is pending, and never substitute a same-family audit.
+On reviewer outage: mark the candidate review-blocked and stop. Never substitute a same-family
+audit, and never integrate while a required review is pending.
 
 ## Families
 
@@ -191,8 +190,7 @@ Use the `### Closeout gate disposition` form in `docs/operations/slice-protocol-
 Preflight: changed paths limited to the three owned files; every acceptance item above mapped to a
 named test or a cited diff hunk; both check exit codes recorded with counts; the audit returned and
 every P0/P1 finding fixed or the candidate stopped.
-Gate cost: `npm run check`, unsandboxed, once at the end. Measured runtime: unknown until run. No
-paperwork-only rerun.
+Gate cost: `npm run check`, unsandboxed, once at the end. No paperwork-only rerun.
 
 Use the `### Hygiene disposition` and `### Read-set measurement` forms in
 `docs/operations/slice-protocol-environment.md`.
