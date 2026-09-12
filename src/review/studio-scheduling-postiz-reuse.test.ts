@@ -250,9 +250,12 @@ describe("the Postiz path refuses a row the reuse guard blocks", () => {
     const folder = `/tmp/${slug}`;
     writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
 
-    // Authoritative discovery says Postiz cannot take x/text, so this text row routes to Typefully,
-    // whose own pre-flight owns the decision. The new gate must not short-circuit it.
-    const reached = stubDeps({ fetchPostizRegistry: async () => takes("youtube", ["video"]) });
+    // SLICE-7B moved the vehicle, not the subject. A text row no longer falls back to Typefully
+    // when discovery lacks the channel, so the legacy route is reached the way the packet keeps
+    // working: no Postiz configured at all. `selectConfiguredProvider` returns the identical
+    // `{ provider: "typefully" }`, so everything downstream of it is the same code path.
+    // Typefully's own pre-flight still owns the decision, and the new gate must not short-circuit it.
+    const reached = stubDeps({ postizEnv: {} });
     const result = await scheduleApproved(folder, textRow(), reached.deps);
     assert.deepEqual(reached.routes, ["typefully-text"], "publishText still runs and still makes its own call");
     assert.equal(result.scheduleError, null, "the pre-flight did not veto a route it does not own");
@@ -260,7 +263,7 @@ describe("the Postiz path refuses a row the reuse guard blocks", () => {
     // And when that publisher silently skips (its own guard), runPublisher's `done.length === 0`
     // recovery branch is still reached and still explains why — the pre-flight has not made it dead.
     const skipped = stubDeps({
-      fetchPostizRegistry: async () => takes("youtube", ["video"]),
+      postizEnv: {},
       publishText: async () => [],
     });
     const recovered = await scheduleApproved(folder, textRow(), skipped.deps);
@@ -271,7 +274,7 @@ describe("the Postiz path refuses a row the reuse guard blocks", () => {
   test("the recovery branch still explains a publisher that skips for a reason the guard knows nothing about", async () => {
     // Guard allows (empty Placed log), publisher returns [] anyway. The generic wording must survive.
     writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
-    const { deps } = stubDeps({ fetchPostizRegistry: async () => takes("youtube", ["video"]), publishText: async () => [] });
+    const { deps } = stubDeps({ postizEnv: {}, publishText: async () => [] });
     const result = await scheduleApproved("/tmp/no-placements", textRow(), deps);
     assert.equal(result.scheduled, null);
     assert.equal(result.scheduleError, "not scheduled: blocked by the reuse guard (check the server log for the reason)");
@@ -532,11 +535,13 @@ describe("SLICE-7A: a refusal says which side of dispatch it came from", () => {
   test("the recovery branch emits the SAME same-row wording but is publisher-declined", async () => {
     const slug = "side-recovery-same-row";
     writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-1", "x", YESTERDAY)}`);
-    // Discovery says Postiz cannot take x/text, so this row routes to Typefully. Its publisher runs
-    // and returns [], and the recovery branch rebuilds the identical refusal string.
+    // No Postiz configured, so this row routes to Typefully (SLICE-7B: a text row no longer falls
+    // back to Typefully from an authoritative registry that lacks the channel, and this test is
+    // about recovery provenance, not about which route got here). Its publisher runs and returns [],
+    // and the recovery branch rebuilds the identical refusal string.
     const ran: string[] = [];
     const { deps } = stubDeps({
-      fetchPostizRegistry: async () => takes("youtube", ["video"]),
+      postizEnv: {},
       publishText: async () => { ran.push("typefully-text"); return []; },
     });
     const result = await scheduleApproved(`/tmp/${slug}`, textRow(), deps);
@@ -549,7 +554,7 @@ describe("SLICE-7A: a refusal says which side of dispatch it came from", () => {
 
   test("the recovery branch's unspecified fallback is publisher-declined as well", async () => {
     writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, "# Placed log\n");
-    const { deps } = stubDeps({ fetchPostizRegistry: async () => takes("youtube", ["video"]), publishText: async () => [] });
+    const { deps } = stubDeps({ postizEnv: {}, publishText: async () => [] });
     const result = await scheduleApproved("/tmp/side-recovery-unspecified", textRow(), deps);
 
     assert.equal(result.scheduleError, "not scheduled: blocked by the reuse guard (check the server log for the reason)");
@@ -562,7 +567,7 @@ describe("SLICE-7A: a refusal says which side of dispatch it came from", () => {
     // A DIFFERENT row of the same slug placed an hour ago: the guard defers rather than refuses, and
     // only the recovery branch turns a deferral into a "not scheduled" message.
     writeFileSync(process.env.CONTENT_AGENTS_TEST_BETS_PATH!, `# Placed log\n${placed(slug, "x-2", "x", anHourAgo)}`);
-    const { deps } = stubDeps({ fetchPostizRegistry: async () => takes("youtube", ["video"]), publishText: async () => [] });
+    const { deps } = stubDeps({ postizEnv: {}, publishText: async () => [] });
     const result = await scheduleApproved(`/tmp/${slug}`, textRow(), deps);
 
     assert.match(result.scheduleError ?? "", /^not scheduled: another post from this piece already went to x /);

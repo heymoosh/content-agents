@@ -135,13 +135,36 @@ function legacyProvider(kind: ScheduleKind, row?: QueueRow): SelectedSchedulingP
   return { provider: kind === "text" || kind === "card" ? "typefully" : kind === "tiktok" ? "postpeer" : kind === "video" ? "youtube" : "substack" };
 }
 
+/**
+ * SLICE-7B. What Muxin is told when discovery is authoritative and does not list the channel.
+ *
+ * A text row used to be handed to Typefully in exactly this case, so an x row landed on a
+ * different provider than its bluesky and threads siblings, with no planned time, no ledger
+ * signal and no message. Discovery already knows the real reason, so say it and say the fix.
+ */
+function postizChannelNotConnected(destination: PostizDestination): string {
+  return `Postiz does not have ${destination} connected, so this row has nowhere to go. Connect ${destination} in Postiz, add its account id to POSTIZ_ACCOUNT_IDS, then approve the row again.`;
+}
+
 /** Discover configured Postiz support first; fallback is allowed only after an authoritative unsupported result. */
 export async function selectConfiguredProvider(row: QueueRow, deps: Pick<SchedulerDeps, "fetchPostizRegistry" | "postizEnv"> = {}): Promise<SelectedSchedulingProvider> {
   const kind = scheduleKind(row);
   if (!kind || kind === "outreach-lock") return { provider: "manual" as never };
   const shape = postizShape(row);
   const env = deps.postizEnv ?? process.env;
-  const configured = Boolean(deps.fetchPostizRegistry || (env.POSTIZ_BASE_URL?.trim() && env.POSTIZ_API_KEY?.trim()));
+  const baseUrl = env.POSTIZ_BASE_URL?.trim();
+  const apiKey = env.POSTIZ_API_KEY?.trim();
+  // SLICE-7B. Neither variable set is a deployment CHOICE: this repo still has to run with no
+  // Postiz at all, so legacy routing below is untouched for that case. Exactly one of them set is
+  // a broken configuration, not a choice, and it used to look identical to "no Postiz" and send
+  // the row quietly to Typefully. Name the variable to fix instead. Only the names appear here,
+  // never a value.
+  if (!deps.fetchPostizRegistry && Boolean(baseUrl) !== Boolean(apiKey)) {
+    const present = baseUrl ? "POSTIZ_BASE_URL" : "POSTIZ_API_KEY";
+    const missing = baseUrl ? "POSTIZ_API_KEY" : "POSTIZ_BASE_URL";
+    throw new Error(`Postiz is only half configured: ${present} is set but ${missing} is not. Set ${missing} to schedule through Postiz, or clear ${present} to schedule without it.`);
+  }
+  const configured = Boolean(deps.fetchPostizRegistry || (baseUrl && apiKey));
   // Trigger 1 of 3 for the media backup route: Postiz is not configured at all, so nothing was
   // ever sent to it and a second route cannot double-post.
   if (!configured || !shape) return legacyProvider(kind, row);
@@ -164,6 +187,7 @@ export async function selectConfiguredProvider(row: QueueRow, deps: Pick<Schedul
   // this row shape can use, so those keep the manual ready-to-paste path.
   if (route === "unsupported") {
     if (kind === "media") return legacyProvider(kind, row);
+    if (shape.media === "text") throw new Error(postizChannelNotConnected(shape.destination));
     throw new Error(`no delivery provider supports ${shape.destination}/${shape.media}`);
   }
   if (route !== "postiz") return kind === "media" ? legacyProvider(kind, row) : { provider: route };

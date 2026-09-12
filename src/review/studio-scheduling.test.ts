@@ -320,3 +320,110 @@ describe("SLICE-6Y the Publishing room schedules any approved Postiz channel", (
     );
   });
 });
+
+// ── SLICE-7B: the Publishing room refuses a channel Postiz does not have, and says which ────────
+//
+// Muxin found `x-1` on Typefully with no planned time while its bluesky and threads siblings were
+// on Postiz. Two paths handed a text row to Typefully with no error, no ledger signal and no
+// Studio message. Both now refuse and name the fix. Discovery is stubbed throughout: no live
+// call, no filesystem write, no provider. Account ids are invented; no secret appears.
+describe("SLICE-7B a text row never lands on Typefully behind Muxin's back", () => {
+  const TEXT_CHANNELS: PostizDestination[] = ["x", "linkedin", "bluesky"];
+  /** Postiz IS configured and discovery IS authoritative; it just does not list the three. */
+  const onlyThreads: PostizCapabilityRegistry = {
+    fetchedAt: "2026-09-12T12:00:00Z",
+    capabilities: [{ destination: "threads", media: ["text"] as PostizMedia[], accountId: "acct-threads", accountLabel: "Human Inference threads" }],
+  };
+  const stubbed = (registry: PostizCapabilityRegistry, postizEnv: NodeJS.ProcessEnv = { POSTIZ_ACCOUNT_IDS: "acct-threads,acct-x" }): Pick<SchedulerDeps, "fetchPostizRegistry" | "postizEnv"> =>
+    ({ postizEnv: { ...postizEnv, POSTIZ_BASE_URL: "http://postiz.test", POSTIZ_API_KEY: "unused-by-the-stub" }, fetchPostizRegistry: async () => registry });
+
+  for (const destination of TEXT_CHANNELS) {
+    test(`a ${destination} text row refuses by name instead of returning typefully`, async () => {
+      let selected: unknown = "no result";
+      try { selected = await selectConfiguredProvider(textRow({ id: `${destination}-1`, platform: destination }), stubbed(onlyThreads)); }
+      catch (error) {
+        assert.equal((error as Error).message,
+          `Postiz does not have ${destination} connected, so this row has nowhere to go. Connect ${destination} in Postiz, add its account id to POSTIZ_ACCOUNT_IDS, then approve the row again.`);
+        return;
+      }
+      assert.fail(`${destination}/text must refuse; it returned ${JSON.stringify(selected)}`);
+    });
+  }
+
+  test("the Publishing room surfaces that refusal and no publisher runs", async () => {
+    const ran: string[] = [];
+    const deps: SchedulerDeps = {
+      publishText: async () => { ran.push("typefully-text"); return [{ ref: "typefully draft x-1" }]; },
+      publishCards: async () => { ran.push("typefully-card"); return []; },
+      publishTikTok: async () => [], publishShorts: async () => [], publishSubstack: async () => [],
+      lockOutreachMessage: async () => [],
+      resolveDeliveryPolicy: policyFor("human-inference"),
+      ...stubbed(onlyThreads),
+      publishPostiz: async () => { ran.push("postiz"); return { providerObjectId: "pz-1", status: "scheduled" }; },
+    };
+    const result = await scheduleApproved("/tmp/slice-7b-refusal", textRow(), deps);
+    assert.deepEqual(ran, [], "no provider may be contacted for a row that has nowhere to go");
+    assert.equal(result.scheduled, null);
+    assert.equal(result.scheduleError,
+      "Postiz does not have x connected, so this row has nowhere to go. Connect x in Postiz, add its account id to POSTIZ_ACCOUNT_IDS, then approve the row again.");
+  });
+
+  test("a listed destination still routes to postiz, and 6Y still picks the account", async () => {
+    const listsX: PostizCapabilityRegistry = {
+      fetchedAt: "2026-09-12T12:00:00Z",
+      capabilities: [{ destination: "x", media: ["text"] as PostizMedia[], accountId: "acct-x", accountLabel: "Human Inference x" }],
+    };
+    const selected = await selectConfiguredProvider(textRow(), stubbed(listsX, { POSTIZ_ACCOUNT_IDS: "acct-x" }));
+    assert.equal(selected.provider, "postiz");
+    assert.equal(selected.postizCapability?.accountId, "acct-x");
+    assert.equal(selected.postizCapability?.destination, "x");
+    // 6Y's approved-account refusal is unchanged and still beats any fallback: a connected channel
+    // Muxin never approved names the id to add, it does not become a Typefully draft.
+    await assert.rejects(
+      selectConfiguredProvider(textRow(), stubbed(listsX, { POSTIZ_ACCOUNT_IDS: "acct-threads" })),
+      (error: Error) => {
+        assert.equal(error.message, "Postiz has x/text connected on account acct-x, which is not approved for posting. Add acct-x to POSTIZ_ACCOUNT_IDS to schedule this channel.");
+        return true;
+      },
+    );
+  });
+
+  test("with no Postiz configured at all, a text row still goes to typefully exactly as today", async () => {
+    const selected = await selectConfiguredProvider(textRow(), { postizEnv: {} });
+    assert.equal(selected.provider, "typefully");
+    assert.equal(selected.postizCapability, undefined);
+  });
+
+  test("exactly one Postiz variable set is a broken configuration and refuses by name", async () => {
+    await assert.rejects(
+      selectConfiguredProvider(textRow(), { postizEnv: { POSTIZ_BASE_URL: "http://postiz.test" } }),
+      (error: Error) => {
+        assert.equal(error.message, "Postiz is only half configured: POSTIZ_BASE_URL is set but POSTIZ_API_KEY is not. Set POSTIZ_API_KEY to schedule through Postiz, or clear POSTIZ_BASE_URL to schedule without it.");
+        return true;
+      },
+    );
+    await assert.rejects(
+      selectConfiguredProvider(textRow(), { postizEnv: { POSTIZ_API_KEY: "not-a-real-key" } }),
+      (error: Error) => {
+        assert.equal(error.message, "Postiz is only half configured: POSTIZ_API_KEY is set but POSTIZ_BASE_URL is not. Set POSTIZ_BASE_URL to schedule through Postiz, or clear POSTIZ_API_KEY to schedule without it.");
+        return true;
+      },
+    );
+    // Whitespace is not configuration: a blank value is still the deliberate no-Postiz case.
+    const blank = await selectConfiguredProvider(textRow(), { postizEnv: { POSTIZ_BASE_URL: "   ", POSTIZ_API_KEY: "  " } });
+    assert.equal(blank.provider, "typefully");
+  });
+
+  test("media rows are untouched: the Typefully backup route and the unsupported branch both stand", async () => {
+    const mediaRow = textRow({ id: "media-1", platform: "x", format: "image", asset: "configured-media/card.png" });
+    const backup = await selectConfiguredProvider(mediaRow, stubbed(onlyThreads));
+    assert.equal(backup.provider, "typefully", "a media row Typefully can take still reaches the backup route");
+    // Same authoritative registry, a destination whose route is `unsupported`: still legacyProvider,
+    // never a throw. instagram has no Typefully backup, so legacyProvider says manual.
+    const unsupported = await selectConfiguredProvider(
+      textRow({ id: "media-2", platform: "instagram", format: "image", asset: "configured-media/ig.png" }),
+      stubbed(onlyThreads),
+    );
+    assert.equal(unsupported.provider, "manual" as never, "the unsupported branch still returns legacyProvider for media");
+  });
+});

@@ -199,12 +199,22 @@ appendPublishingStatus({ slug: "child", rowId: process.argv[2], provider: "manua
     const retried = await scheduleApprovedOnce(folder, "piece", approved, async () => {
       calls++; return { scheduled: { draftId: "tf-retry", when: "Tomorrow" }, scheduleError: null };
     }, path, {
-      fetchPostizRegistry: async () => ({ fetchedAt: "2026-01-01T00:00:00Z", capabilities: [] }),
+      // SLICE-7B moved the vehicle, not the subject. An empty registry used to route an x/text row
+      // to Typefully; it now refuses, which would mask the retry this test is about. A registry
+      // that advertises the row's own channel keeps the retry reaching the scheduler.
+      fetchPostizRegistry: async () => ({ fetchedAt: "2026-01-01T00:00:00Z", capabilities: [{
+        destination: "x" as const, media: ["text" as const], accountId: "acct", accountLabel: "Human Inference",
+      }] }),
       postizEnv: { POSTIZ_ACCOUNT_ID: "acct" },
     });
     assert.equal(calls, 1);
     assert.equal(retried.publishing.state, "planned");
     assert.equal(retried.publishing.providerObjectId, "tf-retry");
+    // SLICE-7B audit P2. The three asserts above are byte-identical to what they were, but none of
+    // them names the route, and `tf-retry` is only the stub's object id. State the vehicle the
+    // retry actually uses now, so a regression in provider selection on the retry path cannot pass
+    // here unnoticed.
+    assert.equal(retried.publishing.provider, "postiz", "the retry selects the channel the registry advertises");
   });
 
   test("normalizes legacy publisher references into stable provider object ids", async () => {

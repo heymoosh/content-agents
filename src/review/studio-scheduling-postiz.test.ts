@@ -71,7 +71,11 @@ test("legacy fallback still requires its exact provider account assertion after 
   const previousTypefully = process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
   delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
   try {
-    const result = await scheduleApproved(folder, row(), configured);
+    // SLICE-7B moved the vehicle, not the subject. A TEXT row no longer has a Typefully fallback,
+    // so this reaches the legacy route through the image fallback that survives (a card row whose
+    // destination the registry does not advertise). The provider is still `typefully` and the
+    // account assertion under test is the same one.
+    const result = await scheduleApproved(folder, row({ id: "card-1", platform: "quote-card:x", format: "image", asset: "images/card.png" }), configured);
     assert.deepEqual(calls, []);
     assert.match(result.scheduleError ?? "", /CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID is missing/);
   } finally {
@@ -81,12 +85,17 @@ test("legacy fallback still requires its exact provider account assertion after 
   }
 });
 
-test("legacy provider fallback occurs only after discovered registry says capability is unsupported", async () => {
+// SLICE-7B rewrote this test's contract on the owner's decision. It used to be named "legacy
+// provider fallback occurs only after discovered registry says capability is unsupported" and
+// asserted that an authoritative registry without x/text handed the row to Typefully — the silent
+// downgrade this slice removes. Same scenario, opposite verdict: nothing is published, and Muxin is
+// told which channel Postiz is missing.
+test("an authoritative registry without the destination refuses a text row instead of falling back to Typefully", async () => {
   const calls: string[] = [];
   const result = await scheduleApproved("/unused", row(), deps(false, calls));
-  assert.deepEqual(calls, ["typefully"]);
-  assert.equal((result.scheduled as { draftId: string }).draftId, "tf-1");
-  assert.equal(result.scheduleError, null);
+  assert.deepEqual(calls, [], "no publisher may be reached for a row that has nowhere to go");
+  assert.equal(result.scheduled, null);
+  assert.equal(result.scheduleError, "Postiz does not have x connected, so this row has nowhere to go. Connect x in Postiz, add its account id to POSTIZ_ACCOUNT_IDS, then approve the row again.");
 });
 
 test("ordinary local media falls back when Postiz has no explicit upload registration capability", async () => {

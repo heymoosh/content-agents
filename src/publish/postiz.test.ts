@@ -17,7 +17,12 @@ describe("Postiz capability-first routing", () => {
     const { client } = transport([{ integrations: [{ platform: "x", capabilities: ["text", "image"], id: "acct-1", name: "Human Inference" }] }]);
     const registry = await fetchPostizCapabilities(client, new Date("2026-08-30T12:00:00Z"));
     assert.equal(selectDeliveryRoute(registry, "x", "image"), "postiz");
-    assert.equal(selectDeliveryRoute(registry, "linkedin", "text"), "typefully");
+    // SLICE-7B changed this one line. It used to read `"typefully"`, which is exactly the silent
+    // downgrade this slice removes: discovery here lists only x, so linkedin/text is a channel
+    // Postiz does not have connected and the row must refuse rather than land on another provider.
+    // The image leg below is the fallback that survives, unchanged.
+    assert.equal(selectDeliveryRoute(registry, "linkedin", "text"), "unsupported");
+    assert.equal(selectDeliveryRoute(registry, "linkedin", "image"), "typefully");
     assert.equal(selectDeliveryRoute(registry, "tiktok", "video"), "postpeer");
     assert.equal(selectDeliveryRoute(registry, "youtube", "video"), "youtube");
     assert.equal(selectDeliveryRoute(registry, "substack", "text"), "substack");
@@ -525,5 +530,49 @@ describe("SLICE-6Y approved Postiz accounts", () => {
       assert.ok(!/here's the thing|isn't just|at the end of the day|let's (dive|unpack)|leverage|seamless|robust/i.test(message), `AI tell in refusal: ${message}`);
       assert.ok(!/[A-Za-z0-9_-]{20,}/.test(message.replace(/POSTIZ_ACCOUNT_IDS?/g, "")), `refusal looks like it carries a secret: ${message}`);
     }
+  });
+});
+
+// ── SLICE-7B: a Postiz channel never silently downgrades to Typefully ───────────────────────────
+//
+// Observed 2026-09-12: `x-1` of one piece sat on Typefully with "No planned time recorded" while
+// its bluesky and threads siblings went to Postiz with real planned times. The cause was one line
+// here: every UNLISTED x/linkedin/bluesky destination fell through to `typefully`, for text as
+// well as image, with no error and no signal. Text no longer falls through. The image leg is the
+// configured-media backup route cards.ts owns and is deliberately untouched.
+//
+// Account ids in these fixtures are invented. No secret and no real id appears.
+describe("SLICE-7B a text destination Postiz does not list never routes to Typefully", () => {
+  const TEXT_CHANNELS: PostizDestination[] = ["x", "linkedin", "bluesky"];
+  const empty: PostizCapabilityRegistry = { fetchedAt: "2026-09-12T12:00:00Z", capabilities: [] };
+  const lists = (destination: PostizDestination): PostizCapabilityRegistry => ({
+    fetchedAt: "2026-09-12T12:00:00Z",
+    capabilities: [{ destination, media: ["text"] as PostizMedia[], accountId: `acct-${destination}`, accountLabel: `Human Inference ${destination}` }],
+  });
+
+  for (const destination of TEXT_CHANNELS) {
+    test(`${destination}/text is unsupported when discovery does not list it`, () => {
+      assert.equal(selectDeliveryRoute(empty, destination, "text"), "unsupported",
+        `${destination}/text must refuse, never quietly become a Typefully draft`);
+    });
+
+    test(`${destination}/text is still postiz when discovery does list it`, () => {
+      assert.equal(selectDeliveryRoute(lists(destination), destination, "text"), "postiz");
+    });
+  }
+
+  test("the configured-media image backup route is unchanged for all three", () => {
+    for (const destination of TEXT_CHANNELS) {
+      assert.equal(selectDeliveryRoute(empty, destination, "image"), "typefully",
+        `${destination}/image keeps the backup route a media row depends on`);
+    }
+  });
+
+  test("every non-text route is unchanged", () => {
+    assert.equal(selectDeliveryRoute(empty, "facebook", "text"), "unsupported");
+    assert.equal(selectDeliveryRoute(empty, "facebook", "image"), "unsupported");
+    assert.equal(selectDeliveryRoute(empty, "tiktok", "video"), "postpeer");
+    assert.equal(selectDeliveryRoute(empty, "youtube", "video"), "youtube");
+    assert.equal(selectDeliveryRoute(empty, "substack", "text"), "substack");
   });
 });

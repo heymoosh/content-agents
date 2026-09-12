@@ -171,11 +171,28 @@ Gate cost: one `npm run check` on the pinned candidate. No paperwork-only rerun.
 
 ## RESULT BLOCK (worker fills this in and returns it)
 
-- **Changed:**
-- **Outcome:**
-- **Checks and load-bearing:**
-- **Unresolved:**
-- **Delivery state:**
+- **Changed:** the four Lane A files; under the 2026-09-12 adjudication the three test files
+  `studio-scheduling-postiz`, `studio-scheduling-postiz-reuse`, `publishing-status`; this block;
+  `SLICE-7B-LOG.md` (new).
+- **Outcome:** Built, verified, audited. `selectDeliveryRoute` drops `text` from the
+  x/linkedin/bluesky Typefully fallback, keeps `image`. `selectConfiguredProvider` refuses an
+  unsupported text route by name, and refuses when exactly one of `POSTIZ_BASE_URL` /
+  `POSTIZ_API_KEY` is set; neither set is unchanged. Media, `legacyProvider`, 6Y and the `:155`
+  throw (byte-identical to HEAD) untouched.
+- **Checks and load-bearing:** `npx tsc --noEmit` 0. Focused run over the six owned and adjudicated
+  test files: 0, **154 pass / 0 fail / 0 skip**, before and after the P2. `npm run check` /
+  `test:e2e` not rerun, per the coordinator; pre-adjudication 4490/8, e2e 55/0/16 clean.
+  Revert-production over the three adjudicated files: 72 of 73 pass, the failure being the
+  rewritten contract test, so it is load-bearing; over the owned files revert fails 9 of 66.
+  Refusal strings: `[]` from `muxinVoiceFindings`. No e2e pass covers that journey.
+- **Audit:** Grok, PASS WITH FINDINGS. Zero P0, zero P1, one P2, applied: the retry leg of
+  `publishing-status.test.ts` now also asserts `retried.publishing.provider === "postiz"`. Added
+  only; flipping the expected value fails it, so it is not vacuous.
+- **Unresolved:** None. The eight tests encoding the old rule are resolved: one contract rewrite
+  (renamed, re-asserted, load-bearing) and seven fixture-only repairs, names and assertions
+  byte-identical, still green against reverted production. Detail: `SLICE-7B-LOG.md` →
+  `### Adjudication`, `## Independent audit`.
+- **Delivery state:** Uncommitted, audit closed, ready for the coordinator's gate.
 
 ## Usage budget and handoff
 

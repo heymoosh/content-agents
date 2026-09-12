@@ -365,7 +365,12 @@ export function selectDeliveryRoute(
   const postiz = registry.capabilities.some((entry) => entry.destination === destination && entry.media.includes(media)
     && (!opts.requiresLocalMediaUpload || entry.localMediaUpload === true));
   if (postiz) return "postiz";
-  if (["x", "linkedin", "bluesky"].includes(destination) && ["text", "image"].includes(media)) return "typefully";
+  // SLICE-7B: a TEXT row never falls through to Typefully. Discovery here is authoritative, so a
+  // destination it does not list means Postiz does not have that channel connected, and the caller
+  // says so rather than handing the row to a different provider with different scheduling
+  // behavior from its siblings in the same piece. The image leg stays exactly as it was: that is
+  // the configured-media backup route cards.ts already owns, and it is accepted 6-series behavior.
+  if (["x", "linkedin", "bluesky"].includes(destination) && media === "image") return "typefully";
   if (destination === "facebook") return "unsupported";
   if (destination === "tiktok" && media === "video") return "postpeer";
   if (destination === "youtube" && media === "video") return "youtube";
