@@ -92,9 +92,11 @@ export async function uploadMedia(setId: string, filePath: string): Promise<stri
   return media_id;
 }
 
-export function loadPlatformMax(): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(loadPlatforms().platforms)) out[k] = v.max_chars ?? Infinity;
+export function loadPlatformMax(): Partial<Record<string, number>> {
+  const out: Partial<Record<string, number>> = {};
+  for (const [k, v] of Object.entries(loadPlatforms().platforms)) {
+    if (v.max_chars !== undefined) out[k] = v.max_chars;
+  }
   return out;
 }
 

@@ -99,17 +99,6 @@ export function replyContextHtml(row: { origin?: string; replyToText?: string; r
   return `<div class="reply-context">↳ replying to: ${esc(snippet)}</div>`;
 }
 
-// Pure, DOM-free mirror of the inline missing-image placeholder the client <script> below renders
-// for a QUOTE-CARD (kind:"image") row whose PNG hasn't been rendered yet (row.assetUrl unset —
-// rows.ts only sets it once existsSync() confirms the file is on disk). Before this, such a row with
-// body text fell through to plain-text rendering with zero missing-image cue, indistinguishable from
-// a normal text row or a fully-rendered card (card 4c3dd6fc). Mirrors the reply-context pair above:
-// same cross-runtime duplication, kept in sync by hand, exists purely so this is Node-testable.
-export function imageMissingHtml(row: { kind?: string; assetUrl?: string }): string {
-  if (row.kind !== "image" || row.assetUrl) return "";
-  return '<div class="src missing-img">No image rendered yet.</div>';
-}
-
 /** Actions shared by every persisted configured-media stage, independent of media kind. */
 export function mediaPlanActionsHtml(asset: string | undefined, media?: string): string {
   const attach = media === "image" || media === "image-carousel"
@@ -1555,9 +1544,6 @@ function rowEl(piece, row){
   if (row.mediaStage) preview = '<pre class="body story" data-media-stage>'+esc(JSON.stringify(row.mediaStage,null,2))+'</pre>';
   else if (row.assetUrl && row.kind === "image") preview = '<img class="preview" src="'+row.assetUrl+'" alt="card" />';
   else if (row.assetUrl && row.kind === "video") preview = '<video class="preview" src="'+row.assetUrl+'" controls muted></video>';
-  // Quote-card row whose PNG hasn't been rendered yet — flag it explicitly instead of falling
-  // through to plain-text rendering, which looked identical to a normal card (card 4c3dd6fc).
-  else if (row.kind === "image") preview = '<div class="src missing-img">No image rendered yet.</div>';
   if (row.body !== undefined && row.body !== "") {
     const cls = row.kind === "storyboard" ? "body story" : "body";
     preview += '<div class="'+cls+'" data-body>'+esc(row.body)+'</div>';
@@ -1698,7 +1684,13 @@ function approvalResultView(kind,result){
   return {status:"approve",message:"Approved"};
 }
 // ── end of the Content approval-result mirror ──
-function contentRequestPieces(pieces){ return (pieces||[]).filter(p=>p.originalInput||p.requestId); }
+function contentRequestPieces(pieces){
+  return (pieces||[])
+    .filter(p=>p.originalInput||p.requestId)
+    .map(p=>({...p,rows:(p.rows||[]).filter(row=>
+      row.kind!=="image"||row.hasAsset||row.assetUrl||row.mediaStage
+    )}));
+}
 function reviewVisiblePieces(){
   const real=contentRequestPieces(DATA.pieces);
   return real.length||!SAMPLE_REVIEW_PIECE ? real : [SAMPLE_REVIEW_PIECE];

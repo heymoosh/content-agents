@@ -149,6 +149,35 @@ test("Postiz dispatch places the source CTA like the Typefully path: reply on X,
   rmSync(root, { recursive: true, force: true });
 });
 
+test("Postiz uses its destination fallback cap when platforms.yaml has no max_chars override", async () => {
+  const root = mkdtempSync(join(tmpdir(), "postiz-fallback-cap-"));
+  mkdirSync(join(root, "derivatives"));
+  mkdirSync(join(root, "configured-media", "tt-1"), { recursive: true });
+  writeFileSync(join(root, "source.md"), "---\ntitle: \"Essay\"\ncanonical_url: https://example.com/source\n---\nBody.\n");
+  writeFileSync(
+    join(root, "derivatives", "tt-1.md"),
+    `---\nsource_lines: [1]\ncta: source\n---\n${"a".repeat(1980)}\n`,
+  );
+  writeFileSync(join(root, "configured-media", "tt-1", "video.mp4"), "mp4");
+  const configuredRow: QueueRow = {
+    id: "tt-1",
+    platform: "tiktok",
+    format: "video",
+    asset: "configured-media/tt-1/video.mp4",
+    status: "approve",
+    notes: "",
+    lineIndex: 1,
+  };
+  try {
+    const plan = await planPostizDispatch(root, configuredRow, "acct", "2026-09-20T17:00:00Z", fakeTransport([]));
+    assert.equal(plan.input.content, "a".repeat(1980), "the body remains the primary Postiz post");
+    assert.equal(plan.input.followUps?.length, 1, "the CTA over the 2,000-character TikTok cap moves to a follow-up");
+    assert.match(plan.input.followUps?.[0] ?? "", /https:\/\/example\.com\/source/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // ── Configured-media routing: scheduleKind should own image/video rows Postiz can deliver, without
 // swallowing rows a legacy scheduler already owns (quote-card, tiktok, YouTube short, or the older
 // {x|linkedin|bluesky, format:"video", asset:"video/*.mp4"} native-video Typefully post). ────────

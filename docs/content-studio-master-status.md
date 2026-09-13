@@ -2,81 +2,18 @@
 
 ## START HERE
 
-- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
-  `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
-- Latest (2026-09-12, SLICE-8A): Instagram and Facebook quote cards can schedule through Studio.
-  The human-inference quote card is rendered and its instagram, facebook, linkedin and bluesky rows
-  are pending Muxin's approval (x row to discard). Item 2 closes once one approved card row is
-  confirmed live. **Handoff:** Muxin is moving further work to Codex; see the 8A progress entry.
-- Current / last accepted: **8A**, `docs/operations/launch-slices/SLICE-8A.md`, PASS after
-  coordinator fixes to two Grok blocking findings. `npm run check` 4574/0.
-- 7D in one line: `fetchAllDrafts` is now the ONE fetch/pagination/dedup path and
-  `fetchScheduledDrafts` narrows from it; a date counts only if it parses (null, "", whitespace and
-  garbage all become no date); `listTypefully` returns `ok: false` with a counting note whenever a
-  dateless draft exists. `ok` is the only gate between a future claim and `releaseClaims`, so that
-  routes the claim to the existing `uncheckable` bucket, which nothing releases.
-- The suppression is deliberately platform-wide, not per-claim. The ledger `Claim` is
-  `{ platform, day, time, asset, by }` with NO provider draft id, so a dateless draft cannot be
-  matched to a specific claim. Per-claim precision would need a ledger schema change. Operational
-  cost, accepted knowingly: while any dateless draft sits in Typefully, `--sync` will not release
-  stale x/linkedin/bluesky claims. It resumes as soon as the draft is dated or deleted.
-- The Typefully status reader now tells three cases apart by id: found and scheduled, found but
-  dateless (a new `unscheduled` reading that normalizes to `uncertain`, never to a planned
-  publish), and genuinely absent, whose wording is unchanged byte for byte.
-- Known and deliberately NOT fixed in 7D: `src/review/rows.ts:232` has the same blind spot, feeding
-  `reconcile.ts:320`, which reports `mismatch` with "no matching scheduled draft found in
-  Typefully" for a draft that is present but undated. Verified display-only: the only two consumers
-  are `page.ts:1580` (warning banner) and `page.ts:1916` ("Needs attention"). Nothing behind
-  `mismatch` releases a claim, cancels a draft, or republishes. Wrong label, not a lost post. A fix
-  needs `LiveProviderState.typefullyDrafts` retyped, pulling in `reconcile.ts`, `page.ts` and their
-  tests. Separate low-priority slice.
-- Previous: **7C**, `docs/operations/launch-slices/SLICE-7C.md`, PASS. A reuse-guard refusal now
-  clears its dispatch fence on EVERY route, not just Postiz, so quote cards and videos are no
-  longer permanently stuck after a refusal. `npm run check` 4558/0. Shipped as `919ae2e`.
-- 7C in one line: `runPublisher` and the `unscheduled-draft` branch now ask `reuseGuardVerdict`
-  BEFORE invoking their publisher, so those routes can carry the strong `no-provider-request`
-  refusal that is the only value permitted to clear a fence. Two call sites cover all five
-  non-Postiz routes. Four executable lines total. Both pre-flights sit OUTSIDE their try/catch so a
-  throwing guard cannot be flattened into a generic `scheduleError` that loses the discriminant.
-  `deferred` is deliberately still not a refusal, and no `earliestAt` reaches a non-Postiz
-  publisher. Fail-closed residue unchanged: allowed-or-deferred plus an empty publisher result is
-  still `publisher-declined`, ledger `blocked`, fence RETAINED.
-- Ordering proved by evidence, not assertion: every `claimSlots` site on these routes lives INSIDE
-  the publisher `fn` names (`typefully.ts:414`, `cards.ts:308`, `tiktok.ts:52`, `youtube.ts:148`,
-  `substack.ts:239`). Verified independently by the coordinator and by the auditor.
-- 7C's four pre-existing test failures were RE-POINTED, not weakened, under the binding rules in
-  `## Adjudication` of the packet. Every claim kept, each re-aimed at a scenario that still reaches
-  the recovery branch, each also gaining the new assertion, assertion count up in all four. The
-  rationale lives in `SLICE-7C-LOG.md`.
-- Before that: **7B**, PASS. A Postiz channel never silently downgrades to Typefully, and Studio can
-  see and cancel Postiz rows. `npm run check` 4543/0, `npm run test:e2e` 55/0/16.
-- What changed, in two commits. `41003a4`: `selectDeliveryRoute` drops `text` from the
-  x/linkedin/bluesky Typefully fallback and keeps `image`, so a text row with no Postiz channel is
-  refused by destination name instead of handed to a different provider. A half-configured Postiz
-  (exactly one of `POSTIZ_BASE_URL` / `POSTIZ_API_KEY`) is refused too. `28ec3ce`: Studio's in-page
-  reconciler learns Postiz. `findLoggedRef` reads the `postiz post <id>` shape, `reconcileRow`
-  gains a Postiz branch ahead of the platform split, cancel dispatches per provider instead of
-  falling through an `else` to PostPeer, and lookups center the read window on the recovered
-  planned time. Absence, fetch failure, config failure and not-yet-fetched all read `uncertain`,
-  because Postiz soft-deletes and filters deleted rows out, so absence cannot tell live from
-  canceled from never-created. An already-published post is not offered a cancel button.
-- Both audited by Grok, cross-family. 7B's second commit returned one P1, an already-published post
-  being cancelable, fixed before integration.
-- Next: **item 2 alone.** The live-proving pass ran 2026-09-12: item 5 closed, item 1 advanced to
-  scheduled-but-not-yet-fired, and item 2 was rescoped after the pass showed Postiz media was
-  already canary-proven (see `## Outstanding work` item 2). These are the
-  only Outstanding items left. 7C's fence fix makes the pass safe to attempt: a refused row can be
-  retried instead of needing hand repair. All three need real provider calls, so they are the
-  coordinator's to run, never a worker's.
-  Muxin's direction on 2026-09-12: fix all of `## Outstanding work` before any front-end or UX
-  pass, because an untrusted Publishing room cannot be design-reviewed honestly.
-- Open questions for Muxin, neither blocking: the em dash in every `### date` progress-log heading
-  in this file (matches ~40 siblings, conflicts with the repo-wide no-em-dash rule, offer standing
-  to convert the lot); and the 4 outreach leads marked `abandoned` at 01:24 in
-  `data/outreach/tracker.jsonl` with no note, where every earlier entry explains itself.
-- Last decision: builder family is Claude for now, Codex and Grok reserved for cross-family audits
-  because quota is limited. Codex is capped until 2026-09-15.
-- Details: `## Progress log` -> 2026-09-12 (7D). Below is history; read only cited headings.
+- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
+- Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
+- Current / last accepted: **8D**, `docs/operations/launch-slices/SLICE-8D.md`; PASS.
+- Also accepted: **8C**, `docs/operations/launch-slices/SLICE-8C.md`; PASS.
+- Result: missing-image card rows stay out of Content and Publishing; absent platform caps now fall
+  through to Postiz limits; publishing tests fail closed without a temp Placed-log path.
+- Gate: frozen candidate `6f4a546`; browser desktop+narrow PASS; `npm run check` 4576/0.
+- Blocked on: none for accepted code. SLICE-8B still needs its first scheduled post confirmed live.
+- Next dependency-ready slice: resume `docs/operations/launch-slices/SLICE-8B.md` after the Bluesky
+  post is due 2026-09-13 18:30 PT; verify provider state and the public post read-only.
+- Last decision: keep the pending X card untouched; do not show missing-image placeholders.
+- Details: `## Progress log` -> 2026-09-12 (8C/8D). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -178,6 +115,22 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (8C/8D) — Studio row visibility and publishing safety accepted
+
+SLICE-8C now filters the shared Content/Publishing piece rows so a quote-card image is invisible
+until its asset exists, while rendered images, text, and inspectable media stages remain visible.
+The disposable browser journey passed in both rooms at 1280x900 and 700x900. SLICE-8D now models
+an absent `max_chars` as no override, preserving Typefully/Cards' uncapped fallback while letting
+Postiz apply its own destination cap, and Node publishing tests fail before a real Placed-log write
+unless they supply `CONTENT_AGENTS_TEST_BETS_PATH`.
+
+Both meaningful changes received bounded Grok audits. Initial verification gaps were closed with
+call-site evidence and focused regressions; both delta audits returned PASS. The accepted source is
+frozen as `6f4a546973d4c4422d2d8169ad5fd29994d7beed`; all eight candidate files matched the bound
+checkout byte-for-byte. `npm run check` passed typecheck and 4576/4576 tests. Two earlier detached
+test runs failed only because the detached checkout intentionally lacked the real `.env`; JUnit
+identified the two secret-sanitization tests, and no secret was copied or linked.
 
 ### 2026-09-12 (8A) — Instagram and Facebook quote cards schedule; handoff to Codex
 

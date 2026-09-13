@@ -15,12 +15,34 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDraftPayload, buildPosts, cancelDraft, createDraft, datelessDrafts, fetchAllDrafts, fetchScheduledDrafts, parseTypefullyCliInvocation, runTypefullyCli } from "./typefully.js";
+import { buildDraftPayload, buildPosts, cancelDraft, createDraft, datelessDrafts, fetchAllDrafts, fetchScheduledDrafts, loadPlatformMax, parseTypefullyCliInvocation, runTypefullyCli } from "./typefully.js";
 import { readQueue, writeCell } from "./queue.js";
 import { commitReviewStatus, journalPathForLedger, recordNewQueueRows } from "../review/approval-provenance.js";
 import { appendPublishingStatus, readPublishingStatuses } from "../review/publishing-status.js";
 
 const POSTS = [{ text: "Verbatim note text spread to a text channel." }];
+
+test("loadPlatformMax omits destinations without a configured override and preserves finite limits", () => {
+  const limits = loadPlatformMax();
+  assert.equal(Object.hasOwn(limits, "tiktok"), false, "an absent max_chars must not become an Infinity override");
+  assert.equal(limits.tiktok, undefined);
+  assert.equal(limits.x, 280, "an explicit finite platform limit still wins");
+  assert.equal(limits.instagram, 2200, "an explicit Postiz-destination limit is preserved");
+});
+
+test("Typefully and card callers keep no-override semantics for an omitted platform limit", () => {
+  const max = loadPlatformMax().tiktok ?? Infinity;
+  const body = "a".repeat(2100);
+  const { posts } = buildPosts(
+    body,
+    [{ label: "Read the full piece:", url: "https://example.com/source" }],
+    "inline",
+    max,
+  );
+  assert.equal(max, Infinity, "the shared Typefully/card fallback remains uncapped when config has no override");
+  assert.equal(posts.length, 1, "an omitted config cap must not impose Postiz's separate destination limit on Typefully or cards");
+  assert.match(posts[0]?.text ?? "", /https:\/\/example\.com\/source$/);
+});
 
 test("createDraft makes exactly one POST for success and every ambiguous or malformed outcome", async () => {
   const oldFetch = globalThis.fetch;

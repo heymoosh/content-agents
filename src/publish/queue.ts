@@ -266,7 +266,14 @@ export function appendPublishLog(folder: string, entry: string): void {
 // real, shared briefs/bets.md — same isolation mechanism as slots.ts's ledgerPath()/
 // CONTENT_AGENTS_TEST_LEDGER.
 function betsPath(brandId: BrandId): string {
-  return process.env.CONTENT_AGENTS_TEST_BETS_PATH ?? join(repoRoot, "briefs", brandId, "bets.md");
+  const testPath = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+  if (testPath) return testPath;
+  if (process.env.NODE_TEST_CONTEXT) {
+    throw new Error(
+      "CONTENT_AGENTS_TEST_BETS_PATH is required for Placed-log writes under the Node test runner"
+    );
+  }
+  return join(repoRoot, "briefs", brandId, "bets.md");
 }
 
 function brandForQueueFolder(folder: string): BrandId {

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { basename, join, dirname } from "node:path";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import {
   readQueue,
   setStatus,
@@ -451,6 +452,40 @@ test("the E2E registry gives every pass a distinct display title", () => {
   const titles = [...source.matchAll(/title:\s*"([^"]+)"/g)].map((match) => match[1]);
   assert.equal(titles.filter((title) => /^Pass E\b/.test(title)).length, 1);
   assert.equal(titles.filter((title) => /^Pass F\b/.test(title)).length, 1);
+});
+
+test("appendBetPlacement fails closed in a Node test without an isolated Placed-log path", () => {
+  assert.ok(process.env.NODE_TEST_CONTEXT, "this guard test must itself run under node --test");
+  const testDir = mkdtempSync(join(tmpdir(), "queue-bets-fail-closed-"));
+  mkdirSync(join(testDir, "scratch"));
+  writeFileSync(join(testDir, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+  const env: NodeJS.ProcessEnv = { ...process.env, TMPDIR: join(testDir, "scratch") };
+  delete env.CONTENT_AGENTS_TEST_BETS_PATH;
+  try {
+    const child = spawnSync(
+      process.execPath,
+      [
+        "--permission",
+        "--allow-fs-read=*",
+        `--allow-fs-write=${testDir}`,
+        "--allow-child-process",
+        "--allow-worker",
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "--eval",
+        "import { appendBetPlacement } from './src/publish/queue.ts'; appendBetPlacement(process.argv[1], 'guard-row', 'x', 'test ref');",
+        testDir,
+      ],
+      { cwd: process.cwd(), env, encoding: "utf8" },
+    );
+    const output = `${child.stdout}\n${child.stderr}`;
+    assert.notEqual(child.status, 0, "the unisolated test write must fail");
+    assert.match(output, /CONTENT_AGENTS_TEST_BETS_PATH.*required.*Node test/i);
+    assert.doesNotMatch(output, /ERR_ACCESS_DENIED/, "the test guard must throw before a production-path filesystem operation");
+  } finally {
+    rmSync(testDir, { recursive: true, force: true });
+  }
 });
 
 // appendBetPlacement's ctaDestination param (card d80411bc, strategy lever E scaffold): the

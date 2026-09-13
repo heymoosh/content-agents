@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  replyContextHtml, imageMissingHtml, mediaPlanActionsHtml, storyboardJobDone, formatElapsed, fmtDays, renderInsightsMeta,
+  replyContextHtml, mediaPlanActionsHtml, storyboardJobDone, formatElapsed, fmtDays, renderInsightsMeta,
   JOB_COLORS, STRIP_LINGER_MS, jobRoom, jobLandingSentence, jobRailLabel, jobClockText, jobsAhead, jobStepDots,
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
@@ -231,27 +231,6 @@ test("replyContextHtml: renders nothing for a normal text row with no reply_to_t
 
 test("replyContextHtml: renders nothing when reply_to_text is present but origin isn't 'reply to mention'", () => {
   assert.equal(replyContextHtml({ origin: "from /cycle", replyToText: "should not show" }), "");
-});
-
-// Unit tests for imageMissingHtml() — the pure, DOM-free mirror of the inline missing-image
-// placeholder rowEl() renders for a QUOTE-CARD (kind:"image") row whose PNG hasn't been rendered
-// yet. Before card 4c3dd6fc, such a row (body present, assetUrl unset) fell through to plain-text
-// rendering with no missing-image cue at all — indistinguishable from a normal card.
-
-test("imageMissingHtml: an image row with no assetUrl renders the missing-image placeholder", () => {
-  const html = imageMissingHtml({ kind: "image" });
-  assert.equal(html, '<div class="src missing-img">No image rendered yet.</div>');
-  assert.ok(!html.includes("—"), "missing-image copy must not use an em dash");
-});
-
-test("imageMissingHtml: an image row WITH an assetUrl renders nothing (the real <img> tag covers it)", () => {
-  assert.equal(imageMissingHtml({ kind: "image", assetUrl: "/assets/quote-card-1.png" }), "");
-});
-
-test("imageMissingHtml: a non-image row renders nothing", () => {
-  assert.equal(imageMissingHtml({ kind: "text" }), "");
-  assert.equal(imageMissingHtml({ kind: "video" }), "");
-  assert.equal(imageMissingHtml({}), "");
 });
 
 test("configured quote/video stage rows expose approval and actual-render actions", () => {
@@ -3391,7 +3370,6 @@ test("Slice 1: no rendered copy carries an em dash", () => {
   assert.ok(!withoutComments.includes("\u2014"), "em dash found in rendered copy");
   const fixed = [
     "No asset generated yet.",
-    "No image rendered yet.",
     "Save and create drafts",
     "Nothing needs you right now.",
     "not recorded",
@@ -3400,8 +3378,6 @@ test("Slice 1: no rendered copy carries an em dash", () => {
     assert.ok(html.includes(s), "missing fixed copy: " + s);
     assert.ok(!s.includes("—"), "em dash in fixed copy: " + s);
   }
-  assert.equal(imageMissingHtml({ kind: "image" }), '<div class="src missing-img">No image rendered yet.</div>');
-  assert.ok(!html.includes("— image not rendered yet —"));
   assert.ok(!html.includes("— no asset generated yet —"));
   assert.ok(!html.includes("Nothing needs you right now. 🎉"));
   assert.ok(!html.includes("✨ your director is working"));
