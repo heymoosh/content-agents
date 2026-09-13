@@ -38,6 +38,8 @@ while the other is active, and the two candidates integrate only after both audi
 - `src/review/content-request-store.ts`
 - `src/review/content-request-store.test.ts`
 - `src/review/content-generation.test.ts` (only the stale new-write community regression)
+- `src/review/content-spin-gate.test.ts` (only the stale `shorter` treatment fixture found by the
+  complete `buildContentRequest` call-site inventory)
 - `src/review/serve.test.ts` (only one malformed Content-request HTTP boundary regression, after
   the completed 8H handoff; preserve every 8H hunk)
 - the smallest existing Studio-options module/test only if needed to establish one shared export
