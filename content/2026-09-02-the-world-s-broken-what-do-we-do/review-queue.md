@@ -25,7 +25,7 @@ the image and animated companion were intentionally not rendered in this no-rend
 | threads-2 | threads | text | derivatives/threads-2.md | 5 | 5 | true | pending | | from /cycle |
 | threads-3 | threads | text | derivatives/threads-3.md | 5 | 5 | true | pending | | from /cycle |
 | quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 5 | 5 | true | pending | text caption drafted; image render intentionally skipped | from /cycle |
-| quote-card-1-linkedin | quote-card:linkedin | image | images/quote-card-1.png | 5 | 5 | true | pending | text caption drafted; image render intentionally skipped | from /cycle |
-| quote-card-1-bluesky | quote-card:bluesky | image | images/quote-card-1.png | 5 | 5 | true | pending | text caption drafted; image render intentionally skipped | from /cycle |
-| quote-card-1-instagram | quote-card:instagram | image | images/quote-card-1.png | 5 | 5 | true | pending | caption from quote-card-1-linkedin | from SLICE-8A |
-| quote-card-1-facebook | quote-card:facebook | image | images/quote-card-1.png | 5 | 5 | true | pending | caption from quote-card-1-linkedin | from SLICE-8A |
+| quote-card-1-linkedin | quote-card:linkedin | image | images/quote-card-1.png | 5 | 5 | true | published | text caption drafted; image render intentionally skipped | from /cycle |
+| quote-card-1-bluesky | quote-card:bluesky | image | images/quote-card-1.png | 5 | 5 | true | published | text caption drafted; image render intentionally skipped | from /cycle |
+| quote-card-1-instagram | quote-card:instagram | image | images/quote-card-1.png | 5 | 5 | true | published | caption from quote-card-1-linkedin | from SLICE-8A |
+| quote-card-1-facebook | quote-card:facebook | image | images/quote-card-1.png | 5 | 5 | true | published | caption from quote-card-1-linkedin | from SLICE-8A |
