@@ -25,7 +25,8 @@ Delivery batch: 8F security preparation, 8G request-boundary validation, and 8H 
 repair are authorized. 8G and 8H may be accepted independently. 8F stops after an audit-cleared
 frozen candidate until the owner completes provider rotation and supplies a newly scoped Bitwarden
 machine token outside Codex; live cutover is then separately verified before acceptance.
-Owner checkpoint: owner rotates LinkedIn, Threads, Facebook, Postiz JWT, and Postgres credentials;
+Owner checkpoint: owner rotates LinkedIn, Threads, Facebook, Postiz JWT, and the two distinct
+Postiz/Temporal Postgres credentials;
 stores the complete active secret set in a dedicated Bitwarden project; creates a read-only machine
 account token; removes/revokes the globally inherited token; and runs the cutover launcher from a
 human terminal. Provider-console rotation may require attended browser work. No secret value is
@@ -69,15 +70,21 @@ candidate hashes plus bounded diff and check output, with no values.
 ## Acceptance
 
 - [ ] No active runtime secret has an inline literal in the candidate Compose.
-- [ ] JWT and both Postgres password uses resolve from one required `JWT_SECRET` and one required
-      `POSTGRES_PASSWORD`; `DATABASE_URL` interpolates that same database secret.
+- [ ] JWT and Postgres values resolve from required `JWT_SECRET`,
+      `POSTIZ_POSTGRES_PASSWORD`, and `TEMPORAL_POSTGRES_PASSWORD`; each service and its DSN use
+      the correct distinct database secret.
 - [ ] Active provider secrets resolve from required environment variables with their existing key
       names; non-secret client IDs and URLs are not mislabeled as secrets.
 - [ ] The accepted 8E host-gateway, read-only CA mount, and `NODE_EXTRA_CA_CERTS` lines are unchanged.
-- [ ] The launcher supports only fixed `validate`, `up-app`, and `up-all` actions, uses
-      `bws run --project-id ... --no-inherit-env`, and never prints or accepts secret values.
+- [ ] The launcher supports only fixed `validate`, `up-app`, `up-all`, and resumable maintenance
+      actions, uses `bws run --project-id ... --no-inherit-env`, rejects unexpected project keys,
+      crosses into a clean allowlisted child environment, and never prints or accepts secret values.
 - [ ] A fake-secret harness proves the launcher passes the required keys to Compose without writing
       them to disk or output; missing token/project/key failures are fail-closed and value-free.
+- [ ] The initialized-database cut action uses fixed services/roles/databases, a non-secret stage
+      journal and lock, quiesces consumers, rotates each role without placing values in argv/logs,
+      performs new TCP probes, preserves named volumes, resumes safely, and never restarts consumers
+      after an incomplete failure. Backup/admin-path prerequisites fail before the first mutation.
 - [ ] The candidate passes `docker compose config -q` with fake placeholders and a bounded
       cross-family security audit.
 - [ ] No live or external file mutation occurs before the owner checkpoint.
