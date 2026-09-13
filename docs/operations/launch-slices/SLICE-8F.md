@@ -131,20 +131,23 @@ blocked until every rotated value exists outside this session.
 Gate cost: bounded temp-tree checks are expected under one minute; live cutover proof unknown and
 not authorized until the owner checkpoint.
 
-Closeout gate: record `PASS` only after the live cutover; otherwise list the checkpoint as leftover.
+Closeout gate leftover: live Bitwarden provisioning, provider/database rotation, attended cutover,
+and authenticated acceptance have not run.
 Hygiene: run `bash scripts/repo-hygiene.sh --rescue`; commit/delete only this slice's repository
 paths, and name every other path left untouched.
 Read-set: use the binding's exact three byte-count commands for this packet.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## RESULT BLOCK
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action:
-- Usage:
+- Changed paths: frozen preparation only at `/private/tmp/content-agents-slice-8f/`.
+- Outcome: secret-free Compose plus a fixed-action, fail-closed Bitwarden/cutover launcher.
+- Checks: fake harness PASS — 14 checks, 15 missing-key, 2 UUID-set, 2 unsafe-password
+  rejections, hostile `.env` isolation, and interrupted-cutover resume; no fixture leaks.
+- Audit: Grok 4.5 ACCEPT plus repaired-delta ACCEPT; no established defects.
+- Unresolved: human provisions scoped Bitwarden UUIDs/secrets, rotates providers and both database
+  roles, then runs and accepts the attended cutover.
+- Delivery: preparation proven and retained outside the repo; nothing applied live.
+- Usage: unavailable.
 
 ## Usage budget and handoff
 
@@ -157,4 +160,10 @@ Read-set: use the binding's exact three byte-count commands for this packet.
 
 ## Stopped
 
-Not stopped yet. Expected checkpoint after build/audit: owner rotation and human-terminal cutover.
+Blocked on the human/live credential checkpoint; the preparation candidate is not accepted as a
+live cutover. Verified: exact frozen hashes, fake harness, full bounded audit, and delta closure.
+Retained paths: `/private/tmp/content-agents-slice-8f/{docker-compose.yaml,postiz-secure,check.sh}`.
+Hygiene reviewed: this packet/master plus the accepted 8G/8H tracked candidate were left; merged
+branches `slice-6m-worker` and `slice-6s-worker` predate this session and were not deleted.
+Next action: Muxin provisions/rotates the scoped credentials outside Codex, then starts an attended
+`prepare-cutover` and `cutover` acceptance run.

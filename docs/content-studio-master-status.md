@@ -4,14 +4,14 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
-- Current batch: **8F** credential boundary, **8G** request validation, **8H** capture lifecycle.
-- Blocked on: 8F live cutover needs owner-side provider rotation and a new scoped Bitwarden token;
-  8G and 8H are independent and unblocked.
-- Next dependency-ready: 8G and 8H in parallel; 8F preparation may proceed to frozen audit.
+- Current slice: **8F** credential boundary; packet: `docs/operations/launch-slices/SLICE-8F.md`.
+- Blocked on: Muxin provisions/rotates Bitwarden, provider and database credentials outside Codex,
+  then attends `prepare-cutover` + `cutover`; nothing has been applied live.
+- Next dependency-ready: accepted 8G/8H integration, then the next recorded reliability batch.
 - Last accepted: **8E**; Postiz self-fetches stored public media after container recreation.
-- Accepted result: six immediate Publishing-room defects closed; this is not whole-system completion.
-- Last decision: inject Postiz secrets from Bitwarden; never expose its machine token to Codex.
-- Details: current packets above; 8E history is in `## Progress log` -> 2026-09-12 (8E accepted).
+- Last decision: use pinned Bitwarden UUIDs and a clean fixed-action launcher; never expose its
+  machine token to Codex. Preparation and two Grok audits passed; live acceptance remains human.
+- Master: `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
 
 ## Standing constraints
 
@@ -143,6 +143,17 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-13 (8F stopped at human checkpoint) — audited secret boundary is ready, not live
+
+The secret-free external Compose candidate and fixed-action `postiz-secure` launcher passed a
+14-check fake harness, including missing/extra UUIDs, unsafe database-password characters, hostile
+`.env`, and interrupted-cutover roll-forward. Grok 4.5 accepted the full preparation candidate and
+the repaired delta with no established defects. The external Compose checkout, Bitwarden, providers,
+containers, databases, volumes, and operational data were not changed. Live completion now requires
+Muxin to provision the pinned read-only Bitwarden project outside Codex, rotate provider/JWT and the
+two distinct database credentials, and attend the staged cutover. Retained preparation:
+`/private/tmp/content-agents-slice-8f/`; packet: `docs/operations/launch-slices/SLICE-8F.md`.
 
 ### 2026-09-12 (8E accepted) — Postiz can self-fetch media; later rows are unchanged
 
