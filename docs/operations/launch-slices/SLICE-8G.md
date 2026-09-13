@@ -33,6 +33,8 @@ Parallel-safe: yes — this lane owns only Content request vocabulary/boundary s
 
 - `src/review/content-request.ts`
 - `src/review/content-request.test.ts` if present, otherwise one new focused test beside it
+- `src/review/content-request-store.ts`
+- `src/review/content-request-store.test.ts`
 - the smallest existing Studio-options module/test only if needed to establish one shared export
 
 Pinned read-only inputs: current `CONTENT_CONFIG_OPTIONS` declaration and persisted request schema at
@@ -55,6 +57,8 @@ the assignment commit. Focused tests must use a temporary data root.
 - [ ] Unknown, blank, and wrong-type values fail before a content request is written or a generation
       job/provider action can begin.
 - [ ] Every option currently offered by Studio remains accepted, including deliberate `none` values.
+- [ ] New writes validate strictly while reads remain tolerant of already-persisted legacy
+      destinations such as `community` and `community:<name>`; legacy data is not rewritten.
 - [ ] Valid Fiction, Charles, Venture, Human Inference, and experiment handoffs remain compatible.
 - [ ] Focused tests prove direct malformed input rejection and zero write/dispatch outcome.
 
