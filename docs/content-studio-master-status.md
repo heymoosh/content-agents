@@ -4,13 +4,14 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
-- Current slice: none; **8E** is accepted in `docs/operations/launch-slices/SLICE-8E.md`.
-- Blocked on: owner rotation of three inline OAuth client secrets found in the local Postiz compose.
-- Next dependency-ready slice: none; credential rotation is a human provider-console checkpoint.
+- Current batch: **8F** credential boundary, **8G** request validation, **8H** capture lifecycle.
+- Blocked on: 8F live cutover needs owner-side provider rotation and a new scoped Bitwarden token;
+  8G and 8H are independent and unblocked.
+- Next dependency-ready: 8G and 8H in parallel; 8F preparation may proceed to frozen audit.
 - Last accepted: **8E**; Postiz self-fetches stored public media after container recreation.
-- Accepted result: all six trust-the-Publishing-room defects are closed; later rows keep their ids.
-- Last decision: rotate the exposed local-only secrets, then move replacements into external `.env`.
-- Details: `## Progress log` -> 2026-09-12 (8E accepted). Below is history; read only cited headings.
+- Accepted result: six immediate Publishing-room defects closed; this is not whole-system completion.
+- Last decision: inject Postiz secrets from Bitwarden; never expose its machine token to Codex.
+- Details: current packets above; 8E history is in `## Progress log` -> 2026-09-12 (8E accepted).
 
 ## Standing constraints
 
@@ -124,12 +125,18 @@ rendered, approved, and scheduled. **Process note:** the stale wording
    `image/png`, 5,930 bytes. The LinkedIn, Instagram, and Facebook rows retained exact ids, times,
    groups, content/media hashes, queued states, no errors, and uniqueness counts of one.
 
-7. **Rotate three OAuth client secrets from the local Postiz compose.** While diagnosing 8E, the
-   external dirty compose file was found to contain inline LinkedIn, Threads, and Facebook client
-   secrets. They are local uncommitted changes and are not in that public upstream repository's
-   committed `HEAD`, but they were displayed in this session's tool output. Rotate them in the
-   provider consoles, put only the replacements in the external `.env`, and change compose to
-   `${...}` references. Never copy the old values into this repository or its evidence.
+7. **Move the Postiz runtime secret boundary to Bitwarden, then rotate exposed/default values.**
+   While diagnosing 8E, the external dirty compose file was found to contain inline LinkedIn,
+   Threads, and Facebook client secrets. They are local uncommitted changes and are not in that
+   public upstream repository's committed `HEAD`, but they were displayed in this session's tool
+   output. A value-free follow-up inventory also found a customized inline Postiz JWT secret, a
+   Postgres password matching the public upstream default, and active provider secrets in the
+   plaintext external `.env`. The existing `BWS_ACCESS_TOKEN` is inherited globally from both the
+   shell profile and launchd, so Bitwarden is not an agent boundary in that state. SLICE-8F moves
+   the complete active secret set to a dedicated Bitwarden project, uses a read-only machine token
+   only from a human terminal, removes secret literals/files after verified cutover, and preserves
+   the 8E repair. Never copy any value or Bitwarden token into this repository, a prompt, command
+   argument, log, or evidence file. Independent code fixes do not wait for this human checkpoint.
 
 Recorded, not defects: the Postiz read window is a +/-45 day list scan because there is no
 read-by-id route, and Postiz soft-deletes, so absence can never distinguish live from canceled from
