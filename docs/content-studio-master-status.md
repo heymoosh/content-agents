@@ -4,13 +4,13 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
-- Current slice: none; **8B** is accepted in `docs/operations/launch-slices/SLICE-8B.md`.
-- Blocked on: the three later Postiz image rows may hit the newly proven media self-fetch defect.
-- Next dependency-ready slice: none authorized; fix self-fetch before Instagram/Facebook on Sep 15.
+- Current slice: **8E**, `docs/operations/launch-slices/SLICE-8E.md`; owner-authorized to finish.
+- Blocked on: apply the proven Postiz DNS + local-CA compose repair, then recreate and verify.
+- Next dependency-ready slice: none beyond 8E; do not revive historical checklist text.
 - Last accepted: **8B**; Postiz and public Bluesky both prove the first approved media row live.
 - Accepted result: four cards scheduled, Bluesky live; 8C/8D remain accepted at `3110d6e`.
-- Last decision: accelerate the Bluesky proof; keep the pending X card untouched.
-- Details: `## Progress log` -> 2026-09-12 (8B accepted). Below is history; read only cited headings.
+- Last decision: durable self-fetch repair; retain all three later provider ids and create no copies.
+- Details: `## Progress log` -> 2026-09-12 (8E authorized). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -125,6 +125,15 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (8E authorized) — repair Postiz self-fetch without replacing scheduled rows
+
+Muxin authorized finishing the remaining master work. The bounded preflight reproduced the defect:
+inside Postiz, `postiz-threads.meta` resolves to `127.0.0.1` and the exact uploaded PNG cannot be
+fetched. A disposable container proved the complete candidate without touching the live service:
+host-gateway mapping alone reached nginx but failed TLS trust; adding the existing local CA through
+`NODE_EXTRA_CA_CERTS` returned HTTP 200, `image/png`, 5,930 bytes. SLICE-8E owns only that compose
+repair and read-only proof that the three later scheduled provider objects keep their identities.
 
 ### 2026-09-12 (8B accepted) — first approved media row is live
 
