@@ -4,14 +4,13 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
-- Current slice: **8B**, `docs/operations/launch-slices/SLICE-8B.md`; scheduled, not accepted.
-- Blocked on: clock only; the first post is due 2026-09-13 18:30 PT on Bluesky.
-- Next action: after that time, read Postiz id `cmtz395zs0001mu8e0p5tbik3` and the public result;
-  close 8B only if both show live.
-- Last accepted: **8C/8D**, commit `3110d6e`; browser PASS and `npm run check` 4576/0.
-- Accepted result: missing-image rows are hidden; Postiz cap fallback and test Placed-log guard work.
-- Last decision: keep the pending X card untouched; do not show missing-image placeholders.
-- Details: `## Progress log` -> 2026-09-12 (8B stopped). Below is history; read only cited headings.
+- Current slice: none; **8B** is accepted in `docs/operations/launch-slices/SLICE-8B.md`.
+- Blocked on: the three later Postiz image rows may hit the newly proven media self-fetch defect.
+- Next dependency-ready slice: none authorized; fix self-fetch before Instagram/Facebook on Sep 15.
+- Last accepted: **8B**; Postiz and public Bluesky both prove the first approved media row live.
+- Accepted result: four cards scheduled, Bluesky live; 8C/8D remain accepted at `3110d6e`.
+- Last decision: accelerate the Bluesky proof; keep the pending X card untouched.
+- Details: `## Progress log` -> 2026-09-12 (8B accepted). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -60,27 +59,32 @@ front-end or UX pass. Ordered by what blocks trusting the Publishing room, not b
    The `2026-09-07` folder rows stay scheduled for Sep 13 and Sep 20. Still without a real row:
    Instagram, Facebook, TikTok and YouTube Shorts (media only, see item 2), Substack Notes, and
    Gmail outreach. See `## Progress log` -> 2026-09-12 (ops, live).
-2. **No REAL media row has gone through Postiz.** **Rescoped 2026-09-12** after Muxin challenged
-   the original wording, which was wrong twice over. Postiz media is not unexercised and not
+2. ~~**No REAL media row has gone through Postiz.**~~ **DONE 2026-09-12, SLICE-8B.** The first
+   approved quote card is live on Bluesky with its image and CTA reply. **Rescoped 2026-09-12**
+   after Muxin challenged the original wording, which was wrong twice over. Postiz media is not unexercised and not
    unproven: a two-slide carousel was live-verified 2026-09-02 on TikTok, Mastodon, Facebook,
    Instagram, LinkedIn, Threads and X (schedule, reschedule, cancel, sweep clean;
    `docs/evidence-postiz-canary-carousel-2026-09-02.json`), all nine connected accounts report
    `mediaUploadVerified: true`, and configured-media rows are **Postiz-only** by design
    (`studio-scheduling.ts:460`), not a secondary path. The old wording also conflated two different
    row kinds: `/atomize` quote-card rows route to Typefully, configured-media rows route to Postiz.
-   The real remaining gap is narrower and is already stated in this file's own capability table:
-   **"Run one real carousel through Studio."** Only a synthetic canary has taken the path, never a
-   row Muxin approved in `review-queue.md`. **Corrected 2026-09-12 (later the same day): this does NOT cost money.** The earlier
+   The real remaining gap was narrower: run one real approved media row through Studio and confirm
+   it live. Before SLICE-8B only a synthetic canary had taken the path, never a row Muxin approved
+   in `review-queue.md`. **Corrected 2026-09-12 (later the same day): this does NOT cost money.** The earlier
 wording said proving it needs a paid render. Wrong. Quote cards are purely typographic
 (`src/video/render.ts:80`, Muxin's June 2026 call "just quotes, not illustrations"): the PNG is a
 local Remotion still and the animated companion is local HyperFrames, both $0. Only the optional
 `--with-image` illustration costs anything, and `config/providers.yaml` sets `image: none` in
 favour of attended Codex art (subscription, $0 marginal). The human-inference folder's card was
-simply never rendered ("render intentionally skipped (zero-cost run)"). So item 2 is blocked only
-on rendering the free card and Muxin approving the row. **Process note:** the stale wording
+simply never rendered ("render intentionally skipped (zero-cost run)"). That free card was then
+rendered, approved, and scheduled. **Process note:** the stale wording
    survived several sessions because it was re-read as a summary line and never re-derived from
    the capability table sixteen hundred lines below, which had already recorded the canary. A
-   summary that contradicts the detail section is not evidence, it is an unrefreshed cache.
+   summary that contradicts the detail section is not evidence, it is an unrefreshed cache. Muxin
+   accelerated the Bluesky proof on Sep 12. The 21:15 CT attempt exposed Postiz's self-fetch defect;
+   the one bounded retry at 21:30 CT used the same PNG over Postiz's verified internal port and went
+   live under stable id `cmtz395zs0001mu8e0p5tbik3`:
+   `https://bsky.app/profile/did:plc:brjgstzt7gooqouz5kdci6n7/post/3mvekg4rsvd2h`.
 3. ~~**The non-Postiz publisher fence never clears.**~~ **DONE 2026-09-12, SLICE-7C, `919ae2e`.**
    Fixed by asking the reuse guard BEFORE the publisher on every non-Postiz route, so a refusal
    there is provably ahead of every provider call and every slot claim and can carry
@@ -108,11 +112,35 @@ on rendering the free card and Muxin approving the row. **Process note:** the st
    one, not `mastodon-2`. The `~/.content-agents` dispatch journals carry no event naming a deferral;
    the record lives only in the per-folder log. Not a defect, just where to look.
 
+6. **Postiz cannot fetch its own public media URL from inside the container.** The accelerated
+   Bluesky image post failed at 21:15 CT because `postiz-threads.meta` resolves to `127.0.0.1`
+   inside Postiz, where port 4443 is closed. The uploaded PNG returned HTTP 200 from the same
+   container at port 5000, and using that internal path made the 21:30 retry publish. The LinkedIn,
+   Instagram, and Facebook quote-card rows are still scheduled with their original uploaded media;
+   repair the container self-resolution or safely reschedule those exact provider objects before
+   Instagram/Facebook are due Sep 15. Do not create duplicates.
+
 Recorded, not defects: the Postiz read window is a +/-45 day list scan because there is no
 read-by-id route, and Postiz soft-deletes, so absence can never distinguish live from canceled from
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (8B accepted) — first approved media row is live
+
+At Muxin's request the existing Bluesky provider object was moved forward, not duplicated. The
+21:15 CT attempt failed when Postiz tried to fetch its own image through
+`postiz-threads.meta:4443`, which resolves to dead loopback inside the container. The same image was
+verified from inside Postiz at port 5000 (HTTP 200, PNG, 94,402 bytes), then the one bounded retry
+used that internal path and published at 21:30:01 CT. Postiz retained id
+`cmtz395zs0001mu8e0p5tbik3` and returned
+`https://bsky.app/profile/did:plc:brjgstzt7gooqouz5kdci6n7/post/3mvekg4rsvd2h`.
+
+Bluesky's public API independently returned `muxin-li.bsky.social`, the exact approved caption,
+one image, and the source CTA reply. The publishing journal records failed -> planned -> live and
+the slot ledger records the final 02:30Z time. This accepts SLICE-8B and closes outstanding item 2.
+The same self-fetch configuration can affect the three later image rows, so it remains separately
+open as item 6 rather than being hidden by the successful retry.
 
 ### 2026-09-12 (8B stopped) — four quote cards scheduled; first-live proof waits
 
@@ -3018,7 +3046,7 @@ Postiz does not support the required destination or capability.
 | Destination | Current provider/path | State | What is still unverified or missing |
 |---|---|---|---|
 | X, LinkedIn, Bluesky, Mastodon, Threads, Facebook text | Self-hosted Postiz when live discovery advertises the exact account/destination/media capability; Typefully scheduled drafts only after an explicit unsupported result | Postiz live-verified for all six text channels on 2026-09-02 (far-future schedule, reschedule, cancel); Typefully live-verified for a LinkedIn text draft | First real scheduled delivery through Studio has not run yet; Facebook has no non-Postiz fallback. |
-| X, LinkedIn, Bluesky, Instagram, Facebook quote cards | Postiz (media registered through `POST /public/v1/upload`); native Typefully image drafts only after an explicit unsupported result | Postiz image path live-verified on Instagram (2026-09-02); dispatch uploads the rendered PNG and sends the card caption | Run one real card through Studio; Typefully image fallback stays provider-unverified. |
+| X, LinkedIn, Bluesky, Instagram, Facebook quote cards | Postiz (media registered through `POST /public/v1/upload`); native Typefully image drafts only after an explicit unsupported result | Postiz image path live-verified on Instagram (2026-09-02); first approved Studio card live on Bluesky (2026-09-12, SLICE-8B) with exact caption, image, and CTA reply | Typefully image fallback stays provider-unverified. Postiz's public media hostname self-resolves to dead loopback inside its container; fix item 6 before the later scheduled cards fire. |
 | Configured-media image, carousel, and video rows (any Postiz channel) | Postiz only; manual ready-to-paste when discovery reports no support. Routed by asset path (`media-stages/` or `configured-media/`) so the older native-video Typefully rows are untouched. | Carousel dispatch uploads every slide in order and sends one multi-image post; caption is the row's own derivative body with CTA placement (never composed); per-channel image caps enforced before the first upload (x 4, bluesky 4, mastodon 4, instagram 10, facebook 10, linkedin 20, threads 20, tiktok 35). Two-slide carousel live-verified on 2026-09-02 on TikTok, Mastodon, Facebook, Instagram, LinkedIn, Threads, and X (schedule, reschedule, cancel, sweep clean; `docs/evidence-postiz-canary-carousel-2026-09-02.json`). Bluesky's carousel case hit Postiz's rate limit that run and has not been rerun yet (single-command rerun once the hour rolls over). | Postiz throttles post creation to 90 requests per hour for the whole instance and each schedule or move counts as one. Since 2026-09-02 a 429 on approval releases the claimed publish slot, is recorded as a retry-eligible `failed` ledger event carrying the resume time (from `Retry-After`, else one hour), and a background drainer inside the Studio server (`src/review/publish-drain.ts`, `/api/publishing/drain-health`) re-dispatches the waiting approved rows once that time passes, one create per row, stopping again at the next 429; Studio shows "N rows waiting for Postiz, resumes at HH:MM". The drainer runs only while Studio is open. A batch move still stops at the first rate-limit error and reports the remaining rows as not attempted; they are not auto-resumed. Moving an image, carousel, or video row re-uploads its media before the create call (Postiz has no delete route, so the library accumulates copies). Run one real carousel through Studio. |
 | TikTok | Postiz (video registered through the upload route) with the PostPeer exception only after an unsupported result | Postiz TikTok video path live-verified on 2026-09-02 (privacy SELF_ONLY canary); production sends DIRECT_POST with public privacy | Run one real short through Studio; PostPeer remains the unverified fallback. |
 | YouTube Shorts | Postiz (video plus `title`/`type` settings from `video/title.txt`) with the YouTube Data API exception only after an unsupported result | Postiz YouTube video path live-verified on 2026-09-02 (private canary) | Run one real short through Studio; the direct YouTube exception stays unverified. |

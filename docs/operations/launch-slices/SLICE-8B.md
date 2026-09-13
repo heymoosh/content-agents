@@ -55,27 +55,32 @@ none
 - [x] Expected-fingerprint reconciliation adopted exactly the four approved rows.
 - [x] After action-time confirmation, one Studio batch action scheduled exactly those four rows.
 - [x] Studio status, the slot ledger, publish log, Placed log, and Postiz calendar readback agree.
-- [ ] The first due post is confirmed live before this slice closes.
+- [x] The first due post is confirmed live before this slice closes.
 
 ## Verify
 
 Classification and applicable gate: meaningful live publishing behavior. No repository-wide code
 gate applies to the unchanged runtime candidate. Verify outcomes from Studio, the slot ledger, and
-a read-only provider query. Use one scheduling batch and no retry unless the first attempt returns a
-safe no-provider-request refusal.
+a read-only provider query. The original four-row Studio batch remained the only batch action.
+Muxin later authorized moving the exact Bluesky provider object forward for immediate proof. Its
+first accelerated attempt failed on Postiz's own image self-fetch, and the one bounded retry used a
+container-reachable URL for the same uploaded PNG; the stable provider id never changed.
 
 ## Observable result
 
-The four card rows show scheduled provider IDs and planned times; after the first due time, its
-provider state and public result show that it is live.
+The four card rows show scheduled provider IDs and planned times. The accelerated Bluesky row is
+live at
+`https://bsky.app/profile/did:plc:brjgstzt7gooqouz5kdci6n7/post/3mvekg4rsvd2h`;
+Postiz and Bluesky agree on the provider object, author, approved caption, image, and CTA reply.
 
 ## Risk
 
 high - audit required: no standalone audit because this uses the already accepted SLICE-8A runtime
 without code changes, but outcome triangulation is mandatory.
 Review boundary: exact four-row batch.
-Review scope/budget: one Schedule batch, at most one retry only after a proven no-provider-request
-refusal; read-only status checks afterward.
+Review scope/budget: one Schedule batch; one owner-authorized accelerated provider reschedule and
+one bounded retry after the first accelerated publish failed deterministically. Read-only status
+checks afterward.
 Prior accepted evidence: SLICE-8A commit `d896cef` and its Grok audit remain valid because runtime
 code is unchanged.
 On provider outage: retain the fail-closed status and wait for a named retry condition.
@@ -87,50 +92,15 @@ On provider outage: retain the fail-closed status and wait for a named retry con
 
 ## Closeout
 
-Preflight: exact four selected rows, owner approval present, reconciled fingerprints, accepted
-runtime commit, and action-time confirmation.
-Gate cost: one live Schedule batch; local runtime unknown until execution.
-Leftover: the first due Bluesky post must be confirmed live after 2026-09-13 18:30 PT.
-
-## RESULT BLOCK
-
-- Changed paths: the four target queue statuses, the folder publish log, and the Human Inference
-  Placed log; outside-repository approval and publishing-status journals plus scheduler ledger.
-- Outcome: one confirmed Studio batch scheduled all four exactly once. LinkedIn is 2026-09-20
-  08:30 PT (`cmtz395vg0000mu8e0v29dgxm`), Bluesky 2026-09-13 18:30 PT
-  (`cmtz395zs0001mu8e0p5tbik3`), Instagram 2026-09-15 12:00 PT
-  (`cmtz3962y0003mu8ex9oq82ic`), Facebook 2026-09-15 12:00 PT
-  (`cmtz3965t0004mu8e5641baj5`). The X row stayed pending and unscheduled.
-- Checks run and results: four dry runs exit 0; four adoption runs exit 0; Studio displayed four
-  scheduled results; exact publishing-status events and four scheduler claims agree; Postiz calendar
-  refreshed from 101 to 102 visible current-week items and displayed the Bluesky caption at its due
-  time.
-- Evidence locations: Studio Publishing room, Postiz Calendar, folder `publish-log.md`, external
-  `publishing-status.jsonl` events 67-74, and external scheduler ledger's final four rows.
-- Unresolved: confirm the first due Bluesky post live after 2026-09-13 18:30 PT.
-- Delivery state and next action: scheduled and read back; frozen wait until the Bluesky due time.
-- Usage: one live four-row Studio batch; no retry; local verification commands under one second.
+**PASS** 2026-09-12. The four-row Studio batch is retained, the X row stayed pending, and the first
+approved media row is publicly live. Postiz id `cmtz395zs0001mu8e0p5tbik3` reports `published` at
+2026-09-13T02:30:00Z and the public Bluesky thread has the exact approved caption, one image, and
+the source CTA reply. The failed accelerated attempt and retry are retained in the publishing
+journal. The unrelated self-fetch risk for the three later image posts is recorded in the master.
 
 ## Usage budget and handoff
 
 - Each extra lane: none; live mutation and its shared ledger serialize this work.
 - Assignment: coordinator only.
 - Evidence return: command exits, exact row IDs/fingerprints, Studio state, ledger/provider IDs.
-- Capability boundary: stop in a frozen wait state after scheduling until the earliest due post.
-
-## Stopped
-
-Blocker: the earliest scheduled post is not due until 2026-09-13 18:30 PT, so live delivery cannot
-yet be truthfully accepted.
-
-Verified: exactly four approved rows were provenance-adopted and scheduled once; Studio, the
-external scheduler ledger, publishing-status events 67-74, folder publish log, Placed log, and
-Postiz calendar readback agree on their provider ids and times. The X row remains pending.
-
-Retained work: uncommitted operational state in
-`content/2026-09-02-the-world-s-broken-what-do-we-do/review-queue.md`, that folder's
-`publish-log.md`, and `briefs/human-inference/bets.md`; this packet is the durable handoff. External
-approval, publishing-status, and scheduler journals retain the provider evidence.
-
-Next action: after the due time, read Postiz id `cmtz395zs0001mu8e0p5tbik3` and the public Bluesky
-result without mutation; if both show live, mark the last acceptance item and close SLICE-8B.
+- Capability boundary: accepted after live proof; the separate self-fetch risk is master item 6.
