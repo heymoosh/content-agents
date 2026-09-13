@@ -38,10 +38,14 @@ while the other is active, and the two candidates integrate only after both audi
 - `src/review/content-request-store.ts`
 - `src/review/content-request-store.test.ts`
 - `src/review/content-generation.test.ts` (only the stale new-write community regression)
+- `src/review/serve.test.ts` (only one malformed Content-request HTTP boundary regression, after
+  the completed 8H handoff; preserve every 8H hunk)
 - the smallest existing Studio-options module/test only if needed to establish one shared export
 
 Shared-file handoff: `src/review/page.ts` is owned by 8G until its frozen RESULT BLOCK. 8H is paused
 from editing it until the coordinator reissues that assignment.
+`src/review/serve.test.ts` transferred from completed 8H verification to 8G only for the bounded
+HTTP rejection test; the workers are serialized and 8G must preserve the existing 8H candidate.
 
 Pinned read-only inputs: current `CONTENT_CONFIG_OPTIONS` declaration and persisted request schema at
 the assignment commit. Focused tests must use a temporary data root.
