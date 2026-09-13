@@ -7,6 +7,7 @@ import { scheduleApproved, defaultPublishPostiz, type SchedulerDeps } from "./st
 import type { QueueRow } from "../publish/queue.js";
 import { resolveDeliveryPolicy, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
 import { PostizRateLimitError, type PostizCapabilityRegistry, type PostizDestination, type PostizMedia, type PostizTransport } from "../publish/postiz.js";
+import { claimSlots } from "../publish/slots.js";
 
 // SLICE-5K — the Postiz path consults the reuse guard BEFORE it creates.
 //
@@ -467,22 +468,39 @@ describe("SLICE-6Z: a different derivative of the same piece is spaced, not refu
     assert.ok(Date.parse(scheduled.plannedFor) < floorMs(AN_HOUR_AGO), "no spacing floor was applied");
   });
 
-  // Acceptance item 5: a deferral that cannot find a slot REFUSES and says so. `facebook` is a real
-  // Postiz destination with no cadence entry in config/platforms.yaml, so the shared scheduler
-  // answers "next-free-slot" — which hands the timing back to the provider and would defeat the
-  // spacing. Fail closed: no slot means say it could not be placed.
+  // Acceptance item 5: a deferral that cannot find a slot REFUSES and says so. `facebook` now has
+  // a real cadence entry (SLICE-8A, owner decision 2026-09-12: facebook gets the quote-card
+  // midday weekday cadence like instagram), so it can no longer stand in for "a destination with
+  // no cadence at all" the way it used to. What still needs proving is the same fail-closed
+  // contract: a deferral that cannot find ANY free slot within the scheduler's 365-day lookahead
+  // (computeClaimSlots, src/publish/slots.ts) refuses instead of reporting a schedule it did not
+  // achieve. So the fixture pre-fills the shared ledger with a real facebook claim on every
+  // Tue/Wed/Thu 12:00 PT slot the scheduler could possibly offer in that window — using the same
+  // production `claimSlots` defaultPublishPostiz itself calls, pinned to the exact same `now` this
+  // deferral will search from (`floorMs(AN_HOUR_AGO)`, matching `earliestAt` below) so the two
+  // calls see an identical 365-day window. With every day already at its one-per-PT-day cap,
+  // `computeClaimSlots` returns an empty `times` array — the same "no achievable slot" outcome
+  // `next-free-slot` used to stand in for — and defaultPublishPostiz hits the same
+  // `!times[0]` guard (studio-scheduling.ts) it always would, so the thrown message is unchanged.
   test("a deferral the scheduler cannot place refuses, and never reports a schedule it did not achieve", async () => {
     const folder = mkdtempSync(join(tmpdir(), "variant-defer-noslot-"));
     dirs.push(folder);
     mkdirSync(join(folder, "configured-media", "cm-1"), { recursive: true });
     writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
     writeFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!, "");
+
+    const earliestAt = new Date(floorMs(AN_HOUR_AGO)).toISOString();
+    // Saturate every facebook slot in the exact 365-day window defaultPublishPostiz will search
+    // (same `now`, same windowKey, same production claimSlots — see comment above).
+    claimSlots({
+      windowKey: "facebook", conflictPlatforms: ["facebook"], count: 200,
+      asset: "prefill-facebook", by: "test-prefill", now: new Date(floorMs(AN_HOUR_AGO)),
+    });
     const ledgerBefore = readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!);
 
     const row = textRow({ id: "cm-1", platform: "facebook", format: "image", asset: "configured-media/cm-1/card.png" });
     const policy = resolveDeliveryPolicy(folder, "postiz");
     const capability = takes("facebook", ["image"]).capabilities[0];
-    const earliestAt = new Date(floorMs(AN_HOUR_AGO)).toISOString();
 
     await assert.rejects(
       () => defaultPublishPostiz(folder, row, capability, policy, () => { throw new Error("the transport must never be reached"); }, earliestAt),

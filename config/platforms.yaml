@@ -121,6 +121,22 @@ platforms:
     slot_days: [Mon, Tue, Wed, Thu, Fri]
     slot_time_pst: "12:00"
     style: One or two quotable lines pulled verbatim from the source.
+  instagram:
+    min_reuse_days: 30      # image-only card destination; matches quote-card's own reuse floor
+    max_chars: 2200         # Postiz's own instagram cap (POSTIZ_MAX_CHARS, src/review/studio-scheduling.ts)
+    # Instagram card cadence for the unified scheduler (SLICE-8A, owner checkpoint 2026-09-12):
+    # matches quote-card's own midday weekday cadence, one post per PT day.
+    posts_per_week: 3
+    slot_days: [Tue, Wed, Thu]
+    slot_time_pst: "12:00"
+  facebook:
+    min_reuse_days: 30      # image-only card destination; matches quote-card's own reuse floor
+    max_chars: 63206        # Postiz's own facebook cap (POSTIZ_MAX_CHARS, src/review/studio-scheduling.ts)
+    # Facebook card cadence for the unified scheduler (SLICE-8A, owner checkpoint 2026-09-12):
+    # matches quote-card's own midday weekday cadence, one post per PT day.
+    posts_per_week: 3
+    slot_days: [Tue, Wed, Thu]
+    slot_time_pst: "12:00"
   tiktok:
     min_reuse_days: 14      # short-form video; faster cadence, consistent with x=14
     # TikTok video cadence for the unified scheduler (publish:tiktok), so the short shares the one

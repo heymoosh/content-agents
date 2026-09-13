@@ -43,9 +43,13 @@ test("configuredPlatformLimit resolves from config/platforms.yaml, matching the 
   // Every platform selectable in the Content room (page.ts CONTENT_CONFIG_OPTIONS.platform) with no
   // configured max_chars resolves to undefined — "no character gate" — exactly as the table did by
   // omission. quote-card carries a config limit but is a media type, never a variant.platform.
-  for (const platform of ["substack", "instagram", "tiktok", "youtube"]) {
+  for (const platform of ["substack", "tiktok", "youtube"]) {
     assert.equal(configuredPlatformLimit(platform), undefined, `${platform} should have no configured character limit`);
   }
+  // SLICE-8A (owner decision 2026-09-12): instagram and facebook are now configured with real
+  // Postiz character caps, so they're no longer in the "no configured limit" list above.
+  assert.equal(configuredPlatformLimit("instagram"), 2200, "instagram limit drifted from config");
+  assert.equal(configuredPlatformLimit("facebook"), 63206, "facebook limit drifted from config");
 });
 
 test("runAgentSpawn forwards a selected engine's stdin payload", () => {

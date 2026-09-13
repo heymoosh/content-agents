@@ -449,14 +449,20 @@ to the same `source.md` and the same platform-fit decision.
    b. **Render it:** `npm run render -- --still <folder> --quote quote-card-N` → writes both
       `images/quote-card-N.png` (still) and `images/quote-card-N.mp4` (animated companion).
    c. **Per-platform context captions** `derivatives/quote-card-N-<target>.md`, one for EACH routed
-      text platform (x / linkedin / bluesky that routing marked `include`). Each is a normal spun
-      text derivative — `platform: <target>`, `spin: true`, `angle: <target>`, best-effort
-      `source_lines` (the lines AROUND the quote), `cta`/`cta_label` — whose body is the CONTEXT
-      that frames the quote: the setup, mechanism, or stakes drawn from the surrounding source
-      lines. **Context only: never repeat the quote that's already on the image.** Same spin
-      guardrails as any text post (reframe through the channel angle, never invent a claim). On a
-      `--no-spin` run, write the caption verbatim (no `spin`/`angle`, `source_lines` hard-required)
-      — still context-only. Char limit is the TARGET platform's (X 280, etc.), enforced by validate.
+      text platform that the card path supports (x / linkedin / bluesky that routing marked
+      `include`), PLUS `instagram` and `facebook` always — those are image-only card destinations
+      routing never targets, so they're never gated by a pillar's `never` rule (which only governs
+      the text platforms). Each is a normal spun text derivative — `platform: <target>`, `spin:
+      true`, `angle: <target>`, best-effort `source_lines` (the lines AROUND the quote),
+      `cta`/`cta_label` — whose body is the CONTEXT that frames the quote: the setup, mechanism, or
+      stakes drawn from the surrounding source lines. **Context only: never repeat the quote
+      that's already on the image.** Same spin guardrails as any text post (reframe through the
+      channel angle, never invent a claim). Instagram and facebook have no configured spin angle
+      (`config/platforms.yaml` `spin_angles`), so drop `spin`/`angle` for those two and reuse the
+      same context body as whichever text platform's caption it's closest to — `source_lines`
+      stays required. On a `--no-spin` run, write the caption verbatim (no `spin`/`angle`,
+      `source_lines` hard-required) — still context-only. Char limit is the TARGET platform's (X
+      280, instagram 2200, facebook 63206, etc.), enforced by validate.
    d. **Optional quote+image variant.** Distinct from the typographic-only card above (which stays
       the default and is unaffected) — the SAME verbatim quote composited over a generated
       illustration, for when the piece has a strong visual concept worth the extra render. Write
@@ -495,8 +501,9 @@ to the same `source.md` and the same platform-fit decision.
 
 8. **Queue for review.** Ensure `<folder>/review-queue.md` has one row per asset that was
    generated — the routing `include` text platforms, plus ONE `quote-card:<target>` row per routed
-   platform for the card (each pointing at the shared `images/quote-card-N.png`, caption from its
-   own `quote-card-N-<target>.md`). (id, platform, format, asset path, scores, status=pending,
+   platform for the card, PLUS `quote-card:instagram` and `quote-card:facebook` always (each
+   pointing at the shared `images/quote-card-N.png`, caption from its own
+   `quote-card-N-<target>.md`). (id, platform, format, asset path, scores, status=pending,
    origin). On a cut other than `extract` (see "Cut-aware steps" above), the id is `cutRowId(lens,
    id)` and the asset path is under `cuts/<lens>/derivatives/` or `cuts/<lens>/…` — every row for
    every cut lands in the SAME `review-queue.md`, one table, no separate queue per cut. The table schema itself doesn't grow a storytelling or thread-check column

@@ -15,6 +15,10 @@
 # broad inclusion (cold-start convention, see the conventions note in root CLAUDE.md).
 # Narrow this to a pillar fit once posts accumulate and route.ts's data-driven scoring
 # has something to work with.
+#
+# Instagram and Facebook (SLICE-8A, 2026-09-12): image-only card destinations, never routed here.
+# A quote card always gets an instagram and a facebook row alongside whatever text platforms this
+# table includes (config/platforms.yaml carries their cadence) — never a text derivative.
 
 defaults:                 # platforms to include per pillar while data is INSUFFICIENT (cold start)
   human-ai:    [linkedin, bluesky, mastodon, threads]

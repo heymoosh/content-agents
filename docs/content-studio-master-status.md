@@ -4,14 +4,12 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main). Master: this file; rules:
   `AGENTS.md` -> `## Slice protocol` + `docs/operations/slice-protocol-environment.md`.
-- Latest (2026-09-12, ops, not a slice): Outstanding item 1 CLOSED. Real approved LinkedIn and
-  Mastodon rows went live, so all five text channels are proven through Studio. Open: item 2 (one
-  real media row; the quote card renders free, needs Muxin's approval). New ops risk: a Postiz restart can leave its
-  backend silently dead behind a `healthy` container; fix is `docker exec postiz pm2 restart
-  backend`, and a self-healing healthcheck was prepared for Muxin to install. See `## Progress log`.
-- Current / last accepted: **7D**, `docs/operations/launch-slices/SLICE-7D.md`, PASS. Nothing
-  blocked. A Typefully draft with no usable date no longer lets `--sync` release the slot claim
-  sitting behind it. `npm run check` 4570/0. Shipped as `f2f9ea5`, pushed to `origin/main`.
+- Latest (2026-09-12, SLICE-8A): Instagram and Facebook quote cards can schedule through Studio.
+  The human-inference quote card is rendered and its instagram, facebook, linkedin and bluesky rows
+  are pending Muxin's approval (x row to discard). Item 2 closes once one approved card row is
+  confirmed live. **Handoff:** Muxin is moving further work to Codex; see the 8A progress entry.
+- Current / last accepted: **8A**, `docs/operations/launch-slices/SLICE-8A.md`, PASS after
+  coordinator fixes to two Grok blocking findings. `npm run check` 4574/0.
 - 7D in one line: `fetchAllDrafts` is now the ONE fetch/pagination/dedup path and
   `fetchScheduledDrafts` narrows from it; a date counts only if it parses (null, "", whitespace and
   garbage all become no date); `listTypefully` returns `ok: false` with a counting note whenever a
@@ -180,6 +178,24 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (8A) — Instagram and Facebook quote cards schedule; handoff to Codex
+
+Instagram and Facebook now have card cadence in `config/platforms.yaml` (3 a week, Tue/Wed/Thu 12:00
+PT, one a day). `/atomize` always adds card rows for them. The Sep 2 human-inference card is
+rendered locally ($0) and has pending rows for instagram, facebook, linkedin, bluesky and x.
+Details, incidents and the audit are in the packet's RESULT BLOCK.
+
+Open for the next session (Codex):
+1. After Muxin approves the four card rows in Studio, confirm they scheduled: the folder's
+   publishing status, `data/publish-schedule.jsonl`, and a read-only Postiz query. Then confirm the
+   first post went live (first IG/FB slot is likely Tue Sep 15 12:00 PT). That closes item 2.
+2. UX finding for the front-end pass: Studio lists card rows whose image is not rendered yet, and
+   approving one fails with "image not rendered yet". Muxin: hide those rows until the image exists.
+3. Latent bug, not fixed: `loadPlatformMax()` (`src/publish/typefully.ts`) maps any platforms.yaml
+   entry without `max_chars` to Infinity, which bypasses `POSTIZ_MAX_CHARS` for that destination.
+4. Test hygiene: a dispatch test must set `CONTENT_AGENTS_TEST_BETS_PATH` or it writes the real
+   Placed log.
 
 ### 2026-09-12 (ops, live) — LinkedIn and Mastodon live; a restart can leave Postiz silently broken
 
