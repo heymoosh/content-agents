@@ -25,8 +25,10 @@ Owner checkpoint: none; the visible outcome is explicitly recorded in the master
 
 ## Owned files
 
-Parallel-safe: yes — this lane owns capture lifecycle, promotion call sites, and their focused tests;
-8G owns Content request validation and 8F owns external deployment files. No repo-wide rewrite.
+Parallel-safe: partially — 8F remains independent. Discovery showed 8G and 8H both need disjoint
+hunks in `src/review/page.ts`; that file is serialized. 8H has stopped editing until 8G freezes its
+shared-options hunk, then 8H receives the file on that handoff and reruns its checks. No repo-wide
+rewrite is permitted.
 
 ### Lane A — capture promotion lifecycle
 
@@ -34,6 +36,9 @@ Parallel-safe: yes — this lane owns capture lifecycle, promotion call sites, a
 - `src/review/captures.test.ts`
 - smallest exact Fiction/room promotion call-site module and focused test
 - smallest exact Home capture rendering/filter module and focused test, only if separate
+
+Shared-file handoff: `src/review/page.ts` transfers from 8G to 8H only after the coordinator receives
+8G's frozen RESULT BLOCK. Existing disjoint 8H hunks are retained; no worker reverts either candidate.
 
 Pinned read-only inputs: current capture version/schema, Fiction promotion route, and Home queue reader
 at the assignment commit. All tests use temporary operational paths.

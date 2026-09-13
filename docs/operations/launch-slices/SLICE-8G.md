@@ -26,8 +26,10 @@ Owner checkpoint: none; the product intent is already recorded under `Open, reco
 
 ## Owned files
 
-Parallel-safe: yes — this lane owns only Content request vocabulary/boundary source and focused tests;
-8F owns external deployment files and 8H owns capture lifecycle files. It runs no rewriting command.
+Parallel-safe: partially — 8F remains independent. Discovery showed 8G and 8H both need disjoint
+hunks in `src/review/page.ts`; that file is serialized. 8G freezes its shared-options hunk first,
+then 8H verifies its Home-filter hunk against that frozen handoff. Neither worker may edit the file
+while the other is active, and the two candidates integrate only after both audits are clear.
 
 ### Lane A — shared selection vocabulary and fail-closed validation
 
@@ -35,7 +37,11 @@ Parallel-safe: yes — this lane owns only Content request vocabulary/boundary s
 - `src/review/content-request.test.ts` if present, otherwise one new focused test beside it
 - `src/review/content-request-store.ts`
 - `src/review/content-request-store.test.ts`
+- `src/review/content-generation.test.ts` (only the stale new-write community regression)
 - the smallest existing Studio-options module/test only if needed to establish one shared export
+
+Shared-file handoff: `src/review/page.ts` is owned by 8G until its frozen RESULT BLOCK. 8H is paused
+from editing it until the coordinator reissues that assignment.
 
 Pinned read-only inputs: current `CONTENT_CONFIG_OPTIONS` declaration and persisted request schema at
 the assignment commit. Focused tests must use a temporary data root.
