@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { buildContentRequest, type ContentOrigin } from "./content-request.js";
+import { buildContentRequest, rebuildStoredContentRequest, type ContentOrigin } from "./content-request.js";
 import { readContentRequest, writeContentRequest } from "./content-request-store.js";
 import { repoRoot } from "../db/db.js";
 import { applyExplorationOverride, applyOriginBlock, applySourceTriage, applySubstackRepost, decideForPillar, loadConfig as loadRoutingConfig, routingMd, type MergedDecision } from "../strategy/route.js";
@@ -39,7 +39,7 @@ test("configured routing gates the complete fake-model generation before draftin
     { name: "origin-block", routing: routingMd(["human-ai"], applyOriginBlock(decisions("human-ai"), "https://www.linkedin.com/posts/example")), platforms: ["linkedin", "bluesky"], included: ["bluesky"] },
     { name: "triage-veto", routing: routingMd(["human-ai"], applyExplorationOverride(applySourceTriage(decisions("human-ai"), ["linkedin", "x"]), "human-ai", "linkedin")), platforms: ["linkedin", "bluesky"], included: ["bluesky"] },
     { name: "note-repost", routing: routingMd(["career-work"], applySubstackRepost(career, ["career-work"], "substack-note")), platforms: ["substack", "bluesky"], included: ["substack"], sourceKind: "substack-note" },
-    { name: "format-asset", routing: routingMd(["career-work"], career), platforms: ["quote-card", "bluesky"], included: ["quote-card"] },
+    { name: "format-asset", routing: routingMd(["career-work"], career), platforms: ["linkedin", "bluesky"], included: ["linkedin"], media: ["static-quote-card"] },
     { name: "community", routing: routingMd(["civic-tech"], decisions("civic-tech")), platforms: ["community:democratic-resilience", "linkedin"], included: ["community:democratic-resilience"] },
     { name: "community-skip", routing: "| community:democratic-resilience | skip |\n| x | include |\n", platforms: ["community:democratic-resilience", "x"], included: ["x"] },
     { name: "missing-file", platforms: ["bluesky"], included: ["bluesky"] },
@@ -54,12 +54,15 @@ test("configured routing gates the complete fake-model generation before draftin
       const slug = `test-routing-${item.name}-${process.pid}-${Date.now()}`;
       const folder = join(repoRoot, "content", slug);
       const source = `---\nsource_kind: ${item.sourceKind ?? "essay"}\n---\nThe source claim stays exact.\n`;
-      let configured = buildContentRequest({
+      const requestInput = {
         id: slug, origin: "human-inference", descriptor: "Routing integration",
-        originalInput: "The source claim stays exact.", treatments: ["summary", "shorter"],
-        platforms: item.platforms, media: [], includeUntreatedControl: true,
+        originalInput: "The source claim stays exact.", treatments: ["summary", "shorter-version"],
+        platforms: item.platforms, media: "media" in item ? item.media : [], includeUntreatedControl: true,
         sourceProvenance: { kind: "source", sourceLines: [4], canonicalUrl: "https://www.humaninference.ai/p/routing-source" },
-      });
+      } as const;
+      let configured = item.name === "community" || item.name === "community-skip"
+        ? rebuildStoredContentRequest(requestInput)
+        : buildContentRequest(requestInput);
       if (item.unsupportedSkippedMedia) configured = { ...configured, variants: configured.variants.map((variant) => ({ ...variant, media: item.included.includes(variant.platform) ? variant.media : "not-supported" })) };
       if (item.experiment) configured = { ...configured, experiment: {
         id: "routing-experiment", recommendationId: "routing-recommendation", planProposalDigest: "proposal", planDecisionDigest: "decision",
@@ -144,8 +147,11 @@ test("configured routing gates the complete fake-model generation before draftin
       mkdirSync(folder, { recursive: true });
       const queueBefore = "# Review queue\n";
       writeFileSync(join(folder, "review-queue.md"), queueBefore);
-      // Unsupported media + missing provenance prove rejection precedes media or drafting work.
-      const configured = buildContentRequest({ id: slug, origin: "studio", descriptor: "Refusal", originalInput: "Source.", treatments: ["summary"], media: ["not-supported"], platforms: item.platforms });
+      // Valid configured media + missing provenance prove routing rejection precedes media or drafting work.
+      const requestInput = { id: slug, origin: "studio" as const, descriptor: "Refusal", originalInput: "Source.", treatments: ["summary"], media: ["image"], platforms: item.platforms };
+      const configured = item.name === "unqualified-community"
+        ? rebuildStoredContentRequest(requestInput)
+        : buildContentRequest(requestInput);
       writeFileSync(join(folder, "routing.md"), item.routing);
       try {
         await assert.rejects(generateConfiguredContent(slug, configured), item.error);
@@ -267,18 +273,14 @@ test("configured generation sends only routed treated identities in every drafti
   }
 });
 
-test("Content request persistence accepts generic and qualified community strings without a room mapping", async () => {
+test("Content request persistence rejects legacy community destinations on new writes", async () => {
   const folder = mkdtempSync(join(tmpdir(), "routing-vocabulary-"));
   try {
-    const saved = await writeContentRequest(folder, {
+    await assert.rejects(() => writeContentRequest(folder, {
       id: "vocabulary", origin: "studio", descriptor: "Community vocabulary", originalInput: "Source.",
       platforms: ["community", "community:democratic-resilience"], media: [], treatments: [],
-    });
-    const restored = await readContentRequest(folder);
-    assert.deepEqual(restored, saved);
-    assert.deepEqual(restored.variants.map((variant) => variant.platform), ["community", "community:democratic-resilience"]);
-    assert.equal(restored.variants[0]!.identity.id, "control-Y29tbXVuaXR5-bm9uZQ");
-    assert.equal(restored.variants[1]!.identity.id, "control-Y29tbXVuaXR5OmRlbW9jcmF0aWMtcmVzaWxpZW5jZQ-bm9uZQ");
+    }), /platforms\[0\].*unknown/i);
+    assert.equal(existsSync(join(folder, "content-request.json")), false);
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });
 
@@ -548,7 +550,7 @@ test("the studio editor prompt is byte-identical to the approved pre-registry co
 test("scannability is independent of traceability: a treated piece without source_lines still gets its origin's editor", () => {
   const folder = mkdtempSync(join(tmpdir(), "editor-gate-split-"));
   const fiction = buildContentRequest({
-    id: "fiction-gate", origin: "fiction", descriptor: "promo", originalInput: "Approved fiction promotion.", treatments: ["shorter"], platforms: ["substack"],
+    id: "fiction-gate", origin: "fiction", descriptor: "promo", originalInput: "Approved fiction promotion.", treatments: ["shorter-version"], platforms: ["substack"],
     sourceContext: { kind: "fiction-approved-promotion", authoritativeBody: "Approved fiction promotion.", series: { id: "s", title: "Series" }, chapter: { number: 1, title: "One" }, sourcePassages: [{ ref: "chapters/001.md#L1", text: "Passage", locked: true }], restrictions: { canon: [], provenance: [] } },
   });
   const fictionTreated = fiction.variants.filter((variant) => variant.identity.kind === "treated");
@@ -556,7 +558,7 @@ test("scannability is independent of traceability: a treated piece without sourc
   assert.deepEqual({ traceable: untraced.traceable, scannable: untraced.scannable, editor: untraced.editor?.kind }, { traceable: false, scannable: true, editor: "fiction" });
 
   const charles = buildContentRequest({
-    id: "charles-gate", origin: "charles", descriptor: "post", originalInput: "Approved Charles post.", treatments: ["shorter"], platforms: ["substack"],
+    id: "charles-gate", origin: "charles", descriptor: "post", originalInput: "Approved Charles post.", treatments: ["shorter-version"], platforms: ["substack"],
     sourceContext: { kind: "charles-approved-post", authoritativeBody: "Approved Charles post.", personaRef: "charles/config/persona.yaml", identity: "charles-lord-featherbottom", restrictions: ["no new leak claims"] },
   });
   const charlesTreated = charles.variants.filter((variant) => variant.identity.kind === "treated");
@@ -583,7 +585,7 @@ test("derivative frontmatter records which editor ran, and only on a treated var
 test("Fiction and Charles authoritative approved bodies win over arbitrary originalInput and carry restrictions", () => {
   const folder = mkdtempSync(join(tmpdir(), "configured-context-"));
   const fiction = buildContentRequest({
-    id: "fiction", origin: "fiction", descriptor: "promo", originalInput: "UNAPPROVED prompt text", treatments: ["shorter"], platforms: ["substack"],
+    id: "fiction", origin: "fiction", descriptor: "promo", originalInput: "UNAPPROVED prompt text", treatments: ["shorter-version"], platforms: ["substack"],
     sourceContext: { kind: "fiction-approved-promotion", authoritativeBody: "Approved fiction promotion.", series: { id: "s", title: "Series" }, chapter: { number: 1, title: "One" }, sourcePassages: [{ ref: "chapters/001.md#L1", text: "Passage", locked: true }], restrictions: { canon: ["no new canon"], provenance: ["locked passage only"] } },
   });
   const resolvedFiction = resolveConfiguredAuthoritative(folder, fiction)!;
@@ -593,7 +595,7 @@ test("Fiction and Charles authoritative approved bodies win over arbitrary origi
   assert.match(configuredContentPrompt(fiction, fiction.variants), /no new canon/);
 
   const charles = buildContentRequest({
-    id: "charles", origin: "charles", descriptor: "post", originalInput: "UNAPPROVED thought", treatments: ["shorter"], platforms: ["substack"],
+    id: "charles", origin: "charles", descriptor: "post", originalInput: "UNAPPROVED thought", treatments: ["shorter-version"], platforms: ["substack"],
     sourceContext: { kind: "charles-approved-post", authoritativeBody: "Approved Charles post.", personaRef: "charles/config/persona.yaml", identity: "charles-lord-featherbottom", restrictions: ["no new leak claims"] },
   });
   const resolvedCharles = resolveConfiguredAuthoritative(folder, charles)!;
@@ -607,7 +609,7 @@ test("Fiction and Charles authoritative approved bodies win over arbitrary origi
 
 test("Venture treated variants use a dedicated engine-body contract with claim and voice restrictions", () => {
   const venture = buildContentRequest({
-    id: "venture", origin: "venture", ventureId: "v1", descriptor: "approved probe", originalInput: "Approved source body.", treatments: ["shorter"], platforms: ["substack"],
+    id: "venture", origin: "venture", ventureId: "v1", descriptor: "approved probe", originalInput: "Approved source body.", treatments: ["shorter-version"], platforms: ["substack"],
     ventureSource: { artifactId: "p1", phase: 1, artifactKind: "text-post-note", messageId: "m1", bodyPath: "phase-1/p1.md", claimRefs: [{ claim: "Users asked for this", ref: "intake:q4" }], approval: { editorialStatus: "approved", provenance: "muxin-editorial-approval" } },
   });
   const ventureTreated = venture.variants.filter((v) => v.identity.kind === "treated");
@@ -642,7 +644,7 @@ test("configured generation dispatches Venture through its editor and stamps the
   const token = `test-${slug}`;
   const venture = buildContentRequest({
     id: slug, origin: "venture", ventureId: "v1", descriptor: "approved probe",
-    originalInput: "Careful operators need a smaller first step.", treatments: ["shorter"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
+    originalInput: "Careful operators need a smaller first step.", treatments: ["shorter-version"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
     ventureSource: {
       artifactId: "p1", phase: 1, artifactKind: "text-post-note", messageId: "m1", bodyPath: "phase-1/p1.md",
       claimRefs: [{ claim: "Careful operators need a smaller first step.", ref: "intake:q4" }],
@@ -743,7 +745,7 @@ test("an untreated control ships the server-owned approved body, never arbitrary
       const folder = join(repoRoot, "content", slug);
       const configured = buildContentRequest({
         id: slug, origin: item.origin, descriptor: "approved promotion", originalInput: item.originalInput ?? unapproved,
-        treatments: ["shorter"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
+        treatments: ["shorter-version"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
         sourceContext: item.sourceContext ?? null, sourceProvenance: item.sourceProvenance ?? null,
         ventureId: item.ventureId ?? null, ventureSource: item.ventureSource ?? null,
       });
@@ -811,7 +813,7 @@ test("configured generation dispatches Fiction and Charles through their own edi
       const folder = join(repoRoot, "content", slug);
       const configured = buildContentRequest({
         id: slug, origin: item.origin, descriptor: "approved promotion", originalInput: item.body,
-        treatments: ["shorter"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
+        treatments: ["shorter-version"], media: [], platforms: ["bluesky"], includeUntreatedControl: true,
         sourceContext: item.sourceContext,
       });
       mkdirSync(folder, { recursive: true });
@@ -880,7 +882,7 @@ test("configured generation preflights media inputs and never invents missing fi
 
   const twoVideos = buildContentRequest({
     id: "two-videos", origin: "studio", descriptor: "source", originalInput: "Source.",
-    treatments: ["shorter"], platforms: ["linkedin"], media: ["short-video-script"],
+    treatments: ["shorter-version"], platforms: ["linkedin"], media: ["short-video-script"],
     sourceProvenance: { kind: "source", sourceLines: [1] },
   });
   assert.throws(() => buildConfiguredMediaOutputs(twoVideos.variants), /one staged script.*folder-scoped/);

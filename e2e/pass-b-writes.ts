@@ -16,6 +16,7 @@ import { appendRows } from "../src/publish/queue.js";
 const PORT = 4793;
 const SLUG = "e2e-probe-venture";
 const CONTENT_SLUG = "2099-09-01-e2e-content-review";
+const FICTION_CAPTURE = "Chapter idea: the lighthouse keeper edits the sea in the disposable Chromium journey.";
 
 /** Answers 1..25, each distinctive so we can prove they were stored verbatim. */
 function answerFor(n: number): string {
@@ -70,6 +71,93 @@ async function main(): Promise<void> {
   try {
     s = await openSession(PORT);
     const { page } = s;
+
+    // ── SLICE-8H: a failed Fiction handoff stays visible; retry promotes it exactly once. ──
+    // `/api/captures/classify` is one of the harness's blocked model routes. The authored text has
+    // the deterministic Fiction keyword, so the visible verdict exercises the client's safe
+    // fallback while the save/start, idea store, capture store, and reloads below are all real.
+    await page.route("**/api/captures/start", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "Injected Fiction promotion failure." }),
+      });
+    }, { times: 1 });
+    await page.fill("#src", FICTION_CAPTURE);
+    await page.click("#routeBtn");
+    const fictionVerdict = page.locator("#captureVerdict:not([hidden])");
+    await fictionVerdict.getByRole("button", { name: "Start on it" }).waitFor({ timeout: 15_000 });
+    const verdictText = (await fictionVerdict.innerText()).replace(/\s+/g, " ");
+    await fictionVerdict.getByRole("button", { name: "Start on it" }).click();
+    await page.waitForFunction(
+      () => document.querySelector("#flash")?.textContent?.includes("Injected Fiction promotion failure."),
+      undefined,
+      { timeout: 15_000 },
+    );
+
+    // The first POST /api/captures already saved the row. A fresh document must read that durable
+    // unresolved row and render it in Fiction instead of losing it with the failed request.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitLoaded(page, "#studioMain");
+    await openRoom(page, "fiction");
+    await waitLoaded(page, "#fictionMain");
+    const waitingCard = page.locator("#fictionCaptureHandoff .capture-handoff:visible", { hasText: FICTION_CAPTURE });
+    const waitingVisible = await waitingCard.count() === 1
+      && await waitingCard.getByText("CAPTURE WAITING HERE", { exact: true }).count() === 1;
+    record({
+      feature: "A failed Fiction promotion stays visibly retryable after reload",
+      status: verdictText.includes("Fiction") && waitingVisible ? "pass" : "fail",
+      detail: `Fiction verdict=${verdictText.includes("Fiction")}; waiting card after failure=${waitingVisible}`,
+    });
+
+    // Retry through the same top-level UI. The one-shot failure route is gone, so this reaches the
+    // real server and must converge on the saved capture rather than creating another capture/idea.
+    await openRoom(page, "studio");
+    await page.fill("#src", FICTION_CAPTURE);
+    await page.click("#routeBtn");
+    const retryVerdict = page.locator("#captureVerdict:not([hidden])");
+    await retryVerdict.getByRole("button", { name: "Start on it" }).waitFor({ timeout: 15_000 });
+    const startResponse = page.waitForResponse((response) => {
+      const request = response.request();
+      return new URL(response.url()).pathname === "/api/captures/start"
+        && request.method() === "POST" && response.status() === 200;
+    }, { timeout: 20_000 });
+    await retryVerdict.getByRole("button", { name: "Start on it" }).click();
+    const startBody = await (await startResponse).json() as {
+      ok?: boolean;
+      capture?: { id: string; promotedAt: string | null; promotion: { room: string; itemId: string } | null };
+      idea?: { id: string; series: string; rawText: string };
+    };
+    await page.locator(`#fictionMain [data-idea-id="${startBody.idea?.id ?? "missing"}"]`).waitFor({ timeout: 20_000 });
+    const durable = await page.evaluate(async ({ captureId, ideaId, series }) => {
+      const captures = await fetch("/api/captures").then((response) => response.json());
+      const inbox = await fetch(`/api/fiction/inbox?series=${encodeURIComponent(series)}`).then((response) => response.json());
+      return {
+        capture: (captures.captures || []).find((row) => row.id === captureId),
+        idea: (inbox.ideas || []).find((row) => row.id === ideaId),
+      };
+    }, { captureId: startBody.capture?.id, ideaId: startBody.idea?.id, series: startBody.idea?.series ?? "" }) as {
+      capture?: { promotedAt?: string | null; promotion?: { room?: string; itemId?: string } | null };
+      idea?: { id?: string; rawText?: string };
+    };
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const studioText = await waitLoaded(page, "#studioMain");
+    await openRoom(page, "fiction");
+    await waitLoaded(page, "#fictionMain");
+    const reloadedIdea = await page.locator(`#fictionMain [data-idea-id="${startBody.idea?.id ?? "missing"}"]`).count() === 1;
+    const waitingAfterPromotion = await page.locator("#fictionCaptureHandoff .capture-handoff:visible", { hasText: FICTION_CAPTURE }).count();
+    const promoted = startBody.ok === true
+      && durable.idea?.rawText === FICTION_CAPTURE
+      && durable.capture?.promotion?.room === "Fiction"
+      && durable.capture?.promotion?.itemId === durable.idea?.id
+      && Boolean(durable.capture?.promotedAt);
+    record({
+      feature: "A promoted Fiction capture survives reload as one durable idea and stops showing as waiting",
+      status: promoted && reloadedIdea && waitingAfterPromotion === 0 && !studioText.includes(FICTION_CAPTURE) ? "pass" : "fail",
+      detail: `promoted=${promoted}; idea after reload=${reloadedIdea}; waiting cards=${waitingAfterPromotion}; Home lists capture=${studioText.includes(FICTION_CAPTURE)}`,
+    });
+
     // ── #381: the whole 25-question intake interview, on the desk, ending in a real intake.md ──
     await openRoom(page, "venture");
     await waitLoaded(page, "#ventureThread").catch(() => {});

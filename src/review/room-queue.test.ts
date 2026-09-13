@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { CAPTURE_VERSION, captureId, listCaptures, saveCapture, type StudioCapture } from "./captures.js";
+import { CAPTURE_VERSION, captureId, listCaptures, saveCapture } from "./captures.js";
 import {
   PENDING_STATES, QUEUE_STATES, TERMINAL_STATES, isPendingState, listQueueItems, pendingCount, projectCapture,
   projectCaptureEvents, readQueueItem, roomQueueItems, updateQueueItem, type QueueState, type RoomQueueItem,
@@ -23,7 +23,7 @@ test("a projection is idempotent per capture and the raw event stays minimal", (
   const root = mkdtempSync(join(tmpdir(), "room-queue-"));
   const captures = join(root, "studio-captures.json"), queue = join(root, "room-queue.json");
   const capture = saveCapture("Venture", "a venture thought", captures);
-  assert.deepEqual(Object.keys(capture).sort(), ["createdAt", "id", "jobId", "room", "startedAt", "text", "version"], "no lifecycle leaks into the front-door event");
+  assert.deepEqual(Object.keys(capture).sort(), ["createdAt", "id", "jobId", "promotedAt", "promotion", "room", "startedAt", "text", "version"], "the front-door event carries only job start and room promotion lifecycle");
   const first = projectCapture(capture, { kind: "venture", slug: null }, queue);
   assert.equal(first.state, "pending");
   assert.equal(first.createdAt, capture.createdAt);
@@ -52,15 +52,16 @@ test("a no-op update leaves the row byte-identical", () => {
 test("migration: legacy studio-captures.json rows still load and project, and the log is never rewritten", () => {
   const root = mkdtempSync(join(tmpdir(), "room-queue-legacy-"));
   const captures = join(root, "studio-captures.json"), queue = join(root, "room-queue.json");
-  // Exactly the v1 shape the current code writes: room/text/timestamps/job, nothing else.
-  const legacy: StudioCapture[] = [
-    { version: CAPTURE_VERSION, id: captureId("Fiction", "an old fiction idea"), room: "Fiction", text: "an old fiction idea", createdAt: "2026-08-01T00:00:00.000Z", startedAt: null, jobId: null },
-    { version: CAPTURE_VERSION, id: captureId("Content", "https://example.com/old"), room: "Content", text: "https://example.com/old", createdAt: "2026-08-02T00:00:00.000Z", startedAt: "2026-08-02T00:00:01.000Z", jobId: "job-x" },
-    { version: CAPTURE_VERSION, id: captureId("Signals", "an old signal"), room: "Signals", text: "an old signal", createdAt: "2026-08-03T00:00:00.000Z", startedAt: null, jobId: null },
+  // Exactly the v1 shape old releases wrote: room/text/timestamps/job, no promotion fields.
+  const legacy = [
+    { version: "studio-capture-v1", id: captureId("Fiction", "an old fiction idea"), room: "Fiction", text: "an old fiction idea", createdAt: "2026-08-01T00:00:00.000Z", startedAt: null, jobId: null },
+    { version: "studio-capture-v1", id: captureId("Content", "https://example.com/old"), room: "Content", text: "https://example.com/old", createdAt: "2026-08-02T00:00:00.000Z", startedAt: "2026-08-02T00:00:01.000Z", jobId: "job-x" },
+    { version: "studio-capture-v1", id: captureId("Signals", "an old signal"), room: "Signals", text: "an old signal", createdAt: "2026-08-03T00:00:00.000Z", startedAt: null, jobId: null },
   ];
   const bytes = JSON.stringify(legacy, null, 2) + "\n";
   writeFileSync(captures, bytes);
-  assert.equal(listCaptures(captures).length, 3, "CAPTURE_VERSION is unchanged so v1 rows still read");
+  assert.equal(listCaptures(captures).length, 3, "v1 rows normalize into the current schema");
+  assert.ok(listCaptures(captures).every((capture) => capture.version === CAPTURE_VERSION && capture.promotion === null));
   const first = projectCaptureEvents(listCaptures(captures), queue);
   assert.equal(first.created, 3);
   assert.equal(readFileSync(captures, "utf8"), bytes, "the event log is immutable");

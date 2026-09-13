@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -296,7 +296,7 @@ test("POST attach-reviewed executes the real route and returns promoted reviewed
   }
 });
 
-test("Studio Start routes a Fiction capture into a durable inbox idea, no model job (item 4)", async () => {
+test("Studio Start routes a Fiction capture into a durable inbox idea and terminal capture state, no model job (item 4)", async () => {
   // The fiction idea store honors CONTENT_AGENTS_HOME but not NODE_TEST_CONTEXT, so isolate it
   // explicitly — otherwise this leaks into Muxin's real ~/.content-agents fiction inbox.
   const home = mkdtempSync(join(tmpdir(), "fiction-start-home-"));
@@ -317,7 +317,7 @@ test("Studio Start routes a Fiction capture into a durable inbox idea, no model 
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ room: "Fiction", text }),
     });
-    const body = await response.json() as { ok?: boolean; idea?: { id: string; series: string; rawText: string; status: string; classification: string; proposal: unknown }; job?: unknown; error?: string };
+    const body = await response.json() as { ok?: boolean; capture?: { id: string; promotedAt: string | null; promotion: { room: string; itemId: string } | null }; idea?: { id: string; series: string; rawText: string; status: string; classification: string; proposal: unknown }; job?: unknown; replayed?: boolean; error?: string };
     assert.equal(response.status, 200, body.error ?? "fiction start failed");
     assert.equal(body.ok, true);
     assert.equal(body.idea?.series, slug);
@@ -330,13 +330,71 @@ test("Studio Start routes a Fiction capture into a durable inbox idea, no model 
     assert.equal(body.idea?.classification, "clarify", "the idea stays unclassified; classification is a later Muxin step");
     assert.equal(body.idea?.proposal, null, "no cleanup proposal — the model cleanup path must not run on Start");
     assert.equal(jobStore.length, jobsBefore, "Fiction Start must not add a job to the store");
+    assert.deepEqual(body.capture?.promotion, { room: "Fiction", itemId: body.idea?.id });
+    assert.ok(body.capture?.promotedAt, "the response reflects the durable terminal capture state");
     // Durable: it is readable from the inbox store afterward, not just in the response.
     const stored = listIdeas(slug, home);
     assert.ok(stored.some((idea) => idea.rawText === text), "the idea persisted to the inbox store");
+    const reloaded = await fetch(`http://127.0.0.1:${address.port}/api/captures`);
+    const reloadBody = await reloaded.json() as { captures?: Array<{ id: string; promotion: { room: string; itemId: string } | null }> };
+    assert.deepEqual(reloadBody.captures?.find((capture) => capture.id === body.capture?.id)?.promotion,
+      { room: "Fiction", itemId: body.idea?.id }, "a Home reload reads the promoted state from disk");
+
+    const replayResponse = await fetch(`http://127.0.0.1:${address.port}/api/captures/start`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ room: "Fiction", text }),
+    });
+    const replay = await replayResponse.json() as typeof body;
+    assert.equal(replayResponse.status, 200, replay.error ?? "fiction replay failed");
+    assert.equal(replay.capture?.id, body.capture?.id);
+    assert.equal(replay.idea?.id, body.idea?.id);
+    assert.deepEqual(replay.capture?.promotion, body.capture?.promotion);
+    assert.equal(replay.replayed, true, "the route reports convergence on the existing room item");
+    assert.equal(listIdeas(slug, home).filter((idea) => idea.rawText === text).length, 1, "a replay creates no duplicate idea");
   } finally {
     await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
     if (priorHome === undefined) delete process.env.CONTENT_AGENTS_HOME; else process.env.CONTENT_AGENTS_HOME = priorHome;
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("a Fiction promotion failure after capture save stays visibly retryable until the durable idea succeeds", async () => {
+  const root = mkdtempSync(join(tmpdir(), "fiction-start-failure-"));
+  const blockedHome = join(root, "not-a-directory");
+  const usableHome = join(root, "home");
+  writeFileSync(blockedHome, "blocks the idea store");
+  const priorHome = process.env.CONTENT_AGENTS_HOME;
+  process.env.CONTENT_AGENTS_HOME = blockedHome;
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const base = `http://127.0.0.1:${address.port}`;
+    const text = `A failed Fiction promotion remains honest. ${Date.now()}`;
+    const failed = await fetch(`${base}/api/captures/start`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ room: "Fiction", text }),
+    });
+    assert.equal(failed.status, 400, "the durable idea write must fail against a non-directory home");
+    const afterFailure = await fetch(`${base}/api/captures`).then((response) => response.json()) as {
+      captures?: Array<{ id: string; text: string; promotion: unknown; promotedAt: string | null }>;
+    };
+    const retryable = afterFailure.captures?.find((capture) => capture.text === text);
+    assert.ok(retryable, "the saved capture remains listed for retry");
+    assert.equal(retryable?.promotion, null);
+    assert.equal(retryable?.promotedAt, null);
+
+    process.env.CONTENT_AGENTS_HOME = usableHome;
+    const retried = await fetch(`${base}/api/captures/start`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ room: "Fiction", text }),
+    });
+    const body = await retried.json() as { ok?: boolean; error?: string; capture?: { promotion: unknown }; idea?: { rawText: string } };
+    assert.equal(retried.status, 200, body.error ?? "retry after restoring the idea store failed");
+    assert.equal(body.idea?.rawText, text);
+    assert.ok(body.capture?.promotion, "only the successful durable idea attempt terminates the capture");
+  } finally {
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+    if (priorHome === undefined) delete process.env.CONTENT_AGENTS_HOME; else process.env.CONTENT_AGENTS_HOME = priorHome;
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -357,6 +415,47 @@ test("the initial GUI Content save derives source authority on the server", () =
   const route = source.slice(start, end);
   assert.match(route, /authorizeGuiContentRequest\(folder, input, existing\)/);
   assert.doesNotMatch(route, /:\s*input\s*;/, "fresh client input must not be persisted as source authority");
+});
+
+test("POST /api/content/request rejects an unknown platform before persistence or dispatch", async () => {
+  const slug = `.test-content-selection-${process.pid}-${Date.now()}`;
+  const folder = join(process.cwd(), "content", slug);
+  const lens = "selection-boundary";
+  mkdirSync(join(folder, "cuts", lens), { recursive: true });
+  writeFileSync(join(folder, "source.md"), "---\ntitle: Selection boundary\ncanonical_url: https://www.humaninference.ai/p/selection-boundary\n---\n\nApproved body.\n");
+  writeFileSync(join(folder, "cuts", lens, "cut.md"), "---\nsource_lines: [6]\n---\n\nApproved body.\n");
+  writeFileSync(join(folder, "review-queue.md"), "# Review queue\n");
+  const jobsBefore = jobStore.length;
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/content/request`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        slug,
+        request: {
+          id: slug, origin: "human-inference", descriptor: "Selection boundary", originalInput: "Approved body.",
+          treatments: ["summary"], media: ["image"], platforms: ["quote-card"],
+          sourceProvenance: { kind: "approved-cut", lens, sourceLines: [999] },
+        },
+      }),
+    });
+    const body = await response.json() as { ok?: boolean; error?: string };
+
+    assert.equal(response.status, 400);
+    assert.equal(body.ok, false);
+    assert.match(body.error ?? "", /platforms\[0\].*unknown.*quote-card/i);
+    assert.equal(existsSync(join(folder, "content-request.json")), false);
+    assert.equal(existsSync(join(folder, "derivatives")), false);
+    assert.equal(existsSync(join(folder, "media-stages")), false);
+    assert.equal(jobStore.length, jobsBefore, "a rejected Content request must not queue generation or reach a provider path");
+  } finally {
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 test("approval writes status without dispatching through a scheduler", () => {

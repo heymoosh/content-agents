@@ -104,17 +104,24 @@ covered; audit complete; final gate prerequisites closed.
 Gate cost: focused tests expected under one minute; `npm run check` runtime unknown, once on the
 audit-cleared frozen candidate.
 
-Closeout gate: record `PASS` or exact leftovers. Hygiene and read-set use the binding forms verbatim.
+**PASS — 2026-09-13.** Persisted promotion lifecycle, retry/replay browser proof, bounded independent
+audit, and detached repository-wide gate are complete; no slice leftover.
+Hygiene reviewed: every 8H repository path is in this commit; the session-created frozen checkout
+and audit bundle were deleted; pre-existing merged branches `slice-6m-worker` and `slice-6s-worker`
+were named and left untouched.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## RESULT BLOCK
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action:
-- Usage:
+- Changed paths: capture/room/route/page source and tests plus `e2e/pass-b-writes.ts`.
+- Outcome: durable idempotent promotion is mutually exclusive with job start; promoted captures
+  disappear from waiting after reload while failed promotions remain retryable.
+- Checks: focused aggregate 402/402, typecheck and diff check PASS.
+- Audit: Grok 4.5 PASS, no established defects.
+- Frozen proof: snapshot `39178fb`; real B-writes 11/11, 0 failed/blocked; shared tree unchanged;
+  `npm run check` 4,585/4,585.
+- Unresolved: none in slice.
+- Delivery: accepted for coordinator commit.
+- Usage: unavailable.
 
 ## Usage budget and handoff
 
@@ -125,4 +132,4 @@ Closeout gate: record `PASS` or exact leftovers. Hygiene and read-set use the bi
 
 ## Stopped
 
-Not stopped.
+Not applicable; accepted 2026-09-13.

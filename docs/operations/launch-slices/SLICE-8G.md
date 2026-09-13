@@ -110,17 +110,23 @@ audit complete; final gate prerequisites closed.
 Gate cost: focused tests expected under one minute; `npm run check` runtime unknown and runs once on the
 audit-cleared frozen candidate.
 
-Closeout gate: record `PASS` or exact leftovers. Hygiene and read-set use the binding forms verbatim.
+**PASS — 2026-09-13.** Strict write validation, legacy-safe reads, bounded independent audit,
+detached Chromium regression, and repository-wide gate are complete; no slice leftover.
+Hygiene reviewed: every 8G repository path is in this commit; the session-created frozen checkout
+and audit bundle were deleted; pre-existing merged branches `slice-6m-worker` and `slice-6s-worker`
+were named and left untouched.
 
-## RESULT BLOCK (worker fills this in and returns it)
+## RESULT BLOCK
 
-- Changed paths:
-- Outcome:
-- Checks run and results:
-- Evidence locations:
-- Unresolved:
-- Delivery state and next action:
-- Usage:
+- Changed paths: owned request/store/tests plus shared Studio/route regression hunks.
+- Outcome: server-owned vocabulary rejects malformed new selections before write or dispatch while
+  recognized legacy community destinations remain readable without rewriting bytes.
+- Checks: focused suites 21/21, 61/61, 33/33 and 5/5; HTTP no-write regression PASS.
+- Audit: Grok 4.5 PASS, no established defects.
+- Frozen proof: snapshot `39178fb`; B-writes 11/11; `npm run check` 4,585/4,585.
+- Unresolved: none in slice.
+- Delivery: accepted for coordinator commit.
+- Usage: unavailable.
 
 ## Usage budget and handoff
 
@@ -131,4 +137,4 @@ Closeout gate: record `PASS` or exact leftovers. Hygiene and read-set use the bi
 
 ## Stopped
 
-Not stopped.
+Not applicable; accepted 2026-09-13.

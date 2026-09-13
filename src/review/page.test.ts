@@ -2412,6 +2412,14 @@ function captureMirror(): { classifyCapture: CaptureFn; captureVerdict: VerdictF
   };
 }
 
+function captureSummaryMirror(): (capture: { room: string; text: string; promotion?: unknown } | null) => unknown {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function captureHandoffSummary(");
+  const end = script.indexOf("function setCaptureSubmitting(", start);
+  assert.ok(start > -1 && end > start, "the capture summary helper must reach the browser");
+  return new Function(script.slice(start, end) + "\nreturn captureHandoffSummary;")() as ReturnType<typeof captureSummaryMirror>;
+}
+
 // [text, expected room]. The precedence cases are the point: each one matches more than one rule.
 const CAPTURE_ROOM_VECTORS: [string, string][] = [
   ["Charles should reply to this absurd claim", "Charles"], // explicit persona beats Outreach's "reply to"
@@ -2465,7 +2473,7 @@ test("classifyCapture: empty text classifies as empty, not as Content", () => {
 
 test("captureHandoffSummary: a saved capture is an explicit next action in its owning room", async () => {
   const { captureHandoffSummary } = await import("./page.js") as unknown as {
-    captureHandoffSummary?: (capture: { room: string; text: string } | null) => unknown;
+    captureHandoffSummary?: (capture: { room: string; text: string; promotion?: unknown } | null) => unknown;
   };
   assert.equal(typeof captureHandoffSummary, "function");
   if (!captureHandoffSummary) return;
@@ -2478,6 +2486,9 @@ test("captureHandoffSummary: a saved capture is an explicit next action in its o
     action: "Open",
   });
   assert.equal(captureHandoffSummary(null), null);
+  const promoted = { room: "Fiction", text: "Elias finally tells the truth.", promotion: { room: "Fiction", itemId: "idea-one" } };
+  assert.equal(captureHandoffSummary(promoted), null, "a durable room item is no longer waiting on Home");
+  assert.equal(captureSummaryMirror()(promoted), null, "the rendered browser helper hides the same promoted capture after reload");
 });
 
 test("classifyCapture mirror: the browser copy answers identically on every vector (Rule 5)", () => {
@@ -2659,7 +2670,9 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(routeBody.includes('/api/captures'), "routing persists through the server");
   assert.ok(routeBody.includes('advanceCaptureSafely(room,t)'), "the top-level action must advance after its durable save");
   const studioRender = script.slice(script.indexOf("function renderStudio()"), script.indexOf("function renderTeamRail", script.indexOf("function renderStudio()")));
-  assert.ok(studioRender.includes("SERVER_CAPTURES.map(captureHandoffSummary)"), "Studio needs-you reads the repository-backed captures");
+  assert.ok(studioRender.includes("SERVER_CAPTURES.map(captureHandoffSummary)"), "Studio needs-you reads the repository-backed captures through the terminal-state filter");
+  const roomHandoff = section.slice(section.indexOf("function renderCaptureHandoff()"), section.indexOf("async function routeCapture()"));
+  assert.ok(roomHandoff.includes("captureHandoffSummary(c)"), "room handoff cards use the same persisted terminal-state filter as Home");
 });
 
 test("Studio capture copy: no em dashes and every classified build names its safe next gate", () => {

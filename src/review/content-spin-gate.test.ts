@@ -226,7 +226,7 @@ test("SLICE-5D: a no-source-essay origin (Venture) is never spun and never force
   writeFileSync(join(folder, "routing.md"), "| linkedin | include |\n");
   const configured = buildContentRequest({
     id: slug, origin: "venture", ventureId: "v1", descriptor: "Venture scoped exception",
-    originalInput: "Careful operators need a smaller first step.", treatments: ["shorter"], platforms: ["linkedin"], media: [], includeUntreatedControl: true,
+    originalInput: "Careful operators need a smaller first step.", treatments: ["shorter-version"], platforms: ["linkedin"], media: [], includeUntreatedControl: true,
     ventureSource: {
       artifactId: "p1", phase: 1, artifactKind: "text-post-note", messageId: "m1", bodyPath: "phase-1/p1.md",
       claimRefs: [{ claim: "Careful operators need a smaller first step.", ref: "intake:q4" }],

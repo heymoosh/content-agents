@@ -7,11 +7,13 @@ import type { CaptureRoom, StudioCapture } from "./captures.js";
 /**
  * Room-owned queue projections over the capture event log (decision 11, slice 1.5a).
  *
- * `studio-captures.json` (captures.ts) is the immutable front door: one content-idempotent event
- * per room + trimmed text, holding only room/text/timestamps/job. Everything a room learns about a
- * capture afterwards (which venture, which fiction idea, which Charles group, where it sits in the
- * room's lifecycle) lives HERE, keyed by the capture id, so the raw event never needs a schema bump
- * and `captureId` derivation stays stable for crash-retry convergence.
+ * `studio-captures.json` (captures.ts) is the stable front door: one content-idempotent record per
+ * room + trimmed text, whose derived `captureId` and original provenance do not change. It may also
+ * carry exactly one durable linkage terminal: either a started job (`startedAt`/`jobId`) or a
+ * promoted room item (`promotedAt`/`promotion`), never both. Capture schema versions can evolve
+ * without changing that identity. Everything room-specific afterwards (which venture, which
+ * fiction idea, which Charles group, and where it sits in the room's lifecycle) lives HERE, keyed
+ * by the stable capture id for crash-retry convergence.
  *
  * Later slices extend a room's payload interface below (Venture candidates + answer version,
  * Charles per-output status) without touching the shared item shape or the count semantics.
@@ -245,10 +247,11 @@ export function mutateQueueItem<P extends RoomQueuePayload>(
 }
 
 /**
- * Migration, explicit and idempotent: every capture event without a projection gets one. Legacy
- * `studio-captures.json` rows (pre-projection) are read as-is and never rewritten; their lifecycle
- * starts from `initialQueueState` and their payload from `payloadFor` (default: unlinked). Safe to
- * run on every read.
+ * Migration, explicit and idempotent: every capture record without a projection gets one. Legacy
+ * `studio-captures.json` rows are normalized by captures.ts without a read-time rewrite, and this
+ * projection never writes the capture store. A new projection's room lifecycle starts from
+ * `initialQueueState` and its payload from `payloadFor` (default: unlinked); later room lifecycle
+ * remains owned by this queue rather than being re-derived from capture linkage. Safe on every read.
  */
 export function projectCaptureEvents(
   captures: readonly StudioCapture[],

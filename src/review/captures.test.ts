@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { captureId, captureJobId, listCaptures, markCaptureStarted, saveCapture } from "./captures.js";
+import { CAPTURE_VERSION, captureId, captureJobId, listCaptures, markCapturePromoted, markCaptureStarted, saveCapture } from "./captures.js";
 
 test("captures are durable, repository-shaped, and idempotent by room plus exact trimmed input", () => {
   const path = join(mkdtempSync(join(tmpdir(), "captures-")), "data", "captures.json");
@@ -58,6 +58,53 @@ test("starting a capture binds one real job id and replay cannot replace it", ()
   assert.equal(started.jobId, "job-1");
   assert.ok(started.startedAt);
   assert.equal(markCaptureStarted(capture.id, "job-2", path).jobId, "job-1");
+});
+
+test("a legacy capture migrates on promotion and the same named room item is an idempotent terminal state", () => {
+  const root = mkdtempSync(join(tmpdir(), "captures-promote-"));
+  const path = join(root, "captures.json");
+  const id = captureId("Fiction", "a legacy beat");
+  const legacy = [{
+    version: "studio-capture-v1", id, room: "Fiction", text: "a legacy beat",
+    createdAt: "2026-08-01T00:00:00.000Z", startedAt: null, jobId: null,
+  }];
+  const legacyBytes = JSON.stringify(legacy, null, 2) + "\n";
+  writeFileSync(path, legacyBytes);
+
+  const loaded = listCaptures(path)[0]!;
+  assert.equal(loaded.version, CAPTURE_VERSION);
+  assert.equal(loaded.promotion, null);
+  assert.equal(loaded.promotedAt, null);
+  assert.equal(readFileSync(path, "utf8"), legacyBytes, "a read alone does not rewrite operational data");
+
+  const target = { room: "Fiction", itemId: "idea-a" } as const;
+  const promoted = markCapturePromoted(id, target, path);
+  assert.deepEqual(promoted.promotion, target);
+  assert.ok(promoted.promotedAt);
+  assert.equal(promoted.jobId, null, "promotion does not fabricate a model job");
+  assert.equal(promoted.startedAt, null, "promotion is distinct from job start");
+  assert.equal(JSON.parse(readFileSync(path, "utf8"))[0].version, CAPTURE_VERSION, "the first write durably migrates the row");
+
+  const promotedBytes = readFileSync(path, "utf8");
+  assert.deepEqual(markCapturePromoted(id, target, path), promoted);
+  assert.equal(readFileSync(path, "utf8"), promotedBytes, "an identical replay is byte-for-byte a no-op");
+  assert.deepEqual(saveCapture("Fiction", " a legacy beat ", path), promoted, "a duplicate save preserves the terminal state");
+});
+
+test("promotion and job-start states refuse to overwrite or contradict one another", () => {
+  const path = join(mkdtempSync(join(tmpdir(), "captures-exclusive-")), "captures.json");
+  const promoted = saveCapture("Fiction", "promote me", path);
+  markCapturePromoted(promoted.id, { room: "Fiction", itemId: "idea-one" }, path);
+  const promotedBytes = readFileSync(path, "utf8");
+  assert.throws(() => markCapturePromoted(promoted.id, { room: "Fiction", itemId: "idea-two" }, path), /different room item/);
+  assert.throws(() => markCaptureStarted(promoted.id, "job-impossible", path), /already promoted/);
+  assert.equal(readFileSync(path, "utf8"), promotedBytes, "refused transitions write nothing");
+
+  const started = saveCapture("Content", "start me", path);
+  markCaptureStarted(started.id, "job-one", path);
+  const startedBytes = readFileSync(path, "utf8");
+  assert.throws(() => markCapturePromoted(started.id, { room: "Content", itemId: "item-impossible" }, path), /already started/);
+  assert.equal(readFileSync(path, "utf8"), startedBytes, "a started capture remains bound to its original job");
 });
 
 test("concurrent processes serialize capture creates without losing writers", async () => {

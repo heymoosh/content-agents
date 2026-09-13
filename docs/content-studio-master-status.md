@@ -4,11 +4,12 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
-- Current slice: **8F** credential boundary; packet: `docs/operations/launch-slices/SLICE-8F.md`.
+- Current slice: **8F** live credential cutover; packet: `docs/operations/launch-slices/SLICE-8F.md`.
 - Blocked on: Muxin provisions/rotates Bitwarden, provider and database credentials outside Codex,
   then attends `prepare-cutover` + `cutover`; nothing has been applied live.
-- Next dependency-ready: accepted 8G/8H integration, then the next recorded reliability batch.
-- Last accepted: **8E**; Postiz self-fetches stored public media after container recreation.
+- Next dependency-ready: select/authorize the next recorded reliability batch; 8F can resume only
+  at its attended human checkpoint.
+- Last accepted: **8G + 8H**; strict Content selections and truthful capture promotion lifecycle.
 - Last decision: use pinned Bitwarden UUIDs and a clean fixed-action launcher; never expose its
   machine token to Codex. Preparation and two Grok audits passed; live acceptance remains human.
 - Master: `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
@@ -143,6 +144,17 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-13 (8G + 8H accepted) — invalid selections stop; promoted captures leave waiting
+
+Content requests now use one server-owned Studio vocabulary: malformed platforms/media/treatments
+fail before persistence or dispatch, while exact legacy `community` destinations remain readable
+without byte rewrites. Fiction capture promotion now writes a durable, idempotent terminal link only
+after its idea/projection exists; retry converges on one idea, and promoted captures disappear from
+Home/room waiting after reload. Grok 4.5 audited the frozen 1,181-line candidate and passed both
+slices with no established defects. Detached snapshot `39178fb` passed the real B-writes browser
+journey 11/11 and the final repository gate 4,585/4,585. The checkout needed two fake, nonsecret
+`.env` keys because existing isolation tests intentionally reject vacuous fresh-worktree runs.
 
 ### 2026-09-13 (8F stopped at human checkpoint) — audited secret boundary is ready, not live
 

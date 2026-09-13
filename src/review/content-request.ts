@@ -5,6 +5,61 @@ export type ContentOrigin = "studio" | "fiction" | "charles" | "venture" | "huma
 export type SelectionKind = "treatment" | "media" | "platform";
 export type VariantKind = "control" | "treated";
 
+/** Server-owned labels and values rendered by the Content Studio configuration screen. */
+export const CONTENT_CONFIG_OPTIONS = {
+  treatment: [
+    ["cta", "CTA"], ["viral-rewrite", "Viral rewrite"], ["platform-framing", "Platform-specific framing"],
+    ["shorter-version", "Shorter version"], ["thread", "Thread"], ["counterpoint", "Counterpoint"],
+    ["summary", "Summary"], ["hook-variants", "Hook variants"], ["belief-shift", "Belief shift"],
+  ],
+  media: [
+    ["static-quote-card", "Static quote card"], ["animated-quote-card", "Animated quote card"],
+    ["image", "Image"], ["image-carousel", "Image carousel"], ["short-video-script", "Short-video script"],
+    ["video-caption-package", "Video transcript / caption package"], ["audiogram", "Audiogram / waveform clip"],
+  ],
+  platform: [
+    ["substack", "Substack"], ["linkedin", "LinkedIn"], ["x", "X"], ["bluesky", "Bluesky"],
+    ["mastodon", "Mastodon"], ["threads", "Threads"], ["instagram", "Instagram"],
+    ["tiktok", "TikTok"], ["youtube", "YouTube"],
+  ],
+} as const;
+
+/** Accepted request values. `none` is the explicit no-media value used by durable handoffs. */
+export const CONTENT_SELECTION_VOCABULARY = {
+  treatments: CONTENT_CONFIG_OPTIONS.treatment.map(([value]) => value),
+  media: [...CONTENT_CONFIG_OPTIONS.media.map(([value]) => value), "none"],
+  platforms: CONTENT_CONFIG_OPTIONS.platform.map(([value]) => value),
+} as const;
+
+interface SelectionVocabulary {
+  has(value: string): boolean;
+}
+
+interface ContentSelectionVocabularies {
+  readonly treatments: SelectionVocabulary;
+  readonly media: SelectionVocabulary;
+  readonly platforms: SelectionVocabulary;
+}
+
+const CONTENT_SELECTION_SETS: ContentSelectionVocabularies = {
+  treatments: new Set<string>(CONTENT_SELECTION_VOCABULARY.treatments),
+  media: new Set<string>(CONTENT_SELECTION_VOCABULARY.media),
+  platforms: new Set<string>(CONTENT_SELECTION_VOCABULARY.platforms),
+};
+
+const LEGACY_COMMUNITY_PLATFORM = /^community:[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const STORED_CONTENT_SELECTIONS: ContentSelectionVocabularies = {
+  treatments: CONTENT_SELECTION_SETS.treatments,
+  media: CONTENT_SELECTION_SETS.media,
+  platforms: {
+    has(value: string): boolean {
+      return CONTENT_SELECTION_SETS.platforms.has(value)
+        || value === "community"
+        || LEGACY_COMMUNITY_PLATFORM.test(value);
+    },
+  },
+};
+
 export interface RecommendationEvidence {
   readonly option: string;
   readonly kind: SelectionKind;
@@ -151,10 +206,14 @@ function required(value: unknown, field: string): string {
 
 const ORIGINS = new Set<ContentOrigin>(["studio", "fiction", "charles", "venture", "human-inference"]);
 
-function selections(value: readonly string[] | undefined, field: string, fallback: readonly string[] = []): string[] {
-  if (value === undefined) return [...fallback];
-  if (!Array.isArray(value)) throw new Error(`${field} must be an array`);
-  return [...new Set(value.map((item, index) => required(item, `${field}[${index}]`)))];
+function selections(value: readonly string[] | undefined, field: string, fallback: readonly string[] = [], vocabulary?: SelectionVocabulary): string[] {
+  if (value !== undefined && !Array.isArray(value)) throw new Error(`${field} must be an array`);
+  const source = value === undefined ? fallback : value;
+  return [...new Set(source.map((item, index) => {
+    const selection = required(item, `${field}[${index}]`);
+    if (vocabulary && !vocabulary.has(selection)) throw new Error(`${field}[${index}] is unknown: ${selection}`);
+    return selection;
+  }))];
 }
 
 function recommendations(evidence: readonly RecommendationEvidence[], kind: SelectionKind): Recommendation[] {
@@ -272,7 +331,7 @@ function experimentContext(value: ContentExperimentContextInput | null | undefin
   };
 }
 
-export function buildContentRequest(input: ContentRequestInput): ContentRequest {
+function assembleContentRequest(input: ContentRequestInput, selectionSets: ContentSelectionVocabularies): ContentRequest {
   const id = required(input.id, "id");
   if (!ORIGINS.has(input.origin)) throw new Error("origin is unknown");
   if (input.ventureSource != null && input.origin !== "venture") throw new Error("Venture source provenance requires a Venture origin");
@@ -289,9 +348,9 @@ export function buildContentRequest(input: ContentRequestInput): ContentRequest 
   // Omitted selections use evidence-backed recommendations. Supplied selections are
   // authoritative, including an explicit empty array (the user may deselect everything).
   const selected = {
-    treatments: selections(input.treatments, "treatments", recs.treatments.map((item) => item.option)),
-    media: selections(input.media, "media", recs.media.map((item) => item.option)),
-    platforms: selections(input.platforms, "platforms", recs.platforms.map((item) => item.option)),
+    treatments: selections(input.treatments, "treatments", recs.treatments.map((item) => item.option), selectionSets.treatments),
+    media: selections(input.media, "media", recs.media.map((item) => item.option), selectionSets.media),
+    platforms: selections(input.platforms, "platforms", recs.platforms.map((item) => item.option), selectionSets.platforms),
   };
   const controlEnabled = input.includeUntreatedControl !== false;
   const variants: ContentVariant[] = [];
@@ -308,6 +367,16 @@ export function buildContentRequest(input: ContentRequestInput): ContentRequest 
     ventureId: input.ventureId ?? null, ventureSource: ventureSource(input.ventureSource), sourceProvenance: sourceProvenance(input.sourceProvenance), sourceContext: sourceContext(input.sourceContext, input.origin), experiment: experimentContext(input.experiment, variants), selections: selected, recommendations: recs,
     control: { enabled: controlEnabled }, variants,
   };
+}
+
+/** Build a new request at a write/generation boundary, rejecting unknown selections. */
+export function buildContentRequest(input: ContentRequestInput): ContentRequest {
+  return assembleContentRequest(input, CONTENT_SELECTION_SETS);
+}
+
+/** Rebuild persisted requests while retaining recognized legacy community destinations. */
+export function rebuildStoredContentRequest(input: ContentRequestInput): ContentRequest {
+  return assembleContentRequest(input, STORED_CONTENT_SELECTIONS);
 }
 
 /** A configuration save may edit choices only; source identity/provenance stays server-owned. */

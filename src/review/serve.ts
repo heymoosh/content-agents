@@ -115,7 +115,7 @@ import { createIdea } from "../fiction/idea-inbox.js";
 import { loadFictionPromotionDraft } from "./fiction-promotion-draft.js";
 import { createApprovedCharlesHandoff } from "./charles-content-handoff-store.js";
 import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
-import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
+import { listCaptures, markCapturePromoted, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
 import { projectFictionCapture, syncFictionQueue } from "./fiction-queue.js";
 import { pendingCount, projectCaptureEvents, readQueueItem, roomQueueItems } from "./room-queue.js";
 import { syncCharlesQueue } from "./charles-queue.js";
@@ -1554,12 +1554,15 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           const series = listFictionSeries();
           if (series.length !== 1) throw new Error(series.length === 0 ? "no fiction series exists yet" : "more than one fiction series exists; open the Fiction room to choose one");
           const capture = saveCapture("Fiction", String(b.text ?? ""));
+          const replayed = capture.promotion !== null;
           // The idea records the capture id it was Started from, so a crash before the queue
           // projection below still leaves the two stores reconcilable by id (fiction-queue.ts).
           const idea = createIdea(series[0]!.slug, capture.text, { captureId: capture.id });
-          // The raw capture event stays as-is; the idea link and lifecycle live in the room queue.
+          // Projection is durable before the capture becomes terminal. A failure above or here leaves
+          // the capture honestly unpromoted; a retry converges through both idempotent stores.
           const queueItem = projectFictionCapture(capture, idea);
-          json(res, 200, { ok: true, capture, idea, queueItem, room: "Fiction", replayed: false });
+          const promotedCapture = markCapturePromoted(capture.id, { room: "Fiction", itemId: idea.id });
+          json(res, 200, { ok: true, capture: promotedCapture, idea, queueItem, room: "Fiction", replayed });
           return;
         }
         if (room === "Venture") {

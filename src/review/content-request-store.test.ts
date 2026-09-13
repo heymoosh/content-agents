@@ -159,6 +159,45 @@ describe("content request store", () => {
     assert.deepEqual(JSON.parse(await readFile(join(root, "content-request.json"), "utf8")), written);
   });
 
+  test("reads legacy community destinations without rewriting the stored request", async () => {
+    const root = await rootDir();
+    const path = join(root, "content-request.json");
+    const legacy = buildContentRequest(input);
+    const stored = JSON.stringify({
+      ...legacy,
+      selections: { ...legacy.selections, platforms: ["community", "community:democratic-resilience"] },
+    }, null, 2) + "\n";
+    await writeFile(path, stored);
+
+    const restored = await readContentRequest(root);
+
+    assert.deepEqual(restored.selections.platforms, ["community", "community:democratic-resilience"]);
+    assert.deepEqual([...new Set(restored.variants.map((variant) => variant.platform))], ["community", "community:democratic-resilience"]);
+    assert.equal(await readFile(path, "utf8"), stored);
+  });
+
+  test("rejects unknown selections in persisted requests without rewriting them", async () => {
+    for (const [field, selection] of [
+      ["treatments", "unknown-treatment"],
+      ["media", "not-supported"],
+      ["platforms", "quote-card"],
+      ["platforms", "community:"],
+      ["platforms", "community:bad/name"],
+    ] as const) {
+      const root = await rootDir();
+      const path = join(root, "content-request.json");
+      const request = buildContentRequest(input);
+      const stored = JSON.stringify({
+        ...request,
+        selections: { ...request.selections, [field]: [selection] },
+      }, null, 2) + "\n";
+      await writeFile(path, stored);
+
+      await assert.rejects(() => readContentRequest(root), new RegExp(`${field}\\[0\\].*unknown`, "i"));
+      assert.equal(await readFile(path, "utf8"), stored);
+    }
+  });
+
   test("preserves Venture source and approval provenance across persistence", async () => {
     const root = await rootDir();
     const ventureInput: ContentRequestInput = {

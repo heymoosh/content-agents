@@ -13,6 +13,7 @@ import {
 // CLAUDE.md rule 7) the first time the two drifted.
 import { INTAKE_QUESTIONS } from "../venture/intake.js";
 import { JOB_COLORS, jobRoom, type JobView } from "./studio-job-ui.js";
+import { CONTENT_CONFIG_OPTIONS } from "./content-request.js";
 export {
   formatElapsed,
   ANSWERED_FOOTER,
@@ -160,14 +161,14 @@ export function workbenchJobTarget(
   return slug && sessions.some((session) => session.slug === slug) ? slug : null;
 }
 
-export type CaptureHandoff = { room: string; text: string; id?: string };
+export type CaptureHandoff = { room: string; text: string; id?: string; promotion?: { room: string; itemId: string } | null };
 
 // A capture remains an inbox item until Muxin chooses Start on it. That action may prepare a
 // build-specific human gate, but never approves, schedules, or publishes.
 export function captureHandoffSummary(capture: CaptureHandoff | null): {
   room: string; label: string; text: string; detail: string; action: string;
 } | null {
-  if (!capture?.text.trim() || !capture.room.trim()) return null;
+  if (!capture?.text.trim() || !capture.room.trim() || capture.promotion) return null;
   return {
     room: capture.room.toLowerCase(),
     label: capture.room,
@@ -3062,22 +3063,7 @@ function readsFromCells(t, cuts){
 
 const CW_STEPS = [["1","Pick a source"],["2","Review the treatment"],["3","Approve the drafts"],["4","Publish"]];
 const CW_TAGCLASS = { "SUBSTACK":"substack", "YOURS":"yours", "READ IN":"readin" };
-const CONTENT_CONFIG_OPTIONS = {
-  treatment: [
-    ["cta","CTA"],["viral-rewrite","Viral rewrite"],["platform-framing","Platform-specific framing"],
-    ["shorter-version","Shorter version"],["thread","Thread"],["counterpoint","Counterpoint"],
-    ["summary","Summary"],["hook-variants","Hook variants"],["belief-shift","Belief shift"],
-  ],
-  media: [
-    ["static-quote-card","Static quote card"],["animated-quote-card","Animated quote card"],
-    ["image","Image"],["image-carousel","Image carousel"],["short-video-script","Short-video script"],
-    ["video-caption-package","Video transcript / caption package"],["audiogram","Audiogram / waveform clip"],
-  ],
-  platform: [
-    ["substack","Substack"],["linkedin","LinkedIn"],["x","X"],["bluesky","Bluesky"],["mastodon","Mastodon"],
-    ["threads","Threads"],["instagram","Instagram"],["tiktok","TikTok"],["youtube","YouTube"],
-  ],
-};
+const CONTENT_CONFIG_OPTIONS = ${JSON.stringify(CONTENT_CONFIG_OPTIONS)};
 
 function contentRequestOrigin(s){
   const origin = String(s.origin||"").toLowerCase();
@@ -6903,7 +6889,7 @@ function captureVerdict(room){
 let linkAskUrl = null;          // the bare link the two-button ask is open on
 let captureSubmitting = false;  // the two Studio handoffs share one guard, so Enter cannot double-queue
 function captureHandoffSummary(capture){
-  if(!capture || !String(capture.text || "").trim() || !String(capture.room || "").trim()) return null;
+  if(!capture || !String(capture.text || "").trim() || !String(capture.room || "").trim() || capture.promotion) return null;
   const room = String(capture.room);
   return { room:room.toLowerCase(), label:room, text:"Capture waiting in "+room+".",
     detail:String(capture.text).trim().replace(/\\s+/g," ").slice(0,140), action:"Open" };
@@ -7034,7 +7020,7 @@ function renderCaptureHandoff(){
   for(const [room, id, label] of targets){
     const box = $("#"+id);
     if(!box) continue;
-    const captures = SERVER_CAPTURES.filter(c=>c.room===label);
+    const captures = SERVER_CAPTURES.filter(c=>c.room===label&&captureHandoffSummary(c));
     if(!captures.length || currentTab !== room){ box.hidden = true; box.innerHTML = ""; continue; }
     box.hidden = false;
     box.innerHTML = captures.map(capture=>'<div class="capture-handoff" data-capture-id="'+esc(capture.id)+'" style="border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:13px 15px;margin-top:14px">'+

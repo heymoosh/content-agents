@@ -1,12 +1,18 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildContentRequest,
+  CONTENT_CONFIG_OPTIONS,
+  CONTENT_SELECTION_VOCABULARY,
   mergeContentConfiguration,
   resolveContentCta,
   type ContentRequestInput,
   type LeadMagnet,
 } from "./content-request.js";
+import { writeContentRequest } from "./content-request-store.js";
 
 const base: ContentRequestInput = {
   id: "request-1",
@@ -56,6 +62,61 @@ describe("content request domain", () => {
     const request = buildContentRequest({ ...base, includeUntreatedControl: false });
     assert.equal(request.control.enabled, false);
     assert.equal(request.variants.every((variant) => variant.identity.kind === "treated"), true);
+  });
+
+  test("rejects unknown, blank, and wrong-type selections", () => {
+    for (const [field, value] of [
+      ["treatments", ["unknown-treatment"]],
+      ["media", ["unknown-media"]],
+      ["platforms", ["quote-card"]],
+    ] as const) {
+      assert.throws(
+        () => buildContentRequest({ ...base, [field]: value }),
+        new RegExp(`${field}\\[0\\].*unknown`, "i"),
+      );
+      assert.throws(
+        () => buildContentRequest({ ...base, [field]: [" "] }),
+        new RegExp(`${field}\\[0\\].*required`, "i"),
+      );
+      assert.throws(
+        () => buildContentRequest({ ...base, [field]: [42] } as unknown as ContentRequestInput),
+        new RegExp(`${field}\\[0\\].*required`, "i"),
+      );
+      assert.throws(
+        () => buildContentRequest({ ...base, [field]: "not-an-array" } as unknown as ContentRequestInput),
+        new RegExp(`${field}.*array`, "i"),
+      );
+    }
+    assert.throws(() => buildContentRequest({
+      ...base,
+      platforms: undefined,
+      recommendationEvidence: [{ option: "quote-card", kind: "platform", reason: "forged", source: "direct-api", recommended: true }],
+    }), /platforms\[0\].*unknown/i);
+  });
+
+  test("accepts every Studio option and the deliberate no-media value from the shared vocabulary", () => {
+    const treatments = CONTENT_CONFIG_OPTIONS.treatment.map(([value]) => value);
+    const media = CONTENT_CONFIG_OPTIONS.media.map(([value]) => value);
+    const platforms = CONTENT_CONFIG_OPTIONS.platform.map(([value]) => value);
+    const request = buildContentRequest({ ...base, treatments, media, platforms });
+    assert.deepEqual(request.selections, { treatments, media, platforms });
+    assert.deepEqual(CONTENT_SELECTION_VOCABULARY.media, [...media, "none"]);
+    assert.deepEqual(buildContentRequest({ ...base, media: ["none"] }).selections.media, ["none"]);
+  });
+
+  test("rejects malformed selections before persistence or later dispatch", async () => {
+    const root = await mkdtemp(join(tmpdir(), "content-request-vocabulary-"));
+    let dispatches = 0;
+    try {
+      await assert.rejects(async () => {
+        await writeContentRequest(root, { ...base, platforms: ["quote-card"] });
+        dispatches += 1;
+      }, /platforms\[0\].*unknown/i);
+      await assert.rejects(() => readFile(join(root, "content-request.json"), "utf8"), { code: "ENOENT" });
+      assert.equal(dispatches, 0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   test("accepts Venture provenance only on a Venture-owned request", () => {

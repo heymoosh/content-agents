@@ -1,7 +1,7 @@
 import { lstat, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { buildContentRequest, mergeContentConfiguration, type ContentRequest, type ContentRequestInput, type RecommendationEvidence } from "./content-request.js";
+import { buildContentRequest, mergeContentConfiguration, rebuildStoredContentRequest, type ContentRequest, type ContentRequestInput, type RecommendationEvidence } from "./content-request.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { extractSourceLines } from "./develop.js";
 import { readReviewedMechanismRecommendations } from "./reviewed-mechanism-recommendations.js";
@@ -151,7 +151,7 @@ export async function authorizeGuiContentRequest(contentRoot: string, input: Con
   }, cut.body, true);
 }
 
-/** Read and rebuild a persisted request, applying the same domain validation as writes. */
+/** Read and structurally rebuild a request without migrating recognized legacy community destinations. */
 export async function readContentRequest(contentRoot: string): Promise<ContentRequest> {
   const { root, target } = await targetPath(contentRoot);
   const details = await lstat(target);
@@ -163,7 +163,7 @@ export async function readContentRequest(contentRoot: string): Promise<ContentRe
   try { parsed = JSON.parse(await readFile(target, "utf8")); }
   catch { throw new Error("content request file is not valid JSON"); }
   if (!parsed || typeof parsed !== "object") throw new Error("content request file must contain an object");
-  return buildContentRequest(inputFromStored(parsed as ContentRequest));
+  return rebuildStoredContentRequest(inputFromStored(parsed as ContentRequest));
 }
 
 export class ContentRequestStore {
