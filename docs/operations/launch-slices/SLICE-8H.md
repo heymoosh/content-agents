@@ -36,6 +36,7 @@ rewrite is permitted.
 - `src/review/captures.test.ts`
 - smallest exact Fiction/room promotion call-site module and focused test
 - smallest exact Home capture rendering/filter module and focused test, only if separate
+- `e2e/pass-b-writes.ts` (only the promoted-capture browser journey)
 
 Shared-file handoff: `src/review/page.ts` transfers from 8G to 8H only after the coordinator receives
 8G's frozen RESULT BLOCK. Existing disjoint 8H hunks are retained; no worker reverts either candidate.
@@ -74,6 +75,7 @@ assert exact idea exists and capture is absent from waiting, while a failed prom
 
 ```sh
 npx tsx --test src/review/captures.test.ts src/review/room-queue.test.ts
+npm run test:e2e -- B-writes
 ```
 
 ## Observable result
