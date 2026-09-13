@@ -5,12 +5,12 @@
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
 - Current slice: **8E**, `docs/operations/launch-slices/SLICE-8E.md`; owner-authorized to finish.
-- Blocked on: apply the proven Postiz DNS + local-CA compose repair, then recreate and verify.
+- Blocked on: explicit approval to send SLICE-8E's bounded private evidence to Grok for audit.
 - Next dependency-ready slice: none beyond 8E; do not revive historical checklist text.
 - Last accepted: **8B**; Postiz and public Bluesky both prove the first approved media row live.
 - Accepted result: four cards scheduled, Bluesky live; 8C/8D remain accepted at `3110d6e`.
-- Last decision: durable self-fetch repair; retain all three later provider ids and create no copies.
-- Details: `## Progress log` -> 2026-09-12 (8E authorized). Below is history; read only cited headings.
+- Last decision: keep the frozen repair unapplied until required cross-family review can run.
+- Details: `## Progress log` -> 2026-09-12 (8E review-blocked). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -125,6 +125,20 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (8E review-blocked) — frozen repair is proven locally and remains unapplied
+
+The four-line compose candidate is frozen at `bea8bfa7`: host-gateway mapping, the existing local
+CA mounted read-only, and `NODE_EXTRA_CA_CERTS` pointing at it. Compose validation passed. A
+disposable container on the production network fetched the exact stored PNG as HTTP 200,
+`image/png`, 5,930 bytes. A read-only database baseline found the three later provider ids exactly
+once, queued at their recorded times, with stable content/media hashes and no errors.
+
+The required Grok audit did not start. The sandbox reviewer correctly rejected sending private
+deployment details to an external model without Muxin's specific approval for that payload and
+destination. No same-family review was substituted and the live compose/service was not changed.
+Resume at the bounded audit after Muxin explicitly authorizes that export; then apply once, prove
+live health/DNS/fetch, and compare the three exact objects to the frozen baseline.
 
 ### 2026-09-12 (8E authorized) — repair Postiz self-fetch without replacing scheduled rows
 
