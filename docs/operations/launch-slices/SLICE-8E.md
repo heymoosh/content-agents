@@ -30,7 +30,7 @@ cancel, or create request is authorized by this packet.
 
 ## Owned files
 
-Parallel-safe: no — the implementation is one three-line compose contract whose validation depends
+Parallel-safe: no — the implementation is one four-line compose contract whose validation depends
 on the exact candidate and whose live proof depends on the recreated service. A second builder
 would repeat the same external-deployment context without an independent deliverable. Audit and
 live readback wait for a frozen candidate.
@@ -60,14 +60,14 @@ none
 
 ## Acceptance
 
-- [ ] The Postiz service maps `postiz-threads.meta` to Docker's host gateway.
-- [ ] The local CA is mounted read-only and `NODE_EXTRA_CA_CERTS` points at that mounted certificate.
+- [x] The Postiz service maps `postiz-threads.meta` to Docker's host gateway.
+- [x] The local CA is mounted read-only and `NODE_EXTRA_CA_CERTS` points at that mounted certificate.
 - [x] `docker compose config -q` accepts the frozen compose candidate without printing secrets.
 - [x] A disposable container on the production network fetches the exact uploaded public PNG as
   HTTP 200 `image/png` before the live service changes.
-- [ ] The recreated Postiz service becomes healthy and resolves the hostname away from loopback.
-- [ ] The recreated live container fetches that exact URL as HTTP 200 `image/png`.
-- [ ] LinkedIn, Instagram, and Facebook retain the same stable provider ids, planned times, media,
+- [x] The recreated Postiz service becomes healthy and resolves the hostname away from loopback.
+- [x] The recreated live container fetches that exact URL as HTTP 200 `image/png`.
+- [x] LinkedIn, Instagram, and Facebook retain the same stable provider ids, planned times, media,
   and scheduled state; no duplicate provider object appears.
 
 ## Verify
@@ -91,11 +91,15 @@ the three later image rows remain the same scheduled provider objects rather tha
 
 high — audit required: yes; a wrong DNS/TLS or compose change can strand scheduled media or expose
 secrets, while a mistaken recovery can duplicate posts.
-Review boundary: the three-line external compose diff plus bounded command outputs and three-object
+Review boundary: the four-line external compose diff plus bounded command outputs and three-object
 readback; never the external compose contents or credentials.
 Review scope/budget: ordinary-effort Grok audit after the candidate is frozen, then a delta audit
 only if a material finding changes the candidate. One live recreation; no provider retry budget
 because this slice makes no provider mutation.
+Audit result: Grok 4.5 ACCEPT. It found no candidate defect. Its three named verification gaps were
+the planned post-recreation health/DNS/fetch, exact object comparison, and no-mutation checks; all
+were closed with direct observable evidence before acceptance. The candidate never changed, so no
+delta audit was needed.
 Prior accepted evidence: SLICE-8B's public Bluesky proof and stable-id retry establish the defect
 and exact uploaded URL. Reopen only if the URL, compose diff, or scheduled object identities change.
 On reviewer outage: leave the compose candidate unapplied or the applied runtime review-blocked;
@@ -114,38 +118,46 @@ application; provider objects are read-only throughout.
 Gate cost: one compose validation, one disposable preflight fetch, one service recreation, one live
 fetch and one object readback. No repository-wide gate because repository runtime source is unchanged.
 
-Leftover list, 2026-09-12: explicit owner authorization to export the bounded private deployment
-evidence to Grok; then audit acceptance, live compose application, health/DNS/fetch proof, and the
-three-object identity readback. The live compose and services remain unchanged.
+**PASS** 2026-09-12. The applied external compose is byte-identical to audited candidate
+`bea8bfa7`. Only `postiz` and `postiz-https` were recreated; the database, Redis, Temporal, named
+volumes, uploaded media, and provider objects were untouched. Postiz is healthy, resolves the
+hostname away from loopback, and fetches the exact stored PNG as HTTP 200 `image/png`, 5,930 bytes.
+The three scheduled rows match their frozen baseline exactly and each matching object count is one.
 
 Hygiene, 2026-09-12: `bash scripts/repo-hygiene.sh --rescue` was run and its output reviewed. It
-listed only this session's two documentation edits, both committed in the stopped-handoff commit,
-and the pre-existing merged branches `slice-6m-worker` and `slice-6s-worker`, which were left in
-place. Its attempted snapshot could not write a Git tree under the active sandbox; the subsequent
-coordinator commit is the durable rescue. No other path was listed or changed.
+listed this session's master, packet, and packet-log edits; all are committed in the acceptance
+commit. It also listed the pre-existing merged branches `slice-6m-worker` and `slice-6s-worker`,
+which were left in place. Its sandboxed snapshot could not write a Git tree, so the coordinator
+commit is the durable rescue. The external Postiz repository was already dirty; this session's
+four-line compose hunk remains applied alongside, but does not absorb or commit, its earlier work.
+The byte-exact before/candidate files and audit bundle remain under `/private/tmp/content-agents-slice-8e*`.
 
-Closeout read set: protocol section 24,560 B; master `START HERE` 872 B; packet 9,727 B before this
-measurement line. All are within their 24,576 B / 12,288 B caps.
+Closeout read set: protocol section 24,560 B; master `START HERE` 885 B; packet 9,423 B before this
+measurement entry. All are within the 24,576 B / 12,288 B caps.
 
 ## RESULT BLOCK (worker fills this in and returns it)
 
-- Changed paths: `/private/tmp/content-agents-slice-8e/docker-compose.yaml` only; the live external
-  compose stayed at SHA-256 `4220f43c97c7a0d320e4bfde8b093d578652176e408e2e28d3fdbf5181664f88`.
-- Outcome: frozen candidate `bea8bfa7fdcbbc445d0fef278da3f5c64f62e34744bf339099a5afa2c654b982`
-  adds only the host-gateway mapping, read-only CA mount, and Node CA path.
+- Changed paths: `/Users/Muxin/Documents/Codex/postiz-docker-compose/docker-compose.yaml` plus this
+  packet, its log, and the master status. The external compose moved from source `4220f43c` to
+  audited candidate `bea8bfa7`; a byte-exact rollback copy remains in the slice temp directory.
+- Outcome: Postiz now self-fetches its stored public media URL through the host gateway with the
+  existing local CA trusted by Node. The three later approved media rows remain unchanged.
 - Checks run and results: structural red/green passed; four added lines and zero deletions;
   `docker compose config -q` exit 0; exact disposable fetch exit 0, HTTP 200, `image/png`, 5,930
-  bytes. Pre-change live DNS/fetch reproduced `127.0.0.1:4443` refusal. Read-only database baseline
-  found all three target ids once, `QUEUE`, at their recorded times, with stable content/media
-  hashes and no error.
+  bytes. Pre-change live DNS/fetch reproduced `127.0.0.1:4443` refusal. Post-change: container
+  `running healthy`, trust env present, CA mount read-only, hostname non-loopback, same exact fetch
+  200/PNG/5,930. LinkedIn, Instagram, and Facebook retained exact ids, `QUEUE` states, times,
+  groups, content hashes, media hashes/byte counts, no-error flags, and match counts of one.
 - Evidence locations: frozen candidate and
-  `/private/tmp/content-agents-slice-8e-audit/evidence.txt`; no secrets are in the audit bundle.
-- Unresolved: Grok did not start. The sandbox reviewer rejected export of private deployment
-  evidence because this session lacks the owner's specific authorization for that external
-  destination. No same-family audit was substituted.
-- Delivery state and next action: built and locally verified, review-blocked, not applied. Muxin
-  must explicitly authorize sending the bounded audit bundle to Grok; then resume at the audit.
-- Usage: local checks under one minute each; model call did not start; provider usage unknown.
+  `/private/tmp/content-agents-slice-8e-audit/evidence.txt`; the saved verdict is
+  `/private/tmp/content-agents-slice-8e-audit/grok-transcript.md`. No secrets entered the bundle.
+  Grok 4.5 returned ACCEPT with no established defect. Live post-checks closed every named gap.
+- Unresolved: none within SLICE-8E. Separate operational security issue: three pre-existing OAuth
+  client secrets remain inline in the external compose's uncommitted local changes and must be
+  rotated/moved to `.env`; no value is repeated here.
+- Delivery state and next action: accepted and applied; coordinator closes the master and commit.
+- Usage: local checks under one minute each; Grok provider-reported usage unavailable; no provider
+  publish/create/update/reschedule/cancel call was made.
 
 ## Usage budget and handoff
 
@@ -156,16 +168,3 @@ measurement line. All are within their 24,576 B / 12,288 B caps.
   and no secret-bearing text.
 - Capability boundary: close automatically after audit, live proof, identity readback, hygiene,
   master update, and coordinator commit; otherwise write one bounded `## Stopped` handoff.
-
-## Stopped
-
-Blocked: the required cross-family audit cannot receive the frozen private deployment evidence
-without Muxin's explicit authorization to send that bounded bundle to Grok.
-
-Verified: candidate hash/diff, compose resolution, exact disposable DNS+TLS media fetch, and the
-three target objects' pre-recreation database baseline. The live compose and services were not
-changed. Retained work is the candidate and redacted audit bundle under
-`/private/tmp/content-agents-slice-8e*`; the committed packet contains their hashes and result.
-
-Next action: Muxin explicitly authorizes (or declines) sending
-`/private/tmp/content-agents-slice-8e-audit/evidence.txt` to Grok 4.5 for the required bounded audit.

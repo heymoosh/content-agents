@@ -4,13 +4,13 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
-- Current slice: **8E**, `docs/operations/launch-slices/SLICE-8E.md`; owner-authorized to finish.
-- Blocked on: explicit approval to send SLICE-8E's bounded private evidence to Grok for audit.
-- Next dependency-ready slice: none beyond 8E; do not revive historical checklist text.
-- Last accepted: **8B**; Postiz and public Bluesky both prove the first approved media row live.
-- Accepted result: four cards scheduled, Bluesky live; 8C/8D remain accepted at `3110d6e`.
-- Last decision: keep the frozen repair unapplied until required cross-family review can run.
-- Details: `## Progress log` -> 2026-09-12 (8E review-blocked). Below is history; read only cited headings.
+- Current slice: none; **8E** is accepted in `docs/operations/launch-slices/SLICE-8E.md`.
+- Blocked on: owner rotation of three inline OAuth client secrets found in the local Postiz compose.
+- Next dependency-ready slice: none; credential rotation is a human provider-console checkpoint.
+- Last accepted: **8E**; Postiz self-fetches stored public media after container recreation.
+- Accepted result: all six trust-the-Publishing-room defects are closed; later rows keep their ids.
+- Last decision: rotate the exposed local-only secrets, then move replacements into external `.env`.
+- Details: `## Progress log` -> 2026-09-12 (8E accepted). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -112,19 +112,47 @@ rendered, approved, and scheduled. **Process note:** the stale wording
    one, not `mastodon-2`. The `~/.content-agents` dispatch journals carry no event naming a deferral;
    the record lives only in the per-folder log. Not a defect, just where to look.
 
-6. **Postiz cannot fetch its own public media URL from inside the container.** The accelerated
+6. ~~**Postiz cannot fetch its own public media URL from inside the container.**~~ **DONE
+   2026-09-12, SLICE-8E.** The accelerated
    Bluesky image post failed at 21:15 CT because `postiz-threads.meta` resolves to `127.0.0.1`
    inside Postiz, where port 4443 is closed. The uploaded PNG returned HTTP 200 from the same
    container at port 5000, and using that internal path made the 21:30 retry publish. The LinkedIn,
    Instagram, and Facebook quote-card rows are still scheduled with their original uploaded media;
-   repair the container self-resolution or safely reschedule those exact provider objects before
-   Instagram/Facebook are due Sep 15. Do not create duplicates.
+   The durable compose repair maps the hostname to Docker's host gateway, mounts the existing local
+   CA read-only, and points Node at it. Grok accepted the bounded candidate. After recreating only
+   Postiz and its HTTPS proxy, the live container fetched the exact stored PNG as HTTP 200
+   `image/png`, 5,930 bytes. The LinkedIn, Instagram, and Facebook rows retained exact ids, times,
+   groups, content/media hashes, queued states, no errors, and uniqueness counts of one.
+
+7. **Rotate three OAuth client secrets from the local Postiz compose.** While diagnosing 8E, the
+   external dirty compose file was found to contain inline LinkedIn, Threads, and Facebook client
+   secrets. They are local uncommitted changes and are not in that public upstream repository's
+   committed `HEAD`, but they were displayed in this session's tool output. Rotate them in the
+   provider consoles, put only the replacements in the external `.env`, and change compose to
+   `${...}` references. Never copy the old values into this repository or its evidence.
 
 Recorded, not defects: the Postiz read window is a +/-45 day list scan because there is no
 read-by-id route, and Postiz soft-deletes, so absence can never distinguish live from canceled from
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (8E accepted) — Postiz can self-fetch media; later rows are unchanged
+
+Grok 4.5 returned ACCEPT on frozen candidate `bea8bfa7`, with no established defect. Its three
+verification gaps were the planned live checks, not design objections. The candidate was applied
+once with a byte-exact rollback copy. Only `postiz` and `postiz-https` were recreated; database,
+Redis, Temporal, named volumes, uploaded media, and provider objects remained untouched.
+
+The recreated Postiz is healthy. `postiz-threads.meta` resolves away from loopback, the CA mount is
+read-only, Node sees its trust path, and the exact stored PNG returns HTTP 200, `image/png`, 5,930
+bytes from inside Postiz. The three later rows match the frozen database baseline on every recorded
+identity/content/media field and each still has exactly one matching provider object. This closes
+all six recorded Publishing-room trust defects before the Sep 15 Instagram/Facebook slots.
+
+A new human-only security item is recorded separately: rotate the three local inline OAuth client
+secrets surfaced during diagnosis, store replacements in the external `.env`, and leave only env
+references in compose. The secrets were excluded from every audit/evidence artifact.
 
 ### 2026-09-12 (8E review-blocked) — frozen repair is proven locally and remains unapplied
 
