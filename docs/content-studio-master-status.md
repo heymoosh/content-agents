@@ -4,16 +4,14 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
-- Current / last accepted: **8D**, `docs/operations/launch-slices/SLICE-8D.md`; PASS.
-- Also accepted: **8C**, `docs/operations/launch-slices/SLICE-8C.md`; PASS.
-- Result: missing-image card rows stay out of Content and Publishing; absent platform caps now fall
-  through to Postiz limits; publishing tests fail closed without a temp Placed-log path.
-- Gate: frozen candidate `6f4a546`; browser desktop+narrow PASS; `npm run check` 4576/0.
-- Blocked on: none for accepted code. SLICE-8B still needs its first scheduled post confirmed live.
-- Next dependency-ready slice: resume `docs/operations/launch-slices/SLICE-8B.md` after the Bluesky
-  post is due 2026-09-13 18:30 PT; verify provider state and the public post read-only.
+- Current slice: **8B**, `docs/operations/launch-slices/SLICE-8B.md`; scheduled, not accepted.
+- Blocked on: clock only; the first post is due 2026-09-13 18:30 PT on Bluesky.
+- Next action: after that time, read Postiz id `cmtz395zs0001mu8e0p5tbik3` and the public result;
+  close 8B only if both show live.
+- Last accepted: **8C/8D**, commit `3110d6e`; browser PASS and `npm run check` 4576/0.
+- Accepted result: missing-image rows are hidden; Postiz cap fallback and test Placed-log guard work.
 - Last decision: keep the pending X card untouched; do not show missing-image placeholders.
-- Details: `## Progress log` -> 2026-09-12 (8C/8D). Below is history; read only cited headings.
+- Details: `## Progress log` -> 2026-09-12 (8B stopped). Below is history; read only cited headings.
 
 ## Standing constraints
 
@@ -115,6 +113,17 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-12 (8B stopped) — four quote cards scheduled; first-live proof waits
+
+Muxin confirmed the action at scheduling time. One Studio batch scheduled exactly the approved
+LinkedIn, Bluesky, Instagram, and Facebook quote-card rows; X stayed pending. Planned times and
+Postiz ids are in SLICE-8B's RESULT BLOCK. Studio, the external scheduler ledger, publishing-status
+events, publish log, Placed log, and a refreshed Postiz calendar agree. No retry was used.
+
+SLICE-8B is not accepted because scheduled is not live. The first due row is Bluesky on
+2026-09-13 at 18:30 PT. Its packet carries the one required next action and the retained uncommitted
+operational paths. Separately, the accepted 8C/8D fixes landed on `main` as `3110d6e`.
 
 ### 2026-09-12 (8C/8D) — Studio row visibility and publishing safety accepted
 
