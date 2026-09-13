@@ -1,5 +1,8 @@
 # content-agents
 
+Read and follow `AGENTS.md` for the repository operating policy. This file holds the product
+architecture and safety rules that apply alongside it.
+
 Systems for Muxin Li's content operation, orchestrated by Claude Code:
 
 - **Build 0 — Strategy Intelligence**: analytics in → SQLite → weekly strategy brief (`briefs/`)
@@ -108,7 +111,7 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    temporary exception for Kling video generation while local Wan 2.2 is evaluated; every paid
    call remains opt-in and logged to `data/cost-log.csv`. Attended Codex image generation is a
    reviewed-file workflow, not a callable repository API. New builds inherit this.
-7. **PR merge: prove changes locally, then merge.** A clean change may merge after its scoped
+7. **Integration: prove changes locally, then merge.** A clean change may merge after its scoped
    verification and any required cross-family audit pass; routine hosted CI is manual/advisory.
    Content-generation logic still receives the same stronger test, canary, and audit gates, but it
    does not require a separate PR-review hold. Committing generated or already-decided content is

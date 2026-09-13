@@ -1,128 +1,79 @@
-# Slice protocol — environment and repository bindings
+# Working protocol — environment and repository bindings
 
-`AGENTS.md` → `## Slice protocol` is the source of truth for the protocol's rules, and the master
-document named below is the source of truth for status and decisions. This file holds only the
-environment-, machine- and repository-specific detail that section points at. It is required
-reading alongside that section and never overrides a rule stated there.
+`AGENTS.md` → `## Slice protocol` is the source of truth for repository workflow. This file
+holds only machine- and repository-specific bindings. It is required alongside an optional slice
+packet when Muxin explicitly invokes orchestration. Normal requests do not load this file merely
+because work could be described as a slice.
 
 ### Repo bindings
 
-This table is the only part of the protocol that changes between repositories. Everything below
-it is repository-neutral.
-
 | Binding | This repository |
 | --- | --- |
-| Repository root | the worktree you were launched in — never `cd` to another checkout |
-| Master document | `docs/content-studio-master-status.md` |
-| Slice packets | `docs/operations/launch-slices/SLICE-<ID>.md` |
+| Repository root | the worktree you were launched in — never switch to another checkout for implementation |
+| Master document | `docs/content-studio-master-status.md`, orchestration only |
+| Slice packets | optional orchestration briefs at `docs/operations/launch-slices/SLICE-<ID>.md` |
 | Packet template | `docs/operations/launch-slices/SLICE-TEMPLATE.md` |
-| Repository-wide gate | Documentation-only exception below; otherwise `npm run check` (typecheck + unit tests). Run it unsandboxed — under the sandbox it reports roughly 196 phantom venture failures. In a fresh worktree run `npm run worktree:setup` once first, or every command fails on missing `node_modules`. |
-| Hygiene command | `bash scripts/repo-hygiene.sh --rescue` |
-| Closeout gate | none — record `PASS` or the leftover list in the slice packet |
-| Integration rule | one coordinator, one reviewed commit at a time, a passing applicable gate on the candidate before each integration commit |
-| Delivery boundary | branch `main`, remote `origin` (`heymoosh/content-agents`). Merge is local-first: the recorded local gate result is the merge proof. Hosted CI is a manual diagnostic — never push merely to obtain a CI result. |
-| Non-negotiable product rules | Extraction-first: never compose new claims, arguments, or worldview statements in Muxin's voice; text and image derivatives quote and trim verbatim and carry `source_lines`. The scoped exceptions (Content Studio treatments, common hook templates, video scripts, Build 3 Venture, Build 4 Charles) are enumerated in the root `CLAUDE.md` and never widen. Nothing publishes without Muxin's review in `review-queue.md`; committing generated content is not publishing. Generated copy follows `config/voice.yaml` — no em dashes, no AI tells. Prefer subscription and free model routes; every paid call is opt-in and logged to `data/cost-log.csv`. Never edit `docs/content-agents-backlog.md` as text — board writes go through `prose_kanban` only. |
-| Live or authenticated model slices | Fix the verification budget before starting: normally one authenticated canary per workflow and at most one retry. Isolate Git, operational data, secrets, ports, and model permissions in a disposable harness. Preserve successful model output when later validation fails. |
-| Machine facts that bite | System `grep` is ugrep 7.5.0: never combine `-q` with `-v` — count then test. There is no coreutils `timeout` binary. `git pull` piped through `tail`/`head` prints "Updating a..b" before a would-be-overwritten abort, so verify with `git status -sb`. |
+| Repository-wide gate | `npm run check` (typecheck + unit tests); in a fresh worktree run `npm run worktree:setup` first |
+| Documentation-only gate | `git diff --check` plus session review for accuracy, links and rule consistency |
+| Hygiene command | `bash scripts/repo-hygiene.sh --rescue --base main` |
+| Closeout gate | none — record `PASS` or an actionable leftover list in the packet when one exists, otherwise in the final handoff |
+| Integration rule | one session, one reviewed commit at a time, with the applicable gate passing before integration |
+| Delivery boundary | branch `main`, private `origin` (`heymoosh/content-agents`); reviewed gated work may be pushed when delivery is in scope; no engineering delivery pull request or new hosted workflow without separate authorization; the scoped story editorial PR flow remains available |
+| Non-negotiable product rules | extraction-first with only the exceptions in `CLAUDE.md`; nothing publishes without Muxin's review; generated copy follows `config/voice.yaml`; every paid model call is opt-in and logged; board writes use `prose_kanban`, never direct text edits |
+| Live or authenticated model work | normally one authenticated canary per workflow and at most one retry; isolate Git, operational data, secrets, ports and model permissions |
+| Machine facts | system `grep` is ugrep 7.5.0, so never combine `-q` with `-v`; there is no coreutils `timeout`; verify a piped `git pull` with `git status -sb` |
 
-### Packet cap scope
+The repository has intentional hosted files for a manual diagnostic, secret scanning, scheduled
+dependency review and Dependabot. Retain them. Do not add another GitHub Actions workflow without
+separate authorization. This repository has no Vercel production project.
 
-The 12,288 B packet cap governs files named `SLICE-<ID>.md` anywhere under
-`docs/operations/launch-slices/`. Three kinds of file in that directory are exempt: `*-LOG.md`
-siblings, which exist so a packet can move its dated records and stay small; `SLICE-TEMPLATE.md`,
-the packet template itself; and `SLICE-5L-coverage.md` by name, exempt as companion analysis, per
-SLICE-6E.
+### Optional packet discipline
 
-### Read-set measurement
+A packet is a brief, not a context prison or mandatory handoff. The owning session may read whatever
+repository context it needs. Workers receive the paths and context needed for their bounded
+assignments and never commit or integrate.
 
-`AGENTS.md` → `## Slice protocol` → `### Packet size discipline` requires printing three numbers
-at closeout: the byte size of the protocol section, of the master document's `## START HERE`
-block, and of the packet read. These are the commands, run from the repository root.
-
-Live tree:
-
-```sh
-# Slice protocol section
-awk '/^## Slice protocol/{f=1} f&&/^## /&&!/^## Slice protocol/{exit} f' AGENTS.md | wc -c
-# START HERE block
-awk '/^## START HERE/{f=1} f&&/^## /&&!/^## START HERE/{exit} f' docs/content-studio-master-status.md | wc -c
-# the packet read this session — substitute the actual filename, e.g. SLICE-6I.md
-wc -c < docs/operations/launch-slices/SLICE-6I.md
-```
-
-Pinned to a specific commit (e.g. to reproduce the numbers below, run at the commit this section
-was written against — prints `24568`, `927`, and the packet's own byte size):
-
-```sh
-git show HEAD:AGENTS.md | awk '/^## Slice protocol/{f=1} f&&/^## /&&!/^## Slice protocol/{exit} f' | wc -c
-git show HEAD:docs/content-studio-master-status.md | awk '/^## START HERE/{f=1} f&&/^## /&&!/^## START HERE/{exit} f' | wc -c
-git show HEAD:docs/operations/launch-slices/SLICE-6I.md | wc -c
-```
-
-Caps: a `SLICE-<ID>.md` packet is capped at 12288 B; the `## Slice protocol` section is capped at
-24576 B. A measured value strictly greater than its cap is the violation — equal to the cap is
-fine.
-
-Extraction trap: a terminator predicate of `/^## [^S]/` does not stop at `## Standing
-constraints` (that heading also starts with `## S`), so it overruns into later sections. Against
-the pinned commit above that broken form reports `3317` for the START HERE block instead of the
-correct `927` — a 3.6x overstatement. Always terminate on `/^## /&&!/^## <this heading>/`, not on
-a character-class exclusion.
+Files named `SLICE-<ID>.md` under `docs/operations/launch-slices/` stay under 12,288 B.
+`*-LOG.md` history files, `SLICE-TEMPLATE.md`, and the existing
+`SLICE-5L-coverage.md` companion analysis are exempt. Status and evidence remain pointers rather
+than copied transcripts.
 
 ### Hygiene disposition
 
-`bash scripts/repo-hygiene.sh --rescue` exits non-zero whenever it lists anything, including
-another session's uncommitted work, merged-but-undeleted branches, or a stray checkout that this
-slice did not create and the closeout rule forbids removing. A non-zero exit is therefore not by
-itself a slice failure when every item the command lists is a path this session did not create.
-A packet must not assert `scripts/repo-hygiene.sh --rescue` exits `0`; that form is unachievable
-whenever other sessions have pending work, and mis-specifies the actual gate.
+The hygiene command can exit nonzero because it reports another session's work, an integrated
+branch awaiting cleanup, or a retained checkout. A nonzero exit is not itself a failure when every
+listed item was reviewed and belongs outside the current session.
 
-Assert instead, in the RESULT BLOCK, all four of: the command was run; its output was reviewed;
-every path this session created was committed or deleted (name each one); every other path the
-command listed was named and left in place (name each one). An exit code alone is not an
-acceptable entry for this item.
+The handoff states all four facts: the command ran; its output was reviewed; every path this session
+created was committed or deleted and named; every other listed path was named and left in place.
+A bare exit code or the word "clean" is not enough.
 
-### Closeout gate disposition
+Use `--base main`. Local `main` is the integration ref, while `origin/main` can lag until fetch
+or push and falsely classify already integrated branches as unmerged.
 
-This repository's `Closeout gate` binding (row above) is `none — record PASS or the leftover
-list in the slice packet`. No command exists to run in that role here.
+### Closeout disposition
 
-Assertable form: a packet's `## Closeout` is only satisfied when it carries either a line
-beginning `**PASS**` followed by a date, or an explicit list of what is left, written before the
-slice closes. Neither form is a command invocation.
-
-No command belongs in the `## Closeout` gate slot while the binding is `none`. In particular,
-`bash scripts/repo-hygiene.sh --rescue` is a separate hygiene item (see `### Hygiene disposition`
-above) and must not be recorded as the closeout gate. `SLICE-6I.md` is the observed instance of
-this conflation: it placed that hygiene command in the closeout gate slot and then asked for the
-same command again under its hygiene item.
-
-Per `AGENTS.md` → `## Slice protocol` → `### Mandatory closeout gate`, a packet recording neither
-a `**PASS**` line nor a leftover list has not closed.
+No closeout command exists in this repository. For runtime or tooling work, record `PASS` or an
+actionable leftover list in the current packet when orchestration is active, otherwise in the final
+handoff. Documentation-only work records its scoped review and diff-check result. The hygiene
+command is a separate requirement and is never substituted for this record.
 
 ### Model routing on this Mac
 
-- Claude for frontend and Codex for backend are defaults, not rules.
+Claude for frontend and Codex for backend are defaults, not rules. Choose the model and effort from
+the work's risk and unanswered questions, optimizing total work to verified completion.
 
 ### Grok CLI on this Mac
 
-Docker Desktop makes `/var/run/docker.sock` a symlink. Grok `--sandbox read-only`
-refuses to start on this machine. Use `--sandbox workspace` for Grok calls, including
-audits; do not call `grok_spawn_readonly`. If a plugin is required, use
-`grok_spawn_worker` only when it supports an explicit `sandbox=workspace` argument.
+Docker Desktop makes `/var/run/docker.sock` a symlink, so Grok's read-only sandbox refuses to
+start. Use the local Grok CLI with `--sandbox workspace`; never call `grok_spawn_readonly` or use
+`grok --sandbox read-only`. Use `grok_spawn_worker` only when a required plugin can explicitly
+pass `sandbox=workspace`. Workspace access never authorizes edits during an audit.
 
-For a bounded audit, run from the intended checkout or disposable audit directory:
-
-```sh
-grok --sandbox workspace --no-subagents --disable-web-search --max-turns 3 --model grok-4.5 --prompt-file /absolute/path/audit-prompt.txt
-```
-
-The prompt must say: "Audit against the supplied requirements. Do not modify files.
-Cite path:line. Separate established defects, verification gaps, and optional improvements."
-Supply the acceptance criteria, candidate diff, changed-file list and focused check output;
-request bounded excerpts for missing evidence. Workspace sandbox is not read-only enforcement:
-inspect the diff afterward and never treat the sandbox choice as permission to edit.
-Keep the input bounded; if Grok offloads a long prompt, allow enough turns to read it and
-finish the audit. Verify exit status and an actual verdict before reporting audit completion.
-This launch fix does not expand repository-export or implementation authorization.
+For evidence-only CLI audits, work outside the repository. Allow only `read_file` with a
+`Read(<exact evidence path>)` allow rule, use `--permission-mode dontAsk`, and disable subagents
+and web search. Point the prompt at frozen evidence and require complete bounded reads. The prompt
+must require: "Audit against the supplied requirements. Do not modify files. Cite path:line.
+Separate established defects, verification gaps, and optional improvements. Answer the code-quality
+question separately from the requirements question." Verify the exit status, complete verdict, and
+unchanged candidate. Never disable sandboxing as a fallback.

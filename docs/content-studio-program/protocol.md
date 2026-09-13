@@ -28,8 +28,8 @@ was not durably recorded.
 Muxin has authorized the coordinator to continue the entire approved Content Studio program without
 requesting ordinary batch-by-batch approval. This authorization covers reconciling the baseline,
 creating decision-complete packets and isolated worktrees, dispatching and returning bounded work,
-testing, cross-family auditing, sequential integration, commits, pushes, pull requests, and
-auto-merge for verified non-logic work.
+testing, cross-family auditing, sequential integration, commits, and pushes of reviewed gated work.
+It does not authorize pull requests, auto-merge, or new hosted workflows.
 
 The coordinator is persistent: after every task or batch it re-reads `work.yaml`, records the
 completed result, identifies every newly eligible disjoint task, and starts the next safe batch.
@@ -157,7 +157,7 @@ files, for example `studio:conversation-routing` or `publish:approval-gate`.
 4. Up to three builders run in parallel only when active file leases and semantic locks are
    disjoint. Hosts spawn agents with their native facilities. Subscription/local CLIs are the
    default; this protocol introduces no paid model routing.
-5. Each worker reads the root rules, any scoped `AGENTS.md`, its packet, and named context only. It
+5. Each builder session reads the root rules, any scoped `AGENTS.md`, its packet, and named context. It
    does not read other vision documents, packets, backlog files, unrelated corpus data, or raw
    pattern bodies.
 6. The builder commits its work and returns a `builder` JSON report. `report` checks report paths
@@ -183,11 +183,13 @@ files, for example `studio:conversation-routing` or `publish:approval-gate`.
    conflict; it returns the task to its builder. An `integration` report from a non-builder family
    is required to move `accepted -> integrated`.
 10. Run the final batch integration audit. Run `npm run test:e2e` once in a disposable worktree
-    only if the batch changes user-visible Studio behavior. Heavy matrices and mutation tests stay
-    in CI. After pushing, inspect `gh pr checks` once; do not poll.
+   only if the batch changes user-visible Studio behavior. Heavy matrices and mutation tests stay
+   in CI. After pushing, inspect only retained workflows that were intentionally triggered; do not
+   poll routine CI.
 
-Non-logic batches may merge after verification and green CI. Content-generation-logic batches are
-separate draft PRs with side-by-side before/after samples and wait for Muxin's review.
+Non-logic batches may merge after local verification and any required audit. Content-generation-
+logic batches stay in separate commits with side-by-side before/after samples and wait for Muxin's
+review; they do not require an engineering pull request.
 
 ## Commands
 

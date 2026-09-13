@@ -1,9 +1,9 @@
 # SLICE-<ID>: <one line>
 
-Protocol: `AGENTS.md` → `## Slice protocol`, plus the bindings in
-`docs/operations/slice-protocol-environment.md`. Read those and this file only.
-Do not open `docs/content-studio-master-status.md` unless a heading is cited below.
-Do not load the repository for context. Do not commit.
+Optional orchestration brief. Protocol: `AGENTS.md` → `## Slice protocol`, plus the bindings in
+`docs/operations/slice-protocol-environment.md`. The owning session may read the repository context
+needed to complete the work. A worker receives the paths and context needed for its assignment and
+never commits or integrates.
 
 ## Goal
 
@@ -24,20 +24,16 @@ availability/dependencies, or `none` — engineering choices remain with the coo
 
 ## Owned files
 
-Before assigning workers, separate preparation, execution, and verification. Identify useful
-independent deliverables; a shared execution budget or final artifact serializes only the
-operations that modify or consume it. Use parallel lanes when the protocol's three conditions
-hold: disjoint write ownership, no repo-wide rewriting commands, and checks that write only
-lane-owned paths and read only lane-owned files or explicitly named immutable shared inputs.
+Before assigning workers, identify useful independent deliverables. Use parallel lanes only when
+write ownership is disjoint, no worker runs repo-wide rewriting commands, and worker checks write
+only to owned paths. A session working alone does not invent lanes or delegation paperwork.
 
-For each lane, list its deliverable, owned paths (including temporary/check outputs), pinned
-read-only inputs, focused checks, dependencies and frozen handoff checkpoint. Do not read another
-lane's unfinished output. Prepare verification tooling independently where useful; actual
-candidate verification waits for the frozen handoff.
+For each worker lane, list its deliverable, owned paths (including temporary/check outputs), shared
+read-only inputs, focused checks, dependencies and handoff checkpoint. Verification of the
+candidate waits for the completed handoff.
 
-Parallel-safe: <yes — name concurrent lanes and serialized handoffs | no — name the concrete
-blocking dependency/resource conflict and the independent split considered; for a small task,
-explain why a separate assignment would add cost without a useful independent deliverable>
+Parallel-safe: <yes — name concurrent lanes and serialized handoffs | no workers — delegation adds
+no useful independent deliverable | no — name the concrete ownership or dependency conflict>
 
 ### Lane A — <what this lane delivers>
 
@@ -51,9 +47,9 @@ explain why a separate assignment would add cost without a useful independent de
 
 - <path or area>
 
-## Cited headings
+## Relevant context
 
-<`docs/content-studio-master-status.md` → `## heading` for each one the worker may open, or `none`>
+<paths, symbols, requirements, and any master-document headings relevant to this brief>
 
 ## Acceptance
 

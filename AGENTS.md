@@ -21,12 +21,31 @@ use `AGENTS.md` so any agent can discover them consistently.
 - Local-first merge gate: the recorded local `npm run check` result is the
   ordinary merge proof. Do not push solely to obtain a hosted test result, and
   do not wait on the manual CI workflow for routine changes.
-- Behavior gate: run `TODO: e2e/integration command` once, only when user-visible behavior changed.
+- Behavior gate: run `npm run test:e2e` once, only when user-visible behavior changed.
 - Heavy checks (mutation testing, full matrices) are CI-only — never run them locally.
 - After pushing, inspect only retained workflows that were intentionally
   triggered (for example the secret scan); do not poll for routine test CI.
-- Maturity: when you finish a feature or open a PR (not small fixes), check the next rung in `docs/maturity.md` and propose it if its trigger fires — never auto-apply.
+- Maturity: when you finish a feature (not a small fix), check the next rung in `docs/maturity.md` and propose it if its trigger fires — never auto-apply.
 - Living document: when a correction recurs, add the rule here.
+
+## Required repository behavior
+
+- Work inside the private `origin` boundary (`heymoosh/content-agents`). A session may push a
+  reviewed, gated commit when delivery is part of the authorized work. Workers and subagents never
+  push or merge. Do not open an engineering delivery pull request, create another remote or hosted
+  repository, or add a GitHub Actions workflow without separate owner authorization. The existing
+  story editorial PR flow, manual diagnostic, secret-scan, dependency-audit and Dependabot files
+  are intentional and remain in place.
+- One session owns integration and merges one reviewed commit at a time. Runtime and tooling changes
+  pass `npm run check` before integration; documentation-only work uses the scoped gate in
+  `## Slice protocol`.
+- Do not reset, discard, stash, overwrite, or commit another session's work. Use an isolated
+  worktree when the active checkout is dirty. Stage only named paths, never `git add .` or
+  `git add -A`.
+- Do not deploy production from pull-request events or ordinary pushes to `main`. This repository
+  has no Vercel project or production deployment. Do not add Vercel configuration or a deployment
+  workflow unless a real production target is first verified and explicitly authorized. If that
+  changes, disable Vercel Git auto-deploy and allow production only from explicit `v*` release tags.
 
 ## Keeping the state clean
 
@@ -69,6 +88,22 @@ Two consequences for how work is arranged:
 - **A planning document that lives only on an unpushed branch is invisible to anyone reading
   `main`.** Land decision records promptly, or say plainly which branch holds the current one.
 
+## Session-end repository hygiene
+
+Before a session or worker reports work finished, run:
+
+```sh
+bash scripts/repo-hygiene.sh --rescue --base main
+```
+
+Local `main` is the integration ref; `origin/main` can lag until fetch or push and therefore gives
+false reports about branches already integrated locally. `--rescue` snapshots uncommitted work to
+`refs/wip/<worktree>` without changing the working tree, index, or branch.
+
+Commit or delete every untracked path this session created. Report every other path the command
+lists and leave it in place. Never delete, commit, reset, stash, or overwrite another session's
+work. Name what was committed, deleted, and deliberately left; "clean" is not a sufficient report.
+
 ## Bounded verification contract
 
 This is the detailed budget for live and authenticated model work only. The general per-slice
@@ -94,6 +129,17 @@ Preserve successful model output when later validation fails. Keep long-command 
 progress/final summaries. Time-box a newly discovered adjacent issue to 30 minutes; if it cannot be
 resolved within that window, stop with evidence and ask before broadening scope.
 
+## Escalation rule
+
+When stuck on a challenging technical, architectural, or debugging problem that cannot be resolved
+cleanly after reasonable effort, ask the `sol_advisor` subagent for guidance only. Do not continue
+guessing. Handle routine implementation and straightforward debugging directly.
+
+The owner decides product scope; the session decides the engineering route to that fixed goal. Do
+not bring an implementation choice to the owner as though it were a scope decision. If a countable
+target cannot be met from the repository's current inputs, add a sourcing requirement to the plan
+instead of silently reducing the target.
+
 ## Repository delivery policy
 
 - This is a private, local-first repository. The declared merge gate is
@@ -112,6 +158,9 @@ resolved within that window, stop with evidence and ask before broadening scope.
   `git.deploymentEnabled: false`. Any production deployment workflow must be
   triggered only by tags matching `v*`, never by pull requests or ordinary
   pushes to `main`.
+- The private `origin` remote is authorized. A session may push its reviewed, gated commit when
+  delivery is in scope, but it does not open an engineering delivery pull request. The scoped story
+  editorial PR flow remains available for chapter review. Workers and subagents never push.
 
 ## Machine facts (this Mac) — any agent, any vendor
 
@@ -144,382 +193,238 @@ Hard-won on 2026-07-17; these are properties of Muxin's machine, not of any one 
 The live-verification harness (hermetic fixture test + bounded live canary, gated behind
 `CANARY_I_MEAN_IT`) is canonical in the `claude-config` repo at `~/.claude/verify/`
 (`run-fixture-test.sh`, `run-canary.sh`) — this repo deliberately has no `verify/` tree of its own.
-Machinery PRs opened here that cite harness evidence should reference it by that path; don't expect
-or add a local copy.
+Changes that cite harness evidence should reference it by that path; don't expect or add a local
+copy.
 
 <!-- BEGIN PORTABLE PROTOCOL -->
 
 ## Slice protocol
 
-This section is the frozen procedure, so session prompts can just point here. A coordinator
-reading only this section, the master document's `## START HERE` block, the environment file below
-and one slice packet has everything it needs, every way a session may end included.
+(The heading name is kept because `orch doctor` looks for it. Read it as "working protocol".)
 
-The bindings table, model routing defaults and the Grok CLI launch fix live in
-`docs/operations/slice-protocol-environment.md`, read with this section; "the bindings" means that
-table. The master document is the single source of truth for status and decisions, and its
-`## START HERE` block is the only part a new session reads.
+**Owner decision, 2026-09-13.** This repository adopts `orch`'s single-session operating model.
+The packet-then-clear-then-blind-build handoff is retired: one session keeps its context, reads the
+repository as needed, and owns a task through verification and integration. Packets remain optional
+briefs for explicitly requested orchestration work. The rules below keep concurrent work safe and
+results checkable; they do not prescribe an implementation method.
+
+### Grok CLI on this Mac
+
+Docker Desktop makes `/var/run/docker.sock` a symlink, so Grok's read-only sandbox refuses to
+start on this Mac. Use the local Grok CLI with `--sandbox workspace`; never call
+`grok_spawn_readonly` or use `grok --sandbox read-only`. Use `grok_spawn_worker` only when a
+plugin is necessary and can explicitly pass `sandbox=workspace`. Workspace access is not
+authorization to edit: audit prompts must say, "Audit against the supplied requirements. Do not
+modify files. Cite path:line. Separate established defects, verification gaps, and optional
+improvements. Answer the code-quality question separately from the requirements question."
+
+For an evidence-only audit, work outside the repository. Allow only `read_file` with a
+`Read(<exact evidence path>)` allow rule, use `--permission-mode dontAsk`, and disable subagents
+and web search. Point the prompt at frozen evidence and require complete bounded reads. Never disable
+sandboxing as a fallback. Verify the exit status, a complete verdict, and an unchanged candidate
+before reporting the audit complete.
+
+### Repo bindings
+
+This table is the only part of the protocol that changes between repositories.
+
+| Binding | This repository |
+| --- | --- |
+| Repository root | the worktree you were launched in — never `cd` to another checkout |
+| Master document | `docs/content-studio-master-status.md`, only when the owner explicitly invokes orchestration |
+| Slice packets | `docs/operations/launch-slices/SLICE-<ID>.md` |
+| Packet template | `docs/operations/launch-slices/SLICE-TEMPLATE.md` |
+| Repository-wide gate | `npm run check`; documentation-only changes run `git diff --check` plus a session review for accuracy, links, and rule consistency |
+| Hygiene command | `bash scripts/repo-hygiene.sh --rescue --base main` |
+| Closeout gate | none; record `PASS` or an actionable leftover list in the packet when one exists, otherwise in the final handoff |
+| Integration rule | one session owns integration, one reviewed commit at a time, with the applicable gate passing before each integration commit |
+| Delivery boundary | private `origin` (`heymoosh/content-agents`) authorized; a session may push reviewed gated work when delivery is in scope; no engineering delivery pull request or new hosted workflow without separate authorization; the scoped story editorial PR flow remains available |
+| Base branch | `main` |
+
+For normal requests, work directly from the user's request and relevant repository files; do not
+read or update the master document, packets, backlog, or board. When the owner explicitly invokes
+orchestration, the master document is the status and decision source, its `## START HERE` block is
+the entry point, and a packet is an optional work brief.
 
 ### Roles
 
-- **Coordinator** — the session the owner talks to. Reads this section, the master's `## START HERE`
-  block and the current slice packet, nothing else; it never loads the repository "for context" and
-  never implements. Under the integration rule it is the only role that commits or integrates, one
-  reviewed commit at a time.
-- **Worker** — a subagent the coordinator spawns. Reads this section and exactly one slice packet.
-  It implements, runs the packet's declared checks, returns a `RESULT BLOCK`, and never commits.
-- **Auditor** — a subagent from a different model family than the builder. Receives the slice's
-  acceptance criteria, candidate diff, changed-file list and focused check output, and never the
-  master document, the repository tree or a worker transcript. If that cannot establish a claim, it
-  names the missing evidence or requests a bounded excerpt rather than assuming unseen code is
-  correct or defective.
+- **Session** — the session the owner talks to. It owns one piece of work end to end, keeps its
+  own context, reads the repository as it sees fit, and decides its own method: build alone or
+  spawn workers. It is the only role that commits or integrates, one reviewed commit at a time.
+- **Worker** — a subagent the session chooses to spawn. Give it what it needs, not "only the
+  packet". It returns a compact `RESULT BLOCK` (changed paths, outcome, checks run with results,
+  evidence locations, unresolved items). It never commits.
+- **Auditor** — a model from a different family than the builder. Gets the acceptance criteria,
+  the candidate diff, the changed-file list and the check output. If that cannot establish a
+  claim, it names the missing evidence rather than guessing.
 
-The read limit governs *starting context* — what you load before the work — never evidence the
-session itself produces. The coordinator's standing read set is every worker `RESULT BLOCK`, the
-candidate diff and changed-file list, check and gate output, audit findings, hygiene output, and any
-file the current packet names as owned or cited. Reading those **is** the review this protocol
-requires.
+One session works in one git worktree and one branch. A session that finds another session's
+uncommitted paths reports them; it does not commit, revert, or stash them. Stage only paths named
+for the current change, never `git add -A` or `git add .`.
 
-Never silently substitute a same-family audit; a bigger sibling of the builder is not independent
-review. If required cross-family tooling is unavailable, mark the candidate review-blocked, follow
-the usage-limit checkpoint, and do not integrate it.
+A bigger sibling of the builder is not independent review. Never silently substitute a
+same-family audit. If cross-family tooling is unavailable, say so and take the
+stopping-without-acceptance branch; do not integrate.
 
-### Slice packet contract
+If you spawn workers sharing one working tree: write ownership is disjoint; no lane runs a
+repo-wide rewriting command (formatters, codegen, `--fix` linters) — the session does that after
+every lane is done; each lane's checks write only to its own paths. Do not create workers merely
+to raise utilization. Say in one line what each extra lane buys.
 
-A slice is the smallest thing that is demonstrably done, not the smallest thing that can be
-described. Every packet records: goal, difficulty, dependencies, owned files, files not to touch,
-acceptance criteria, focused verification commands, observable result, risk and whether an audit is
-required, and the builder and auditor families. Copy the packet template named in the bindings; do
-not invent a different shape. Handing a worker a packet always includes this protocol section —
-"only that packet" bounds what else the worker may read, not whether it gets the rules.
+### Scope and the owner
 
-Before choosing lanes, separate preparation, execution and verification and identify the useful
-independent deliverables and their dependencies. A shared budget, mutable resource or final artifact
-serializes only the operations that modify or consume it, not independent preparation or
-verification tooling.
-
-Prefer useful parallel work within available agent and resource limits. Workers share one working
-tree, so every concurrent lane must satisfy all three conditions, stated in the packet:
-
-- Write ownership is disjoint: no path is owned by two lanes, and no lane creates, moves or deletes
-  a path inside another lane's owned directories. Shared read-only inputs are allowed only under the
-  third condition.
-- No lane runs a repo-wide command that rewrites files — formatters, codegen, migrations or `--fix`
-  linters. Those belong to the coordinator, after every lane has finished.
-- Each lane's focused checks write only to its owned paths, temporary and generated files included.
-  They may read explicitly named immutable shared inputs pinned to a commit or content hash, and
-  must not depend on another lane's unfinished or changing output.
-
-Record each lane's deliverable, owned paths, immutable inputs, focused checks, dependencies and
-handoff checkpoint. Verification tooling may be prepared against fixed requirements and lane-owned
-fixtures while implementation proceeds, but verifying the candidate itself waits for a completed,
-frozen handoff; preparation is not proof that it passes. If a condition fails, serialize the affected
-operations and reassess the remaining independent work. For a single-worker slice, name the concrete
-dependency or resource conflict preventing useful parallel work and the split considered; "coupled
-work", "shared budget" or "safer serially" alone is insufficient. A small task may stay single-worker
-when a separate assignment would add coordination cost without a useful independent deliverable —
-state that reason. Never create workers merely to raise utilization or repeat an investigation.
-
-Conflicting edits, shared mutable budgets, final integration and commits stay serialized, and workers
-must preserve other sessions' changes. A stalled lane triggers a checkpoint and a fresh look at
-independent remaining work, not concurrent reassignment of its owned paths. On an active slice, change
-lane ownership only after affected workers pause and the coordinator updates the packet and reissues
-assignments. Cross-family audit requirements are unchanged.
-
-### Delivery batch and owner checkpoint
-
-Before launching, record the authorized slice IDs, dependencies, per-slice deliverables (design or
-implementation), acceptance boundaries and stop condition in the current packet. A free slot is not
-permission to pull another slice from the backlog; expand the batch only with owner authorization,
-though preparation and repairs within its fixed requirements stay engineering decisions. Prefer
-accepting built, dependency-ready candidates over more implementation, and preserve healthy running
-gates and existing ownership at checkpoints.
-
-Collect genuine scope decisions and human-only acceptance steps in one short upfront owner
-checkpoint, recording resolved decisions, remaining human actions and their required checkpoint, and
-arranging hands-on verification early enough for the owner's availability. Never ask the owner to
-choose engineering methods, manufacture decisions, or treat advance approval as proof that a later
-walkthrough occurred. Independent authorized work may continue around a blocker.
-
-Keep handoffs compact: candidate identity, status, evidence pointers, unresolved items, next action.
-Reload unchanged packets, histories, diffs or skill references only for a named new question or
-changed input; retain durable evidence rather than reconstructing history in context. Report built,
-verified, accepted and committed states separately, and local test elapsed time separately from model
-calls and provider-reported usage; mark unavailable usage unknown, never inferring tokens or cost
-from runtime or a subscription percentage.
-
-### Writing a missing packet
-
-If START HERE names a slice packet that does not exist, writing it **is** coordination, not a
-departure from the read limit. Without asking permission the coordinator may read exactly these and
-nothing more:
-
-- the packet template named in the bindings;
-- the master document's standing-constraints or non-negotiables section, if it has one;
-- any heading in the master document that START HERE names;
-- a design spec that START HERE or the slice sequence names, limited to that slice's own section
-  plus the spec's dependency / running-order section.
-
-Draft the packet from those, then proceed. Stop for the owner only when the slice's goal or
-acceptance criteria are genuinely undecided. Permission to read a named input is not a decision and
-must never be escalated as one; the owner decides scope, not method.
-
-### Audit scope and proportional verification
-
-Classify the candidate in the packet before work, recording the reason, applicable checks and review
-boundary. Changed behavior and risk determine the class, not file count.
-
-- **Documentation only:** status, planning, prose and owner-directed procedure changes that do not
-  alter executable inputs need coordinator review for accuracy, links and rule consistency, plus a
-  whitespace/diff check — no external-model audit, application build or UI E2E. This is the
-  documentation-only exception to the repository-wide gate, runtime closeout command and detached
-  runtime checkout requirement; record the scoped result in the packet, or in the master progress
-  entry for a separately scoped policy update. Review a frozen diff and commit only those
-  documentation hunks. Files consumed as executable configuration, generated inputs or runtime
-  prompts are never exempt, here or under any other exception.
-- **Low-risk copy/mechanical:** focused checks and coordinator diff review, no standalone
-  maximum-effort audit. Where independent review is required, batch related changes into one named
-  capability-boundary audit before integration. Runtime gates still apply, including UI journey
-  checks for user-visible copy. Never use this class to waive a material finding's independent
-  closure or to disguise a behavior, privacy, security or data-integrity change.
-- **Meaningful behavior or high risk:** focused outcome/regression proof and bounded cross-family
-  review before integration. Supply exact changed evidence and affected invariants; broaden review
-  only when the change or a demonstrated blind spot warrants it.
-- **Feature/experience completion:** reconcile requirements with source and actual end-to-end
-  browser evidence. A full review fits this boundary or an explicit owner request, and need not be
-  repeated for every small follow-up repair.
-
-Plan one bounded review of a ready candidate, then delta reviews of unresolved material findings and
-changed evidence. Retain accepted dispositions with their candidate/input hashes, reopening only when
-changed behavior, dependencies or new evidence invalidates them. Never re-send the whole repository,
-re-audit settled decisions, or create duplicate reports. Record the three finding categories below
-separately; a verification gap needs the missing experiment, not more opinion.
-
-Existing packets and templates inherit these rules and preserve owner-selected reviewers, security,
-privacy and authenticated-canary budgets, and release gates.
+The owner decides product scope. Engineering questions — including which of two routes reaches
+a fixed goal — are yours to decide and act on. Do not pull extra work from the
+backlog on your own; a free slot is not authorization. Collect genuine scope decisions into one
+short owner checkpoint rather than a stream of questions. Report built, verified, accepted and
+committed as separate states. Report wall-clock time separately from provider-reported usage;
+never infer tokens from runtime.
 
 ### Model routing
 
-Start each kind of work on the model best at it *in one shot*, not the cheapest that might pass:
-cost-effective means the least total tokens to *verified* completion, counting missed requirements,
-retries, audits and repairs, not the price of one attempt. Coordination, slice boundaries, acceptance
-calls, integration decisions and difficult or high-stakes implementation take a strong model; bounded
-reading, inventories, mechanical edits and status writing take a lighter one. `### Effort tiers`
-binds this to named jobs.
+Start each kind of work on the model that is best at it in one shot. Cost-effective means the
+least total work to *verified* completion, counting retries, audits and repairs.
 
-Choose audit effort from the change's risk and unanswered questions, not the strongest available
-setting by default. Routine bounded reviews use a capable reviewer at ordinary effort; reserve
-high/max effort for difficult, high-stakes or broad experience reviews. Record the requested
-model/effort and the actual result; a failed startup is not a completed audit.
+- Judgment calls — scope, acceptance, integration, blocked or deviating candidates: strong model,
+  high effort.
+- Bounded reading, inventories, mechanical edits, status writing: lighter model.
+- Difficult or high-stakes implementation: strong model.
+- Claude for frontend and Codex for backend are defaults, not rules.
 
-At a usage limit, first record the affected lane, evidence, blocker and next retry condition in the
-packet and master. Pause that provider; never repeatedly probe quota or silently change a
-user-required reviewer. Continue dependency-ready work in authorized scope where ownership and inputs
-are independent: browser verification, evidence preparation, other repairs, a separately accepted
-documentation change. Required review stays an integration gate for the blocked candidate; ending
-work on it without an independently accepted deliverable takes the stopping-without-acceptance
-branch. Separately scoped accepted changes use the accepted closeout — keep blocked candidates and
-their status out of that commit.
+Choose audit effort from the change's risk, not the strongest setting by default. Record the
+requested model/effort and the actual result; a failed startup is not a completed audit. At a
+usage limit, record the blocker and next retry condition in the current handoff (and the master
+document when orchestration is active), pause that provider, and continue independent work. Do not
+repeatedly probe quota or silently swap a required reviewer.
+
+### Audit scope and proportional verification
+
+Classify the change before work and record the reason. Changed behavior and risk set the class,
+not file count.
+
+- **Documentation only:** session review for accuracy and links, then the documentation-only
+  gate from the bindings. No external audit. Files consumed as executable configuration,
+  generated inputs or runtime prompts are not documentation.
+- **Low-risk mechanical:** focused checks and a diff review. Batch related changes into one
+  audit at a capability boundary if independent review is needed.
+- **Meaningful behavior or high risk:** focused outcome/regression proof and a cross-family
+  audit before integration.
+- **Feature/experience completion:** reconcile requirements with source and real end-to-end
+  browser evidence.
+
+Plan one bounded audit of a ready candidate, then delta reviews of unresolved material findings
+only. Retain accepted dispositions with their candidate hashes; do not re-audit settled
+decisions. Verification gaps need the missing experiment; more model opinion does not close them.
 
 ### Usage discipline
 
-Optimize total model work to verified completion, counting context, coordination, retries and
-review. This qualifies the parallel-work preference above: a safe split alone is insufficient. Record
-each extra lane's useful independent result and expected benefit in one packet line, and keep work
-serial when another agent would mostly repeat context or add bookkeeping.
-
-Use a fresh packet-sized worker context for unrelated work. Reuse a worker for related repairs when
-its retained context saves investigation, preserving ownership until a frozen handoff. Record worker
-model and effort with the assignment, and apply Model routing to mechanical work as well as
-implementation — never use the strongest worker merely because it is already available.
-
-Use completion notifications. Poll only for a missing notification, a deadline, a suspected stalled
-process or a concrete intervention; never repeatedly inspect unchanged progress. Scripts should emit
-command, exit code, counts, candidate identity and a short result, keeping raw logs, screenshots and
-manifests on disk. The coordinator reviews its standing read set under Roles and loads further
-evidence only for a named acceptance question or failure, never duplicating evidence bundles or
-narrating them. This limits context overhead, not required outcome tests, visual inspection or
-independent review.
-
-Run closeout automatically once per completed coherent capability, not after every worker, command
-or repair. Compact when continuing unfinished related work; prefer a fresh coordinator chat at the
-next substantial capability boundary when START HERE and the packet suffice, keeping only short
-resume pointers. Neither compaction nor fresh chats substitute for these controls. Never make the
-owner monitor workers or restate this policy in session prompts.
+Optimize total model work to verified completion, including context, coordination, retries and
+review. Use completion notifications; poll only for a missing notification or a suspected stall.
+Keep raw logs, screenshots and manifests on disk and cite them; do not narrate their contents.
+Load further evidence only for a named acceptance question or failure.
 
 ### Worker contract
 
-A worker returns a compact `RESULT BLOCK` and nothing else: changed paths, outcome, checks run with
-their results, evidence locations, and unresolved items. Never relay worker transcripts or
-re-summarize the plan; cite section headings instead.
+A worker returns a compact `RESULT BLOCK` and nothing else. Do not relay worker transcripts. A
+worker must report when a prediction in its brief is disproven, with the evidence, and must not
+relax a constraint or manufacture a success to fit the prediction. Comments that claim a
+guarantee must describe behavior the change actually provides.
 
 ### Completion sequence
 
-Run in this order for runtime/tooling candidates; documentation-only changes use their scoped gate
-above. Never start an expensive repository-wide gate while known audit or repair work remains for
-that candidate.
+For runtime/tooling candidates; documentation-only changes use their scoped gate. Do not start
+the expensive repository-wide gate while known audit or repair work remains.
 
-1. Implement only the assigned slice.
-2. Run the packet's declared acceptance checks and the relevant regression checks.
-3. Fix focused-check failures.
-4. Obtain the cross-family audit when the slice requires one.
-5. Reproduce and repair established findings, rerun affected checks, and obtain independent closure
-   of material findings.
-6. Freeze the audit-cleared candidate on a detached checkout; review immutable evidence, never a
-   changing live tree. A review-blocked runtime candidate cannot pass this integration step.
-7. Run the repository-wide gate from the bindings table. Run required UI journeys on the frozen
-   candidate, then the full check once, last; repeat only after a relevant change or failure.
-8. Close the slice through the mandatory closeout gate (below).
-9. The coordinator reviews the final diff and commits only after acceptance, audit closure and a
-   passing gate, keeping the master document current in the same commit.
+1. Implement the work.
+2. Run the focused acceptance checks and the relevant regression checks; fix what fails.
+3. Obtain the cross-family audit when the class requires one; repair established findings and
+   rerun affected checks.
+4. Run the repository-wide gate from the bindings table once, last, on the frozen candidate.
+   Verify it by exit code — a `| tail` pipe hides a failure.
+5. Close through the closeout gate below.
+6. Review the final diff and commit only after acceptance, audit closure and a passing gate,
+   with the master document updated in the same commit when orchestration is active.
 
-If the final gate exposes a defect, repair it, rerun the affected checks, obtain independent review
-of any material change, and rerun the gate on a new frozen candidate.
-
-Verify a gate by its exit code. A `| tail` pipe reports success when the gate failed.
+If the final gate exposes a defect, repair it, rerun affected checks, get independent review of
+any material change, and rerun the gate on a new frozen candidate. Do not weaken required gates
+or reuse results contrary to this protocol. If closeout would force a full rerun solely for
+paperwork, say so and propose a bounded closeout fix instead.
 
 ### Mandatory closeout gate
 
-Every worker slice finishes through the closeout gate named in the bindings: it runs the declared
-check, retains only this slice's bounded evidence, and persists `PASS` or an actionable list of what
-is left. Where a repository has no such tool, the coordinator records `PASS` or the leftover list in
-the slice packet itself before the slice can close.
+This repository has no closeout command. For runtime or tooling work, record `PASS` or an
+actionable leftover list in the current packet when orchestration is active, or in the final handoff
+for direct work. This record is separate from the hygiene command and does not replace it.
+Documentation-only work records its scoped review and diff-check result.
 
 ### Findings and escalation
 
-Require the auditor to separate established defects, verification gaps and optional improvements.
-Convert every material finding into a builder checklist item carrying evidence, an acceptance test
-or reproduction, a state invariant where relevant, and a named symbol or file search covering every
-other use of an affected symbol. Close each with a fix plus evidence or an explicit supported
-disposition. Never expand scope for speculative suggestions.
+The auditor separates established defects, verification gaps and optional improvements, and
+answers a code-quality question separately from the requirements question. **Every finding in
+every bucket gets a written disposition from the builder** — fixed with evidence, or declined
+with a reason. A finding with no disposition is an open finding. (Bake-off lesson: a real
+lock-timeout defect was filed under "optional improvements" and silently dropped.)
 
-Bound the repair loop. After two repair cycles on one finding produce no new evidence, stop and call
-it engineering-blocked: record the finding, what was tried and the failing output in the slice
-packet, then take the stopping-without-acceptance branch below. Tell the owner it is blocked on
-engineering, not on a scope decision — it is not a question for them to answer.
-
-If repairs reveal skipped files, omitted verification or early stopping, raise effort one notch on
-the same model. If they reveal a structural blind spot, change model or builder family. Change one
-variable at a time, and keep the auditor independent of whoever implements the repair.
-
-The owner decides product scope; engineering questions, including which of two routes reaches a
-fixed product goal, are yours to decide and act on. Where a countable target cannot be met by the
-target repository, the answer is a sourcing requirement added to the plan, stated plainly — never a
-reduced request.
+Bound the repair loop by surface, finding and attempt count. After two repair cycles on one
+finding produce no new evidence, stop and call it engineering-blocked. Two rounds with genuinely
+new evidence but no progress trigger a stronger model or tier, never an equivalent retry. Change
+one variable at a time and keep the auditor independent of whoever repairs. An engineering block
+is an engineering report to the owner, not a scope question.
 
 ### Verify the outcome, not the call
 
-A test asserting that an argument was passed proves nothing about the process that ran; assert the
+A test that asserts an argument was passed proves nothing about the process that ran. Assert the
 observable outcome.
 
 For frontend work, agents own functional QA before asking the owner for design judgment. Use the
-repo's Playwright CLI/test runner or declared browser equivalent to exercise actual user journeys,
-not only components. Each UI packet names the affected journey and error/recovery paths, viewport(s),
-feature-flag state, fixture versus live backend, and observable assertions. Reuse relevant tests; add
-coverage where a required outcome is absent, not tests that mirror code.
-
-Retain the candidate/build identity, command, exit code, passed/failed/skipped counts and reasons,
-and screenshots/traces or print output where needed to prove visibility or layout. A passing flags-OFF
-suite that skips the feature is not feature proof: run the affected journey with the feature enabled
-in an isolated local test instance, without changing production flags or the owner's preview. Mocked
-responses establish controlled UI behavior, not live backend integration.
-
-Before claiming a frontend complete, cover its required journey matrix — responsive, theme,
-loading/error, persistence, accessibility interactions, print states where applicable — compare the
-required prototype experience, and run a bounded live-backend journey where the feature has one,
-within existing authorization and canary budgets. Static or entirely local journeys record that
-live integration is not applicable and prove their real local behavior instead. Report blocked live
-steps separately and continue independent controlled/browser coverage. The owner reviews subtle
-visual choices and product decisions, and is not the first functional smoke tester.
+repo's browser test runner to exercise real user journeys, including error/recovery paths,
+viewports, flag state, and responsive/theme/loading/persistence/accessibility states where they
+apply. A passing flags-OFF suite that skips the feature is not feature proof. Mocked responses
+establish controlled UI behavior, not live backend integration. Retain build identity, command,
+exit code, counts and screenshots/traces. The owner reviews subtle visual choices; they are not
+the first smoke tester.
 
 ### Stopping without acceptance
 
-A session that stops before acceptance — blocked on an owner decision, out of usage, engineering-
-blocked, or lacking cross-family audit tooling — still closes out, taking this branch instead of the
-accepted one:
+A session that stops before acceptance because of an owner decision, usage limit, engineering block,
+or unavailable required cross-family audit still closes out:
 
-1. Never commit the candidate. Leave the working tree as it stands.
-2. Run the hygiene command from the bindings so nothing is silently lost.
-3. Record in the slice packet, under a `## Stopped` heading: the blocker in one line, what was
-   actually verified, which paths hold retained work, and the single next action that unblocks it.
-4. Rewrite the master document's `## START HERE` block to point at that packet and that blocker,
-   then commit **only** the packet and the master-document edit, with a message saying the slice is
-   not accepted.
-5. Print the master document's full path and the repository root, then stop.
-
-This branch is always available: no session needs an accepted slice to end, and none may end leaving
-the master document stale.
+1. Do not commit the candidate.
+2. Run the hygiene command and settle only paths this session created.
+3. Record the blocker, verified work, retained paths, and single next action. For explicitly
+   requested orchestration, update the current packet and the master document's `## START HERE`
+   block and append the narrative to `## Progress log`. For direct work, report the same facts in
+   the final handoff without touching orchestration state.
+4. If orchestration requires a status-only commit, commit only that paperwork with a message saying
+   the candidate is not accepted.
+5. Print the repository root and, when orchestration is active, the master document path.
 
 ### Closeout
 
-Before reporting a slice finished:
+Before reporting work finished:
 
-1. Run the closeout gate from the bindings for the slice, and record `PASS` or the leftover.
-2. Run the hygiene command from the bindings. Commit or delete every untracked path **this session
-   created**, and report each one by name. A path this session did not create is reported and left
-   in place — never delete or commit another session's work, even inside your own worktree. Never
-   leave a committed file beside an untracked twin. "Clean" is not a report.
-3. Coordinator reviews the final diff and commits, master document updated in the same commit.
+1. Record `PASS` or the leftover as the closeout binding requires.
+2. Run the hygiene command from the bindings. Commit or delete every untracked path **this
+   session created**, and report each by name. A path this session did not create is reported
+   and left in place. "Clean" is not a report.
+3. Review the final diff and commit; include the master document only when orchestration is active.
 
 ### Ending a session
 
-Run these in order; the document edits come **before** the hygiene pass and commit, so both cover
-them.
+1. If the work is not accepted, use `### Stopping without acceptance`.
+2. If orchestration is active, update `## START HERE` in place to no more than 15 lines of pointers,
+   append narrative only to `## Progress log`, and stage the packet and master by name. Normal
+   direct work does not read or modify those files.
+3. Run the hygiene command and settle every path this session created.
+4. Review the final diff and commit only the intended paths after the applicable gate passes.
+5. If working in a branch worktree, fast-forward it into local `main`. If it cannot fast-forward,
+   report the divergence; do not create a merge commit or force it. Rerun the applicable gate on
+   `main`, then remove the worktree and delete the merged branch with `git branch -d`.
+6. Print the repository root and, when orchestration is active, the master document path.
 
-1. If the slice was not accepted, use `### Stopping without acceptance` above instead and stop
-   there. Otherwise run the closeout above through step 1.
-2. Rewrite the master document's `## START HERE` block **in place**, 15 lines maximum, pointers
-   only: current slice and its packet path, blocked-on, next dependency-ready slice, last decision,
-   repository root, and the master document's own path.
-3. Append everything narrative to `## Progress log`. Never rewrite a completed dated section —
-   those are append-only history.
-4. If a detailed spec lives in its own file, leave a breadcrumb both ways: the spec is design only,
-   and its top block redirects here.
-5. Run `### Closeout` steps 2 and 3: the hygiene pass, settling every path it lists, then the
-   final-diff review and commit with the master document in it.
-6. Print the master document's full path and the repository root, then stop.
+### Size discipline
 
-### Packet size discipline
-
-A packet is a specification, not a session log; every session reads it in full at its start.
-
-- Cap a packet at 12288 B, roughly 3,000 tokens. Measure bytes, not lines.
-- A packet carries exactly one `## Stopped` section, at most 4 KB. A frozen handoff is a set of
-  pointers to evidence, never the evidence itself.
-- Superseded `## Stopped` sections, completed `RESULT BLOCK`s and every dated session record
-  (`## Accepted — <date>`, `## Independent audit — <date>`, `## Resumed — …`) move to
-  `SLICE-<ID>-LOG.md` beside the packet, newest first. No session reads that file.
-- A session cut off mid-work — usage limit, interrupt — writes down everything it knows; that dump
-  is correct behaviour, not a cap violation. The **resuming** session compresses it to pointers as
-  its first act, before anything else. Never compress another session's handoff without reading it.
-- This protocol section is capped at 24576 B. A section already over cap is trimmed at the next
-  closeout, not appended to.
-- At either cap, something is archived or compressed. Nothing is appended past a cap.
-- At closeout the coordinator prints its starting read set: the byte size of this section, of the
-  master document's `## START HERE` block, and of the packet it read.
-
-### Effort tiers
-
-Bind the model and effort to the job, not to the session. Tiers are named by strength, never by
-provider.
-
-| Job | Tier |
-| --- | --- |
-| Write a new slice packet | strongest available model, high effort |
-| Run a packet that is already written | mid-tier model, medium effort |
-| Judge a bounced, blocked or deviating candidate | strongest available model, high effort |
-| Closeout and `## START HERE` rewrite | mid-tier model, low effort |
-
-Workers default to a mid-tier model at medium effort. Escalate a worker only when its packet declares
-the work high-risk, or when a first pass fails acceptance. Auditors keep the cross-family rule above;
-family matters more than tier for a review.
-
-Writing a packet and running it are separate sessions. A packet session reads this section, the
-`## START HERE` block and any cited headings, writes one packet, spawns no workers, and ends. Before
-ending it rewrites the one `## START HERE` line naming the slice it just wrote: the planned slice ID
-is replaced by the packet's path, marked dependency-ready, and that single-line edit is committed
-with the packet. A closeout session names a next slice by ID only, with no path, because its packet
-does not exist yet.
-An execution session runs a packet that already exists; if `## START HERE` names no written,
-dependency-ready packet, it stops and asks for a packet session instead of switching modes
-mid-session at the wrong tier.
+This section stays under 24 KB. Optional slice packets stay under 12,288 B; their status and
+evidence are pointers, not session transcripts. A session interrupted mid-work writes down what it
+knows, and the resuming session compresses that handoff after reading it. Narrative belongs in the
+master progress log only when orchestration is active.
