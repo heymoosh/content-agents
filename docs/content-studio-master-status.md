@@ -103,6 +103,30 @@ Keep them until explicitly changed; do not confuse validating this method with t
 of business support. Personalized subscriber-email automation is an aspiration not established by
 this review; do not imply the Outreach Gmail sender implements it.
 
+### Owner's business operating constraints
+
+**Adopted by Muxin, 2026-09-14:** inspired by Justin Welsh's personal business rules,
+as supplied by Muxin in conversation. These are Muxin's own requirements for how her
+ventures should operate, not merely an example from the starter kit.
+
+- No employees to manage.
+- No more than 30 hours of work per week.
+- The ability to take most Fridays completely off.
+- No more than two meetings in any day.
+- No meeting longer than 45 minutes.
+- Work must not interrupt weekends or evenings with family.
+
+Apply these constraints when developing business models, offers, experiments, workload,
+meeting expectations, and operating plans. Do not recommend a plan that depends on violating
+them. Flag a conflict and propose a compatible alternative; only Muxin can explicitly revise
+these boundaries. The 30-hour limit is a ceiling, not a target or a replacement for a smaller
+task-specific time budget.
+
+**Status:** recorded as planning requirements. This documentation update does not add runtime
+enforcement or alter the active venture's saved intake, scorecard, or decision records.
+When implementing venture planning support, check that these constraints are included in its
+context and review criteria rather than assuming this document alone enforces them.
+
 ## Fiction: develop the story without losing author intent
 
 **Promise:** brainstorm and iterate, retain author-supplied world/character detail faithfully,
