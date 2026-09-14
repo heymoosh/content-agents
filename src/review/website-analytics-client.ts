@@ -40,6 +40,9 @@ export interface WebsiteAnalyticsReport {
     newSignups: number;
     newSignupsWithSession: number;
     newSignupsWithoutSession: number;
+    newsletterFormStarts: number;
+    newsletterFormSubmits: number;
+    surveyStarts: number;
     newCohortSurveyCompletions: number;
     importedSurveyCompletions: number;
     otherSurveyCompletions: number;
@@ -182,6 +185,9 @@ export function normalizeWebsiteAnalyticsReport(value: unknown): WebsiteAnalytic
       newSignups: count(coverage.newSignups, 'new signups'),
       newSignupsWithSession: count(coverage.newSignupsWithSession, 'new signups with session'),
       newSignupsWithoutSession: count(coverage.newSignupsWithoutSession, 'new signups without session'),
+      newsletterFormStarts: count(coverage.newsletterFormStarts ?? 0, 'newsletter form starts'),
+      newsletterFormSubmits: count(coverage.newsletterFormSubmits ?? 0, 'newsletter form submits'),
+      surveyStarts: count(coverage.surveyStarts ?? 0, 'survey starts'),
       newCohortSurveyCompletions: count(coverage.newCohortSurveyCompletions, 'new cohort survey completions'),
       importedSurveyCompletions: count(coverage.importedSurveyCompletions, 'imported survey completions'),
       otherSurveyCompletions: count(coverage.otherSurveyCompletions, 'other survey completions'),

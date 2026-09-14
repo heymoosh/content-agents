@@ -19,6 +19,7 @@ export function websiteAnalyticsReportHtml(report: WebsiteAnalyticsReport | null
     : '<p>No saved survey choices were recorded in this range.</p>';
   return '<section class="website-analytics-report"><h4>Measured website funnel</h4><p>Range '+esc(report.range.from)+' to '+esc(report.range.to)+' ('+esc(report.range.timezone)+') · captured '+esc(report.capturedAt)+'. Existing audience: '+esc(report.audience.total)+' records, '+esc(report.audience.active)+' active, '+esc(report.audience.surveyCompletions)+' saved survey completions. Origin counts: '+esc(report.audience.origin.website)+' website · '+esc(report.audience.origin.imported)+' imported · '+esc(report.audience.origin.unknown)+' unknown.</p>'
     + '<p>Measured sessions: '+esc(report.coverage.measuredSessions)+' · unattributed sessions: '+esc(report.coverage.unattributedSessions)+' · new signups without a measured session: '+esc(report.coverage.newSignupsWithoutSession)+'. These aggregate rows do not expose subscriber details or free-text answers.</p>'
+    + '<p>Flow diagnostics: newsletter form starts: '+esc(report.coverage.newsletterFormStarts)+' · newsletter submit attempts: '+esc(report.coverage.newsletterFormSubmits)+' · survey starts: '+esc(report.coverage.surveyStarts)+' · saved new-cohort survey completions: '+esc(report.coverage.newCohortSurveyCompletions)+'. These are diagnostic client signals; browser blocking and repeated attempts can affect them. Saved outcomes remain authoritative.</p>'
     + rowsHtml + rowLimitNote + '<h4>Saved audience needs</h4>'+needsHtml+'</section>';
 }
 

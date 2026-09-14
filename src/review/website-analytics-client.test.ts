@@ -36,6 +36,9 @@ function report(): WebsiteAnalyticsReport {
       newSignups: 2,
       newSignupsWithSession: 2,
       newSignupsWithoutSession: 0,
+      newsletterFormStarts: 4,
+      newsletterFormSubmits: 3,
+      surveyStarts: 5,
       newCohortSurveyCompletions: 1,
       importedSurveyCompletions: 4,
       otherSurveyCompletions: 2,
@@ -102,6 +105,10 @@ test('reads the saved aggregate report and renders the source funnel and needs i
   assert.match(html, /linkedin \/ social/);
   assert.match(html, /\/essays\/example/);
   assert.match(html, /More freedom/);
+  assert.match(html, /newsletter form starts: 4/);
+  assert.match(html, /newsletter submit attempts: 3/);
+  assert.match(html, /survey starts: 5/);
+  assert.match(html, /diagnostic client signals/);
   assert.doesNotMatch(html, /server-only-token|rawAnswers/);
   assert.match(renderPage({ repoRoot: '/fixture', isDevWorktree: true }), /const websiteAnalyticsReportHtml = function websiteAnalyticsReportHtml/);
 });
