@@ -4,6 +4,7 @@
 
 - **Owner direction, 2026-09-13:** assess the code against the room-level product vision, map gaps, and keep one current status per requirement.
 - This is the requirements/status handoff, not standing authorization to execute every gap.
+- **Owner direction, 2026-09-14:** defer task-specific model/effort controls and learned preferences (X6 below); Muxin is continuing the Venture interview. Signals simplification remains outstanding (L5). Design work can be isolated, but do not restart the personal app or reload its interview while a response is pending; coordinate a safe activation point.
 - Current assessment: source review of local `main` at `3e0acc92805cb5dfdc54c2380bb54336898e75e7`.
 - Seven room-level promises are accepted as scope. Charles publishing is explicitly required eventually; it is not set up today.
 - Fiction and Charles social treatments are implemented. Their delivery restrictions are separate unfinished work.
@@ -46,6 +47,7 @@ are distinguished from that scope; they do not all become newly confirmed requir
 | X3 | Choose writing models; see honest progress, elapsed time, errors, stop/retry, and results. | Yes, bounded | `engines.ts`, `jobs.ts`, `fiction-jobs.ts`, `venture-runner.ts`, `charles-jobs.ts`. Claude/Grok/Codex paths exist; GPT-OSS remains paused. Interrupted work is not silently replayed. This is not fresh proof of every engine on every workflow. |
 | X4 | Nothing publishes or sends without approval; identities and voices stay separate. | Yes, with delivery gaps | Review and delivery boundaries exist. Content approval and scheduling are separate actions today. Charles/Fiction delivery remains blocked/manual pending G7/G8. |
 | X5 | The system recommends practical choices and handles repetition while preserving the author's substance. | Partial | Recommendations, source-grounded treatments, origin-specific editors, and media stages exist. General recommendation quality and low-friction visual production are not complete; G5/G6. |
+| X6 | Choose an exact model and reasoning effort per task; eventually reuse the settings Muxin prefers for that task. | No; recorded for later, not current implementation | The picker generally selects a CLI provider and inherits machine defaults, not a task-specific model/effort pair. Owner's starting preference is Astra at medium for substantial analysis/project context and Sonnet for writing; these are hypotheses, not measured winners. Add explicit supported model/effort overrides, visible effective settings and per-run override; retain task-scoped preferences and allow reset. Learn from explicit feedback/accepted results and observed latency, with owner-visible confirmation before changing defaults. No silent provider substitution, paid routing, or automated benchmark spending. Next: inventory task invocation paths and supported controls, then agree a small set of task presets. |
 
 ## Studio: capture and continue
 
@@ -147,6 +149,15 @@ explain uncertainty, and propose changes or experiments that require Muxin's dec
 | L2 | Recommend changes and apply only reviewed allowed changes. | Yes, bounded | `signals-decisions.ts`, `signals-change-proposals.ts`, and `serve-signals.ts` implement decisions and configuration proposals. Adoption and application are distinct gates. This is not permission for arbitrary prose to change routing. |
 | L3 | Propose controlled experiments, use normal Content review, and interpret measured outcomes. | Partial | `signals-experiment-proposal.ts`, `signals-experiment-recommendation.ts`, plan/result stores and `src/grow/`. Plan approval and copy approval stay separate. Prior live proof produced a proposal, not a completed approved experiment; G14. |
 | L4 | Feed relevant learning to one venture without conflating engagement with demand. | Partial | `signals-venture-handoff-store.ts` and Venture learning code preserve context and review. Complete live learning loop remains unverified; G14. |
+| L5 | A simple dashboard makes actual insights, experiment status and learning understandable at a glance. | No; simplification outstanding | Owner reports sample-led cards, confusing wording and excessive whitespace obscure the purpose. Proposed hierarchy: what we know (real evidence and freshness), experiments (status, results and uncertainty), and decisions/next actions. Keep sample/demo content out of the primary live view; explain absent data and offer a clear next step. Put measurement inventory, exports and raw briefs in secondary details. Preserve brand isolation, insufficient-data honesty and review gates. Next: map existing Signals data/states to this hierarchy and review the design before implementation. Isolate work from the active Venture interview and coordinate any running-app restart. |
+
+**Interview latency follow-up (X6):** each current Venture turn sends the notes and conversation
+and regenerates the full structured context (`src/review/intake-notes.ts`). The owner's reported
+delay is not yet attributed to model size/effort: distinguish queue time, CLI startup, input/context
+size, output generation and provider time before choosing an optimization. Consider separating
+the quick conversational response from background context extraction if measurement warrants it;
+preserve grounded fields and durable conversation. Do not change the active interview as part of
+this deferred planning item.
 
 The older vision also requests topical research/idea suggestions. The inspected Scout UI discovers
 outreach leads, not general content ideas. A complete idea-suggestion-to-Content journey was not
