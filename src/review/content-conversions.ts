@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { ventureResources } from './venture-resources.js';
 import { readConversionPlan, conversionDestinations } from '../venture/conversions.js';
 import { readArtifact } from '../venture/artifacts.js';
 import { readVentureSeries } from './venture-actions.js';
@@ -29,9 +30,11 @@ export function contentConversionContext(folder: string, request?: Pick<ContentR
   const questions = series.length ? series.flatMap(s => s.questions) : probes
     .filter(p=>!artifact?.unknown_id || p.unknown_id===artifact.unknown_id)
     .map(p=>p.hypothesis).filter((h):h is string=>typeof h==='string').slice(0,20);
+  const resources = ventureResources(ventureId, dirname(folder), plan);
+  const linkedEssays = resources.destinations.filter(d => d.kind === 'Essay' && d.usedBy.some(p => p.id === request!.id));
   const intended = plan.assignments.find(a => a.contentId === request!.id)
     ?? (artifact?.cta_id ? { destinationId: artifact.cta_id, reason: 'CTA attached to the Venture post' } : null);
-  return { ventureId, goal: plan.goal, questions, destinations: conversionDestinations(ventureId, plan), intended };
+  return { ventureId, goal: plan.goal, questions, destinations: resources.destinations, intended: intended ?? (linkedEssays.length === 1 ? { destinationId: linkedEssays[0]!.id, reason: 'Full essay already linked in this piece. Preserve the existing reader path.' } : null) };
 }
 
 /** Resolve IDs to authoritative URLs; the owner reviews fit, not model-created links. */
@@ -46,7 +49,7 @@ export function authorizeReaderAction(folder: string, input: unknown, request: C
   if (choice.mode !== 'destination' || choice.reviewed !== true) throw new Error('Review the CTA fit and reader value before creating drafts');
   const context = contentConversionContext(folder);
   const destination = context.destinations.find(d => d.id === choice.destinationId);
-  if (!context.ventureId || !destination || destination.status !== 'ready' || !destination.url) throw new Error('Choose a ready destination belonging to this Venture');
+  if (!context.ventureId || !destination || !['ready', 'linked'].includes(destination.status) || !destination.url) throw new Error('Choose a ready or existing linked destination belonging to this Venture');
   const reason = typeof choice.reason === 'string' ? choice.reason.trim() : '';
   if (!reason) throw new Error('Explain why this destination helps readers of this piece');
   const suggested = readAdvice(folder)?.rounds.flatMap(r => r.cards).some(c => c.kind === 'cta' && c.status !== 'dismissed' && c.destinationId === destination.id);
@@ -59,7 +62,7 @@ export function verifyReaderAction(folder: string, request: ContentRequest): voi
   if (!action || action.mode !== 'destination') return;
   const context = contentConversionContext(folder, request);
   const d = context.destinations.find(d => d.id === action.destinationId);
-  if (context.ventureId !== action.ventureId || !d || d.status !== 'ready' || d.url !== action.url || d.action !== action.label) {
+  if (context.ventureId !== action.ventureId || !d || !['ready', 'linked'].includes(d.status) || d.url !== action.url || d.action !== action.label) {
     throw new Error('The CTA destination changed or is not ready. Review the Content plan again.');
   }
 }

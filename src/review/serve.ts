@@ -1,5 +1,6 @@
 import { contentConversionContext, authorizeReaderAction, protectDraftReaderAction } from './content-conversions.js';
-import { readConversionPlan, saveConversionPlan, conversionDestinations } from '../venture/conversions.js';
+import { ventureResources } from './venture-resources.js';
+import { readConversionPlan, saveConversionPlan } from '../venture/conversions.js';
 import { useOriginalSource } from './develop.js';
 // Unified review + approval GUI.
 //
@@ -2566,9 +2567,8 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     const conversionRoute = /^\/api\/venture\/([a-z0-9-]+)\/conversions$/.exec(url.pathname);
     if (conversionRoute && (req.method === 'GET' || req.method === 'POST')) {
       const slug = conversionRoute[1]!;
-      const pieces = listContentSessions().filter(s => contentConversionContext(safeFolder(s.slug)).ventureId === slug).map(s=>({id:s.slug,title:s.title}));
       const plan = req.method === 'POST' ? await saveConversionPlan(slug, await readBody(req)) : readConversionPlan(slug);
-      json(res, 200, { ok: true, plan, destinations: conversionDestinations(slug, plan), pieces });
+      json(res, 200, { ok: true, plan, ...ventureResources(slug, undefined, plan) });
       return;
     }
     if (req.method === "POST" && url.pathname.startsWith("/api/venture/")) {

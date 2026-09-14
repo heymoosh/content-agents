@@ -3227,7 +3227,7 @@ function cwConfigSectionHtml(kind, title, options, s){
 }
 function cwIntendedReaderAction(){
   const intended=CW.conversion?.intended;
-  return intended&&CW.conversion.destinations.some(d=>d.id===intended.destinationId&&d.status==='ready')?{mode:'destination',destinationId:intended.destinationId,reason:intended.reason,reviewed:false}:null;
+  return intended&&CW.conversion.destinations.some(d=>d.id===intended.destinationId&&['ready','linked'].includes(d.status))?{mode:'destination',destinationId:intended.destinationId,reason:intended.reason,reviewed:false}:null;
 }
 
 function cwSources(){ return WB_SESSIONS || []; }
@@ -3541,7 +3541,7 @@ $("#contentWizard").addEventListener("click", (e)=>{
   const original=e.target.closest?.('[data-use-original]');
   if(original){original.disabled=true;post('/api/develop/use-original',{slug:CW.slug}).then(async r=>{if(!r.ok)throw new Error(r.error);CW.approvedLens=r.lens;await loadContent();const cfg=cwEnsureConfig();cfg.open=true;await cwLoadTreatment();}).catch(e=>{original.disabled=false;flash(e.message);});return;}
   const cta=e.target.closest?.('[data-cta-suggestion]');
-  if(cta){const cfg=cwEnsureConfig(), id=cta.dataset.ctaSuggestion, d=CW.conversion?.destinations.find(x=>x.id===id&&x.status==='ready');if(!d){flash('This destination is not ready in the linked Venture.');return;}const card=(cwSession()?.rounds||[]).flatMap(r=>r.cards).filter(c=>c.kind==='cta'&&c.destinationId===id&&c.status!=='dismissed').at(-1);cfg.readerAction={mode:'destination',destinationId:id,reason:card?.summary||'',reviewed:false};cfg.open=true;renderContentWizard();$('#contentReaderAction')?.focus();return;}
+  if(cta){const cfg=cwEnsureConfig(), id=cta.dataset.ctaSuggestion, d=CW.conversion?.destinations.find(x=>x.id===id&&['ready','linked'].includes(x.status));if(!d){flash('This destination is not available in the linked Venture.');return;}const card=(cwSession()?.rounds||[]).flatMap(r=>r.cards).filter(c=>c.kind==='cta'&&c.destinationId===id&&c.status!=='dismissed').at(-1);cfg.readerAction={mode:'destination',destinationId:id,reason:card?.summary||'',reviewed:false};cfg.open=true;renderContentWizard();$('#contentReaderAction')?.focus();return;}
   const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-set-pane],[data-config-all],[data-config-none],[data-config-save],[data-dev-start],[data-dev-reply],[data-dev-accept],[data-dev-dismiss],[data-cut-save],[data-cut-comment],[data-open-config]") : null;
   if(!t) return;
   if(t.dataset.openConfig!==undefined){ const cfg=cwEnsureConfig(); cfg.open=true; renderContentWizard(); cwLoadTreatment(); return; }
@@ -4532,7 +4532,6 @@ $('#roomVenture .venture-stages').append(conversionTab);
 let ventureConversionData=null;
 async function loadVentureConversions(force=false){
   if(!ventureSlug||ventureSlug==='__example__'){$('#ventureConversionsPane').textContent='Choose a real venture first.';return;}
-  if(!force&&ventureConversionData?.slug===ventureSlug)return;
   const slug=ventureSlug;
   $('#ventureConversionsPane').textContent='Loading reader destinations…';
   try{const r=await fetch('/api/venture/'+encodeURIComponent(slug)+'/conversions').then(x=>x.json());if(!r.ok)throw new Error(r.error||'Could not load destinations');if(slug!==ventureSlug)return;ventureConversionData={...r,slug};$('#ventureConversionsPane').innerHTML=renderVentureConversions(r,esc);}
@@ -4548,8 +4547,7 @@ $('#ventureConversionsPane').addEventListener('click',async e=>{
   const button=e.target.closest?.('[data-conversion-save]');if(!button||!ventureConversionData)return;
   button.disabled=true;const pane=$('#ventureConversionsPane'), data=ventureConversionData;
   const destinations=Array.from(pane.querySelectorAll('[data-conversion-row]')).map(row=>Object.fromEntries([['id',row.dataset.conversionRow],...Array.from(row.querySelectorAll('[data-conversion-field]')).map(i=>[i.dataset.conversionField,i.value])]));
-  const visibleIds=new Set(data.pieces.map(p=>p.id));
-  const assignments=data.plan.assignments.filter(a=>!visibleIds.has(a.contentId)).concat(Array.from(pane.querySelectorAll('[data-conversion-piece]')).map(row=>({contentId:row.dataset.conversionPiece,destinationId:row.querySelector('[data-conversion-assignment]').value,reason:row.querySelector('[data-conversion-reason]').value})).filter(a=>a.destinationId));
+  const assignments=data.plan.assignments;
   try{const r=await post('/api/venture/'+encodeURIComponent(data.slug)+'/conversions',{...data.plan,goal:$('#ventureConversionGoal').value,destinations,assignments});if(!r.ok)throw new Error(r.error||'Could not save');ventureConversionData={...r,slug:data.slug};if(ventureSlug===data.slug){pane.innerHTML=renderVentureConversions(r,esc);$('#ventureConversionStatus').textContent='Destinations and assignments saved. Content will check these when you plan a piece.';}}
   catch(error){$('#ventureConversionStatus').textContent=error.message;}finally{button.disabled=false;}
 });

@@ -7,11 +7,22 @@
 a file lock and atomically replace the document. They never change phase or editorial gates.
 Each destination has a stable `id`, `name`, `audience`, `benefit`, `action` (CTA label),
 `measurement` (including “Not connected yet”), `status` (`proposed`, `building`, `ready`,
-`retired`), and `url`. Ready custom destinations require an owner-supplied existing HTTPS URL.
+`retired`, `linked`), and `url`. Ready custom destinations require an owner-supplied existing HTTPS URL.
 Lead-magnet and landing-page artifacts are also discovered from `artifacts.jsonl`; their IDs
 stay stable, and their readiness requires editorial approval, live confirmation and URL evidence.
 Registry metadata cannot promote an unfinished artifact. Assignments contain `contentId`,
 `destinationId`, and a per-piece `reason`; an artifact's existing `cta_id` is a fallback intention.
+
+The resource screen is a read-through catalogue, not a required intake form. It discovers public
+HTTPS Markdown links and canonical essay URLs from `source.md` of Content requests owned by the
+venture. URL-derived IDs are stable, repeated links are grouped with `usedBy` references, and
+`kind` / `provenance` distinguish essays, linked resources and Venture work. `linked` means present
+in saved content, not live-verified. Lead-magnet concepts appear as proposed until artifact work
+exists; artifact approval/delivery state remains authoritative. Reads never mutate interview,
+content, registry or gate records. Manual registry entries remain optional overrides/additions.
+A single linked essay is offered as the existing reader path (not automatically approved);
+multiple possible essays are left for review. Content still requires explicit fit/value review
+before using a linked resource as a destination CTA. Existing saved CTA choices are not rewritten.
 
 Content resolves Venture identity from its stored request or the existing-series handoff, not
 browser assertions. Fiction/Charles cannot borrow these Human Inference destinations. The advisor

@@ -50,9 +50,9 @@ platforms" runs the normal `/atomize --continue` pipeline afterward.
    - **Reader's next step** (kind `cta`, one card): use the server-supplied Venture conversion
      context. Check an intended CTA first; do not replace it just to produce a new idea. Explain
      the audience need, benefit, fit with this piece and conversion action. If none was supplied
-     or it does not fit, compare ready destinations in the same Venture and recommend the best
+     or it does not fit, compare ready or existing-content-linked destinations in the same Venture and recommend the best
      relevant one by `destinationId`. Never assume one is best just because it exists. Proposed,
-     building or retired assets are not usable CTAs. With no suitable ready destination, say
+     building or retired assets are not usable CTAs. Linked resources are not live-verified; preserve relevant source links and do not call essays or tools lead magnets. With no suitable destination, say
      "No CTA for this piece" and flag any missing asset for Venture to consider. Do not invent
      an offer, link, consulting service or availability close. A canonical long-form source
      remains the default unless Muxin explicitly selects a different destination or no CTA.
@@ -86,7 +86,7 @@ platforms" runs the normal `/atomize --continue` pipeline afterward.
              "title": "Belief under audit: ...",
              "summary": "Reader + payoff, altitude -> platform, the observable. Your rationale prose; it never enters content.",
              "lens": "belief-audit",     // angle only
-             "destinationId": "existing-resource-id", // cta only, from supplied ready destinations; omit if none
+             "destinationId": "existing-resource-id", // cta only, from supplied ready or linked destinations; omit if none
              "sourceLines": [12, "31-33"],  // angle only: verbatim source.md lines that carry it
              "status": "open",           // always "open" when you write it
              "acceptedLens": null,
