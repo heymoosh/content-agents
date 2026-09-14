@@ -238,7 +238,7 @@ export async function publishTikTok(
       continue;
     }
     const ref = await scheduleToTikTok(videoPath, caption, scheduledFor);
-    setStatus(folder, row, "published");
+    setStatus(folder, row, "scheduled");
     appendPublishLog(folder, `${row.id} → tiktok ${ref} (scheduled ${scheduledFor})`);
     appendBetPlacement(folder, row.id, "tiktok", `${ref} @ ${scheduledFor}`, fm, caption);
     console.log(`scheduled: ${row.id} → tiktok ${ref} @ ${scheduledFor}`);

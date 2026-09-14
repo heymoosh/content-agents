@@ -550,7 +550,7 @@ export async function publishText(
       });
       continue;
     }
-    setStatus(folder, row, "published");
+    setStatus(folder, row, noSchedule ? "submitted" : "scheduled");
     const placeNote = ctas.length > 0 ? `, cta→${placement}` : "";
     appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, ${when}${placeNote})`);
     if (manualComment) {

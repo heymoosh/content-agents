@@ -14,6 +14,10 @@ import { assertApprovalJournalReadable, recordNewQueueRows } from "../review/app
 export const QUEUE_ORIGINS = ["from /cycle", "reply to mention", "from GUI queue", "from /outreach draft"] as const;
 export type QueueOrigin = (typeof QUEUE_ORIGINS)[number];
 
+// Completion of dispatch is not proof of public delivery. `published` is retained for
+// confirmed live writes and legacy rows whose exact provider state must be reconciled.
+export const DISPATCHED_STATUSES = new Set(["scheduled", "submitted", "prepared", "published"]);
+
 export interface QueueRow {
   id: string;
   platform: string;

@@ -74,6 +74,11 @@ describe("reschedule a scheduled Postiz row", () => {
     assert.equal(status.plannedFor, "2026-09-14T17:00:00.000Z");
     assert.equal(status.state, "planned");
     assert.equal(status.providerObjectId, "pz-1");
+    const log = readFileSync(join(folder, "publish-log.md"), "utf8");
+    assert.match(log, /Moved x-1 .* from 2026-09-10T17:00:00.000Z to 2026-09-14T17:00:00.000Z/);
+    const again = await rescheduleRow(folder, "2026-09-01-essay", row, { to: "2026-09-14T17:00:00Z" }, { transport, statusPath, now: () => NOW });
+    assert.equal(again.ok, true);
+    assert.equal(readFileSync(join(folder, "publish-log.md"), "utf8"), log, "same-time retry does not duplicate move history");
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -195,4 +200,19 @@ describe("batch reschedule by theme", () => {
     assert.equal(readLedger().filter((c) => c.platform === "x" && c.time >= "2026-10-01").length, 2);
     rmSync(root, { recursive: true, force: true });
   });
+});
+
+test("move history write failure reports that the provider already moved", async () => {
+  const { root, folder, statusPath } = fixture();
+  try {
+    mkdirSync(join(folder, 'publish-log.md'));
+    const { transport } = fakePostiz();
+    const row = readQueue(folder).rows.find(r => r.id === 'x-1')!;
+    const result = await rescheduleRow(folder, '2026-09-01-essay', row, {to:'2026-09-14T17:00:00Z'}, {transport,statusPath,now:()=>NOW});
+    assert.equal(result.ok, false);
+    assert.match(result.error!, /Postiz moved the post/);
+    const status = readPublishingStatuses(statusPath)['2026-09-01-essay/x-1'];
+    assert.equal(status.state, 'uncertain');
+    assert.equal(status.plannedFor, '2026-09-14T17:00:00.000Z');
+  } finally { rmSync(root,{recursive:true,force:true}); }
 });

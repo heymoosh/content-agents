@@ -149,7 +149,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     );
 
     const { rows } = readQueue(folder);
-    assert.equal(rows[0].status, "published");
+    assert.equal(rows[0].status, "scheduled");
     const log = readFileSync(join(folder, "publish-log.md"), "utf8");
     assert.match(log, /quote-card-1-x → typefully draft draft-1/);
   });
@@ -275,7 +275,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     assert.equal(body.platforms.linkedin.enabled, true);
 
     const { rows } = readQueue(folder);
-    assert.equal(rows[0].status, "published");
+    assert.equal(rows[0].status, "scheduled");
     assert.match(readFileSync(join(folder, "publish-log.md"), "utf8"), /cm-1 → typefully draft draft-1 \(linkedin/);
   });
 
@@ -331,7 +331,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     assert.deepEqual(results.map((r) => r.id), ["quote-card-1-x"], "the sweep takes the card row and only the card row");
     assert.equal(calls.filter((c) => c.url.endsWith("/drafts")).length, 1, "exactly one draft, for the quote-card row");
     const rows = readQueue(folder).rows;
-    assert.equal(rows.find((r) => r.id === "quote-card-1-x")!.status, "published");
+    assert.equal(rows.find((r) => r.id === "quote-card-1-x")!.status, "scheduled");
     assert.equal(rows.find((r) => r.id === "cm-1")!.status, "approve", "the media row is left for the Postiz-first path to decide");
   });
 
@@ -349,7 +349,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
 
     // Put the row back to `approve`, exactly as a crashed status write would have left it.
     const queuePath = join(folder, "review-queue.md");
-    writeFileSync(queuePath, readFileSync(queuePath, "utf8").replace("| published |", "| approve |"));
+    writeFileSync(queuePath, readFileSync(queuePath, "utf8").replace("| scheduled |", "| approve |"));
     assert.equal(readQueue(folder).rows[0].status, "approve", "precondition: the row is approve again");
 
     // Layer one: the reuse guard alone already refuses the re-run (linkedin's min_reuse_days).
@@ -363,7 +363,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     assert.equal(calls.filter((c) => c.url.endsWith("/drafts")).length, 1, "no second live draft may be created");
     assert.equal(calls.filter((c) => c.url.includes("/media/upload")).length, 1, "and no second media upload");
     assert.equal(second[0].ref, "typefully draft draft-1", "the prior draft's ref is reused");
-    assert.equal(readQueue(folder).rows[0].status, "published");
+    assert.equal(readQueue(folder).rows[0].status, "scheduled");
   });
 
   test("fallback media rows claim real slots from the shared ledger and cannot exceed linkedin's per-day cap", async () => {

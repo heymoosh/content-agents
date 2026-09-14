@@ -152,7 +152,7 @@ export function readPublishingStatuses(path: string = PUBLISHING_STATUS_PATH): R
 }
 
 export function publishingRetryBlock(slug: string, row: QueueRow, path: string = PUBLISHING_STATUS_PATH): string | null {
-  if (row.status === "published" || row.status === "locked") return "this row was already scheduled or locked";
+  if (["scheduled", "submitted", "prepared", "published", "locked"].includes(row.status)) return "this row was already dispatched, prepared or locked";
   const existing = readPublishingStatuses(path)[publishingKey(slug, row.id)];
   if (existing && ["scheduling", "scheduled", "planned", "delivered", "live", "private", "uncertain"].includes(existing.state)) {
     return `this row already has a ${existing.state} publishing attempt; reconcile it before retrying`;

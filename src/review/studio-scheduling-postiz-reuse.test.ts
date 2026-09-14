@@ -128,7 +128,7 @@ describe("the Postiz path refuses a row the reuse guard blocks", () => {
 
   // ── The control. Without it every assertion in the next test passes trivially on a fixture that
   // could never have reached Postiz in the first place. ───────────────────────────────────────────
-  test("an ALLOWED row still goes through Postiz unchanged: post created, slot held, row published", async () => {
+  test("an ALLOWED row still goes through Postiz unchanged: post created, slot held, row scheduled", async () => {
     const { folder } = liveFolder();
     const calls: string[] = [];
     const result = await scheduleApproved(folder, textRow(), liveDeps(calls));
@@ -141,7 +141,7 @@ describe("the Postiz path refuses a row the reuse guard blocks", () => {
     assert.equal(ledger.length, 1, `Postiz holds its claimed slot: ${JSON.stringify(ledger)}`);
     assert.equal(ledger[0].by, "postiz");
     assert.equal(ledger[0].platform, "x");
-    assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /\| published \|/);
+    assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /\| scheduled \|/);
     assert.ok(existsSync(join(folder, "publish-log.md")), "a real placement is logged");
   });
 
@@ -173,7 +173,7 @@ describe("the Postiz path refuses a row the reuse guard blocks", () => {
     // Still pending for Muxin, never marked published, and nothing written to the publish log.
     const queue = readFileSync(join(folder, "review-queue.md"), "utf8");
     assert.match(queue, /\| approve \|/);
-    assert.doesNotMatch(queue, /\| published \|/);
+    assert.doesNotMatch(queue, /\| scheduled \|/);
     assert.ok(!existsSync(join(folder, "publish-log.md")));
     // The WHOLE string, timestamp included — the same message runPublisher's recovery branch emits
     // and the same shape reconcile.ts parses back out of the row's notes.
@@ -416,7 +416,7 @@ describe("SLICE-6Z: a different derivative of the same piece is spaced, not refu
     assert.equal(ledger.length, 1, `exactly one claim: ${JSON.stringify(ledger)}`);
     assert.equal(ledger[0].platform, "bluesky");
     assert.equal(ledger[0].time, scheduled.plannedFor, "the scheduler picked the time, nothing else did");
-    assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /\| published \|/);
+    assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /\| scheduled \|/);
   });
 
   test("the SAME row an hour after its own placement still refuses, with today's message and window", async () => {
@@ -431,7 +431,7 @@ describe("SLICE-6Z: a different derivative of the same piece is spaced, not refu
     assert.deepEqual(calls, [], "nothing was created, and no backup route ran");
     assert.equal(result.scheduleError, `blocked by reuse guard, last placed to bluesky ${AN_HOUR_AGO} (min_reuse_days: 21)`);
     assert.deepEqual(readFileSync(process.env.CONTENT_AGENTS_TEST_LEDGER!), ledgerBefore, "no slot consumed");
-    assert.doesNotMatch(readFileSync(join(folder, "review-queue.md"), "utf8"), /\| published \|/);
+    assert.doesNotMatch(readFileSync(join(folder, "review-queue.md"), "utf8"), /\| scheduled \|/);
   });
 
   test("platforms stay independent: a bluesky placement does not defer or block an x row", async () => {

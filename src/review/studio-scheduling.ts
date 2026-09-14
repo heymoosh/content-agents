@@ -434,7 +434,7 @@ export async function defaultPublishPostiz(
   }
   // Same bookkeeping as the Typefully/cards publishers: queue status, publish log, and the bets
   // Placed row (CTA destination included) so grading and tag-source see this placement.
-  setStatus(folder, row, "published");
+  setStatus(folder, row, "scheduled");
   const placeNote = plan.ctaCount > 0 ? `, cta→${plan.placement}` : "";
   // Plain spacing note for a deferred row, so the Studio result and the folder's own publish log
   // both say why this one landed a week out instead of tomorrow.

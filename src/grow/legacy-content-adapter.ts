@@ -86,7 +86,9 @@ function stableSlug(folder: string): string {
 }
 
 function normalizeVariantStatus(status: string, publishedInLog: boolean): LegacyVariantStatus {
-  if (publishedInLog || status === "published") return "published";
+  if (publishedInLog) return "published";
+  // Legacy published rows included schedules/private uploads. Without live evidence stay unknown.
+  if (["published", "submitted", "prepared"].includes(status)) return "unknown";
   if (["approve", "approved"].includes(status)) return "approved";
   if (["schedule", "scheduled"].includes(status)) return "scheduled";
   if (["discard", "discarded", "rejected"].includes(status)) return "discarded";
@@ -106,7 +108,7 @@ function readPublishLog(folder: string, queueRows: readonly QueueRow[]): { summa
     if (!/^\s*-\s+/.test(line)) continue;
     entryCount += 1;
     const match = line.match(/—\s+(.+?)\s+→/);
-    if (match && queueIds.has(match[1].trim())) published.add(match[1].trim());
+    if (match && /→ substack https?:\/\/\S+ \(posted,/.test(line) && queueIds.has(match[1].trim())) published.add(match[1].trim());
   }
   return {
     text,

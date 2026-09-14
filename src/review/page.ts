@@ -1354,7 +1354,7 @@ const SAMPLE_REVIEW_PIECE = ${opts.fixtures ? JSON.stringify({
     { id: "thread-1-linkedin", platform: "linkedin", media: "text", format: "thread", treatment: "platform-framing", status: "pending", editable: true, body: "We fear new systems of power while treating old concentrations of power as background conditions. That asymmetry is worth examining." },
   ],
 }) : "null"};
-const DECIDED = new Set(["published","discard","locked"]);
+const DECIDED = new Set(["scheduled","submitted","prepared","published","discard","locked"]);
 const reviewSelected = new Set();
 // In-flight action registries, keyed by stable row.id / piece.slug — NOT stored on the row/DATA
 // objects. The 3s job poll (setInterval below) calls load() on ANY job status change anywhere,
@@ -1515,7 +1515,7 @@ async function post(path, body){
 }
 
 function statusLabel(s){ return s ? s : "needs"; }
-function pillClass(s){ return s && ["approve","revise","discard","published","blocked","locked"].includes(s) ? s : "needs"; }
+function pillClass(s){ return s && ["approve","revise","discard","scheduled","submitted","prepared","published","blocked","locked"].includes(s) ? s : "needs"; }
 
 function rowEl(piece, row){
   const el = document.createElement("div");
@@ -1664,7 +1664,7 @@ function reviewScanRowEl(piece,row){
   return button;
 }
 function reviewStateLabel(status){
-  if(status==="approve"||status==="published"||status==="locked") return "Approved";
+  if(["approve","scheduled","submitted","prepared","published","locked"].includes(status)) return "Approved";
   if(status==="revise"||status==="blocked") return "Changes requested";
   if(status==="discard") return "Rejected";
   return "Draft";
@@ -1676,8 +1676,8 @@ function approvalResultView(kind,result){
   if(result&&result.scheduled){
     if(kind==="outreach-message") return {status:"locked",message:"Locked"};
     if(result.scheduled.readyToPaste) return {status:"approve",message:"Approved · ready-to-paste handoff created"};
-    if(result.scheduled.autoPublishes===false) return {status:"published",scheduledWhen:result.scheduled.when,manualComment:result.scheduled.manualComment||"",message:"Uploaded (still PRIVATE: flip it manually in YouTube Studio) · "+result.scheduled.when};
-    return {status:"published",scheduledWhen:result.scheduled.when,manualComment:result.scheduled.manualComment||"",message:"Scheduled · "+(result.scheduled.when||"provider accepted")};
+    if(result.scheduled.autoPublishes===false) return {status:"submitted",scheduledWhen:result.scheduled.when,manualComment:result.scheduled.manualComment||"",message:kind==="video" ? "Uploaded (still PRIVATE: flip it manually in YouTube Studio) · "+result.scheduled.when : "Saved provider draft · not scheduled"};
+    return {status:"scheduled",scheduledWhen:result.scheduled.when,manualComment:result.scheduled.manualComment||"",message:"Scheduled · "+(result.scheduled.when||"provider accepted")};
   }
   if(result&&result.scheduleError) return {status:"approve",message:"Approved, scheduling needs attention: "+result.scheduleError};
   return {status:"approve",message:"Approved"};
@@ -1905,22 +1905,29 @@ function publishingState(row){
   if(state==="uncertain") return "Needs reconciliation";
   if(state==="blocked") return "Blocked";
   if(state==="scheduling") return "Scheduling";
-  if(state==="private") return "Uploaded private";
+  if(state==="private") return row.publishingStatus.provider==="typefully" ? "Saved provider draft" : "Uploaded private";
   if(state==="cleared"||state==="canceled"||state==="deleted") return "Ready to retry";
   if(row.scheduleError||row.reconciled&&row.reconciled.state==="mismatch") return "Needs attention";
   if(state==="scheduled"||state==="planned") return "Scheduled";
+  if(row.reconciled&&row.reconciled.deliveryState==="live") return "Live";
+  if(row.status==="submitted") return "Submitted";
+  if(row.status==="prepared") return "Ready to paste";
   if(row.reconciled&&row.reconciled.state==="scheduled"||row.scheduledWhen) return "Scheduled";
-  if(row.status==="published") return "Scheduled / uploaded";
+  if(row.status==="scheduled") return "Scheduled";
+  if(row.status==="published") return "Needs reconciliation";
   return "Pending";
 }
 function publishingStatusMessage(state,error){
   if(error) return error;
   if(state==="Live") return "Confirmed live at the provider.";
   if(state==="Pending") return "Waiting for the provider to accept it.";
-  if(state==="Scheduled"||state==="Scheduled / uploaded") return "Scheduled with the provider; live publication is not yet confirmed.";
+  if(state==="Submitted") return "Accepted by the provider; public delivery is not confirmed.";
+  if(state==="Ready to paste") return "A manual handoff was prepared. Nothing has been posted by this action.";
+  if(state==="Scheduled") return "Scheduled with the provider; live publication is not yet confirmed.";
   if(state==="Needs reconciliation") return "Provider outcome is uncertain. Check the provider before retrying.";
   if(state==="Needs attention") return "Provider delivery needs attention.";
   if(state==="Ready to retry") return "The prior provider object is no longer active; this row may be approved and retried.";
+  if(state==="Saved provider draft") return "Saved at the provider without a publication time.";
   if(state==="Uploaded private") return "Uploaded privately; public delivery is not confirmed.";
   return "Provider status recorded.";
 }
@@ -1933,7 +1940,7 @@ const publishingSelected=new Set();
 function publishingKeyFor(slug,id){ return JSON.stringify([slug,id]); }
 function hasLiveSchedule(row){
   const state=row.publishingStatus&&row.publishingStatus.state;
-  return Boolean(row.scheduledWhen||(row.reconciled&&row.reconciled.state==="scheduled")||state==="scheduling"||state==="scheduled"||state==="planned"||state==="private"||state==="uncertain"||row.status==="published"||row.status==="locked");
+  return Boolean(row.scheduledWhen||(row.reconciled&&row.reconciled.state==="scheduled")||state==="scheduling"||state==="scheduled"||state==="planned"||state==="private"||state==="uncertain"||["scheduled","submitted","prepared","published","locked"].includes(row.status));
 }
 function pendingPublishingRow(row){ return row.status==="approve"&&!hasLiveSchedule(row); }
 function renderPublished(){
@@ -1952,7 +1959,7 @@ function renderPublished(){
     main.appendChild(sec);
   }
   for(const piece of contentRequestPieces(DATA.pieces)){
-    const rows=(piece.rows||[]).filter(r=>(r.status==="approve"||r.status==="published"||r.status==="locked"||r.scheduleError)&&!pendingPublishingRow(r));
+    const rows=(piece.rows||[]).filter(r=>(["approve","scheduled","submitted","prepared","published","locked"].includes(r.status)||r.scheduleError)&&!pendingPublishingRow(r));
     if(!rows.length) continue; shown+=rows.length;
     const sec=document.createElement("section"); sec.className="piece";
     sec.innerHTML='<h3>'+esc(piece.descriptor||piece.title)+'</h3><div class="slug">Input request · '+esc(piece.slug)+'</div><div class="publish-row head"><span>Draft</span><span>Destination</span><span>Planned / sent</span><span>Provider status</span></div>';
@@ -1966,7 +1973,8 @@ function renderPublished(){
       const ref=row.publishingStatus&&row.publishingStatus.ref ? ' · '+esc(row.publishingStatus.ref) : '';
       const canonical=row.publishingStatus&&row.publishingStatus.canonicalUrl ? '<span class="src" style="display:block">'+esc(row.publishingStatus.canonicalUrl)+'</span>' : '';
       const reconcile=row.publishingStatus&&(row.publishingStatus.state==="uncertain"||row.publishingStatus.state==="scheduling") ? '<div class="actions"><button data-publish-resolve="exists" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">I found it at the provider</button><button data-publish-resolve="not-created" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">Provider has nothing · allow retry</button></div>' : '';
-      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(planned)+moveBtn+'</span></span><span class="src"><strong>'+esc(provider)+'</strong>'+ref+canonical+'<br>'+esc(publishingStatusMessage(state,error))+reconcile+'</span>';
+      const moves=(row.publishingMoves||[]).length ? '<details><summary>Move history</summary>'+row.publishingMoves.map(line=>'<div>'+esc(line)+'</div>').join('')+'</details>' : '';
+      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(planned)+moveBtn+'</span></span><span class="src"><strong>'+esc(provider)+'</strong>'+ref+canonical+'<br>'+esc(publishingStatusMessage(state,error))+reconcile+moves+'</span>';
       sec.appendChild(item);
     }
     main.appendChild(sec);

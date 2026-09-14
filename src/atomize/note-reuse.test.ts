@@ -94,13 +94,13 @@ describe("noteReuse — the picker-facing verdict", () => {
   test("published inside the cooldown → blocked, tag says how long ago", () => {
     const r = noteReuse({ undecided: false, lastPublishedAt: daysBeforeNow(10), publishedUndated: false }, NOW);
     assert.equal(r.reusable, false);
-    assert.equal(r.draftedTag, "published 10d ago");
+    assert.equal(r.draftedTag, "publishing recorded 10d ago");
   });
 
   test(`published ${REUSE_COOLDOWN_DAYS}+ days ago → selectable again, labeled`, () => {
     const r = noteReuse({ undecided: false, lastPublishedAt: daysBeforeNow(REUSE_COOLDOWN_DAYS + 5), publishedUndated: false }, NOW);
     assert.equal(r.reusable, true);
-    assert.equal(r.draftedTag, `published ${REUSE_COOLDOWN_DAYS + 5}d ago, ok to reuse`);
+    assert.equal(r.draftedTag, `publishing recorded ${REUSE_COOLDOWN_DAYS + 5}d ago, ok to reuse`);
   });
 
   test("published exactly at the cooldown boundary is reusable (>= cooldown days)", () => {
@@ -111,7 +111,7 @@ describe("noteReuse — the picker-facing verdict", () => {
   test("published but undated → blocked (can't prove the cooldown passed)", () => {
     const r = noteReuse({ undecided: false, lastPublishedAt: null, publishedUndated: true }, NOW);
     assert.equal(r.reusable, false);
-    assert.equal(r.draftedTag, "published (date unknown)");
+    assert.equal(r.draftedTag, "publication date unconfirmed");
   });
 
   test("drafted then fully discarded → selectable immediately", () => {
@@ -172,4 +172,13 @@ describe("readOriginStates — real folder scan", () => {
   test("missing content dir → empty map", () => {
     assert.equal(readOriginStates(join(tmpdir(), "definitely-not-there-12345")).size, 0);
   });
+});
+
+test('scheduled and prepared handoffs remain blocked without claiming a live publication', () => {
+  for (const status of ['scheduled', 'submitted', 'prepared']) {
+    const state = foldFolderState([{status}], ['2020-01-01T00:00:00Z']);
+    const result = noteReuse(state, Date.parse('2026-09-13'));
+    assert.equal(result.reusable, false);
+    assert.match(result.draftedTag, /in publishing; live status not confirmed/);
+  }
 });

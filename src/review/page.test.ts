@@ -1264,7 +1264,7 @@ function approvalResultMirror(): ApprovalResultView {
 test("Content approval outcomes preserve the provider/manual truth boundary", () => {
   const view = approvalResultMirror();
   assert.deepEqual(view("text", { scheduled: { when: "Sep 2 at 9:00 AM", ref: "provider-1" } }), {
-    status: "published", scheduledWhen: "Sep 2 at 9:00 AM", manualComment: "",
+    status: "scheduled", scheduledWhen: "Sep 2 at 9:00 AM", manualComment: "",
     message: "Scheduled · Sep 2 at 9:00 AM",
   });
   assert.deepEqual(view("text", { scheduleError: "provider timed out" }), {
@@ -1274,7 +1274,7 @@ test("Content approval outcomes preserve the provider/manual truth boundary", ()
   assert.deepEqual(manual, { status: "approve", message: "Approved · ready-to-paste handoff created" });
   assert.doesNotMatch(manual.message, /provider accepted|scheduled|uploaded/i);
   assert.deepEqual(view("video", { scheduled: { autoPublishes: false, when: "now", manualComment: "finish in Studio" } }), {
-    status: "published", scheduledWhen: "now", manualComment: "finish in Studio",
+    status: "submitted", scheduledWhen: "now", manualComment: "finish in Studio",
     message: "Uploaded (still PRIVATE: flip it manually in YouTube Studio) · now",
   });
 });
@@ -3961,7 +3961,7 @@ test("the folder divider is the original input itself, open, with title and slug
     (sel: string) => (sel === "#reviewMain" ? main : sel === "#count" ? count : undefined),
     document,
     { pieces },
-    new Set(["published", "discard", "locked"]),
+    new Set(["scheduled", "submitted", "prepared", "published", "discard", "locked"]),
     (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string)),
     () => pieces,
     () => document.createElement("div"),
@@ -4142,7 +4142,7 @@ test("bulk approve reports its failures as a standing error, not a passing toast
       (m: string) => errors.push(m),
       async () => {},
       { pieces },
-      new Set(["published", "discard", "locked"]),
+      new Set(["scheduled", "submitted", "prepared", "published", "discard", "locked"]),
       selected,
       (slug: string, id: string) => JSON.stringify([slug, id]),
     ) as () => Promise<void>;
@@ -4199,4 +4199,22 @@ test("the queue list is set in readable body type with muted metadata", () => {
   assert.ok(!css.includes(".piece-source.scroll"), "no character-count scroll variant survives");
   assert.match(css, /\.piece > \.piece-sub \{ color:var\(--muted\)/, "title and slug are a muted subtitle");
   assert.match(css, /\.flash\.error \{[^}]*pointer-events:auto/, "a standing error can be clicked to dismiss");
+});
+
+test("Publishing labels distinguish schedules, handoffs and provider-confirmed live delivery", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function publishingState(row)");
+  const end = script.indexOf("function publishingProvider(row)", start);
+  const { state, message } = new Function(script.slice(start, end) + "\nreturn {state:publishingState,message:publishingStatusMessage};")();
+  assert.equal(state({status:"scheduled"}), "Scheduled");
+  assert.equal(state({status:"submitted",scheduledWhen:"now"}), "Submitted");
+  assert.equal(state({status:"prepared"}), "Ready to paste");
+  assert.equal(state({status:"published"}), "Needs reconciliation");
+  assert.equal(state({status:"scheduled",publishingStatus:{state:"live"}}), "Live");
+  assert.equal(state({status:"scheduled",reconciled:{deliveryState:"live",state:"unavailable"}}), "Live");
+  assert.equal(state({status:"submitted",publishingStatus:{state:"private",provider:"typefully"}}), "Saved provider draft");
+  assert.equal(state({status:"scheduled",publishingStatus:{state:"failed"}}), "Needs attention");
+  assert.equal(state({status:"scheduled",publishingStatus:{state:"uncertain"}}), "Needs reconciliation");
+  assert.match(message("Scheduled"), /live publication is not yet confirmed/);
+  assert.match(message("Ready to paste"), /Nothing has been posted/);
 });

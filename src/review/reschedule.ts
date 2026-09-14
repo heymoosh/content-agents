@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readQueue, type QueueRow } from "../publish/queue.js";
+import { readQueue, appendPublishLog, type QueueRow } from "../publish/queue.js";
 import { claimSlots, laDayKey, moveClaim, type Claim } from "../publish/slots.js";
 import { createPostizTransport, findPostizPost, reschedulePostizPost, type PostizTransport } from "../publish/postiz.js";
 import { appendPublishingStatus, publishingKey, readPublishingStatuses, PUBLISHING_STATUS_PATH, type PublishingStatus } from "./publishing-status.js";
@@ -107,6 +107,7 @@ export async function rescheduleRow(folder: string, slug: string, row: QueueRow,
         providerUpdatedAt: new Date().toISOString(), error: undefined, schemaVersion: undefined, eventId: undefined,
       };
       appendPublishingStatus(publishing, statusPath);
+      appendPublishLog(folder, `Moved ${row.id} (${platform}, Postiz ${status.providerObjectId}) from ${status.plannedFor} to ${moved.scheduledAt}. Still scheduled; public delivery not confirmed.`);
       return { ...base, to: moved.scheduledAt!, ok: true, publishing: readPublishingStatuses(statusPath)[publishingKey(slug, row.id)] ?? publishing };
     } catch (error) {
       const message = `Postiz moved the post to ${moved.scheduledAt} but the local record could not be updated: ${error instanceof Error ? error.message : String(error)}`;

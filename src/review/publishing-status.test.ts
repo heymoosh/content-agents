@@ -716,3 +716,10 @@ describe("SLICE-7C: a non-Postiz reuse-guard refusal is re-dispatchable end to e
     assert.equal(calls, 1, "and the scheduler must not run a second time");
   });
 });
+
+test('dispatched queue states cannot be retried merely because the provider ledger is absent', () => {
+  for (const status of ['scheduled', 'submitted', 'prepared', 'published']) {
+    const row = {id:'x-1',platform:'x',format:'text',asset:'derivatives/x-1.md',status,notes:'',lineIndex:2};
+    assert.match(publishingRetryBlock('example', row, '/nonexistent-publishing-ledger'), /already dispatched/);
+  }
+});

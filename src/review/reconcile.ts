@@ -71,7 +71,7 @@ export interface PublishLogRead {
 // the auto-scheduler failed) or "published" (the GUI/CLI publisher believes it scheduled this row).
 // Both are worth checking against the live provider — a "published" row can still drift if its
 // draft/post was later cancelled or deleted outside this pipeline.
-const APPROVED_STATUSES = new Set(["approve", "published"]);
+const APPROVED_STATUSES = new Set(["approve", "scheduled", "submitted", "published"]);
 
 // Postiz statuses that mean the post still exists AND has not fired yet, so cancelling it is the
 // repair Muxin actually wants. "published" is deliberately NOT here: page.ts renders

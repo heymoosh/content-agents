@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, basename, extname } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { readQueue, writeCell, appendPublishLog, type QueueRow } from "../publish/queue.js";
+import { readQueue, writeCell, appendPublishLog, DISPATCHED_STATUSES, type QueueRow } from "../publish/queue.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { fetchScheduledDrafts, cancelDraft } from "../publish/typefully.js";
 import { fetchScheduledPosts, cancelPost } from "../publish/postpeer-status.js";
@@ -51,7 +51,7 @@ export function setReviewRootsForTest(roots: { contentRoot: string; outreachRoot
 // A row is "decided" once it's out of the review inbox. Everything else needs Muxin's eyes.
 // "locked" (an outreach-message row's terminal state — see lock.ts) counts as decided too: it's
 // not still awaiting Muxin, just like "published"/"discard".
-export const DECIDED = new Set(["published", "discard", "locked"]);
+export const DECIDED = new Set([...DISPATCHED_STATUSES, "discard", "locked"]);
 export const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 export const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
 
@@ -78,6 +78,7 @@ interface EnrichedRow extends QueueRow {
   approveBlocked: string | null; // reason Approve is disabled, if any
   reconciled?: ReconciledStatus; // live Typefully/PostPeer reconciliation — omitted when not applicable
   publishingStatus?: PublishingStatus;
+  publishingMoves?: string[];
   // "Generate storyboard" button (card 9e20a616): true for a video-script row whose storyboard
   // hasn't been generated yet — the one case Approve is blocked with no way in the GUI to fix it.
   canGenerateStoryboard: boolean;
@@ -311,6 +312,7 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
   const out: EnrichedRow = {
     ...row,
     ...(publishingStatus ? { publishingStatus } : {}),
+    publishingMoves: publishLog.text.split("\n").filter(line => line.includes(` — Moved ${row.id} (`)).map(line => line.replace(/^- /, "")),
     kind,
     editable: false,
     revisable: !isReply && existsSync(join(folder, "derivatives", `${row.id}.md`)),

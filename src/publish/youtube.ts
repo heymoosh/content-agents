@@ -160,7 +160,7 @@ export async function publishShorts(
     const publishAt = slot && slot !== "next-free-slot" ? slot : undefined;
     const videoId = await uploadShort(videoPath, title, description, publishAt);
     const url = `https://youtube.com/shorts/${videoId}`;
-    setStatus(folder, row, "published");
+    setStatus(folder, row, publishAt ? "scheduled" : "submitted");
     const when = publishAt ? `public ${labels[i]}` : `privacy: ${process.env.YOUTUBE_PRIVACY ?? "private"}`;
     appendPublishLog(folder, `${row.id} → youtube ${url} (${when})`);
     appendBetPlacement(folder, row.id, "youtube", publishAt ? `${url} @ ${labels[i]}` : url, fm, title);

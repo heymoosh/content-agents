@@ -288,7 +288,7 @@ export async function publishCards(
       const priorRef = alreadyLoggedDraft(folder, row.id);
       if (priorRef) {
         console.log(`  ↳ ${row.id} already scheduled on a prior run (typefully draft ${priorRef}) — skipping re-post`);
-        setStatus(folder, row, "published");
+        setStatus(folder, row, "scheduled");
         results.push({ id: row.id, platform: target, when: "(scheduled on a prior run)", ref: `typefully draft ${priorRef}` });
         continue;
       }
@@ -332,7 +332,7 @@ export async function publishCards(
         buildDraftPayload({ title: rowDraftTitle(row.id), platformKey: target, posts, publishAt: scheduledFor })
       );
 
-      setStatus(folder, row, "published");
+      setStatus(folder, row, "scheduled");
       const placeNote = ctas.length > 0 ? `, cta→${placement}` : "";
       const when = fmtLa(new Date(scheduledFor));
       appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${target}, ${when}${placeNote})`);

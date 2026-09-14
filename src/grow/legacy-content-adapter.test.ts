@@ -67,9 +67,9 @@ test("adapts source, extract/non-extract cuts, queue rows, and publish evidence 
     assert.deepEqual(result.cuts.map((cut) => cut.lens), ["extract", "short"]);
     assert.deepEqual(result.cuts[0].variants.map((variant) => variant.rowId), ["extract-1"]);
     assert.deepEqual(result.cuts[1].variants.map((variant) => variant.rowId), ["short/short-1"]);
-    assert.equal(result.cuts[1].variants[0].status, "published");
+    assert.equal(result.cuts[1].variants[0].status, "approved");
     assert.deepEqual(result.cuts[1].variants[0].publishRef, { provider: "typefully", refId: "123" });
-    assert.deepEqual(result.publishLog.publishedVariantIds, ["short/short-1"]);
+    assert.deepEqual(result.publishLog.publishedVariantIds, []);
     assert.equal(result.cuts[1].cutRef.id, `cut:${result.slug}:short`);
     assert.equal(result.cuts[1].variantRefs[0].id, `variant:${result.slug}:short/short-1`);
     assert.equal(result.bodyIncluded, false);
@@ -90,7 +90,7 @@ test("keeps legacy missing lineage and missing files blocked instead of inferrin
     assert.ok(extract);
     assert.equal(extract.sourceStatus, "blocked");
     assert.equal(extract.cutStatus, "blocked");
-    assert.deepEqual(extract.variants.map((variant) => variant.status), ["published", "discarded"]);
+    assert.deepEqual(extract.variants.map((variant) => variant.status), ["unknown", "discarded"]);
     assert.ok(extract.blockers.includes("source.md is missing"));
     assert.ok(extract.blockers.includes("cut artifact is missing"));
     assert.ok(extract.blockers.includes("Muxin cut decision is not persisted in the legacy folder"));

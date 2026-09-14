@@ -78,6 +78,10 @@ function lineage(value: unknown, blockers: string[]): GrowDeliveryLineage | null
 
 function queueStatus(value: unknown, blockers: string[]): GrowQueueStatus {
   const status = rawStatus(value);
+  if (status === "submitted" || status === "prepared") {
+    blockers.push("public delivery is not confirmed");
+    return "unknown";
+  }
   if (status === null || !RAW_STATUSES.has(status)) {
     blockers.push("status is invalid or missing");
     return "unknown";
@@ -100,6 +104,10 @@ function queueStatus(value: unknown, blockers: string[]): GrowQueueStatus {
 
 function schedulerStatus(value: unknown, blockers: string[]): GrowSchedulerStatus {
   const status = rawStatus(value);
+  if (status === "submitted" || status === "prepared") {
+    blockers.push("public delivery is not confirmed");
+    return "unknown";
+  }
   if (status === null || !RAW_STATUSES.has(status)) {
     blockers.push("status is invalid or missing");
     return "unknown";

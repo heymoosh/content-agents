@@ -20,14 +20,16 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { readPublishingStatuses } from "../review/publishing-status.js";
 import { readQueue } from "../publish/queue.js";
 
 export const REUSE_COOLDOWN_DAYS = 30;
 
 // A row is out of the review inbox once it's one of these — mirrors rows.ts's DECIDED set.
-const DECIDED = new Set(["published", "discard", "locked"]);
+const DECIDED = new Set(["scheduled", "submitted", "prepared", "published", "discard", "locked"]);
 
 export interface OriginState {
+  inPublishing?: boolean;
   undecided: boolean; // some matching folder still has rows awaiting review (or no rows yet)
   lastPublishedAt: string | null; // newest publish-log timestamp across matching folders (ISO)
   publishedUndated: boolean; // a row says "published" but no publish-log date was found
@@ -57,6 +59,7 @@ export function foldFolderState(rows: { status: string }[], publishDates: string
   const lastPublishedAt = publishDates.length ? [...publishDates].sort()[publishDates.length - 1] : null;
   return {
     undecided,
+    ...(rows.some(r => ["scheduled", "submitted", "prepared"].includes(r.status.trim().toLowerCase())) ? { inPublishing: true } : {}),
     // publish-log dates count even if no row currently reads "published" (a hand-edited row);
     // conversely a "published" row with no log line is publishedUndated (handled conservatively).
     lastPublishedAt,
@@ -69,6 +72,7 @@ export function foldFolderState(rows: { status: string }[], publishDates: string
 export function mergeOriginStates(a: OriginState, b: OriginState): OriginState {
   return {
     undecided: a.undecided || b.undecided,
+    ...(a.inPublishing || b.inPublishing ? { inPublishing: true } : {}),
     lastPublishedAt:
       a.lastPublishedAt && b.lastPublishedAt
         ? (a.lastPublishedAt > b.lastPublishedAt ? a.lastPublishedAt : b.lastPublishedAt)
@@ -89,19 +93,20 @@ function daysAgo(dateStr: string, nowMs: number): number {
 // Pure: the picker-facing verdict for one note. `state` undefined = never drafted.
 export function noteReuse(state: OriginState | undefined, nowMs: number): NoteReuse {
   if (!state) return { drafted: false, reusable: true, draftedTag: "" };
+  if (state.inPublishing) return { drafted: true, reusable: false, draftedTag: "in publishing; live status not confirmed" };
   if (state.undecided) {
     return { drafted: true, reusable: false, draftedTag: "in review now" };
   }
   if (state.lastPublishedAt) {
     const days = daysAgo(state.lastPublishedAt, nowMs);
     if (days < REUSE_COOLDOWN_DAYS) {
-      return { drafted: true, reusable: false, draftedTag: `published ${days}d ago` };
+      return { drafted: true, reusable: false, draftedTag: `publishing recorded ${days}d ago` };
     }
-    return { drafted: true, reusable: true, draftedTag: `published ${days}d ago, ok to reuse` };
+    return { drafted: true, reusable: true, draftedTag: `publishing recorded ${days}d ago, ok to reuse` };
   }
   if (state.publishedUndated) {
     // Says published but no dated log line — can't prove the cooldown has passed, so stay blocked.
-    return { drafted: true, reusable: false, draftedTag: "published (date unknown)" };
+    return { drafted: true, reusable: false, draftedTag: "publication date unconfirmed" };
   }
   return { drafted: true, reusable: true, draftedTag: "drafted before, discarded" };
 }
@@ -109,6 +114,8 @@ export function noteReuse(state: OriginState | undefined, nowMs: number): NoteRe
 // Filesystem scan: every content/<slug> folder's source.md `origin:` → folded OriginState.
 // A folder whose review-queue.md is missing/unreadable counts as undecided (conservative).
 export function readOriginStates(contentDir: string): Map<string, OriginState> {
+  let deliveries: ReturnType<typeof readPublishingStatuses> = {};
+  try { deliveries = readPublishingStatuses(); } catch { /* uncertain state keeps handoffs blocked */ }
   const states = new Map<string, OriginState>();
   if (!existsSync(contentDir)) return states;
   for (const folder of readdirSync(contentDir)) {
@@ -131,7 +138,20 @@ export function readOriginStates(contentDir: string): Map<string, OriginState> {
       } catch {
         // no publish log yet — nothing published from this folder
       }
-      state = foldFolderState(rows, parsePublishLogDates(logText));
+      const liveDates: string[] = [];
+      let confirmedLive = false;
+      const effectiveRows = rows.map(row => {
+        const delivery = deliveries[folder+"/"+row.id];
+        if (delivery && (delivery.state === "live" || delivery.state === "delivered")) {
+          confirmedLive = true;
+          // Only confirmed provider time starts the reuse clock, never scheduling/move time.
+          if (delivery.providerPublishedAt) liveDates.push(delivery.providerPublishedAt);
+          return { status: "published" };
+        }
+        if (delivery && ["planned", "scheduled", "private", "scheduling", "uncertain"].includes(delivery.state)) return { status: "submitted" };
+        return row;
+      });
+      state = foldFolderState(effectiveRows, confirmedLive ? liveDates : parsePublishLogDates(logText));
     } catch {
       state = { undecided: true, lastPublishedAt: null, publishedUndated: false };
     }

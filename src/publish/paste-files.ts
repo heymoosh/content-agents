@@ -34,7 +34,7 @@ function main() {
     const target = String(fm.community ?? row.platform);
     const outPath = join(outDir, `${row.id}.txt`);
     writeFileSync(outPath, `# paste into: ${target}\n# delete these two header lines before posting\n\n${body}\n`);
-    setStatus(folder, row, "published");
+    setStatus(folder, row, "prepared");
     appendPublishLog(folder, `${row.id} → ready-to-paste/${row.id}.txt (${target})`);
     appendBetPlacement(folder, row.id, row.platform, `ready-to-paste/${row.id}.txt (${target})`, fm, body);
     console.log(`ready to paste: ${outPath} (${target})`);
