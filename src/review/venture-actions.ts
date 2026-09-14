@@ -31,7 +31,12 @@ export interface WebsiteMeasurement {
   signups: number;
   surveyCompletions: number;
   activeSubscribers: number;
-  source: 'website-postgres';
+  source: 'website-postgres' | 'website-analytics-api';
+  measuredSessions?: number;
+  newSignups?: number;
+  newSignupSessions?: number;
+  unattributedSessions?: number;
+  newSignupsWithoutSession?: number;
 }
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
 const storePath = () => join(dataRoot(), 'venture-series.json');
@@ -67,13 +72,20 @@ export function readWebsiteMeasurement(path = join(dataRoot(), 'website-measurem
   return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
 }
 export function saveWebsiteMeasurement(value: WebsiteMeasurement, path = join(dataRoot(), 'website-measurements.json')): void {
-  if (value.brandId !== 'human-inference' || value.source !== 'website-postgres' || !Number.isFinite(Date.parse(value.capturedAt))
+  if (value.brandId !== 'human-inference' || !['website-postgres', 'website-analytics-api'].includes(value.source) || !Number.isFinite(Date.parse(value.capturedAt))
     || [value.signups, value.surveyCompletions, value.activeSubscribers].some(n => !Number.isSafeInteger(n) || n < 0)
     || value.surveyCompletions > value.signups || value.activeSubscribers > value.signups
-    || (value.firstSignupAt !== null && !Number.isFinite(Date.parse(value.firstSignupAt)))) throw new Error('Invalid website aggregate');
+    || (value.firstSignupAt !== null && !Number.isFinite(Date.parse(value.firstSignupAt)))
+    || [value.measuredSessions, value.newSignups, value.newSignupSessions, value.unattributedSessions, value.newSignupsWithoutSession]
+      .some(n => n !== undefined && (!Number.isSafeInteger(n) || n < 0))) throw new Error('Invalid website aggregate');
   // Explicit field projection prevents private fields hitching a ride into the public read.
   const safe = { brandId: value.brandId, source: value.source, capturedAt: value.capturedAt, firstSignupAt: value.firstSignupAt,
-    signups: value.signups, surveyCompletions: value.surveyCompletions, activeSubscribers: value.activeSubscribers };
+    signups: value.signups, surveyCompletions: value.surveyCompletions, activeSubscribers: value.activeSubscribers,
+    ...(value.measuredSessions === undefined ? {} : { measuredSessions: value.measuredSessions }),
+    ...(value.newSignups === undefined ? {} : { newSignups: value.newSignups }),
+    ...(value.newSignupSessions === undefined ? {} : { newSignupSessions: value.newSignupSessions }),
+    ...(value.unattributedSessions === undefined ? {} : { unattributedSessions: value.unattributedSessions }),
+    ...(value.newSignupsWithoutSession === undefined ? {} : { newSignupsWithoutSession: value.newSignupsWithoutSession }), };
   mkdirSync(join(path, '..'), { recursive: true });
   writeFileSync(path + '.tmp', JSON.stringify(safe, null, 2) + '\n', { mode: 0o600 });
   renameSync(path + '.tmp', path);
