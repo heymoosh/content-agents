@@ -3165,7 +3165,14 @@ function contentRequestOrigin(s){
 function cwEnsureConfig(){
   const s = cwSession();
   if(!s) return null;
-  if(CW.config && CW.config.slug===s.slug) return CW.config;
+  const stored=CW.requestFor===s.slug?CW.request:null;
+  if(CW.config && CW.config.slug===s.slug && (!stored || CW.config.fromRequest===stored.id)) return CW.config;
+  if(stored){
+    CW.config={slug:s.slug,fromRequest:stored.id,open:true,
+      treatment:new Set(stored.selections.treatments),media:new Set(stored.selections.media.filter(x=>x!=='none')),
+      platform:new Set(stored.selections.platforms),control:stored.control.enabled,saving:false,saved:false};
+    return CW.config;
+  }
   const routed = (CW.treat && CW.treat.channels || []).filter(c=>c.decision==="include").map(c=>c.channel);
   const supported = CONTENT_CONFIG_OPTIONS.platform.map(x=>x[0]);
   const platforms = routed.filter(p=>supported.includes(p));

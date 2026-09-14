@@ -80,3 +80,14 @@ test('source section selection is bounded and emitted browser script parses',()=
   const page=renderPage({repoRoot:'/fixture',isDevWorktree:true});
   assert.doesNotThrow(()=>new Function(page.match(/<script>([\s\S]*?)<\/script>/)![1]));
 });
+test('Content restores saved choices instead of generic recommendations and retains unsaved adjustments',()=>{
+  const script=renderPage({repoRoot:'/fixture',isDevWorktree:true}).match(/<script>([\s\S]*?)<\/script>/)![1];
+  const start=script.indexOf('function cwEnsureConfig(){');
+  const fn=script.slice(start,script.indexOf('function cwConfigSectionHtml',start));
+  const CW={requestFor:'source',request:{id:'source',selections:{treatments:['platform-framing'],media:['none'],platforms:['linkedin','bluesky']},control:{enabled:false}},config:{slug:'source',platform:new Set(['x'])}};
+  const result=new Function('CW',`const cwSession=()=>({slug:'source'});${fn};return cwEnsureConfig();`)(CW);
+  assert.deepEqual([...result.platform],['linkedin','bluesky']);assert.equal(result.control,false);assert.equal(result.media.size,0);
+  result.platform.delete('bluesky');
+  const retained=new Function('CW',`const cwSession=()=>({slug:'source'});${fn};return cwEnsureConfig();`)(CW);
+  assert.equal(retained,result);assert.deepEqual([...retained.platform],['linkedin']);
+});
