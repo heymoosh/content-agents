@@ -76,7 +76,8 @@ transition below survives unchanged and only this subsection is replaced.
 
 ```
 venture/<slug>/
-  intake.md                      # 25-question answers + the Day 14 scorecard, fixed at kickoff
+  intake.md                      # 25 reviewed context fields + the Day 14 scorecard, fixed at kickoff
+  intake-context.json            # notes-first only: original notes/history, model fields with basis and exact evidence quotes, existing answers, corrections, reviewedBy/reviewedAt
   canon.md                       # append-only event ledger (see §5.3); stamps kickoff_at
   state.md                       # derived cache; canon.md is authoritative
   responses.jsonl                # gitignored, never reaches the GUI (§5.4) — Phase 3

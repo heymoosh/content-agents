@@ -716,6 +716,8 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
      is page.ts's first @media block, authored because a two-column room is the first thing here
      that genuinely breaks below ~900px. */
   .vroom { display:grid; grid-template-columns:minmax(0,1fr) 268px; }
+  .vroom[hidden] { display:none; }
+  .venture-intake-open #ventureWorkPane, .venture-intake-open .venture-stages { display:none; }
   .vthread { min-width:0; padding:26px 40px 34px; display:flex; flex-direction:column; gap:22px; }
   .vrail { border-left:1px solid var(--line); background:#faf7f0; border-radius:0 5px 5px 0; }
   .vrail-in { position:sticky; top:58px; box-sizing:border-box; padding:22px 24px 30px;
@@ -3699,7 +3701,7 @@ async function loadVentureList(){
     $("#ventureAnalysisPanel").hidden = true;
     $("#ventureDay").textContent = "";
     $("#ventureIntakeSections").innerHTML = '<div class="empty" style="padding:18px 0">Start or choose a venture to edit its durable voice and scorecard fields.</div>';
-    $("#ventureThread").innerHTML = '<div class="empty">No venture on the desk yet. "Start a venture" above runs the whole intake interview here: 25 questions, one at a time.</div>';
+    $("#ventureThread").innerHTML = '<div class="empty">Start a venture with the notes and plans you already have. Your model will organize the context and ask only what still needs clarity.</div>';
     $("#ventureRail").innerHTML = "";
     renderVentureSwitcher(); renderVentureDocuments();
     return;
@@ -4641,7 +4643,7 @@ async function ventureContentHandoff(artifactId, button){
 
 // ── the intake interview ─────────────────────────────────────────────────────────────────────────
 //
-// The 25-question interview from venture/rules.md §4.2, conducted here instead of in a terminal.
+// Notes-first intake maps onto the context schema in venture/rules.md §4.2.
 // One question at a time (SKILL.md step 1: "not a form dump"), autosaved to the scratch buffer
 // behind /api/venture/:slug/intake/..., then the two panels kickoffVenture cannot write without --
 // voice evidence and the Day 14 scorecard -- and then the commit.
@@ -4721,6 +4723,7 @@ function ivResumable(){
 }
 
 function ivShow(on){
+  $("#roomVenture").classList.toggle("venture-intake-open", on);
   // Interview sits on the thread pane. Leaving guardrails open would stack two work surfaces.
   if(on){ VEN.pane = "work"; renderVentureSheets(); }
   $("#ventureRead").hidden = on;
@@ -4821,15 +4824,10 @@ async function ivEnter(slug){
   ivMissing = [];
   ivSave = { state:"", savedAt:"", error:"" };
   ivRemember(slug);
-  await ivLoadAll();
-  // Open on the first unanswered question, so resuming picks up where she stopped rather than
-  // making her page through what she already wrote.
-  const gaps = ivUnanswered(ivDraftList(), IV_TOTAL);
-  ivStep = gaps.length ? gaps[0] : IV_VOICE_STEP;
+  ivNotesState=null; ivNotesBusy=false; ivNotesMessage="";
   ivShow(true);
   renderIntake();
-  const box = $("#ivIn");
-  if(box) box.focus();
+  await ivLoadContext(slug);
 }
 
 function ivExit(){
@@ -4986,23 +4984,98 @@ function ivStartHtml(){
   return '<div class="vmono">START A VENTURE</div>'
     + (resume
         ? '<div class="iv-panel"><div class="iv-q">You left one unfinished.</div>'
-          + '<div class="iv-hint">Your answers to '+esc(resume)+' are still on the server, exactly where you stopped.</div>'
+          + '<div class="iv-hint">Your saved notes and answers for '+esc(resume)+' are ready to continue.</div>'
           + '<div class="iv-nav"><button class="primary" id="ivResume">Pick up '+esc(resume)+'</button>'
           + '<button id="ivForget">Forget it</button></div></div>'
         : "")
     + '<div class="iv-q" style="margin-top:'+(resume?"26px":"0")+'">'+(resume?"Or start a new one.":"What should it be called?")+'</div>'
-    + '<div class="iv-hint">Lowercase letters, numbers and dashes. This becomes venture/&lt;name&gt;/ on disk. Typing a name you already started brings those answers back too.</div>'
+    + '<div class="iv-hint">Give this venture a short name, using letters, numbers and dashes. Next, paste the notes and plans you already have.</div>'
     + '<div class="iv-field"><input id="ivSlugIn" placeholder="voter-choice"></div>'
-    + '<div class="iv-nav"><button class="primary" id="ivBegin">Begin the interview</button>'
+    + '<div class="iv-nav"><button class="primary" id="ivBegin">Add my notes</button>'
     + '<span class="grow"></span><button id="ivLeave">Cancel</button></div>'
     + ivRefusalHtml();
 }
 
+let ivNotesState=null, ivNotesFields=[], ivNotesBusy=false, ivNotesMessage="", ivNotesEngine="claude", ivNotesPoll=null, ivNotesAnalyzedText="", ivNotesConflict=false;
+function ivNotesBackupKey(slug){ return "venture.notes."+slug; }
+function ivBackupNotes(){
+  if(!ivSlug||!ivNotesState) return;
+  try { sessionStorage.setItem(ivNotesBackupKey(ivSlug),JSON.stringify({revision:ivNotesState.revision,notes:ivNotesState.notes,corrections:ivNotesState.corrections})); } catch(e) {}
+}
+async function ivLoadContext(slug){
+  ivNotesConflict=false;
+  if(ivNotesPoll) clearTimeout(ivNotesPoll);
+  try {
+    const r=await fetch("/api/venture/"+encodeURIComponent(slug)+"/intake/context"); const j=await r.json();
+    if(ivSlug!==slug) return;
+    if(!j.ok) throw new Error(j.error||"Could not load your saved context.");
+    ivNotesState=j.state; ivNotesFields=j.fields; ivNotesBusy=!!j.analyzing;
+    ivNotesAnalyzedText=j.state.analysis?j.state.notes:"";
+    try {
+      const local=JSON.parse(sessionStorage.getItem(ivNotesBackupKey(slug))||"null");
+      if(local&&local.revision===j.state.revision){ ivNotesState.notes=local.notes; ivNotesState.corrections=local.corrections; }
+      else if(local&&(local.notes!==j.state.notes||JSON.stringify(local.corrections)!==JSON.stringify(j.state.corrections))){
+        ivNotesState={...j.state,...local};
+        ivNotesConflict=true;
+        ivNotesMessage="This tab has unsaved notes or corrections from an earlier version. Copy anything you want to keep before loading the saved version; saving will refuse to overwrite newer work.";
+      }
+    } catch(e) {}
+    if(j.analyzing) ivNotesPoll=setTimeout(()=>{ if(ivSlug===slug) ivLoadContext(slug); },2000);
+  } catch(e){ if(ivSlug===slug) ivNotesMessage=e instanceof Error?e.message:String(e); }
+  if(ivSlug===slug) renderIntake();
+}
+async function ivNotesAction(action){
+  if(ivNotesBusy||!ivNotesState) return;
+  const slug=ivSlug, base="/api/venture/"+encodeURIComponent(slug)+"/intake/context";
+  let succeeded=false;
+  ivNotesBusy=true; ivNotesMessage=action==="analyze"?"Reading your notes and connecting the details…":"Saving…"; renderIntake();
+  try {
+    const saved=await post(base,{revision:ivNotesState.revision,notes:ivNotesState.notes,corrections:ivNotesState.corrections});
+    if(!saved.ok) throw new Error(saved.error||"Could not save your notes.");
+    try { sessionStorage.removeItem(ivNotesBackupKey(slug)); } catch(e) {}
+    if(ivSlug!==slug) return;
+    ivNotesState=saved.state;
+    if(action==="analyze"){
+      const result=await post("/api/venture/"+encodeURIComponent(slug)+"/intake/context/analyze",{revision:ivNotesState.revision,engine:ivNotesEngine});
+      if(!result.ok) throw new Error(result.error||"The model could not read these notes. They are saved; try again.");
+      if(ivSlug!==slug) return;
+      ivNotesState=result.state; ivNotesAnalyzedText=result.state.notes; ivNotesMessage="Read complete. Review the understanding below.";
+    } else if(action==="confirm"){
+      const result=await post("/api/venture/"+encodeURIComponent(slug)+"/intake/context/confirm",{revision:ivNotesState.revision,confirm:true});
+      if(!result.ok) throw new Error(result.error||"Could not create this venture.");
+      if(ivSlug!==slug) return;
+      ivRemember(null); ivExit(); ventureSlug=slug; await loadVentureList(); flash("Venture created from your reviewed context.");
+    } else ivNotesMessage="Notes saved. You can leave and resume later.";
+    succeeded=true;
+  } catch(e){ if(ivSlug===slug) ivNotesMessage=e instanceof Error?e.message:String(e); }
+  finally { if(ivSlug===slug){ ivNotesBusy=false; renderIntake(); } }
+  return succeeded;
+}
+function ivNotesHtml(){
+  if(!ivNotesState) return '<div role="status">'+esc(ivNotesMessage||"Loading your saved notes…")+'</div><button id="ivNotesReload">Try again</button><button id="ivLeave">Leave for now</button>';
+  const s=ivNotesState, a=s.analysis, disabled=ivNotesBusy?' disabled':'';
+  const value=key=>Object.prototype.hasOwnProperty.call(s.corrections,key)?s.corrections[key]:(a?.fields.find(f=>f.key===key)?.text||"");
+  const missing=ivNotesFields.filter(f=>!value(f.key).trim());
+  const questions=(a?.questions||[]).filter(q=>q.fields.some(key=>!value(key).trim()));
+  const review=a?'<h3>What I understand</h3><div class="vnote" style="white-space:pre-wrap">'+esc(a.summary)+'</div>'+
+    (questions.length?'<h3>What still needs clarity</h3><ul>'+questions.map(q=>'<li>'+esc(q.question)+'</li>').join('')+'</ul><p>Add your answers to the notes below in whatever form is easiest.</p>':missing.length?'<p>A few details are still missing. Add more context or correct them in the details below, then read the notes again.</p>':'<p>The context is ready for your review.</p>')+
+    '<details style="margin:20px 0"><summary>Review or correct the full business context</summary>'+ivNotesFields.map(f=>{
+      const field=a.fields.find(x=>x.key===f.key), edited=Object.prototype.hasOwnProperty.call(s.corrections,f.key);
+      return '<label style="display:block;margin:16px 0"><strong>'+esc(f.label)+'</strong><div class="src">'+esc(edited?'Your correction':field?.basis==='inferred'?'Inferred from your notes':field?.basis==='stated'?'From supplied context':'Needs clarity')+'</div><textarea rows="2" style="width:100%;box-sizing:border-box" data-notes-field="'+esc(f.key)+'"'+disabled+'>'+esc(value(f.key))+'</textarea>'+(field?.evidence?.length?'<span class="src" style="display:block">Supporting text: '+esc(field.evidence.join(' / '))+'</span>':'')+'</label>';
+    }).join('')+'</details>':'';
+  return '<div class="iv-q">'+(a?'Your venture context':'Tell me what you are thinking about building.')+'</div>'+review+
+    '<label for="ivNotes">'+(a?'Your notes and clarifications':'Your notes')+'</label><textarea class="iv-in" id="ivNotes" rows="9" placeholder="Paste your plans, ideas, audience notes, existing work, and constraints. A rough description is enough to begin."'+disabled+'>'+esc(s.notes)+'</textarea>'+
+    '<p class="iv-hint">Your model maps the details you have already provided and asks only about gaps or ambiguity. You can correct its interpretation before creating the venture. Earlier interview answers are included automatically.</p>'+
+    '<div class="iv-nav"><label>Read with <select id="ivNotesEngine"'+disabled+'><option value="claude"'+(ivNotesEngine==='claude'?' selected':'')+'>Claude</option><option value="codex"'+(ivNotesEngine==='codex'?' selected':'')+'>GPT (Codex)</option></select></label><button class="primary" id="ivNotesAnalyze"'+disabled+'>'+(ivNotesBusy?'Working…':a?'Update my understanding':'Read my notes')+'</button><button id="ivNotesSave"'+disabled+'>Save notes</button><button id="ivLeave"'+disabled+'>Leave for now</button></div>'+
+    '<div role="status" style="margin:14px 0">'+esc(ivNotesMessage)+'</div>'+
+    (ivNotesConflict?'<button id="ivNotesUseSaved">Discard this tab’s edits and load saved version</button>':'')+
+    (a?'<button class="primary" id="ivNotesConfirm"'+(ivNotesBusy||missing.length||s.notes!==ivNotesAnalyzedText?' disabled':'')+'>Confirm understanding and create venture</button><p class="iv-hint">Creates the venture from the context you reviewed. Original notes and the model’s interpretation stay separately recorded. No content is published.</p>':'');
+}
 function renderIntake(){
   const box = $("#intakeBox");
   if(!box) return;
   if(!ivSlug){ box.innerHTML = ivStartHtml(); const s = $("#ivSlugIn"); if(s) s.focus(); return; }
-  const body = ivStep <= IV_TOTAL ? ivQuestionHtml() : ivStep === IV_VOICE_STEP ? ivVoiceHtml() : ivScoreHtml();
+  const body = ivNotesHtml();
   box.innerHTML = '<div class="iv"><div class="vmono">INTAKE: '+esc(ivSlug)+'</div>'+body+'</div>';
 }
 
@@ -5011,6 +5084,13 @@ function renderIntake(){
 document.addEventListener("input", e=>{
   const t = e.target;
   if(!t || !t.closest || !t.closest("#ventureIntake")) return;
+  if(t.id==="ivNotes"){ ivNotesState.notes=t.value; ivBackupNotes(); const confirm=$("#ivNotesConfirm"); if(confirm) confirm.disabled=true; return; }
+  if(t.dataset.notesField){
+    ivNotesState.corrections[t.dataset.notesField]=t.value; ivBackupNotes();
+    const confirm=$("#ivNotesConfirm"), s=ivNotesState;
+    if(confirm) confirm.disabled=ivNotesBusy||s.notes!==ivNotesAnalyzedText||ivNotesFields.some(f=>!(Object.prototype.hasOwnProperty.call(s.corrections,f.key)?s.corrections[f.key]:s.analysis?.fields.find(x=>x.key===f.key)?.text||"").trim());
+    return;
+  }
   if(t.id === "ivIn") return ivQueue(Number(t.dataset.ivq), t.value);
   const f = t.dataset && t.dataset.ivf;
   // The voice and scorecard panels are one sitting, not autosaved: the draft store holds question
@@ -5019,16 +5099,26 @@ document.addEventListener("input", e=>{
   if(f && Object.prototype.hasOwnProperty.call(ivVoice, f)) ivVoice[f] = t.value;
   else if(f && Object.prototype.hasOwnProperty.call(ivScore, f)) ivScore[f] = t.value;
 });
+document.addEventListener("change",e=>{ if(e.target.id==="ivNotesEngine") ivNotesEngine=e.target.value; });
 document.addEventListener("click", e=>{
   const t = e.target;
   if(!t || !t.closest) return;
   if(t.id === "ventureStartBtn"){
-    if(ivSlug){ ivShow(false); ivSlug = null; return; }
+    if(ivSlug){ return ivNotesAction("save").then(ok=>{ if(ok) ivExit(); }); }
     ivShow(true);
     ivRefusal = "";
     return renderIntake();
   }
   if(!t.closest("#ventureIntake")) return;
+  if(t.id==="ivNotesAnalyze") return ivNotesAction("analyze");
+  if(t.id==="ivNotesSave") return ivNotesAction("save");
+  if(t.id==="ivNotesConfirm") return ivNotesAction("confirm");
+  if(t.id==="ivNotesReload") return ivLoadContext(ivSlug);
+  if(t.id==="ivNotesUseSaved"){
+    try { sessionStorage.removeItem(ivNotesBackupKey(ivSlug)); } catch(e) {}
+    ivNotesMessage="Loaded the saved version.";
+    return ivLoadContext(ivSlug);
+  }
 
   if(t.id === "ivResume"){ const s = ivResumable(); return s ? ivEnter(s) : renderIntake(); }
   if(t.id === "ivForget"){ ivRemember(null); return renderIntake(); }
@@ -5041,7 +5131,11 @@ document.addEventListener("click", e=>{
     if((VENTURE_SLUGS||[]).includes(slug)){ ivRefusal = slug + " already exists. Pick another name, or open it from the picker above."; return renderIntake(); }
     return ivEnter(slug);
   }
-  if(t.id === "ivLeave"){ ivRemember(ivSlug); return ivExit(); }
+  if(t.id === "ivLeave"){
+    if(!ivSlug||!ivNotesState){ ivExit(); return; }
+    const slug=ivSlug;
+    return ivNotesAction("save").then(ok=>{ if(ok&&ivSlug===slug){ ivRemember(slug); ivExit(); } });
+  }
   if(t.id === "ivBack") return ivGo(ivStep - 1);
   if(t.id === "ivNext") return ivGo(ivStep + 1);
   if(t.id === "ivCommit") return ivCommit();

@@ -232,6 +232,9 @@ test("every path the guards read is declared, and the commit route is one of the
   assert.ok(VENTURE_WRITE_PATHS.includes("/api/venture/:slug/intake/commit"));
   assert.ok(VENTURE_WRITE_PATHS.includes("/api/venture/:slug/intake/drafts/clear"));
   assert.deepEqual(INTAKE_DRAFT_PATHS, [
+    "/api/venture/:slug/intake/context",
+    "/api/venture/:slug/intake/context/analyze",
+    "/api/venture/:slug/intake/context/confirm",
     "/api/venture/:slug/intake/:n/draft",
     "/api/venture/:slug/intake/drafts",
     "/api/venture/:slug/intake/section",

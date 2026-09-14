@@ -92,6 +92,7 @@ import { buildStudioHome } from "./studio.js";
 import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, type Engine } from "./engines.js";
 import { readTreatment } from "./treatment.js";
 import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts, saveIntakeSectionDraft, readIntakeSections, clearIntakeDrafts } from "./intake-draft.js";
+import { readNotes, saveNotes, analyzeNotes, confirmNotes, notesRunning, INTAKE_NOTE_FIELDS } from "./intake-notes.js";
 import { enqueueVentureStep } from "./venture-runner.js";
 import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
 import { providerForKind, PUBLISHING_STATUS_PATH, publishingKey, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce, type PublishingResolution } from "./publishing-status.js";
@@ -2385,6 +2386,37 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       }
       return;
     }
+    // Notes-first intake: analysis proposes context; only the explicit confirmation creates a venture.
+    if (/^\/api\/venture\/[^/]+\/intake\/context$/.test(url.pathname) ||
+        /^\/api\/venture\/[^/]+\/intake\/context\/analyze$/.test(url.pathname) ||
+        /^\/api\/venture\/[^/]+\/intake\/context\/confirm$/.test(url.pathname)) {
+      const slug = decodeURIComponent(url.pathname.split('/')[3]);
+      const action = url.pathname.split('/')[6];
+      try {
+        if (req.method === 'GET' && !action) {
+          json(res, 200, { ok: true, state: readNotes(slug), fields: INTAKE_NOTE_FIELDS, analyzing: notesRunning(slug) }); return;
+        }
+        if (req.method !== 'POST') { json(res, 405, { ok: false, error: 'Method not allowed' }); return; }
+        const b = await readBody(req);
+        if (!Number.isSafeInteger(b.revision) || Number(b.revision) < 0) throw new Error('Reopen this context before saving.');
+        const revision = Number(b.revision);
+        if (action === 'analyze') {
+          const engine = requestEngine(b.engine);
+          if (engine !== 'claude' && engine !== 'codex') throw new Error('Choose Claude or GPT (Codex) for this analysis.');
+          const state = await runQueued('venture-analysis', `Read notes for ${slug}`, async job => {
+            job.slugs = [slug];
+            return analyzeNotes(slug, revision, engine);
+          }, engine);
+          json(res, 200, { ok: true, state }); return;
+        }
+        if (action === 'confirm') {
+          if (b.confirm !== true) throw new Error('Review the context and explicitly confirm it first.');
+          json(res, 200, { ok: true, result: confirmNotes(slug, revision) }); return;
+        }
+        json(res, 200, { ok: true, state: saveNotes(slug, revision, b.notes, b.corrections) }); return;
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); return; }
+    }
+    // Legacy manual answer drafts remain available for compatibility and are reused by notes analysis.
     // Venture intake autosave (Venture Build v7 handoff §1). The intake interview is 25 questions
     // long, so the room debounces each keystroke to a scratch buffer and a half-typed answer
     // survives a reload. These are SEPARATE from the final write: kickoffVenture() in

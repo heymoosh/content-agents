@@ -3,9 +3,9 @@ import { intakePath, ventureDir } from "./paths.js";
 import { appendCanonEvent } from "./canon.js";
 import { type VentureRules } from "./rules.js";
 
-// venture/rules.md §4.2's fixed 25 questions. The skill runs the actual interview one question
-// at a time (Claude's judgment work); this module only persists the completed, verbatim answers
-// -- it never generates or edits an answer itself.
+// venture/rules.md §4.2's business-context schema. Notes-first intake maps onto these fields;
+// this module persists completed context and never generates an answer itself. Legacy manual
+// answers remain verbatim; notes-based context carries separate inference provenance.
 export const INTAKE_QUESTIONS: { id: string; block: string; question: string }[] = [
   { id: "q1", block: "A: what are we building?", question: "What are you helping people do?" },
   { id: "q2", block: "A: what are we building?", question: "Who will you help first?" },
@@ -65,8 +65,10 @@ export const SCORECARD_FIXED = {
   final_decision_options: ["continue", "revise_positioning", "revise_lead_magnet", "collect_more_evidence", "stop"],
 } as const;
 
-function renderIntakeMd(slug: string, answers: IntakeAnswers, voice: VoiceEvidence, scorecard: ScorecardInput): string {
-  const lines = [`# Intake — ${slug}`, ``, `Answers are stored verbatim, exactly as given. Nothing here is paraphrased.`, ``];
+function renderIntakeMd(slug: string, answers: IntakeAnswers, voice: VoiceEvidence, scorecard: ScorecardInput, fromNotes = false): string {
+  const lines = [`# Intake — ${slug}`, ``, fromNotes
+    ? `Business context mapped from founder notes and reviewed by Muxin at kickoff. Original notes, model inferences, supporting quotes, and corrections are preserved in intake-context.json. These answers are reviewed interpretations, not verbatim quotations unless identified there.`
+    : `Answers are stored verbatim, exactly as given. Nothing here is paraphrased.`, ``];
   let currentBlock = "";
   for (const q of INTAKE_QUESTIONS) {
     if (q.block !== currentBlock) {
@@ -126,6 +128,7 @@ export interface KickoffInput {
   scorecard: ScorecardInput;
   rules: VentureRules;
   at: string;
+  notesProvenance?: Record<string, unknown>;
 }
 
 // Reads back the two Day 14 targets a venture's kickoff fixed (rules.md §4.4) so Phase 4's
@@ -244,7 +247,8 @@ export function kickoffVenture(input: KickoffInput): { alreadyKickedOff: boolean
   const dir = ventureDir(input.slug);
   mkdirSync(dir, { recursive: true });
   if (!existsSync(intakePath(input.slug))) {
-    writeFileSync(intakePath(input.slug), renderIntakeMd(input.slug, input.answers, input.voice, input.scorecard));
+    if (input.notesProvenance) writeFileSync(`${dir}/intake-context.json`, JSON.stringify({ ...input.notesProvenance, reviewedBy: 'muxin', reviewedAt: input.at }, null, 2));
+    writeFileSync(intakePath(input.slug), renderIntakeMd(input.slug, input.answers, input.voice, input.scorecard, !!input.notesProvenance));
   }
   const { alreadyRecorded } = appendCanonEvent(
     input.slug,

@@ -133,8 +133,11 @@ must abstain rather than guess (§5.4c), a measured zero is a real reading and a
 ## Authorship and privacy
 
 A generated recommendation must remain visibly distinct from Muxin's own words, and her edit
-becomes her version. The 25 intake answers stay verbatim and correctable — nothing silently
-rewrites her answer, her voice evidence, or her selection. Where Venture handles third-party
+becomes her version. Intake is notes-first: an LLM maps supplied notes into the 25 context fields
+and asks only for missing or ambiguous details. Original notes and manual answers stay verbatim;
+inferred answers are labeled, correctable, and finalized only by Muxin's explicit confirmation.
+`intake-context.json` preserves the notes, model mapping, supporting quotes, and corrections.
+Nothing silently rewrites her answer, her voice evidence, or her selection. Where Venture handles third-party
 replies (a later phase), `respondent_hash` is a keyed HMAC and neither the raw identifier nor the
 key ever appears in a log, export, error record, or PR body.
 
@@ -147,8 +150,9 @@ predicates.
 
 ## Consistency model — per-venture state
 
-- `venture/<slug>/intake.md` — the 25 answers verbatim + the Day 14 scorecard fields, fixed at
-  kickoff.
+- `venture/<slug>/intake.md` — 25 reviewed context fields + the Day 14 scorecard, fixed at kickoff.
+  Notes-first intake preserves originals and inference provenance in `intake-context.json`;
+  legacy manually entered answers remain verbatim.
 - `venture/<slug>/canon.md` — append-only ledger; the **authority** for checkpoint state, with the
   stamped rules version and both source hashes written at kickoff. `state.md` is a cache, rebuilt
   from the ledger on disagreement, never trusted.
@@ -175,7 +179,8 @@ predicates.
 
 ## Scripts (Phase 1, Phase 2, Phase 3, and Phase 4)
 
-`/venture new <slug>` (`npm run venture:new`) — 25-question intake, kickoff canon event.
+`/venture new <slug>` (`npm run venture:new`) — completed business-context intake, kickoff canon event.
+The GUI gathers that context from notes with an LLM and targeted clarification, not 25 sequential screens.
 `/venture <slug>` (`npm run venture:phase1`) — research plan → **stop for Muxin's plan review** →
 platform pick → ten ideas → **stop, Muxin selects three** → draft → per-post approval → the Phase
 1-to-2 bridge (research read → **stop for review** → continuation decision, which either sends the

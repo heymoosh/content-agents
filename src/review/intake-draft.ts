@@ -32,6 +32,9 @@ export const MAX_QUESTION = INTAKE_QUESTIONS.length;
 // regex route literal in serve.ts is declared in one of these lists — so the next regex route
 // added straight into serve.ts fails the guard until it is declared too.
 export const INTAKE_DRAFT_PATHS = [
+  "/api/venture/:slug/intake/context",
+  "/api/venture/:slug/intake/context/analyze",
+  "/api/venture/:slug/intake/context/confirm",
   "/api/venture/:slug/intake/:n/draft", // POST save one answer, GET restore one answer
   "/api/venture/:slug/intake/drafts", // GET restore the whole in-progress interview
   "/api/venture/:slug/intake/section", // POST save one Voice Evidence or Scorecard field
