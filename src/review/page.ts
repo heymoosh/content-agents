@@ -18,6 +18,7 @@ import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 import { intakeProgress } from "./intake-progress.js";
 import { ventureProgressHtml, ventureResearchPlanHtml } from "./page-venture-progress.js";
 import { ventureActionsHtml, ventureSeriesSignalsHtml } from './page-venture-actions.js';
+import { ventureGuideHtml, ventureStructuredHtml } from './page-venture-guide.js';
 export {
   formatElapsed,
   ANSWERED_FOOTER,
@@ -1244,6 +1245,8 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <nav class="room-pages venture-stages" aria-label="Venture pages"><button class="venture-stage on" data-set-ven-pane="work">Overview and next steps</button><button class="venture-stage" data-set-ven-pane="documents">Documents</button><button class="venture-stage" data-set-ven-pane="intake">Guardrails</button><button class="venture-stage" data-set-ven-pane="history">History</button></nav>
       <div id="ventureWorkPane">
       <style>.venture-progress,.vp-plan{font-size:16px;line-height:1.6;color:#26231e}.venture-progress{max-width:82ch;margin-top:32px}.vp-sections section{margin:24px 0}.vp-sections h3{margin:0 0 8px}.vp-sections ul{margin:0;padding-left:24px}.vp-sections li{margin:0 0 8px}.vp-text{white-space:pre-wrap;margin:0}.vp-meta{font-size:13px;color:#625b50}.vp-field{display:block;margin:16px 0}.vp-field textarea{display:block;width:100%;box-sizing:border-box;padding:12px;font:inherit}.venture-progress details{margin:24px 0}.venture-progress summary{cursor:pointer}.vp-plan section{padding:8px 0;border-bottom:1px solid var(--line)}#roomVenture .vnote{color:#403b33}#roomVenture .vthread{max-width:none}#ventureNextExplanation{max-width:850px}@media(max-width:760px){#ventureMainSheet{padding:20px!important}}</style>
+      <style>.venture-phase-track{display:flex;gap:8px;list-style:none;padding:0;flex-wrap:wrap}.venture-phase-track li{flex:1;min-width:135px;border-top:5px solid var(--line);padding:10px 8px}.venture-phase-track li[aria-current]{border-color:#25221d;background:#f1ece1}.venture-phase-track span,.venture-phase-track small{display:block}.venture-guide{margin:24px 0;font-size:15px;line-height:1.5}.venture-table-wrap{overflow-x:auto}.venture-action-table{width:100%;border-collapse:collapse;text-align:left;font-size:15px;line-height:1.5}.venture-action-table th,.venture-action-table td{padding:14px 12px;border-bottom:1px solid var(--line);vertical-align:top}.venture-action-table th{font-weight:600}.venture-action-table button{text-align:left;white-space:normal}.venture-document-fields{margin:0}.venture-document-fields>div{margin:16px 0}.venture-document-fields dt{font-weight:600}.venture-document-fields dd{margin:6px 0 0}.venture-document-fields ul{padding-left:22px}#ventureActions .venture-progress{max-width:none}</style>
+      <div id="ventureGuide"></div>
       <div id="ventureActions"></div>
       <section class="venture-tools" id="ventureTools" style="margin-top:24px">
         <h3>Next action</h3><p id="ventureNextExplanation"></p>
@@ -1268,11 +1271,13 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div id="ventureHistoryPane" hidden><div id="ventureRail"></div></div>
       <div id="ventureIntakePane" hidden>
       <div class="sheet-head">
-        <h2>Intake guardrails</h2>
+        <h2>Operating constraints and optional notes</h2>
         <span class="grow"></span>
         <span class="src">Voice and scorecard fields save as you type</span>
       </div>
-      <div class="sheet-sub">These fields are separate from the 25-question interview. They survive a reload, never advance a phase, and remain durable notes for this venture until you choose to use them.</div>
+      <div id="ventureSavedConstraints"></div>
+      <p>These optional notes are not another interview or a checklist you need to finish. They do not replace your reviewed business context, change the kickoff scorecard, or advance a phase.</p>
+      <p>Your interview and current direction are in Documents. Use the fields below only for extra voice examples or review notes. They save as you type.</p>
       <div id="ventureIntakeSections">
         <div class="empty" style="padding:18px 0">Choose a venture to load its intake guardrails.</div>
       </div>
@@ -3698,7 +3703,7 @@ function renderVentureIntake(){
     '<div style="margin-top:18px"><div class="wb-label">'+esc(section==="voice"?"Voice":"Scorecard")+'</div>'+
     '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px">'+fields.map(field=>{
       const key = intakeKey(section, field);
-      return '<label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:#5a5346"><span>'+esc(INTAKE_LABELS[field]||field)+' <span data-intake-state="'+esc(key)+'" style="font:10px ui-monospace,monospace;color:#a89a80">saved</span></span>'+
+      return '<label style="display:flex;flex-direction:column;gap:5px;font-size:14px;color:#302d28"><span>'+esc(INTAKE_LABELS[field]||field)+' <span data-intake-state="'+esc(key)+'" style="font:12px ui-monospace,monospace;color:#625b50">'+(intakeValue(section,field)?'saved':'optional, not set')+'</span></span>'+
         '<textarea data-intake-section="'+esc(section)+'" data-intake-field="'+esc(field)+'" rows="3" placeholder="Add a durable guardrail for this section" style="width:100%;box-sizing:border-box;resize:vertical;border:1px solid #e0d6c0;border-radius:7px;padding:9px 10px;background:#fffdf8;font:14px/1.5 Georgia,serif">'+esc(intakeValue(section, field))+'</textarea></label>';
     }).join('')+'</div></div>'
   ).join('');
@@ -3799,14 +3804,21 @@ function renderVentureSwitcher(){
 }
 function renderVentureDocuments(){
   const box=$("#ventureDocuments"); if(!box) return;
-  box.innerHTML='<div class="vmono" style="margin-top:22px">CANONICAL DOCUMENTS</div><div class="vnote" style="font-size:11px;margin-top:4px">Opened from the venture files on disk.</div>'+
-    (VENTURE_DOCUMENTS.length ? '<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">'+VENTURE_DOCUMENTS.map(d=>
-      '<button type="button" data-venture-document="'+esc(d.id)+'" class="lead-chip"'+(d.state==="missing"||d.state==="unavailable"?' disabled':'')+' style="text-align:left;display:flex;flex-direction:column"><span>'+esc(d.title)+'</span><span class="from">Phase '+esc(d.phase)+' · '+esc(d.state)+' · '+esc(d.path)+(d.state==="unavailable"&&d.error?' · unavailable: '+esc(d.error):'')+'</span></button>'
-    ).join('')+'</div>' : '<div class="vnote" style="margin-top:9px">No document index is available for this venture yet.</div>');
+  const available=VENTURE_DOCUMENTS.filter(d=>d.state==='ready'||d.state==='empty');
+  const later=VENTURE_DOCUMENTS.filter(d=>d.state!=='ready'&&d.state!=='empty');
+  box.innerHTML='<h3>Your venture reference shelf</h3><p>Saved context, decisions and plans. Opening a document does not change it.</p><p><a href="/api/venture/starter-kit.pdf" target="_blank" rel="noopener">Open the original 14-day Solo Business Starter Kit (PDF)</a></p>'+
+    (available.length ? '<ul>'+available.map(d=>'<li style="margin:10px 0"><button type="button" data-venture-document="'+esc(d.id)+'">'+esc(d.title)+'</button> <span>'+(d.phase?'Phase '+d.phase:'Venture reference')+'</span></li>').join('')+'</ul>' : '<p>No saved documents available yet.</p>')+
+    (later.length?'<details><summary>Later documents and unavailable records ('+later.length+')</summary><ul>'+later.map(d=>'<li>'+esc(d.title)+' · '+(d.state==='unavailable'?'Could not read saved record':'Not created yet')+' · Phase '+d.phase+'</li>').join('')+'</ul></details>':'');
   const reader=$("#ventureDocumentReader");
   if(!ventureDocument){ reader.hidden=true; reader.innerHTML=""; return; }
   reader.hidden=false;
-  reader.innerHTML='<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--line)"><div class="vtitle" style="font-size:15px">'+esc(ventureDocument.title)+'</div><div class="from">Phase '+esc(ventureDocument.phase)+' · '+esc(ventureDocument.path)+' · '+esc(ventureDocument.state)+'</div><div class="md" style="margin-top:10px;max-height:360px;overflow:auto">'+(ventureDocument.content===null?'<p>This document is missing on disk.</p>':ventureDocument.content.trim()?mdToHtml(ventureDocument.content):'<p>This document exists but is empty.</p>')+'</div></div>';
+  let body=ventureDocument.content===null?'<p>This document is missing on disk.</p>':mdToHtml(ventureDocument.content);
+  if(ventureDocument.content){ try { body=renderVentureStructured(JSON.parse(ventureDocument.content),esc); } catch {} }
+  if(ventureDocument.id==='research-plan'){
+    const plan=VENTURE_THREAD?.messages.find(m=>m.kind==='card'&&m.researchPlan)?.researchPlan;
+    if(plan) body=renderVentureResearchPlan(plan,esc);
+  }
+  reader.innerHTML='<article style="margin-top:24px;padding-top:18px;border-top:1px solid var(--line)"><h2>'+esc(ventureDocument.title)+'</h2><div class="md" style="font-size:16px;line-height:1.6">'+body+'</div><details><summary>Source record</summary><p>'+esc(ventureDocument.path)+'</p><pre style="white-space:pre-wrap">'+esc(ventureDocument.content||'')+'</pre></details></article>';
 }
 async function loadVentureDocuments(){
   const slug=ventureSlug;
@@ -3822,7 +3834,7 @@ async function openVentureDocument(id){
   const j=await r.json();
   if(!r.ok||!j.ok){ flash(j.error||"Could not open that document"); return; }
   if(slug!==ventureSlug) return;
-  ventureDocument=j.document; renderVentureDocuments();
+  ventureDocument=j.document; renderVentureDocuments(); $("#ventureDocumentReader").scrollIntoView({block:'start'});
 }
 async function loadVenture(){
   if(!ventureSlug) return loadVentureList();
@@ -4466,6 +4478,8 @@ async function openVentureCapture(item){
 }
 const renderVentureProgress = ${ventureProgressHtml.toString()};
 const renderVentureActions = ${ventureActionsHtml.toString()};
+const renderVentureGuide = ${ventureGuideHtml.toString()};
+const renderVentureStructured = ${ventureStructuredHtml.toString()};
 const renderVentureSeriesSignals = ${ventureSeriesSignalsHtml.toString()};
 const renderVentureResearchPlan = ${ventureResearchPlanHtml.toString()};
 const ventureWorkingDrafts = {};
@@ -4517,13 +4531,21 @@ async function saveVentureWorkingContext(){
   finally { if(slug===ventureSlug) $('#ventureWorkingSave').disabled=false; }
 }
 document.addEventListener('click',async e=>{
+  const refresh=e.target.closest?.('[data-website-refresh]');
+  if(refresh){
+    document.querySelectorAll('[data-website-refresh]').forEach(b=>{b.disabled=true;b.textContent='Reading website totals…';});
+    try { const result=await post('/api/website-measurements/refresh',{}); if(!result.ok) throw new Error(result.error||'Could not refresh'); await loadVenture(); await loadSignals(); flash('Website totals refreshed. No subscriber details retrieved.'); }
+    catch(error){ flash(error.message||'Website refresh failed. Saved totals unchanged.'); }
+    finally { document.querySelectorAll('[data-website-refresh]').forEach(b=>{b.disabled=false;b.textContent='Refresh website totals';}); }
+    return;
+  }
   const button=e.target.closest?.('[data-venture-content],[data-venture-signals],[data-venture-documents],[data-venture-history]');
   if(!button) return;
   if(button.hasAttribute('data-venture-content')){
     await setRoom('content'); CW.pane='wizard'; CW.slug=button.dataset.ventureContent; CW.approvedLens='existing-post'; CW.step=2;
     await cwLoadTreatment(); cwEnsureConfig().open=true; renderContentWizard();
   } else if(button.hasAttribute('data-venture-signals')){
-    $('#signalsBrand').value='human-inference'; setSignalsTab('experiments'); await setRoom('signals');
+    $('#signalsBrand').value='human-inference'; setSignalsTab(button.dataset.ventureSignals==='existing'?'overview':'experiments'); await setRoom('signals');
   } else {
     VEN.pane=button.hasAttribute('data-venture-documents')?'documents':'history';renderVentureSheets();
   }
@@ -4532,6 +4554,8 @@ function renderVenture(){
   const t = VENTURE_THREAD;
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
   renderWorkingContext(t);
+  $('#ventureGuide').innerHTML=renderVentureGuide(t,esc);
+  $('#ventureSavedConstraints').innerHTML='<h3>Saved operating constraints</h3>'+(t.workingContext?.constraints?'<p style="white-space:pre-wrap">'+esc(t.workingContext.constraints)+'</p>':'<p>No separate operating update recorded. Your original interview is preserved in Documents.</p>');
   const execution = t.phase===1 && (t.executionSeries||[]).length>0 && t.nextAction?.label==='Work through the actions below';
   $('#ventureActions').innerHTML=execution?renderVentureActions(t.executionSeries,t.websiteMeasurement,esc):'';
   // Keep the operating page short. Original context and every workflow gate remain in History.

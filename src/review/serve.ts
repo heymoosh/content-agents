@@ -35,6 +35,8 @@ import { listLeadDetails, readLeadDetail, type LeadDetail } from "../outreach/st
 import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { handleVentureRead } from "./venture-reads.js";
+import { readStarterKit } from './venture-starter-kit.js';
+import { refreshWebsiteMeasurement } from './website-refresh.js';
 import { VENTURE_PROGRESS_GUIDANCE } from "../venture/working-context.js";
 import { handleVentureWrite } from "./venture-writes.js";
 import { deliverVenture } from "../venture/deliver.js";
@@ -1119,6 +1121,23 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(renderReviewPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE, fixtures: FIXTURES_ON }));
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/website-measurements/refresh') {
+      const origin = req.headers.origin;
+      const site = req.headers['sec-fetch-site'];
+      if ((origin && origin !== `http://${req.headers.host}`) || site === 'cross-site') {
+        json(res,403,{ok:false,error:'Use the local dashboard to refresh website measurements.'}); return;
+      }
+      try { json(res,200,{ok:true,measurement:await refreshWebsiteMeasurement()}); }
+      catch { json(res,502,{ok:false,error:'Website refresh failed. Check Vercel sign-in and database access. Saved totals are unchanged.'}); }
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/venture/starter-kit.pdf') {
+      const pdf = readStarterKit();
+      if (!pdf) { res.writeHead(404).end('The original starter kit is not available at its saved local location.'); return; }
+      res.writeHead(200, { 'content-type':'application/pdf', 'content-disposition':'inline; filename="Solo-Business-Starter-Kit.pdf"', 'cache-control':'no-store' });
+      res.end(pdf);
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/engines") {

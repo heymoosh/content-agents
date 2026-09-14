@@ -1,8 +1,9 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { readArtifact } from "../venture/artifacts.js";
-import { readDecision } from "../venture/decisions.js";
-import { clusterAnalysisPath, ventureDir } from "../venture/paths.js";
+import { readDecision, readDecisions } from "../venture/decisions.js";
+import { clusterAnalysisPath, ventureDir, intakePath, canonPath } from "../venture/paths.js";
+import { readWorkingContext } from '../venture/working-context.js';
 
 export type VentureDocumentState = "missing" | "empty" | "ready" | "unavailable";
 
@@ -32,6 +33,10 @@ interface DocumentDefinition {
 }
 
 const DOCUMENTS: DocumentDefinition[] = [
+  { id: "interview", phase: 0, title: "Original interview: reviewed business context", source: slug => ({ kind: 'file', path: intakePath(slug) }) },
+  { id: "working-context", phase: 0, title: "Current direction, tests and operating constraints", source: slug => ({ kind: 'file', path: resolve(ventureDir(slug), 'working-context.jsonl') }) },
+  { id: "decision-log", phase: 0, title: "Venture history and recorded decisions", source: slug => ({ kind: 'file', path: canonPath(slug) }) },
+  { id: "selected-decisions", phase: 0, title: "Selected business decisions", source: slug => ({kind:'file',path:resolve(ventureDir(slug),'decisions.jsonl')}) },
   { id: "research-plan", phase: 1, title: "Research plan and confirmed knowns", source: () => ({ kind: "artifact", artifactId: "p1-research-plan" }) },
   { id: "research-read", phase: 1, title: "Research read and findings", source: () => ({ kind: "artifact", artifactId: "p1-research-read" }) },
   { id: "cluster-analysis", phase: 3, title: "Cluster analysis", source: (slug) => ({ kind: "file", path: clusterAnalysisPath(slug) }) },
@@ -76,6 +81,9 @@ function fromText(def: DocumentDefinition, path: string, content: string | null)
 
 function resolveDocument(slug: string, def: DocumentDefinition): VentureDocument {
   const source = def.source(slug);
+  if (source.kind === 'file') insideVenture(slug, source.path);
+  if (def.id === 'working-context') return fromText(def, 'working-context.jsonl', existsSync((source as {path:string}).path) ? JSON.stringify(readWorkingContext(slug), null, 2) : null);
+  if (def.id === 'selected-decisions') return fromText(def, 'decisions.jsonl', JSON.stringify(readDecisions(slug).filter(d=>d.status==='selected'), null, 2));
   if (source.kind === "file") {
     const path = insideVenture(slug, source.path);
     return fromText(def, relative(ventureDir(slug), path), existsSync(path) ? readFileSync(path, "utf8") : null);

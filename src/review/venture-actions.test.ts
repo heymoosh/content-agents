@@ -55,7 +55,7 @@ test('selected existing sources queue once, preserve exact content and owner gat
     const action=nextVentureAction(1,[{...plan,fields:{reviewed_by_muxin:true}}],[],progress);
     assert.equal(action.runnable,false);
     const html=ventureActionsHtml(progress,null,String);
-    assert.match(html,/ready to configure/);assert.match(html,/Setup needed/);assert.match(html,/data-venture-content/);
+    assert.match(html,/Ready to configure/);assert.match(html,/Setup needed/);assert.match(html,/data-venture-content/);
     assert.match(ventureSeriesSignalsHtml(progress,null,String),/1 of 2/);
   } finally {
     if(before===undefined) delete process.env.CONTENT_AGENTS_TEST_VENTURE_ROOT; else process.env.CONTENT_AGENTS_TEST_VENTURE_ROOT=before;
