@@ -2,20 +2,17 @@
 
 ## START HERE
 
-- Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
-- Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
-- Current work: real-content channel coverage through the actual Studio Publishing workflow.
-- Confirmed public: X, LinkedIn, Bluesky, Mastodon, Threads, Facebook, and Instagram.
-- TikTok Direct Post sandbox fix is applied; OAuth reconnection and the approved retry remain.
-- YouTube's actual Postiz OAuth client is in `voter-choice-493119`, confirmed External / Testing.
-- Postiz browser access is restored. Owner authorized the existing YouTube channel's reconnection.
-- Next: repair Postiz's YouTube callback mismatch; leave Voter Choice's Google settings unchanged.
-- Substack is not live; a fresh attended retry budget is required. Gmail remains optional/manual.
-- Durable HTTPS media hosting and attended Bitwarden injection for Studio's API key remain open.
-- Last accepted runtime: `ea05080`, including 8F/8G/8H and publishing recovery; Grok accepted,
-  clean E2E passed, and the final gate passed 4,593/4,593. No new live retry ran in this continuation.
-- Latest investigation: Progress log -> 2026-09-13 (Postiz access restored; YouTube callback mismatch).
-- Keep the read-only Bitwarden token in attended shell scope only.
+- **Owner direction, 2026-09-13: stop this master-driven workstream.** Publishing recovery is paused.
+- Next work is specific Studio UI/UX problems identified by the owner, using the actual application.
+- This document is a historical investigation record, not a trusted scope definition or work queue.
+- Do not resume its outstanding list, prerequisites, or old standing authorization automatically.
+- Repository architecture, content-review, security, and verification rules still apply.
+- Postiz browser access is restored; YouTube reconnection did not complete because of a callback mismatch.
+- No runtime patch, Google settings change, credential change, or publication occurred in this continuation.
+- Voter Choice's Google project settings remain unchanged. No further account action is requested.
+- Verified recovery details: Progress log -> 2026-09-13 (Postiz access restored; YouTube callback mismatch).
+- Closeout: documentation reviewed and committed; other-session work preserved. See latest Progress log.
+- Repo root: `/Users/Muxin/Documents/GitHub/content-agents`; master: this file.
 
 ## Standing constraints
 
@@ -51,8 +48,10 @@ worker holding only that section and its packet still has them.
 
 ## Outstanding work
 
-Everything known-broken or unproven, as of 2026-09-13. Muxin's direction: fix all of it before any
-front-end or UX pass. Ordered by what blocks trusting the Publishing room, not by size.
+Historical inventory of reported defects and verification gaps as of 2026-09-13; completeness and
+product-scope alignment are not established. **Owner reversal, 2026-09-13:** this list no longer
+gates UI/UX work and is not authorization to keep implementing it. Investigate only a specifically
+requested problem; verify claims against the actual application before relying on them.
 
 1. ~~**Text destination delivery is 4 of 5 confirmed.**~~ **DONE 2026-09-13 after the X repair.**
    LinkedIn and Mastodon were completed 2026-09-12. Two rows
@@ -282,6 +281,21 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-13 (owner stopped master-driven work; safe closeout)
+
+Muxin explicitly stopped the publishing/master-document workstream and wants to address obvious
+Studio UI/UX problems directly. The master is not assumed to faithfully define current product
+scope. START HERE, the outstanding-list preamble, and the old standing authorization were edited
+in place so later sessions do not automatically resume this work or require its completion before
+UI/UX fixes. No replacement backlog or automatic UI work was created.
+
+The investigation is closed with YouTube reconnection incomplete, its exact callback mismatch
+recorded below, and no runtime repair applied. Postiz browser access was verified restored.
+Voter Choice settings, credentials, and scheduled/public content were not changed. No further
+owner sign-in or account-maintenance action is pending from this task. Documentation-only review
+and `git diff --check` pass; local integration and this session's temporary-worktree cleanup are
+part of closeout. Other sessions' ledger, captures, and branches remain untouched as named below.
 
 ### 2026-09-13 (Postiz access restored; YouTube callback mismatch)
 
@@ -2513,18 +2527,15 @@ completed work; they are not instructions to reopen it.
 > `agent/cs6-parallel-safe-ui-completion`) — prior-session work, unclassified, left untouched; verify
 > against merged history before deleting or resuming any of them.
 
-### Standing authorization (settles the old "nothing is approved to build" gate)
+### Historical standing authorization (withdrawn as an automatic work queue, 2026-09-13)
 
-Muxin owns *what* gets built, and she has already said it: **work through this document.** She does
-not pick starting items, sequence lanes, or approve mechanics — that is the agent's job. Earlier
-revisions of this doc froze `src/review/jobs.ts` "until she picks a starting item"; that freeze is
-**lifted**. The order below is not a preference, it is forced by the code (see "Room-model
-execution order"), so there was never anything for her to choose.
+The earlier direction to "work through this document" no longer governs execution. Muxin stopped
+that workstream because this document had become confusing and its alignment with requested scope
+was uncertain. Work now starts from specific owner-identified Studio UI/UX problems and direct
+application evidence. The historical running order below is not a current instruction.
+Repository safety, content approval, and applicable verification rules remain in force.
 
-No PR-specific review hold remains. Content-generation logic retains its stronger verification and
-cross-family audit requirements; publishing still requires Muxin's normal content approval.
-
-### Do this next, in this order
+### Historical running order (not current instructions)
 
 **No open PRs. Start by building, not by triage.** The rest of the 2026-09-03 queue was resolved
 that day; what happened is under "PR hygiene" below, and you do not need it to begin.
