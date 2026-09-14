@@ -34,6 +34,20 @@ export const CONTENT = join(repoRoot, "content");
 // this SAME Review tab, not a second one — a second discovery root, not a second parser.
 export const OUTREACH_LEADS = join(repoRoot, "outreach", "leads");
 
+let reviewContentRoot = CONTENT;
+let reviewOutreachRoot = OUTREACH_LEADS;
+
+/** Keep HTTP integration fixtures out of the live Studio roots. Tests must restore the returned seam. */
+export function setReviewRootsForTest(roots: { contentRoot: string; outreachRoot: string }): () => void {
+  const previous = { contentRoot: reviewContentRoot, outreachRoot: reviewOutreachRoot };
+  reviewContentRoot = roots.contentRoot;
+  reviewOutreachRoot = roots.outreachRoot;
+  return () => {
+    reviewContentRoot = previous.contentRoot;
+    reviewOutreachRoot = previous.outreachRoot;
+  };
+}
+
 // A row is "decided" once it's out of the review inbox. Everything else needs Muxin's eyes.
 // "locked" (an outreach-message row's terminal state — see lock.ts) counts as decided too: it's
 // not still awaiting Muxin, just like "published"/"discard".
@@ -89,9 +103,9 @@ export interface Piece {
 // slugs are date-prefixed, outreach lead slugs are kind-prefixed, e.g. "client-acme-co").
 export function safeFolder(slug: string): string {
   if (!slug || slug.includes("/") || slug.includes("..")) throw new Error("bad slug");
-  const contentFolder = join(CONTENT, slug);
+  const contentFolder = join(reviewContentRoot, slug);
   if (existsSync(join(contentFolder, "review-queue.md"))) return contentFolder;
-  const outreachFolder = join(OUTREACH_LEADS, slug);
+  const outreachFolder = join(reviewOutreachRoot, slug);
   if (existsSync(join(outreachFolder, "review-queue.md"))) return outreachFolder;
   throw new Error("no such queue");
 }
@@ -447,8 +461,8 @@ export async function listPieces(): Promise<Piece[]> {
   // → rows initialization cycle even though request metadata is only needed at request time.
   const { readContentRequest } = await import("./content-request-store.js");
   const dirs = [
-    ...listRootFolders(CONTENT).map((slug) => ({ slug, folder: join(CONTENT, slug) })),
-    ...listRootFolders(OUTREACH_LEADS).map((slug) => ({ slug, folder: join(OUTREACH_LEADS, slug) })),
+    ...listRootFolders(reviewContentRoot).map((slug) => ({ slug, folder: join(reviewContentRoot, slug) })),
+    ...listRootFolders(reviewOutreachRoot).map((slug) => ({ slug, folder: join(reviewOutreachRoot, slug) })),
   ];
   // Read every folder's rows up front (sync, no network) so a live Typefully/PostPeer fetch only
   // happens when there's actually an approved row somewhere to reconcile.
@@ -567,8 +581,8 @@ export function cutSetForFolder(folder: string, title: string): CutView[] | null
 // excluded — cuts are a content-pipeline concept, leads don't have them.
 export function listCutSets(): CutSet[] {
   const out: CutSet[] = [];
-  for (const slug of listRootFolders(CONTENT)) {
-    const folder = join(CONTENT, slug);
+  for (const slug of listRootFolders(reviewContentRoot)) {
+    const folder = join(reviewContentRoot, slug);
     const cuts = cutSetForFolder(folder, slug);
     if (!cuts) continue;
     out.push({ slug, title: firstHeading(folder), cuts });

@@ -29,3 +29,6 @@ the image and animated companion were intentionally not rendered in this no-rend
 | quote-card-1-bluesky | quote-card:bluesky | image | images/quote-card-1.png | 5 | 5 | true | published | text caption drafted; image render intentionally skipped | from /cycle |
 | quote-card-1-instagram | quote-card:instagram | image | images/quote-card-1.png | 5 | 5 | true | published | caption from quote-card-1-linkedin | from SLICE-8A |
 | quote-card-1-facebook | quote-card:facebook | image | images/quote-card-1.png | 5 | 5 | true | published | caption from quote-card-1-linkedin | from SLICE-8A |
+| joy-short-tiktok | tiktok | video | configured-media/joy-animated-short/video.mp4 | 5 | 5 | true | approve | approved animated quote card; real-channel canary candidate | from live coverage closeout |
+| joy-short-youtube | youtube | video | configured-media/joy-animated-short/video.mp4 | 5 | 5 | true | approve | approved animated quote card; real-channel canary candidate | from live coverage closeout |
+| joy-substack-note | substack | text | derivatives/joy-substack-note.md | 5 | 5 | true | approve | source-excerpt Note; real-channel canary candidate | from live coverage closeout |

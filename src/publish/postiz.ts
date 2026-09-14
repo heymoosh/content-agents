@@ -1,3 +1,7 @@
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { isAbsolute, join } from "node:path";
+
 export type PostizDestination = "x" | "linkedin" | "bluesky" | "mastodon" | "threads" | "facebook" | "instagram" | "tiktok" | "youtube" | "substack";
 export type PostizMedia = "text" | "image" | "video";
 
@@ -434,12 +438,68 @@ async function postPosts(transport: PostizTransport, body: Record<string, unknow
  * return the `{ id, path }` media ref Postiz expects inside `posts[].value[].image`. Public API
  * accepts jpeg/png/gif/webp/avif/bmp/tiff images and mp4 video; there is no public delete for media.
  */
-export async function uploadPostizMedia(transport: PostizTransport, file: { bytes: Uint8Array; filename: string; mime: string }): Promise<PostizMediaRef> {
+const PUBLIC_MEDIA_EXTENSIONS: Readonly<Record<string, string>> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/avif": "avif",
+  "image/bmp": "bmp",
+  "image/tiff": "tiff",
+  "video/mp4": "mp4",
+};
+
+type PublicMediaEnv = Record<string, string | undefined>;
+
+function configuredPublicMedia(file: { bytes: Uint8Array; mime: string }, env: PublicMediaEnv): { path: string; write(): void } | null {
+  const root = env.CONTENT_AGENTS_PUBLIC_MEDIA_ROOT?.trim();
+  const base = env.CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL?.trim();
+  if (!root && !base) return null;
+  if (!root || !base) throw new Error("CONTENT_AGENTS_PUBLIC_MEDIA_ROOT and CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL must be set together");
+  if (!isAbsolute(root)) throw new Error("CONTENT_AGENTS_PUBLIC_MEDIA_ROOT must be an absolute path");
+  let baseUrl: URL;
+  try { baseUrl = new URL(base.endsWith("/") ? base : `${base}/`); }
+  catch { throw new Error("CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL must be a valid HTTPS URL"); }
+  if (baseUrl.protocol !== "https:") throw new Error("CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL must use HTTPS");
+  if (baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) {
+    throw new Error("CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL cannot contain credentials, a query, or a fragment");
+  }
+  const extension = PUBLIC_MEDIA_EXTENSIONS[file.mime.toLowerCase()];
+  if (!extension) throw new Error(`public media does not support MIME type ${file.mime}`);
+  const digest = createHash("sha256").update(file.bytes).digest("hex");
+  const name = `${digest}.${extension}`;
+  const destination = join(root, name);
+  return {
+    path: new URL(name, baseUrl).toString(),
+    write() {
+      mkdirSync(root, { recursive: true, mode: 0o700 });
+      try {
+        writeFileSync(destination, file.bytes, { flag: "wx", mode: 0o444 });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        const existing = readFileSync(destination);
+        if (!existing.equals(Buffer.from(file.bytes))) throw new Error(`public media digest collision at ${destination}`);
+      }
+      chmodSync(destination, 0o444);
+    },
+  };
+}
+
+export async function uploadPostizMedia(
+  transport: PostizTransport,
+  file: { bytes: Uint8Array; filename: string; mime: string },
+  env: PublicMediaEnv = process.env,
+): Promise<PostizMediaRef> {
   if (!file.bytes.length) throw new Error("Postiz upload needs a non-empty file");
+  const publicMedia = configuredPublicMedia(file, env);
+  publicMedia?.write();
   const form = new FormData();
   form.append("file", new Blob([file.bytes.slice().buffer as ArrayBuffer], { type: file.mime }), file.filename);
   const response = record(await transport.request("/api/public/v1/upload", { method: "POST", body: form }));
-  return { id: requiredString(response.id, "media id"), path: requiredString(response.path, "media path") };
+  return {
+    id: requiredString(response.id, "media id"),
+    path: publicMedia?.path ?? requiredString(response.path, "media path"),
+  };
 }
 
 export async function createPostizPost(transport: PostizTransport, input: PostizCreateInput, now = new Date()): Promise<PostizPost> {

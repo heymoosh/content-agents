@@ -4,9 +4,10 @@
 # tech/AI audience skews West Coast (SF Bay is a top location). `best_times_pst` is the human-readable
 # target window; the machine-readable cadence below it drives automatic scheduling.
 #
-# CADENCE (Muxin, 2026-06-16): publish:typefully now computes an EXPLICIT publish time per post and
-# sends it to Typefully (DST-aware, PT) so posts auto-publish on schedule — no manual dragging. Three
-# fields per platform drive it:
+# CADENCE (Muxin, 2026-06-16; provider route corrected 2026-09-13): the unified scheduler computes
+# an EXPLICIT publish time per post (DST-aware, PT). Studio then uses live capability discovery to
+# dispatch through Postiz first and only an explicitly supported fallback otherwise. Three fields
+# per platform drive the time claim:
 #   posts_per_week  — cap on how many posts land on this platform in any Mon-Sun week
 #   slot_days       — weekdays eligible for a slot (Sun..Sat); scheduler places ~1/day by default
 #   slot_time_pst   — time of day (PST/PDT wall clock) for that day's slot, inside best_times_pst

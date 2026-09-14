@@ -28,7 +28,7 @@ yet. The three card rows below are queued on their drafted captions only.
 
 | id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |
 |----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|
-| x-1 | x | text | derivatives/x-1.md | 5 | 5 | true | published | | from /cycle |
+| x-1 | x | text | derivatives/x-1.md | 5 | 5 | true | published | provider object was deleted before its slot; approved retry for real-channel verification | from /cycle |
 | x-2 | x | text | derivatives/x-2.md | 5 | 4 | true | approve | | from /cycle |
 | x-3 | x | text | derivatives/x-3.md | 5 | 4 | true | pending | flag: spin pass suggested (low: narrative) | from /cycle |
 | linkedin-1 | linkedin | text | derivatives/linkedin-1.md | 5 | 5 | true | published | | from /cycle |

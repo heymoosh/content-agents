@@ -23,6 +23,8 @@ test("production runner performs one bounded pass and exposes persisted last-run
   assert.equal(calls, 1);
   assert.equal(health.state, "ok");
   assert.equal(health.observations, 1);
+  assert.match(health.limitations?.join("\n") ?? "", /confirms a new exact-text public feed item at creation/i);
+  assert.doesNotMatch(health.limitations?.join("\n") ?? "", /events remain explicitly uncertain until human confirmation/i);
   assert.equal(JSON.parse(readFileSync(healthPath, "utf8")).lastCompletedAt, "2026-01-02T00:00:00.000Z");
 });
 

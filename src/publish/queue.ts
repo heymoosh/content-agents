@@ -340,7 +340,11 @@ export function appendBetPlacement(
     existing = BETS_HEADER;
   }
   const key = `${basename(folder)}/${rowId}`;
-  if (existing.includes(`[${key}]`)) return; // already recorded — keep /publish a no-op
+  const latestForRow = existing.split("\n").filter((line) =>
+    (line.startsWith("- placed ") || line.startsWith("- retracted "))
+      && line.includes(`[${key}] ${platform} →`),
+  ).at(-1);
+  if (latestForRow?.startsWith("- placed ")) return; // one active placement keeps /publish a no-op
   const fromBrief = fm.from_brief ? ` | from_brief: ${String(fm.from_brief)}` : "";
   const dir = fm.directives_applied;
   const directives = dir
@@ -388,5 +392,44 @@ export function appendBetPlacement(
       : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
   const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${outreachMessage}${cta}${cadence}${experiment}${recommendation}${prefix}`;
+  writeFileSync(path, existing.replace(/\n*$/, "\n") + line + "\n");
+}
+
+/**
+ * Append an audit-preserving correction for the latest placement of one exact row/platform.
+ * Used only after a terminal failure has been confirmed; the reuse guard pops this one placement
+ * while retaining any older successful placement for the same row. The reference may be a stable
+ * provider object id or, for browser-only delivery, the locally recorded attempt reference.
+ */
+export function appendBetRetraction(
+  folder: string,
+  rowId: string,
+  platform: string,
+  providerReference: string,
+  opts: { allowMissing?: boolean } = {},
+): void {
+  const reference = providerReference.trim();
+  if (!reference || /[\r\n]/.test(reference)) throw new Error("placement retraction needs one provider reference");
+  const brandId = brandForQueueFolder(folder);
+  if (brandId === "fiction") throw new Error("Fiction publishing is blocked; no bets ledger placement retracted");
+  const path = betsPath(brandId);
+  const existing = readFileSync(path, "utf8");
+  const key = `${basename(folder)}/${rowId}`;
+  const latestForRow = existing.split("\n").filter((line) =>
+    (line.startsWith("- placed ") || line.startsWith("- retracted "))
+      && line.includes(`[${key}] ${platform} →`),
+  ).at(-1);
+  if (latestForRow?.startsWith("- retracted ") && latestForRow.includes(`→ reference ${reference} invalidated after terminal failure`)) {
+    return; // retry after a crash between this append and terminal status persistence
+  }
+  if (!latestForRow?.startsWith("- placed ")) {
+    if (opts.allowMissing) return; // provider status can exist even if the placement append never landed
+    throw new Error(`no active placement exists for ${key} on ${platform}`);
+  }
+  const recordedReference = latestForRow.split(" → ", 2)[1]?.split(" | ", 1)[0] ?? "";
+  const recordedObject = recordedReference.split(" @ ", 1)[0];
+  const referenceMatches = recordedObject === reference || recordedObject.endsWith(` ${reference}`);
+  if (!referenceMatches) throw new Error(`active placement for ${key} on ${platform} does not match provider reference ${reference}`);
+  const line = `- retracted ${new Date().toISOString()} [${key}] ${platform} → reference ${reference} invalidated after terminal failure`;
   writeFileSync(path, existing.replace(/\n*$/, "\n") + line + "\n");
 }

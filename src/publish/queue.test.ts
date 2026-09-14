@@ -13,6 +13,7 @@ import {
   appendRow,
   appendRows,
   appendBetPlacement,
+  appendBetRetraction,
   cutRowId,
   rowLens,
   type QueueRow,
@@ -528,6 +529,40 @@ describe("appendBetPlacement: ctaDestination marker", () => {
   test("the cta marker coexists with the spin marker, both before the quote", () => {
     appendBetPlacement("essay-01", "x-3", "x", "typefully draft 3", { spin: true }, "third posted text long enough to match", "work_with_me");
     assert.match(lineFor("x-3"), /\| spin \| cta:work_with_me \|/);
+  });
+
+  test("a terminal-failure retraction preserves history and permits one replacement placement", () => {
+    appendBetPlacement("essay-01", "x-retry", "x", "postiz post failed-1", {}, "approved body");
+    appendBetRetraction("essay-01", "x-retry", "x", "failed-1");
+    appendBetRetraction("essay-01", "x-retry", "x", "failed-1");
+    assert.throws(() => appendBetRetraction("essay-01", "x-retry", "x", "different-object"), /no active placement/);
+    appendBetPlacement("essay-01", "x-retry", "x", "postiz post replacement-1", {}, "approved body");
+    assert.throws(() => appendBetRetraction("essay-01", "x-retry", "x", "failed-1"), /does not match provider reference/);
+    appendBetPlacement("essay-01", "x-retry", "x", "postiz post duplicate", {}, "approved body");
+    const matching = readFileSync(testBetsPath, "utf8").split("\n").filter((line) => line.includes("[essay-01/x-retry] x →"));
+    assert.equal(matching.length, 3);
+    assert.match(matching[0], /^- placed .*failed-1/);
+    assert.match(matching[1], /^- retracted .*failed-1.*terminal failure/);
+    assert.match(matching[2], /^- placed .*replacement-1/);
+
+    appendBetRetraction("essay-01", "x-retry", "x", "replacement-1");
+    appendBetPlacement("essay-01", "x-retry", "x", "postiz post replacement-2", {}, "approved body");
+    const repeatedCycle = readFileSync(testBetsPath, "utf8").split("\n").filter((line) => line.includes("[essay-01/x-retry] x →"));
+    assert.equal(repeatedCycle.length, 5);
+    assert.match(repeatedCycle[3], /^- retracted .*replacement-1.*terminal failure/);
+    assert.match(repeatedCycle[4], /^- placed .*replacement-2/);
+
+    appendBetPlacement("essay-01", "x-ref-boundary", "x", "postiz post actual-object", {}, "body mentions wrong-object");
+    assert.throws(
+      () => appendBetRetraction("essay-01", "x-ref-boundary", "x", "wrong-object"),
+      /does not match provider reference/,
+      "text metadata cannot make a different provider reference look active",
+    );
+    assert.throws(
+      () => appendBetRetraction("essay-01", "x-ref-boundary", "x", "object"),
+      /does not match provider reference/,
+      "an arbitrary substring cannot impersonate the exact provider reference",
+    );
   });
 });
 

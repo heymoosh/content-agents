@@ -186,6 +186,21 @@ describe("reuse-guard: the variant window spaces a different derivative instead 
     assert.match(r.reason ?? "", /min_reuse_days: 21/);
   });
 
+  test("a retraction removes only the latest failed placement from both reuse windows", () => {
+    const old = new Date(NOW - 40 * 86_400_000).toISOString();
+    writeFileSync(VARIANT_BETS_PATH,
+      `# Placed log\n${placedLine(VSLUG, "bluesky-2", "bluesky", old)}` +
+      placedLine(VSLUG, "bluesky-2", "bluesky", AN_HOUR_AGO) +
+      `- retracted ${new Date(NOW - 1_000).toISOString()} [${VSLUG}/bluesky-2] bluesky → reference pz-0 invalidated after terminal failure\n`,
+    );
+    const sameRow = checkReuseForRow(VSLUG, "bluesky", { rowId: "bluesky-2", now: NOW });
+    assert.equal(sameRow.allowed, true, "the older real placement remains, but is outside min_reuse_days");
+    assert.equal(sameRow.lastPlacedAt, old);
+    const differentRow = checkReuseForRow(VSLUG, "bluesky", { rowId: "bluesky-1", now: NOW });
+    assert.equal(differentRow.allowed, true, "the retracted failure does not impose a variant delay");
+    assert.equal(differentRow.lastPlacedAt, old);
+  });
+
   // The behavior change this slice is actually for: 10 days is past the 7-day variant window but
   // still inside bluesky's 21-day re-publish window, so the merged guard used to refuse it.
   test("a DIFFERENT row past the variant window is allowed even though min_reuse_days has not elapsed", () => {

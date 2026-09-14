@@ -21,10 +21,10 @@ prose: grok-cli         # BUILD 2 — FICTION ONLY, subscription-backed Grok CLI
 # `prose: grok-cli` in its own series.yaml (e.g. Grok's fiction voice earning its keep).
 # Grok must be installed and signed in locally. This path has no OPENROUTER_API_KEY dependency.
 video-broll: openrouter-video   # animated scenes: Kling first+last-frame interpolation (OpenRouter). Used by /video.
-# Quote cards (publish:cards) ship as NATIVE Typefully image posts since 2026-07-08 (uploadMedia +
-# media_ids on a scheduled draft — src/publish/typefully.ts, reused by src/publish/cards.ts). No
-# provider toggle needed here anymore: PostPeer/Upload-Post are retired for cards. PostPeer stays
-# wired (hardcoded, not config-driven) for TikTok only — src/publish/tiktok.ts.
+# Quote cards and configured media use Studio's Postiz-first live capability discovery. A native
+# Typefully image draft is only the explicit fallback after Postiz reports the exact destination or
+# media shape unsupported; PostPeer remains only the TikTok exception after the same unsupported
+# result. The provider choice is enforced in src/review/studio-scheduling.ts, not by this file.
 # Animated scene-engine settings, passed to interpolate(). Kling v3.0 Std ~$0.08/s — cheaper than Veo,
 # and the one model verified to do start→end interpolation on the existing OPENROUTER_API_KEY.
 video_broll_params: { model: kwaivgi/kling-v3.0-std, resolution: 720p, cost_per_sec: 0.08 }

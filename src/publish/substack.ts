@@ -11,6 +11,7 @@ import { checkReuseForRow } from "./reuse-guard.js";
 import { launchPlatform } from "../pull/browser.js";
 import { captureDiagnostics, looksLikeAuthWall } from "../pull/diagnose.js";
 import { PullError, classifyUnknown, CULPRIT, type PullFailureKind } from "../pull/errors.js";
+import { fetchSubstackNotes, type FetchedNote } from "../atomize/fetch-notes.js";
 
 // Post approved `substack` rows to Substack Notes. Substack has NO usable posting API (see CLAUDE.md
 // rule 3), so this is the sanctioned constrained-browser path — it drives the saved-session stealth
@@ -49,6 +50,54 @@ export interface PostContext {
 }
 
 export type PostFn = (context: PostContext, text: string) => Promise<{ ref: string }>;
+
+function normalizedNoteText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Fail-closed public proof that the exact note appeared after this publish attempt. A cleared
+ * composer only proves that Substack changed the UI; it does not prove that the requested note
+ * exists. The public Notes feed supplies the canonical URL and an observable delivery outcome.
+ */
+export async function confirmPublishedSubstackNote(
+  text: string,
+  handle: string,
+  opts: {
+    notBefore: Date;
+    attempts?: number;
+    intervalMs?: number;
+    fetchNotes?: (handle: string, opts: { limit: number; maxPages: number }) => Promise<FetchedNote[]>;
+    sleep?: (milliseconds: number) => Promise<void>;
+  },
+): Promise<{ ref: string; publishedAt: string }> {
+  const attempts = opts.attempts ?? 8;
+  const intervalMs = opts.intervalMs ?? 2_000;
+  const fetchNotes = opts.fetchNotes ?? fetchSubstackNotes;
+  const sleep = opts.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+  const wanted = normalizedNoteText(text);
+  const notBefore = opts.notBefore.getTime();
+  let lastReadError: unknown;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const notes = await fetchNotes(handle, { limit: 10, maxPages: 3 });
+      const match = notes.find((note) =>
+        normalizedNoteText(note.text) === wanted &&
+        note.publishedAt !== null &&
+        Date.parse(note.publishedAt) >= notBefore
+      );
+      if (match?.publishedAt) return { ref: match.url, publishedAt: match.publishedAt };
+    } catch (error) {
+      lastReadError = error;
+    }
+    if (attempt + 1 < attempts) await sleep(intervalMs);
+  }
+
+  throw new Error("Substack accepted the composer action, but the exact newly published note did not appear in the public feed", {
+    ...(lastReadError === undefined ? {} : { cause: lastReadError }),
+  });
+}
 
 // A prior claim already recorded in the shared ledger for this asset that hasn't fired yet. "Not yet
 // fired" is implicit: once a row fires, its review-queue status becomes `published` and it drops out
@@ -94,6 +143,10 @@ export async function postNoteToSubstack(
       const opener = page
         .getByRole("button", { name: /write a note|new note|write note|start a post/i })
         .or(page.getByRole("textbox", { name: /write a note|add a comment|note/i }))
+        // Current Substack home feed (verified 2026-09-13) renders the composer affordance as a
+        // clickable card whose visible copy is "What's on your mind?", without button/textbox
+        // semantics. Keep the role-based selectors first, then accept that exact visible label.
+        .or(page.getByText("What's on your mind?", { exact: true }))
         .first();
       await opener.waitFor({ state: "visible", timeout: 15_000 });
       await opener.click();
@@ -102,6 +155,7 @@ export async function postNoteToSubstack(
       await editor.waitFor({ state: "visible", timeout: 10_000 });
       await editor.click();
       await editor.fill(text);
+      const submittedAfter = new Date();
 
       const post = page
         .getByRole("button", { name: /^post$|^publish$|^send$/i })
@@ -109,9 +163,8 @@ export async function postNoteToSubstack(
       await post.waitFor({ state: "visible", timeout: 10_000 });
       await post.click();
 
-      // Best-effort confirmation: the composer clears (editor empties or detaches) once the note is
-      // accepted. We don't fail the post if this races — the click already went through — but we do
-      // give the network round-trip a moment to land before closing the browser.
+      // The composer clearing is only a UI transition, not delivery proof. Wait for it, then require
+      // the exact note to appear in the public feed before reporting success or mutating local state.
       await page
         .waitForFunction(
           () => {
@@ -122,12 +175,27 @@ export async function postNoteToSubstack(
         )
         .catch(() => {});
 
-      return { ref: `substack note (posted ${new Date().toISOString()})` };
+      const handle = process.env.SUBSTACK_HANDLE?.trim();
+      if (!handle) {
+        throw new PullError("SETUP", "SUBSTACK_HANDLE is required to verify the published note", {
+          hint: "Set SUBSTACK_HANDLE to the public profile handle used by the saved Substack session.",
+        });
+      }
+      try {
+        return await confirmPublishedSubstackNote(text, handle, { notBefore: submittedAfter });
+      } catch (cause) {
+        const diag = await captureDiagnostics(page, "substack", "note-not-confirmed");
+        throw new PullError("UNKNOWN", "Substack did not expose the exact submitted note after posting", {
+          hint: "The local row was left unmodified. Check the public profile and the captured composer state before retrying.",
+          diagnosticsDir: diag,
+          cause,
+        });
+      }
     } catch (cause) {
       if (cause instanceof PullError) throw cause;
       const diag = await captureDiagnostics(page, "substack", "notes-composer");
       throw new PullError("UI_CHANGED", `Couldn't post a note from ${page.url()}`, {
-        hint: `Expected a "Write a note" composer + "Post" button on ${NOTES_URL}. Re-check the selectors in src/publish/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
+        hint: `Expected a Notes composer affordance + "Post" button on ${NOTES_URL}. Re-check the selectors in src/publish/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
         diagnosticsDir: diag,
         cause,
       });

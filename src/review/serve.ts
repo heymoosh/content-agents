@@ -25,7 +25,7 @@ import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { repoRoot, openDb } from "../db/db.js";
 import { measurementAccountForBrand } from "../config/brand-accounts.js";
-import { readQueue, writeCell, type QueueRow } from "../publish/queue.js";
+import { appendBetRetraction, readQueue, writeCell, type QueueRow } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { fetchNotesList, humanInferenceSubstackMeasurementBinding, scaffoldPicked } from "../atomize/new-notes.js";
 import { scaffoldContentFolder } from "../atomize/new-content.js";
@@ -299,9 +299,18 @@ type ReviewSchedulingDeps = {
   scheduleApproved: typeof scheduleApproved;
   scheduleApprovedOnce: typeof scheduleApprovedOnce;
   readPublishingStatuses: typeof readPublishingStatuses;
+  resolvePublishingAttempt: typeof resolvePublishingAttempt;
+  appendBetRetraction: typeof appendBetRetraction;
   publishingStatusPath: string;
 };
-let reviewSchedulingDeps: ReviewSchedulingDeps = { scheduleApproved, scheduleApprovedOnce, readPublishingStatuses, publishingStatusPath: PUBLISHING_STATUS_PATH };
+let reviewSchedulingDeps: ReviewSchedulingDeps = {
+  scheduleApproved,
+  scheduleApprovedOnce,
+  readPublishingStatuses,
+  resolvePublishingAttempt,
+  appendBetRetraction,
+  publishingStatusPath: PUBLISHING_STATUS_PATH,
+};
 
 /** Test seam for proving status-only writes cannot reach a scheduling dependency. */
 export function setReviewSchedulingDepsForTest(deps: Partial<ReviewSchedulingDeps>): () => void {
@@ -1348,11 +1357,17 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         if (!row) throw new Error("no such publishing row");
         const kind = scheduleKind(row);
         if (!kind) throw new Error("no publishing provider owns this row");
-        const publishing = resolvePublishingAttempt(slug, id, resolution, {
+        const publishing = reviewSchedulingDeps.resolvePublishingAttempt(slug, id, resolution, {
           provider: providerForKind(kind),
           ref: b.ref === undefined ? undefined : String(b.ref),
           plannedFor: b.plannedFor === undefined ? undefined : String(b.plannedFor),
-        });
+          onConfirmedNotCreated: (existing) => {
+            const providerObjectId = existing.providerObjectId ?? existing.ref;
+            if (providerObjectId) {
+              reviewSchedulingDeps.appendBetRetraction(folder, id, rowDestination(row), providerObjectId, { allowMissing: true });
+            }
+          },
+        }, reviewSchedulingDeps.publishingStatusPath);
         json(res, 200, { ok: true, publishing });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });

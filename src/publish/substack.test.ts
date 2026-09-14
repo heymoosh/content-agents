@@ -19,7 +19,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { join, dirname, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { publishSubstack, findPendingClaim, type PostFn } from "./substack.js";
+import { publishSubstack, findPendingClaim, confirmPublishedSubstackNote, type PostFn } from "./substack.js";
 import { readQueue } from "./queue.js";
 import { readLedger, type Claim } from "./slots.js";
 
@@ -208,6 +208,30 @@ describe("publishSubstack", () => {
     assert.match(bets, new RegExp(`\\[${basename(dir)}/substack-1\\]`));
   });
 
+  test("a provider confirmation failure preserves the approved row and all publication records", async () => {
+    const dir = tmpFolder();
+    seedDerivative(dir, "substack-1", "Note body to post.");
+    seedQueue(dir, [row("substack-1", "substack", "approve")]);
+    seedClaim(dir, "substack-1", new Date(Date.now() - 3_600_000).toISOString());
+    const queueBefore = readFileSync(join(dir, "review-queue.md"), "utf8");
+    const ledgerBefore = readFileSync(TEST_LEDGER, "utf8");
+    const betsBefore = existsSync(BETS_PATH) ? readFileSync(BETS_PATH, "utf8") : null;
+
+    await assert.rejects(
+      publishSubstack(dir, {
+        postFn: async () => {
+          throw new Error("exact newly published note did not appear");
+        },
+      }),
+      /exact newly published note did not appear/,
+    );
+
+    assert.equal(readFileSync(join(dir, "review-queue.md"), "utf8"), queueBefore);
+    assert.equal(readFileSync(TEST_LEDGER, "utf8"), ledgerBefore, "due claim remains available for attended recovery");
+    assert.equal(existsSync(join(dir, "publish-log.md")), false);
+    assert.equal(existsSync(BETS_PATH) ? readFileSync(BETS_PATH, "utf8") : null, betsBefore);
+  });
+
   // (d) dry-run makes zero mutations — no ledger claim, no status change, no postFn call.
   test("dry-run reports intent without writing anything", async () => {
     const dir = tmpFolder();
@@ -245,4 +269,28 @@ describe("publishSubstack", () => {
     assert.ok(claim1 && claim2, "both rows must have claimed a slot");
     assert.notEqual(claim1!.day, claim2!.day, "the default 1/day cap must push the second row to a different day");
   });
+});
+
+test("Substack confirmation requires the exact newly published note and returns its canonical URL", async () => {
+  const observations = [
+    [{ noteId: "c-old", url: "https://substack.test/old", publishedAt: "2026-09-13T22:00:00.000Z", text: "Different note", likes: 0, reposts: 0, replies: 0 }],
+    [{ noteId: "c-new", url: "https://substack.test/new", publishedAt: "2026-09-13T22:31:00.000Z", text: "Exact note\n\nwith spacing.", likes: 0, reposts: 0, replies: 0 }],
+  ];
+  let reads = 0;
+  const result = await confirmPublishedSubstackNote("Exact note with spacing.", "humaninference", {
+    notBefore: new Date("2026-09-13T22:30:00.000Z"),
+    attempts: 2,
+    intervalMs: 0,
+    fetchNotes: async () => observations[Math.min(reads++, observations.length - 1)]!,
+    sleep: async () => {},
+  });
+  assert.deepEqual(result, { ref: "https://substack.test/new", publishedAt: "2026-09-13T22:31:00.000Z" });
+
+  await assert.rejects(
+    confirmPublishedSubstackNote("Missing note", "humaninference", {
+      notBefore: new Date("2026-09-13T22:30:00.000Z"), attempts: 1, intervalMs: 0,
+      fetchNotes: async () => observations[1]!, sleep: async () => {},
+    }),
+    /exact newly published note did not appear/i,
+  );
 });

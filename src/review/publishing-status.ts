@@ -47,6 +47,14 @@ export interface PublishingStatus {
   evidence?: string;
 }
 
+export interface ResolvePublishingDetails {
+  ref?: string;
+  plannedFor?: string;
+  provider?: PublishingProvider;
+  /** Runs while the row lock is held, before retry is unlocked. */
+  onConfirmedNotCreated?: (existing: Readonly<PublishingStatus>) => void;
+}
+
 type DisposableProviderOutcome = { provider: "typefully"; scheduled: unknown; scheduleError: string | null };
 
 /**
@@ -161,7 +169,7 @@ export function resolvePublishingAttempt(
   slug: string,
   rowId: string,
   resolution: PublishingResolution,
-  details: { ref?: string; plannedFor?: string; provider?: PublishingProvider } = {},
+  details: ResolvePublishingDetails = {},
   path: string = PUBLISHING_STATUS_PATH,
 ): PublishingStatus {
   if (publishingClaimIsActive(slug, rowId, path)) throw new Error("this provider call is still active in another Studio process");
@@ -174,11 +182,17 @@ export function resolvePublishingAttempt(
   const releaseClaim = claimPublishingAttempt(slug, rowId, path);
   try {
     const existing = readPublishingStatuses(path)[publishingKey(slug, rowId)];
-    if (!existing || (existing.state !== "uncertain" && existing.state !== "scheduling")) {
+    if (existing?.state === "failed" && resolution !== "not-created") {
+      throw new Error("a failed attempt can only be cleared after confirming its provider object was removed");
+    }
+    if (!existing || (existing.state !== "uncertain" && existing.state !== "scheduling" && existing.state !== "failed")) {
       throw new Error("this row has no uncertain publishing attempt to reconcile");
     }
     const provider = existing.provider ?? details.provider;
     if (!provider) throw new Error("the uncertain publishing provider is unknown");
+    if (resolution === "not-created") {
+      details.onConfirmedNotCreated?.(existing);
+    }
     const status: PublishingStatus = resolution === "exists"
       ? {
           slug, rowId, provider, state: "planned", at: new Date().toISOString(),

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cancelPostizPost, createPostizPost, defaultProviderSettings, fetchPostizCapabilities, readPostizPost, reconcilePostizPost, reschedulePostizPost, resolveConfiguredPostizCapability, selectDeliveryRoute, supportsPostiz, createPostizTransport, updatePostizPost, uploadPostizMedia, type PostizTransport, type PostizCapabilityRegistry, type PostizDestination, type PostizMedia, rateLimitRetryAt, PostizRateLimitError, postizRateLimitRetryAt } from "./postiz.js";
@@ -87,6 +88,52 @@ describe("Postiz capability-first routing", () => {
     await uploadPostizMedia(client, { bytes: new Uint8Array([1]), filename: "a.png", mime: "image/png" });
     assert.equal((seen[0]?.headers as Record<string, string>)["Content-Type"], undefined);
     assert.equal((seen[0]?.headers as Record<string, string>).Authorization, "k");
+  });
+
+  test("materializes provider-fetchable media at the configured public origin", async () => {
+    const root = mkdtempSync(join(tmpdir(), "postiz-public-media-"));
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    const { client } = transport([{ id: "media-1", path: "https://postiz.local/uploads/private.png" }]);
+    try {
+      const ref = await uploadPostizMedia(client, { bytes, filename: "approved.png", mime: "image/png" }, {
+        CONTENT_AGENTS_PUBLIC_MEDIA_ROOT: root,
+        CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL: "https://media.example/canary/",
+      });
+      const publicPath = join(root, `${digest}.png`);
+      assert.deepEqual(ref, { id: "media-1", path: `https://media.example/canary/${digest}.png` });
+      assert.deepEqual(readFileSync(publicPath), Buffer.from(bytes));
+      assert.equal(statSync(publicPath).mode & 0o777, 0o444);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses every incomplete or unsafe public media configuration", async () => {
+    const root = mkdtempSync(join(tmpdir(), "postiz-public-media-"));
+    try {
+      const cases: Array<[Record<string, string>, RegExp]> = [
+        [{ CONTENT_AGENTS_PUBLIC_MEDIA_ROOT: root }, /must be set together/],
+        [{ CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL: "https://media.example" }, /must be set together/],
+        [{ CONTENT_AGENTS_PUBLIC_MEDIA_ROOT: "relative/media", CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL: "https://media.example" }, /must be an absolute path/],
+        [{ CONTENT_AGENTS_PUBLIC_MEDIA_ROOT: root, CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL: "http://media.example" }, /must use HTTPS/],
+        [{ CONTENT_AGENTS_PUBLIC_MEDIA_ROOT: root, CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL: "https://user:pass@media.example" }, /cannot contain credentials, a query, or a fragment/],
+        [{ CONTENT_AGENTS_PUBLIC_MEDIA_ROOT: root, CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL: "https://media.example?token=present" }, /cannot contain credentials, a query, or a fragment/],
+        [{ CONTENT_AGENTS_PUBLIC_MEDIA_ROOT: root, CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL: "https://media.example/#private" }, /cannot contain credentials, a query, or a fragment/],
+      ];
+      for (const [env, expected] of cases) {
+        await assert.rejects(
+          uploadPostizMedia(
+            transport([{ id: "m", path: "p" }]).client,
+            { bytes: new Uint8Array([1]), filename: "a.png", mime: "image/png" },
+            env,
+          ),
+          expected,
+        );
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("sends the bare API key: Postiz's public middleware rejects a Bearer prefix", async () => {

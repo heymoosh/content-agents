@@ -69,25 +69,25 @@ candidate hashes plus bounded diff and check output, with no values.
 
 ## Acceptance
 
-- [ ] No active runtime secret has an inline literal in the candidate Compose.
-- [ ] JWT and Postgres values resolve from required `JWT_SECRET`,
+- [x] No active runtime secret has an inline literal in the candidate Compose.
+- [x] JWT and Postgres values resolve from required `JWT_SECRET`,
       `POSTIZ_POSTGRES_PASSWORD`, and `TEMPORAL_POSTGRES_PASSWORD`; each service and its DSN use
       the correct distinct database secret.
-- [ ] Active provider secrets resolve from required environment variables with their existing key
+- [x] Active provider secrets resolve from required environment variables with their existing key
       names; non-secret client IDs and URLs are not mislabeled as secrets.
-- [ ] The accepted 8E host-gateway, read-only CA mount, and `NODE_EXTRA_CA_CERTS` lines are unchanged.
-- [ ] The launcher supports only fixed `validate`, `up-app`, `up-all`, and resumable maintenance
+- [x] The accepted 8E host-gateway, read-only CA mount, and `NODE_EXTRA_CA_CERTS` lines are unchanged.
+- [x] The launcher supports only fixed `validate`, `up-app`, `up-all`, and resumable maintenance
       actions, uses `bws run --project-id ... --no-inherit-env`, rejects unexpected project keys,
       crosses into a clean allowlisted child environment, and never prints or accepts secret values.
-- [ ] A fake-secret harness proves the launcher passes the required keys to Compose without writing
+- [x] A fake-secret harness proves the launcher passes the required keys to Compose without writing
       them to disk or output; missing token/project/key failures are fail-closed and value-free.
-- [ ] The initialized-database cut action uses fixed services/roles/databases, a non-secret stage
+- [x] The initialized-database cut action uses fixed services/roles/databases, a non-secret stage
       journal and lock, quiesces consumers, rotates each role without placing values in argv/logs,
       performs new TCP probes, preserves named volumes, resumes safely, and never restarts consumers
       after an incomplete failure. Backup/admin-path prerequisites fail before the first mutation.
-- [ ] The candidate passes `docker compose config -q` with fake placeholders and a bounded
+- [x] The candidate passes `docker compose config -q` with fake placeholders and a bounded
       cross-family security audit.
-- [ ] No live or external file mutation occurs before the owner checkpoint.
+- [x] No live or external file mutation occurred before the owner checkpoint.
 
 ## Verify
 
@@ -131,22 +131,28 @@ blocked until every rotated value exists outside this session.
 Gate cost: bounded temp-tree checks are expected under one minute; live cutover proof unknown and
 not authorized until the owner checkpoint.
 
-Closeout gate leftover: live Bitwarden provisioning, provider/database rotation, attended cutover,
-and authenticated acceptance have not run.
+Closeout gate: **PASS.** Bitwarden provisioning and provider/database rotation were completed by
+the owner. The attended cutover reached durable stage `COMPLETE`; both real TCP password probes,
+all Postiz/Temporal health checks, the 8E media self-fetch invariant, and retained scheduled-row
+checks passed. The external `.env` contains no secret-bearing keys, and the authorized obsolete
+Compose backup containing old literals was permanently deleted.
 Hygiene: run `bash scripts/repo-hygiene.sh --rescue`; commit/delete only this slice's repository
 paths, and name every other path left untouched.
 Read-set: use the binding's exact three byte-count commands for this packet.
 
 ## RESULT BLOCK
 
-- Changed paths: frozen preparation only at `/private/tmp/content-agents-slice-8f/`.
-- Outcome: secret-free Compose plus a fixed-action, fail-closed Bitwarden/cutover launcher.
-- Checks: fake harness PASS — 14 checks, 15 missing-key, 2 UUID-set, 2 unsafe-password
-  rejections, hostile `.env` isolation, and interrupted-cutover resume; no fixture leaks.
-- Audit: Grok 4.5 ACCEPT plus repaired-delta ACCEPT; no established defects.
-- Unresolved: human provisions scoped Bitwarden UUIDs/secrets, rotates providers and both database
-  roles, then runs and accepts the attended cutover.
-- Delivery: preparation proven and retained outside the repo; nothing applied live.
+- Changed paths: secret-free external Compose, fixed-action launcher, external `.env` cleanup, and
+  this packet/master status record.
+- Outcome: Bitwarden-backed runtime is live; durable cutover stage `COMPLETE`.
+- Checks: final fake harness PASS — 16 checks, 15 missing-key, 2 UUID-set, 2 unsafe-password
+  rejections, hostile `.env` isolation, exact network-password probes, and interrupted-cutover
+  resume; no fixture leaks. All Postiz/Temporal containers healthy after recreation.
+- Audit: Grok 4.5 `ACCEPT-CLOSED`; every defect, verification gap, and optional improvement has a
+  written disposition in the retained evidence bundle.
+- Unresolved: none for 8F. Rotate again only if a provider later reports credential compromise.
+- Delivery: installed Compose SHA-256 `dddaa94a31a9f688444803cbe850283abdcaa680c88d1ba93ecb2bcc43cb4295`;
+  launcher SHA-256 `dd10232d70ef46ed300469820192ebf34dea3826856138897e415b61738a565d`.
 - Usage: unavailable.
 
 ## Usage budget and handoff
@@ -158,12 +164,12 @@ Read-set: use the binding's exact three byte-count commands for this packet.
   short result, no values.
 - Capability boundary: security candidate audit and owner checkpoint; completion notification only.
 
-## Stopped
+## Accepted
 
-Blocked on the human/live credential checkpoint; the preparation candidate is not accepted as a
-live cutover. Verified: exact frozen hashes, fake harness, full bounded audit, and delta closure.
-Retained paths: `/private/tmp/content-agents-slice-8f/{docker-compose.yaml,postiz-secure,check.sh}`.
-Hygiene reviewed: this packet/master plus the accepted 8G/8H tracked candidate were left; merged
-branches `slice-6m-worker` and `slice-6s-worker` predate this session and were not deleted.
-Next action: Muxin provisions/rotates the scoped credentials outside Codex, then starts an attended
-`prepare-cutover` and `cutover` acceptance run.
+Accepted live on 2026-09-13 after the owner checkpoint. The first interactive database rotation
+attempt exposed a PTY timeout and a false local-trust password probe; the repaired launcher uses
+fixed ephemeral network clients, disables local PTY echo, and requires a version-2 diagnostic proof
+before stage advance. Exact wrong-password negatives passed for both databases, Grok 4.5 returned
+`ACCEPT-CLOSED`, the combined live diagnostic reported `desired_credentials_active`, and the
+roll-forward cutover completed with every service healthy. No secret value entered repository or
+audit evidence.

@@ -179,6 +179,27 @@ appendPublishingStatus({ slug: "child", rowId: process.argv[2], provider: "manua
     assert.equal(publishingRetryBlock("piece", { ...row, status: "approve" }, path), null);
   });
 
+  test("lets an operator clear a provider-confirmed failed object only after it has been removed", async () => {
+    const path = ledger();
+    const folder = approvedContentFolder(path);
+    await scheduleApprovedOnce(folder, "piece", row, async () => ({ scheduled: null, scheduleError: "provider accepted the request, then failed" }), path);
+    appendPublishingStatus({
+      slug: "piece", rowId: "x-1", provider: "postiz", state: "failed", at: new Date().toISOString(),
+      providerObjectId: "postiz-failed-1", error: "provider reports a terminal failed object",
+    }, path);
+    assert.throws(
+      () => resolvePublishingAttempt("piece", "x-1", "exists", {}, path),
+      /failed attempt can only be cleared after confirming.*removed/i,
+    );
+    const retracted: string[] = [];
+    const cleared = resolvePublishingAttempt("piece", "x-1", "not-created", {
+      onConfirmedNotCreated: (existing) => retracted.push(existing.providerObjectId ?? ""),
+    }, path);
+    assert.equal(cleared.state, "canceled");
+    assert.deepEqual(retracted, ["postiz-failed-1"], "the placement is retracted before retry becomes available");
+    assert.equal(publishingRetryBlock("piece", { ...row, status: "approve" }, path), null);
+  });
+
   test("a newly approved row with an empty ledger remains retryable after discovery fails before dispatch", async () => {
     const path = ledger();
     const folder = approvedContentFolder(path);

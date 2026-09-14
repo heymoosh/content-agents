@@ -15,7 +15,7 @@ export interface ProviderReconciliationHealth {
   limitations?: string[];
 }
 
-const LIMITATIONS = ["Substack has no authoritative post-status API in this adapter; its events remain explicitly uncertain until human confirmation"];
+const LIMITATIONS = ["Substack confirms a new exact-text public feed item at creation, but has no later status or delete API; subsequent removal still requires human verification"];
 let health: ProviderReconciliationHealth = { state: "idle", limitations: LIMITATIONS };
 let active: Promise<ProviderReconciliationHealth> | null = null;
 export function providerReconciliationHealth(): ProviderReconciliationHealth { return { ...health }; }

@@ -143,23 +143,35 @@ function findPlacements(
   if (!existsSync(path)) return { latest: null, latestSameRow: null };
   const content = readFileSync(path, "utf8");
 
-  // Match every placed line for this slug, capturing the derivative row id so the caller can tell
-  // "this exact post again" from "a different post from the same piece".
-  const linePattern = new RegExp(
-    `^- placed (\\S+) \\[${escapeRegex(slug)}/([^\\]]+)\\] (\\S+) →`,
-    "gm"
+  // Retractions are append-only corrections for a scheduled placement whose provider object later
+  // failed and was removed. Each one pops only the newest placement of that exact row/platform, so
+  // an older genuinely published placement still constrains reuse while the failed attempt does not.
+  const eventPattern = new RegExp(
+    `^- (placed|retracted) (\\S+) \\[${escapeRegex(slug)}/([^\\]]+)\\] (\\S+) →`,
   );
+  const activeByRow = new Map<string, Placement[]>();
+  for (const line of content.split("\n")) {
+    const m = eventPattern.exec(line);
+    if (!m || m[4] !== platform) continue;
+    const normalizedRow = m[3].trim().toLowerCase();
+    const active = activeByRow.get(normalizedRow) ?? [];
+    if (m[1] === "retracted") {
+      active.pop();
+    } else {
+      const t = new Date(m[2]).getTime();
+      if (!isNaN(t)) active.push({ iso: m[2], ms: t });
+    }
+    activeByRow.set(normalizedRow, active);
+  }
 
   let latest: Placement | null = null;
+  for (const active of activeByRow.values()) {
+    for (const placement of active) if (!latest || placement.ms > latest.ms) latest = placement;
+  }
   let latestSameRow: Placement | null = null;
-  let m: RegExpExecArray | null;
-  while ((m = linePattern.exec(content)) !== null) {
-    if (m[3] !== platform) continue; // different platform on this line
-    const t = new Date(m[1]).getTime();
-    if (isNaN(t)) continue;
-    if (!latest || t > latest.ms) latest = { iso: m[1], ms: t };
-    if (rowKey !== undefined && m[2].trim().toLowerCase() === rowKey && (!latestSameRow || t > latestSameRow.ms)) {
-      latestSameRow = { iso: m[1], ms: t };
+  if (rowKey !== undefined) {
+    for (const placement of activeByRow.get(rowKey) ?? []) {
+      if (!latestSameRow || placement.ms > latestSameRow.ms) latestSameRow = placement;
     }
   }
 

@@ -48,10 +48,27 @@ import { listFictionSeries } from "./fiction.js";
 import { listIdeas } from "../fiction/idea-inbox.js";
 import { jobs as jobStore } from "./jobs.js";
 import type { LiveProviderState } from "./reconcile.js";
-import { appendRows, type QueueRow } from "../publish/queue.js";
+import { appendBetRetraction, appendRows, readQueue, writeCell, type QueueRow } from "../publish/queue.js";
 import { approveConfiguredMediaStage } from "./configured-media-runtime.js";
-import { journalPathForLedger } from "./approval-provenance.js";
-import { PUBLISHING_STATUS_PATH, readPublishingHistory, scheduleApprovedOnce } from "./publishing-status.js";
+import { approvalDispatchDisposition, commitReviewStatus, journalPathForLedger, markDispatchStarted, recordNewQueueRows } from "./approval-provenance.js";
+import { appendPublishingStatus, PUBLISHING_STATUS_PATH, readPublishingHistory, resolvePublishingAttempt, scheduleApprovedOnce } from "./publishing-status.js";
+import { setReviewRootsForTest } from "./rows.js";
+
+function isolatedReviewFolder(slug: string): { folder: string; cleanup: () => void } {
+  const root = mkdtempSync(join(tmpdir(), "content-agents-review-http-"));
+  const contentRoot = join(root, "content");
+  const outreachRoot = join(root, "outreach", "leads");
+  mkdirSync(contentRoot, { recursive: true });
+  mkdirSync(outreachRoot, { recursive: true });
+  const restoreRoots = setReviewRootsForTest({ contentRoot, outreachRoot });
+  return {
+    folder: join(contentRoot, slug),
+    cleanup: () => {
+      restoreRoots();
+      rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
 
 test("strategy brief lookup is brand-scoped and leaves top-level legacy briefs unassigned", () => {
   const root = mkdtempSync(join(tmpdir(), "strategy-brand-briefs-"));
@@ -266,7 +283,8 @@ test("configured media has separate plan approval, queued render, and reviewed-f
 
 test("POST attach-reviewed executes the real route and returns promoted reviewed media", async () => {
   const slug = `.test-attach-reviewed-${process.pid}-${Date.now()}`;
-  const folder = join(process.cwd(), "content", slug);
+  const isolatedReview = isolatedReviewFolder(slug);
+  const folder = isolatedReview.folder;
   mkdirSync(join(folder, "media-stages"), { recursive: true });
   mkdirSync(join(folder, "reviewed"));
   writeFileSync(join(folder, "review-queue.md"), `| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| m1 | linkedin | image | media-stages/m1.json | — | — | — | pending | | from GUI queue |\n`);
@@ -292,7 +310,7 @@ test("POST attach-reviewed executes the real route and returns promoted reviewed
     assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /Attached reviewed image/);
   } finally {
     await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
-    rmSync(folder, { recursive: true, force: true });
+    isolatedReview.cleanup();
   }
 });
 
@@ -419,7 +437,8 @@ test("the initial GUI Content save derives source authority on the server", () =
 
 test("POST /api/content/request rejects an unknown platform before persistence or dispatch", async () => {
   const slug = `.test-content-selection-${process.pid}-${Date.now()}`;
-  const folder = join(process.cwd(), "content", slug);
+  const isolatedReview = isolatedReviewFolder(slug);
+  const folder = isolatedReview.folder;
   const lens = "selection-boundary";
   mkdirSync(join(folder, "cuts", lens), { recursive: true });
   writeFileSync(join(folder, "source.md"), "---\ntitle: Selection boundary\ncanonical_url: https://www.humaninference.ai/p/selection-boundary\n---\n\nApproved body.\n");
@@ -454,7 +473,7 @@ test("POST /api/content/request rejects an unknown platform before persistence o
     assert.equal(jobStore.length, jobsBefore, "a rejected Content request must not queue generation or reach a provider path");
   } finally {
     await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
-    rmSync(folder, { recursive: true, force: true });
+    isolatedReview.cleanup();
   }
 });
 
@@ -479,7 +498,8 @@ test("the rendered Studio route carries readable persistent Publishing refusal s
 
 test("POST /api/status approves a row without a publishing attempt", async () => {
   const slug = `.test-status-only-${process.pid}-${Date.now()}`;
-  const folder = join(process.cwd(), "content", slug);
+  const isolatedReview = isolatedReviewFolder(slug);
+  const folder = isolatedReview.folder;
   mkdirSync(folder, { recursive: true });
   writeFileSync(join(folder, "review-queue.md"), "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | | from GUI queue |\n");
   const attemptsBefore = readPublishingHistory(PUBLISHING_STATUS_PATH).length;
@@ -509,13 +529,79 @@ test("POST /api/status approves a row without a publishing attempt", async () =>
   } finally {
     restoreSchedulers();
     await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
-    rmSync(folder, { recursive: true, force: true });
+    isolatedReview.cleanup();
+  }
+});
+
+test("POST /api/publishing/resolve retracts a provider-confirmed missing placement before allowing a retry", async () => {
+  const slug = `.test-failed-resolution-${process.pid}-${Date.now()}`;
+  const isolatedReview = isolatedReviewFolder(slug);
+  const folder = isolatedReview.folder;
+  const isolated = mkdtempSync(join(tmpdir(), "studio-failed-resolution-"));
+  const ledger = join(isolated, "publishing-status.jsonl");
+  const bets = join(isolated, "bets.md");
+  const priorBets = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+  process.env.CONTENT_AGENTS_TEST_BETS_PATH = bets;
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+  writeFileSync(join(folder, "review-queue.md"),
+    "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n" +
+    "|---|---|---|---|---|---|---|---|---|---|\n" +
+    "| quote-1 | quote-card:instagram | image | images/quote.png | — | — | — | pending | | from GUI queue |\n");
+  mkdirSync(join(folder, "images"));
+  writeFileSync(join(folder, "images", "quote.png"), "approved image bytes");
+  const journal = journalPathForLedger(ledger);
+  recordNewQueueRows(folder, readQueue(folder).rows, journal);
+  assert.equal(commitReviewStatus(
+    folder,
+    slug,
+    "quote-1",
+    "approve",
+    () => writeCell(folder, "quote-1", { status: "approve" }),
+    ledger,
+    journal,
+  ), true);
+  const approvedRow = readQueue(folder).rows.find((row) => row.id === "quote-1")!;
+  markDispatchStarted(folder, slug, approvedRow, ledger, journal);
+  appendPublishingStatus({
+    slug, rowId: "quote-1", provider: "postiz", state: "uncertain", at: "2026-09-13T22:00:30.000Z",
+    providerObjectId: "failed-postiz-1",
+  }, ledger);
+  writeFileSync(bets, `# Bets\n\n## Placed log\n- placed 2026-09-13T22:00:00.000Z [${slug}/quote-1] instagram → postiz post failed-postiz-1\n`);
+  const restoreSchedulers = setReviewSchedulingDepsForTest({
+    publishingStatusPath: ledger,
+    resolvePublishingAttempt,
+    appendBetRetraction,
+  });
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/publishing/resolve`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug, id: "quote-1", resolution: "not-created" }),
+    });
+    const body = await response.json() as { ok?: boolean; error?: string };
+    assert.equal(response.status, 200, body.error ?? "publishing resolution request failed");
+    assert.equal(body.ok, true);
+    assert.match(readFileSync(bets, "utf8"), new RegExp(`- retracted .* \\[${slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\/quote-1\\] instagram → reference failed-postiz-1 invalidated after terminal failure`));
+    assert.equal(readPublishingHistory(ledger).at(-1)?.state, "canceled");
+    assert.equal(approvalDispatchDisposition(folder, slug, approvedRow, ledger, journal).kind, "reconciled-not-created");
+  } finally {
+    restoreSchedulers();
+    if (priorBets === undefined) delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+    else process.env.CONTENT_AGENTS_TEST_BETS_PATH = priorBets;
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+    isolatedReview.cleanup();
+    rmSync(isolated, { recursive: true, force: true });
   }
 });
 
 test("Publishing Schedule calls only eligible rows, reports skipped rows, and keeps the no-provider fallback inert", async () => {
   const slug = `test-publishing-schedule-${process.pid}-${Date.now()}`;
-  const folder = join(process.cwd(), "content", slug);
+  const isolatedReview = isolatedReviewFolder(slug);
+  const folder = isolatedReview.folder;
   mkdirSync(folder, { recursive: true });
   writeFileSync(join(folder, "review-queue.md"),
     "| id | platform | format | asset | native | brand | cta | status | notes | origin |\n" +
@@ -573,13 +659,14 @@ test("Publishing Schedule calls only eligible rows, reports skipped rows, and ke
   } finally {
     restoreSchedulers();
     await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
-    rmSync(folder, { recursive: true, force: true });
+    isolatedReview.cleanup();
   }
 });
 
 test("HTTP approval and Schedule consume one fresh fenced dispatch through the actual scheduler", async (t) => {
   const slug = `slice-5s-http-${process.pid}-${Date.now()}`;
-  const folder = join(process.cwd(), "content", slug);
+  const isolatedReview = isolatedReviewFolder(slug);
+  const folder = isolatedReview.folder;
   const isolated = mkdtempSync(join(tmpdir(), "slice-5s-http-ledger-"));
   const ledger = join(isolated, "publishing-status.jsonl");
   const journal = journalPathForLedger(ledger);
@@ -653,7 +740,7 @@ test("HTTP approval and Schedule consume one fresh fenced dispatch through the a
     if (priorTypefullyAccount === undefined) delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
     else process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = priorTypefullyAccount;
     await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
-    rmSync(folder, { recursive: true, force: true });
+    isolatedReview.cleanup();
     rmSync(isolated, { recursive: true, force: true });
   }
 });

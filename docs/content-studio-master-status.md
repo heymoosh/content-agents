@@ -4,14 +4,18 @@
 
 - Repo root: `/Users/Muxin/Documents/GitHub/content-agents` (main); master: this file.
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
-- Current slice: **8F** live credential cutover; packet: `docs/operations/launch-slices/SLICE-8F.md`.
-- Blocked on: Muxin provisions/rotates Bitwarden, provider and database credentials outside Codex,
-  then attends `prepare-cutover` + `cutover`; nothing has been applied live.
-- Next dependency-ready: select/authorize the next recorded reliability batch; 8F can resume only
-  at its attended human checkpoint.
-- Last accepted: **8G + 8H**; strict Content selections and truthful capture promotion lifecycle.
-- Last decision: use pinned Bitwarden UUIDs and a clean fixed-action launcher; never expose its
-  machine token to Codex. Preparation and two Grok audits passed; live acceptance remains human.
+- Current work: real-content channel coverage through the actual Studio Publishing workflow.
+- Confirmed public: X, LinkedIn, Bluesky, Mastodon, Threads, Facebook, and Instagram.
+- Retry-ready after account repair: TikTok's sandbox Direct Post fix is applied; YouTube's rejected
+  refresh grant likely reflects Google's seven-day Testing-app lifetime.
+- Substack is **not** a pass: its browser attempt recorded a false local success, while the exact
+  approved Note never appeared publicly. That state was corrected and the verifier now fails closed.
+- Next: reconnect TikTok; verify Google OAuth status and reconnect YouTube; then run both ASAP
+  canaries. Decide whether optional Gmail stays manual; Substack needs a fresh attended retry budget.
+- Temporary public-media delivery worked, but production still needs a durable HTTPS media origin.
+- Last accepted: **8F, 8G, 8H, and the live-canary repair**; Grok accepted it, clean E2E passed, and the final gate passed 4,593/4,593.
+- Last decision: retain the read-only token only in attended shell scope; no plaintext runtime
+  secrets remain in Compose or its `.env`, and the authorized obsolete secret-bearing backup is gone.
 - Master: `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
 
 ## Standing constraints
@@ -48,19 +52,30 @@ worker holding only that section and its packet still has them.
 
 ## Outstanding work
 
-Everything known-broken or unproven, as of 2026-09-12. Muxin's direction: fix all of it before any
+Everything known-broken or unproven, as of 2026-09-13. Muxin's direction: fix all of it before any
 front-end or UX pass. Ordered by what blocks trusting the Publishing room, not by size.
 
-1. ~~**Live channel coverage is 3 of 5.**~~ **DONE 2026-09-12 for LinkedIn and Mastodon.** Two rows
+1. ~~**Text destination delivery is 4 of 5 confirmed.**~~ **DONE 2026-09-13 after the X repair.**
+   LinkedIn and Mastodon were completed 2026-09-12. Two rows
    Muxin approved in `2026-09-02-the-world-s-broken-what-do-we-do` (`linkedin-1`, `mastodon-1`)
    were scheduled through Studio, moved with `publish:reschedule` to 18:34Z the same day, and went
    out on time. Postiz reports both `PUBLISHED` with no error. Mastodon checked publicly without
    logging in (`https://mastodon.social/@human_inference/117259504240530864`, visibility `public`);
-   LinkedIn (`urn:li:share:7504608270674890753`) confirmed by Muxin on the account. All five text
-   channels (Bluesky, Threads, X, LinkedIn, Mastodon) now have a real approved row through Studio.
-   The `2026-09-07` folder rows stay scheduled for Sep 13 and Sep 20. Still without a real row:
-   Instagram, Facebook, TikTok and YouTube Shorts (media only, see item 2), Substack Notes, and
-   Gmail outreach. See `## Progress log` -> 2026-09-12 (ops, live).
+   LinkedIn (`urn:li:share:7504608270674890753`) confirmed by Muxin on the account. Bluesky,
+   Threads, X, LinkedIn, and Mastodon all had real approved rows go through Studio, but that was not
+   delivery proof for X. On 2026-09-13 the X object was absent from the public API; a read-only
+   database check established that Postiz soft-deleted it two minutes after scheduling and before
+   its due time, with no release URL or provider error. Studio had nevertheless left the row labeled
+   `published` and its Placed event active. The repaired running Studio successfully reconciled the
+   object as not-created, retracted that exact placement under the row lock, returned the row to
+   `approve`, created one replacement, and moved it to 2026-09-13T23:52:00Z. The replacement became
+   `PUBLISHED` at 23:52:09Z with no error and is live at
+   `https://twitter.com/heymoosh/status/2099284995453886822`. The normal provider reconciliation
+   pass persisted the canonical URL and `live` state in Studio's status ledger.
+   The `2026-09-07` folder rows stay scheduled for Sep 13 and Sep 20. This item originally listed
+   Instagram and Facebook as missing; both gained confirmed live quote cards on 2026-09-13.
+   Remaining destination gaps are TikTok, YouTube Shorts, Substack Notes, and Gmail outreach; see
+   current item 8. See `## Progress log` -> 2026-09-12 (ops, live).
 2. ~~**No REAL media row has gone through Postiz.**~~ **DONE 2026-09-12, SLICE-8B.** The first
    approved quote card is live on Bluesky with its image and CTA reply. **Rescoped 2026-09-12**
    after Muxin challenged the original wording, which was wrong twice over. Postiz media is not unexercised and not
@@ -126,24 +141,277 @@ rendered, approved, and scheduled. **Process note:** the stale wording
    `image/png`, 5,930 bytes. The LinkedIn, Instagram, and Facebook rows retained exact ids, times,
    groups, content/media hashes, queued states, no errors, and uniqueness counts of one.
 
-7. **Move the Postiz runtime secret boundary to Bitwarden, then rotate exposed/default values.**
+7. ~~**Move the Postiz runtime secret boundary to Bitwarden, then rotate exposed/default values.**~~
+   **DONE 2026-09-13, SLICE-8F.**
    While diagnosing 8E, the external dirty compose file was found to contain inline LinkedIn,
-   Threads, and Facebook client secrets. They are local uncommitted changes and are not in that
-   public upstream repository's committed `HEAD`, but they were displayed in this session's tool
-   output. A value-free follow-up inventory also found a customized inline Postiz JWT secret, a
-   Postgres password matching the public upstream default, and active provider secrets in the
-   plaintext external `.env`. The existing `BWS_ACCESS_TOKEN` is inherited globally from both the
-   shell profile and launchd, so Bitwarden is not an agent boundary in that state. SLICE-8F moves
-   the complete active secret set to a dedicated Bitwarden project, uses a read-only machine token
-   only from a human terminal, removes secret literals/files after verified cutover, and preserves
-   the 8E repair. Never copy any value or Bitwarden token into this repository, a prompt, command
-   argument, log, or evidence file. Independent code fixes do not wait for this human checkpoint.
+   Threads, and Facebook client secrets. They were local uncommitted changes rather than part of
+   upstream `HEAD`, but they were displayed in session tool output. A value-free inventory also
+   found a customized inline Postiz JWT secret, a Postgres password matching the public upstream
+   default, and active provider secrets in the plaintext external `.env`. At discovery time,
+   `BWS_ACCESS_TOKEN` was inherited globally from both the shell profile and launchd, so Bitwarden
+   was not an agent boundary. Muxin removed that inheritance, populated a dedicated exact-key
+   Bitwarden project, rotated the exposed/default values, and supplied the read-only machine token
+   only inside temporary attended shells. The accepted launcher completed the live database
+   cutover, preserved the 8E repair, and removed the plaintext literals/files after verification.
+   Never copy any value or Bitwarden token into this repository, a prompt, command argument, log,
+   or evidence file.
+
+8. **Finish real-content delivery coverage through Studio.** Real approved Studio rows are public
+   on LinkedIn, Bluesky, Mastodon, and Threads (text), plus Facebook and Instagram (quote cards).
+   X's first object was deleted before delivery, but its repaired replacement is confirmed public.
+   The Meta canaries are confirmed at:
+   `https://www.facebook.com/122109715155448255/posts/122109715149448255` and
+   `https://www.instagram.com/p/DdPoM7SjfSx/`. Instagram's first attempt failed because Postiz gave
+   Meta a local-only media URL; the approved retry used the new content-addressed public-media
+   bridge and delivered. TikTok and YouTube were both scheduled and moved to ASAP through Studio,
+   but current Postiz logs prove their grants are stale: TikTok reported an invalid token followed
+   by missing scopes, and YouTube requested re-authentication. Later inspection established that
+   these are not equivalent token-expiry incidents. Postiz refreshed TikTok on 2026-09-13 and its
+   database shows a current token through 2026-09-14, but the installed provider requests only
+   `user.info.basic` and `video.upload` while defaulting to `DIRECT_POST`; TikTok requires
+   `video.publish` for that path. Re-authenticating without first adding and approving that scope
+   would repeat the failure. YouTube's access token expired normally one hour after its 2026-09-01
+   connection, but its refresh token now returns `invalid_grant`. Its twelve-day age and the Google
+   rule that external Testing apps requesting non-basic scopes receive seven-day refresh tokens make
+   Testing status the leading explanation; verify the OAuth consent-screen publishing status before
+   reconnecting. The installed override now requests `video.publish`; the single app container was
+   restarted healthy and both backend and orchestrator load the corrected bind mount. TikTok's
+   existing `Local Postiz Test` sandbox has Login Kit, Content Posting API, target user
+   `humaninference`, and `video.upload`, but inspection on 2026-09-13 found Direct Post switched off.
+   Turning it on automatically adds `video.publish`; the owner applied that exact sandbox change,
+   and a fresh portal read shows Direct Post on with `video.publish`. Both terminal failed objects were
+   deleted and reconciled through Studio's `not-created` route. The live route did not append the
+   expected Placed retractions, so those two append-only corrections were repaired with the same
+   queue helper before the approved rows were made retry-ready. The candidate route now performs
+   that retraction under the row lock and has an actual HTTP integration test; the live discrepancy
+   remains a verification gap until the next failed-object recovery proves it in the running Studio.
+   Substack's attempt is not live:
+   the unrelated plantation-strike Note at 22:29Z is not the approved Joy derivative, and the Joy
+   text is absent from the public feed. The false success, Placed row, and queue state were corrected.
+   Gmail remains unconfigured and uncanaried. Destination coverage is therefore not complete.
+   Format/provider-specific gaps such as Facebook text-only, the real carousel run, and unverified
+   fallback routes remain separately explicit in the capability matrix below. Next: reconnect
+   TikTok, verify the Google OAuth app is not subject to the seven-day Testing limit,
+   then reconnect TikTok/YouTube inside Postiz and run one ASAP retry each; grant a fresh attended Substack retry after the exhausted attempt/retry budget,
+   then configure and explicitly approve the exact Gmail canary envelope. The shared retry video is
+   now a real tracked candidate at its canonical `configured-media` path; the earlier untracked
+   symlink to an ignored render was removed so another checkout will not inherit a broken row.
+
+9. **Make the temporary delivery and credential boundaries durable.** The live Meta proof used an
+   owner-authorized Cloudflare Quick Tunnel that serves only the canary media directory; it has no
+   stable hostname or uptime guarantee. Provision a durable HTTPS origin and set the paired
+   `CONTENT_AGENTS_PUBLIC_MEDIA_ROOT` / `CONTENT_AGENTS_PUBLIC_MEDIA_BASE_URL` values before normal
+   media publishing. The repository-root `.env` still supplies `POSTIZ_API_KEY` as plaintext to
+   Content Studio; its file mode was tightened from 0644 to 0600, but this is not a credential-store
+   boundary. Add that key to the Bitwarden project and launch Studio with attended, scoped secret
+   injection. Postiz also has no configured email sender, so its password-reset path is unavailable.
+   That Postiz mailer is optional account-administration infrastructure and is unrelated to social
+   publishing. Content Studio's Gmail OAuth is a separate Outreach feature for sending one exact,
+   locked, owner-approved email and reconciling it through Sent mail; leave it unconfigured if
+   authenticated Outreach delivery is not currently wanted.
+
+10. **Finish making local publishing labels and move history tell the provider truth.** The queue changes an
+    accepted schedule to status `published` before provider delivery, so the original X row still
+    looked published after its provider object had been deleted. Studio's separate protected
+    publishing-status ledger correctly distinguishes `planned`, `live`, `failed`, and `canceled`,
+    but the overloaded queue label caused this master to overclaim X until the provider was checked.
+    **UI half fixed 2026-09-13:** the browser Publishing room had the same defect, rendering every
+    accepted provider result as Scheduled and saying live publication was unconfirmed even when the
+    protected ledger contained `live` plus a canonical URL. It also described obsolete
+    Typefully/PostPeer/direct-YouTube routing as the normal path. The running Studio now renders
+    `Live`, the provider URL, and a confirmed-delivery explanation from the protected state; future
+    rows remain Scheduled, and its introduction describes Postiz-first capability selection.
+    The operational comments in `config/platforms.yaml` and `config/providers.yaml` also still
+    described Typefully quote-card delivery as the default; they now describe the same Postiz-first
+    live-capability route the production scheduler actually executes.
+    The reconciliation-health endpoint also still claimed every Substack event remained uncertain
+    until human confirmation after the publisher was repaired to require a new exact-text public
+    feed match. Its running copy now states the narrower truth: creation is confirmed, while later
+    removal has no status/delete API and still needs human verification.
+    Also, `publish-log.md` records the original scheduled time but `rescheduleRow` does not append a
+    move event; the X replacement log therefore says Sep 14 even though the authoritative status
+    ledger and provider show its successful Sep 13 23:52Z move. Neither defect blocked the post,
+    but both can mislead manual operations. The queue-file label remains overloaded outside the
+    repaired UI. Add a non-ambiguous scheduled/dispatched queue state and append move/correction
+    history to the per-folder log without rewriting earlier entries.
+
+11. **Finish one browser-operated live Publishing journey.** The 2026-09-13 live canaries invoked
+    the production Content Studio server's real approval, schedule, move, resolution, and status
+    HTTP routes. They therefore exercised the same schedulers, row locks, append-only ledgers, and
+    provider adapters used by the Publishing room; they were not direct provider calls or a fake
+    harness. Some actions were driven against those routes instead of by clicking every browser
+    control, however. That proves the publishing engine but does not prove that every current UI
+    control is wired to it or that errors and recovery are rendered correctly. After TikTok and
+    YouTube are re-authenticated, run one retry from the browser Publishing room through approval,
+    ASAP move, provider outcome, and displayed reconciliation. Treat any UI/backend divergence as
+    a blocking defect and retain browser evidence. The first browser inspection found and repaired
+    the false Scheduled rendering and obsolete provider copy described in item 10; it did not click
+    a retry through to delivery, so the full journey remains a verification gap.
+
+12. ~~**Keep Studio HTTP tests out of the live Content workspace.**~~ **FIXED IN THE CURRENT
+    CANDIDATE 2026-09-13.** Six route tests created temporary queue folders under the repository's
+    real `content/` directory. Their `finally` blocks eventually removed them on a normal pass, but
+    the running Studio discovered and displayed the synthetic posts while the suite was executing;
+    an interrupted run could leave them behind. The routes now receive isolated temporary Content
+    and Outreach roots through a narrow test seam. The full 102-test server suite passes, and a
+    post-run search finds none of the six fixture-name families under live `content/`.
+
+13. **Prevent the currently healthy Meta/LinkedIn connections from becoming surprise October
+    outages.** Secret-free database inspection puts Facebook and Instagram expiry on 2026-10-29,
+    and LinkedIn and Threads on 2026-10-30. Threads has a real refresh implementation. The installed
+    Facebook and Instagram `refreshToken` methods return empty credentials, while LinkedIn's real
+    refresh method requires a refresh token and this connection has none stored; Postiz's refresh
+    service disconnects a channel when refresh produces no access token. Set an attended renewal
+    reminder and either repair/test those refresh paths before the dates or deliberately reconnect
+    the three affected accounts before expiry. This is not blocking today's canaries, but it is a
+    known availability defect/risk and must not wait to be discovered by a failed post.
 
 Recorded, not defects: the Postiz read window is a +/-45 day list scan because there is no
 read-by-id route, and Postiz soft-deletes, so absence can never distinguish live from canceled from
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-13 (publishing repair accepted; closeout PASS) — Grok ACCEPT, local gates green
+
+The owner authorized the frozen, secret-free three-file publishing audit. Grok 4.5 ran outside the
+repository with workspace sandboxing, only the three exact evidence files readable, no edits,
+subagents, or web access, and returned exit 0, requirements **PASS**, code quality **PASS**, no
+established defects, and **ACCEPT**. The three evidence SHA-256 hashes were identical before and
+after the audit; stderr was empty. Its five verification gaps were dispositioned: the public-media
+reject matrix, a second retract/replace cycle, and Substack failure-state preservation were added
+and pass in the 134/134 focused run; the final `test:e2e`/`check` gates belong to this closeout; the
+real TikTok Direct Post retry remains an honest operational gap. One optional fixture-wording
+improvement was applied. Sampling Substack's lower-bound timestamp immediately before the click was
+retained because sampling after the click can exclude a fast successful publication. The mutable
+review-root seam was retained because every HTTP fixture restores it in `finally`, the complete
+server suite passes, and repeated post-run live-root scans found no fixture family.
+
+Authenticated TikTok portal inspection then found the exact app-side cause. The existing sandbox
+already has Login Kit, Content Posting API, `video.upload`, and `humaninference` as its sole target
+user, but Direct Post was off. Turning the unsaved switch on automatically prepared
+`video.publish`. The owner clicked `Apply changes`; a fresh portal read confirms Direct Post on and
+`video.publish` present. OAuth reconnection and the TikTok retry remain for the next run.
+
+The clean disposable E2E rerun reported 57 pass, 0 fail, and 16 intentionally blocked authenticated
+or nondeterministic cases, with the shared worktree byte-identical afterward. The final unsandboxed
+`npm run check` passed typecheck and all 4,593 tests, exit 0. A sandboxed attempt immediately before
+it could not create TSX subprocess IPC sockets and failed 213 tests with `listen EPERM`; that was an
+execution-environment restriction, not candidate evidence, so the exact gate was rerun outside the
+sandbox. The first final typecheck had also caught one test-only optional-string error in
+`src/review/serve.test.ts`; the assertion was corrected, its 102-test suite passed, and the complete
+gate then passed on the repaired candidate.
+
+Closeout status is **PASS** for the repository candidate. Actionable live leftovers remain and are
+not mislabeled as repository failures: reconnect TikTok and run its one ASAP approved retry; verify
+the Google app's OAuth publication status, reconnect YouTube, and run its ASAP retry; authorize a
+fresh attended Substack retry budget; replace the temporary media tunnel with a durable HTTPS
+origin; decide whether Gmail stays manual or receives a locked OAuth send envelope; and move the
+remaining root `.env` Postiz API key behind the Bitwarden injection boundary.
+
+### 2026-09-13 (live coverage in progress) — real Studio delivery exposed three production breaks
+
+The production Studio approval, Schedule, move, provider, and reconciliation HTTP path—not a
+synthetic lifecycle harness or direct provider call—was used for owner-approved real content. Some
+actions were sent to the same HTTP routes that the browser controls call rather than clicked in the
+browser, so this proves the real publishing engine but not every UI binding; outstanding item 11
+records the browser-operated proof still required. Facebook and Instagram quote cards are live at
+the canonical URLs in outstanding item 8. Instagram's first delivery failed because the provider
+received a local-only uploaded-media URL. A paired, fail-closed public-media configuration now
+materializes content-addressed read-only media at an HTTPS origin; the one approved Instagram retry
+used the temporary owner-authorized tunnel and published successfully.
+
+A review of the earlier text rows found that X had been counted from its Studio dispatch rather
+than a delivery outcome. Postiz's public API cannot find that object; its database proves the object
+was soft-deleted two minutes after creation, before the due time, with no release URL or error.
+Threads, by contrast, is `PUBLISHED` at
+`https://www.threads.com/@human_inference/post/DdKy13vGyUV`. The current recovery candidate then
+passed against the real X incident: Studio recorded `not-created`, appended the exact placement
+retraction while holding the row lock, restored approval, created one replacement, and moved it to
+2026-09-13T23:52:00Z. It became `PUBLISHED` at 23:52:09Z with no error and canonical URL
+`https://twitter.com/heymoosh/status/2099284995453886822`; the normal provider reconciliation pass
+then persisted Studio state `live`.
+
+TikTok and YouTube accepted Studio schedules and ASAP moves but failed at delivery. Postiz's live
+worker logs identify the causes: TikTok's token is invalid and lacks the required scopes; YouTube
+requires re-authentication. The failed Postiz objects were removed and proved absent. The running
+Studio reconciled both rows but did not append the expected Placed retractions, so this session
+repaired the two append-only entries with the queue helper. The candidate recovery route now
+retracts while holding the publishing row lock before it unlocks retry, and an actual Studio HTTP
+integration test proves that path. Retraction matching is restricted to the recorded reference
+field and an exact object token, so neither post text nor an arbitrary ID substring can impersonate
+the failed provider object. The discrepancy remains a live verification gap until a later
+failed-object recovery demonstrates the behavior in the running Studio. The approved rows are
+retry-ready, but no retry runs until those Postiz connections are repaired.
+
+Substack exposed a distinct false-positive defect. Its browser clicked a composer action, ignored a
+non-clearing composer timeout, then marked the row published without provider evidence. The public
+profile showed only an unrelated plantation-strike Note; the exact approved Joy text was absent.
+The protected status ledger now records `failed`, the false Placed event is retracted, the append-only
+publish log carries a correction, and the row is approved but fenced. The publisher now requires an
+exact text match with a new public-feed timestamp and returns the canonical URL before it changes
+queue, claim, log, or bets state. The exhausted attended attempt/retry budget was not silently widened.
+
+Focused regression coverage for the changed Postiz media, retry, reuse, Substack, and Studio HTTP
+surfaces passes 272/272. Remaining operational dependencies are explicit: Postiz sign-in plus
+TikTok/YouTube reconnect, a fresh Substack retry budget, durable HTTPS media hosting, Gmail OAuth and
+locked send envelope, and migration of the root `.env` Postiz API key behind the Bitwarden boundary.
+The retry video's queue asset was also made checkout-durable by replacing its untracked symlink to
+an ignored render with the actual MP4 at `configured-media/joy-animated-short/video.mp4`.
+
+The first current-browser Publishing inspection then disproved the page's status display: live X,
+LinkedIn, Bluesky, Mastodon, Threads, Facebook, and Instagram rows all said Scheduled, and the room
+described retired Typefully/PostPeer/direct-YouTube defaults. The repaired running page reads the
+protected status ledger, labels confirmed rows Live, shows each canonical URL, keeps future rows
+Scheduled, and explains Postiz-first capability selection. Its full page regression passes 289/289.
+The restarted health endpoint also replaces its obsolete blanket Substack-uncertainty warning with
+the implemented boundary: exact-text public-feed proof at creation, no later status/delete API.
+
+The same test run exposed a second Studio-integrity defect: six HTTP tests wrote synthetic review
+queues under the live `content/` root, so fake posts appeared in the running Publishing room until
+cleanup. The server routes now use an injectable, temporary Content/Outreach root in those tests.
+The complete server suite passes 102/102, and none of the fixture-name families remains under the
+live Content root after the run.
+
+After the additional truthfulness and isolation repairs, the combined focused publishing candidate
+passes 563/563 tests across 19 suites, exit 0. A second post-run scan again found no synthetic HTTP
+fixture directory under live `content/`. The repository-wide gate remains deliberately deferred
+until independent audit findings and the attended provider repairs are closed.
+
+A secret-free inventory of every active Postiz integration found no additional channel unhealthy
+today beyond TikTok's wrong scope and YouTube's rejected grant. It did expose a dated availability
+risk: Facebook/Instagram expire 2026-10-29 and LinkedIn/Threads 2026-10-30. Threads implements a
+real refresh. Facebook and Instagram's installed refresh methods return empty credentials, and the
+LinkedIn connection stores no refresh token even though its method requires one; Postiz disconnects
+when a refresh yields no access token. Outstanding item 13 records the required pre-expiry repair or
+attended renewal rather than waiting for an October publication to fail.
+
+Secret-free credential-boundary inspection corrected the first OAuth diagnosis. The `.env` values
+used to configure Postiz are client IDs/secrets: they identify the apps but are not the user grants
+that authorize posting. Postiz stores access and refresh grants in its database. TikTok's access
+token was refreshed and is current, but the installed provider requests `video.upload` and then
+defaults to a direct-post endpoint requiring `video.publish`; fix the scope and TikTok app approval
+before reconnecting. YouTube's one-hour access token expired normally, while its stored refresh
+grant is rejected with `invalid_grant`; the dates fit Google's seven-day External/Testing-app rule,
+which must be checked in the Google OAuth console. The repository's native YouTube adapter uses a
+different OAuth client and therefore needs a separate repair only if that fallback is retained.
+Postiz SMTP is absent but is only for Postiz account mail such as password reset; Content Studio
+Gmail is an independent, optional Outreach sender and does not block social publishing.
+
+### 2026-09-13 (8F accepted) — Bitwarden runtime boundary is live
+
+The owner populated the exact 15-key Bitwarden project, rotated LinkedIn, Threads, Facebook, JWT,
+and both database passwords, and supplied the read-only machine token only inside an attended
+temporary shell. The first cutover attempt exposed a nested-PTY timeout and proved the original
+inside-container password check was invalid under local trust. The repaired launcher uses exact
+ephemeral Docker-network clients for both positive and wrong-password probes, suppresses PTY echo,
+and requires a version-2 diagnostic proof before stage advance. Grok 4.5 closed every audit item.
+
+The combined live diagnostic reported `desired_credentials_active`; cutover reached durable stage
+`COMPLETE`; Postiz, Temporal, both databases, Redis, Elasticsearch, the admin/UI services, and the
+HTTPS proxy are healthy. Installed Compose and launcher hashes match the accepted candidate. The
+external `.env` has no secret-bearing keys, and Muxin authorized permanent deletion of the obsolete
+secret-bearing Compose backup. The final 16-check focused harness passed.
 
 ### 2026-09-13 (8G + 8H accepted) — invalid selections stop; promoted captures leave waiting
 
@@ -3126,23 +3394,23 @@ Postiz does not support the required destination or capability.
 
 | Destination | Current provider/path | State | What is still unverified or missing |
 |---|---|---|---|
-| X, LinkedIn, Bluesky, Mastodon, Threads, Facebook text | Self-hosted Postiz when live discovery advertises the exact account/destination/media capability; Typefully scheduled drafts only after an explicit unsupported result | Postiz live-verified for all six text channels on 2026-09-02 (far-future schedule, reschedule, cancel); Typefully live-verified for a LinkedIn text draft | First real scheduled delivery through Studio has not run yet; Facebook has no non-Postiz fallback. |
-| X, LinkedIn, Bluesky, Instagram, Facebook quote cards | Postiz (media registered through `POST /public/v1/upload`); native Typefully image drafts only after an explicit unsupported result | Postiz image path live-verified on Instagram (2026-09-02); first approved Studio card live on Bluesky (2026-09-12, SLICE-8B) with exact caption, image, and CTA reply | Typefully image fallback stays provider-unverified. Postiz's public media hostname self-resolves to dead loopback inside its container; fix item 6 before the later scheduled cards fire. |
+| X, LinkedIn, Bluesky, Mastodon, Threads, Facebook text | Self-hosted Postiz when live discovery advertises the exact account/destination/media capability; Typefully scheduled drafts only after an explicit unsupported result | Postiz lifecycle mechanics were verified for all six text channels on 2026-09-02 (far-future schedule, reschedule, cancel); Typefully was live-verified for a LinkedIn text draft. Real approved Studio rows are publicly confirmed on X, LinkedIn, Bluesky, Mastodon, and Threads. The original X object was soft-deleted before its slot with no retained cause; the repaired replacement became `PUBLISHED` at 2026-09-13T23:52:09Z and Studio reconciliation recorded the canonical URL. | Facebook has a confirmed real media delivery but no real text-only row; it has no non-Postiz fallback. |
+| X, LinkedIn, Bluesky, Instagram, Facebook quote cards | Postiz (media registered through `POST /public/v1/upload`); native Typefully image drafts only after an explicit unsupported result | First approved Studio card live on Bluesky (2026-09-12, SLICE-8B); Facebook and Instagram cards live 2026-09-13 with exact canonical URLs. Instagram's first attempt exposed the local-only media URL defect; the approved retry passed through the content-addressed public-media bridge. | Typefully image fallback stays provider-unverified. The container self-fetch repair is live, but normal provider delivery still needs a durable public HTTPS media origin rather than the temporary canary tunnel. |
 | Configured-media image, carousel, and video rows (any Postiz channel) | Postiz only; manual ready-to-paste when discovery reports no support. Routed by asset path (`media-stages/` or `configured-media/`) so the older native-video Typefully rows are untouched. | Carousel dispatch uploads every slide in order and sends one multi-image post; caption is the row's own derivative body with CTA placement (never composed); per-channel image caps enforced before the first upload (x 4, bluesky 4, mastodon 4, instagram 10, facebook 10, linkedin 20, threads 20, tiktok 35). Two-slide carousel live-verified on 2026-09-02 on TikTok, Mastodon, Facebook, Instagram, LinkedIn, Threads, and X (schedule, reschedule, cancel, sweep clean; `docs/evidence-postiz-canary-carousel-2026-09-02.json`). Bluesky's carousel case hit Postiz's rate limit that run and has not been rerun yet (single-command rerun once the hour rolls over). | Postiz throttles post creation to 90 requests per hour for the whole instance and each schedule or move counts as one. Since 2026-09-02 a 429 on approval releases the claimed publish slot, is recorded as a retry-eligible `failed` ledger event carrying the resume time (from `Retry-After`, else one hour), and a background drainer inside the Studio server (`src/review/publish-drain.ts`, `/api/publishing/drain-health`) re-dispatches the waiting approved rows once that time passes, one create per row, stopping again at the next 429; Studio shows "N rows waiting for Postiz, resumes at HH:MM". The drainer runs only while Studio is open. A batch move still stops at the first rate-limit error and reports the remaining rows as not attempted; they are not auto-resumed. Moving an image, carousel, or video row re-uploads its media before the create call (Postiz has no delete route, so the library accumulates copies). Run one real carousel through Studio. |
-| TikTok | Postiz (video registered through the upload route) with the PostPeer exception only after an unsupported result | Postiz TikTok video path live-verified on 2026-09-02 (privacy SELF_ONLY canary); production sends DIRECT_POST with public privacy | Run one real short through Studio; PostPeer remains the unverified fallback. |
-| YouTube Shorts | Postiz (video plus `title`/`type` settings from `video/title.txt`) with the YouTube Data API exception only after an unsupported result | Postiz YouTube video path live-verified on 2026-09-02 (private canary) | Run one real short through Studio; the direct YouTube exception stays unverified. |
-| Substack Notes | Constrained saved-session browser automation | Provider unverified | Run an explicitly approved canary; maintain selectors; add independent live confirmation. Full essays remain manual. |
+| TikTok | Postiz (video registered through the upload route) with the PostPeer exception only after an unsupported result | The synthetic Postiz lifecycle passed 2026-09-02. A real approved Studio short reached its 2026-09-13 ASAP slot, then failed provider-side: invalid token followed by missing scopes. The failed object was removed; the running Studio reconciled it, but the missing placement retraction required a queue-helper repair. The restarted candidate route has actual HTTP integration proof. Secret-free database inspection shows Postiz refreshed the access token successfully and does not mark it expired; the provider requested only `video.upload` while defaulting to direct posting. The installed override now requests `video.publish`, and the restarted app container is healthy with that file mounted in both backend and orchestrator. The `Local Postiz Test` sandbox now shows Direct Post on and `video.publish` present for target user `humaninference`. | Reconnect the account so the stored user grant includes `video.publish`, then use the one retry-ready approved row. Prove the repaired recovery route in the running Studio if another provider object fails. PostPeer remains the unverified fallback. |
+| YouTube Shorts | Postiz (video plus `title`/`type` settings from `video/title.txt`) with the YouTube Data API exception only after an unsupported result | The synthetic private Postiz lifecycle passed 2026-09-02. A real approved Studio Short reached its 2026-09-13 ASAP slot, then failed because the account must be re-authenticated. Postiz has a refresh token but marks it `refreshNeeded`; refresh returns `invalid_grant`. The one-hour access-token expiry was normal. The grant dates are consistent with Google's seven-day refresh-token lifetime for external OAuth apps left in Testing while requesting non-basic scopes. Native direct-YouTube sync also reports `invalid_grant`, and its client-ID hash differs from Postiz's, so it is a second OAuth client/grant rather than the same connection. The failed Postiz object was removed; the running Studio reconciled it, but the missing placement retraction required a queue-helper repair. The restarted candidate route has actual HTTP integration proof. | Verify the Postiz Google OAuth consent screen is not External/Testing (or otherwise accepts recurring seven-day reauthorization), then reconnect Postiz and use the retry-ready row. Repair the separate native adapter grant only if retaining that fallback. Prove the repaired recovery route in the running Studio if another provider object fails. The direct exception remains provider-unverified. |
+| Substack Notes | Constrained saved-session browser automation | **Not live-verified.** The 2026-09-13 attempt exposed a changed composer affordance, then a false-success bug: the composer transition was accepted as success even though the exact Joy note never appeared publicly. The local state was corrected. Current code requires an exact, newly timestamped public-feed match and records its canonical URL before marking published. | Grant a fresh attended retry budget after the exhausted attempt/retry pair. Full essays remain manual. Studio still cannot move a claimed Substack slot to ASAP; that operational timing action needs a first-class route/UI. |
 | Community/manual destinations | `ready-to-paste/` | Intentionally manual | Surface the handoff and status in the Studio consistently. |
-| Postiz | Self-hosted Postiz | **Live-verified on all nine connected channels (2026-09-02): scheduled create, in-place reschedule, cancel, media upload** | Adapter, environment contract, dynamic capability/account registry, per-channel provider settings, media registration, create/read/reschedule/update/cancel/reconcile lifecycle, recovery ledger, gated canary (draft or approved far-future schedule), fallback matrix, single-row and batch reschedule (Studio endpoints, CLI `publish:reschedule`). History: the 2026-08-30 instance was offline; on 2026-09-01 `.env` lacked the base URL and key; on 2026-09-02 discovery authenticated, the first attended draft canary exposed a guessed create/read/cancel contract that was rewritten from the `postiz-app` source, the draft lifecycle passed, and after Muxin approved scheduled visibility the all-channel canary passed with zero leftovers. |
-| Outreach email/Gmail | Send a locked email from the Content Agents GUI through the exact approved Gmail account after an explicit confirmation; retain manual/external sending for unsupported channels. | **Implemented and deterministic-tested; provider unverified.** The GUI exposes Gmail only when the matching OAuth configuration is present, validates the authenticated profile as `muxin.li.pro@gmail.com`, writes a body-free append-only delivery ledger, prevents blind retries, reconciles uncertain sends by deterministic RFC Message-ID against Sent mail, and advances the follow-up clock only after confirmed delivery. The by-hand fallback remains available. | Run one explicitly approved authenticated send/reconcile canary. Recipient address and subject are explicit send-time envelope fields; the locked reviewed artifact remains the message body and channel. |
+| Postiz | Self-hosted Postiz | Lifecycle mechanics were live-verified on all nine connected channels on 2026-09-02: scheduled create, in-place reschedule, cancel, and media upload. Current authorization is not healthy on all nine: TikTok's provider scope is wrong and YouTube's refresh grant is rejected. Both failed real delivery on 2026-09-13. | Adapter, dynamic account/capability discovery, provider settings, content-addressed public-media materialization, create/read/reschedule/update/cancel/reconcile, recovery ledger, and single/batch Studio moves are implemented. Facebook and Instagram real-content deliveries prove the current Meta path. The public list API reports terminal `ERROR` but omits the provider error message; diagnosis currently requires local Postiz worker logs, so Studio must not present the generic failed state as a complete explanation. |
+| Outreach email/Gmail | Optional Outreach delivery, separate from Postiz: send a locked email from the Content Agents GUI through the exact approved Gmail account after an explicit confirmation; retain manual/external sending for unsupported channels. | **Implemented and deterministic-tested; provider unverified and currently unconfigured.** The GUI exposes Gmail only when the matching OAuth configuration is present, validates the authenticated profile as `muxin.li.pro@gmail.com`, writes a body-free append-only delivery ledger, prevents blind retries, reconciles uncertain sends by deterministic RFC Message-ID against Sent mail, and advances the follow-up clock only after confirmed delivery. The by-hand fallback remains available. Postiz's own missing email-sender warning concerns password-reset/account mail and has no bearing on this path or social publishing. | Decide whether authenticated Outreach email is wanted now. If yes, configure the separate Gmail OAuth grant and explicitly approve one exact send/reconcile canary. If no, retain the manual handoff and do not treat Postiz SMTP as a publishing blocker. |
 
 ### Scheduler and publishing status
 
 | Capability | Current state | Verification | Remaining work |
 |---|---|---|---|
 | Unified scheduler | `src/publish/slots.ts`, configuration, publish ledger, durable jobs, captures, provider status, and reconciliation health all resolve through `CONTENT_AGENTS_DATA_ROOT` (defaulting outside the checkout). File locks and execution leases serialize cross-process mutation; startup recovery fails abandoned non-idempotent work closed. | Strong deterministic PT/DST, migration, cross-process, stale-lock, lease, and restart-recovery tests. | Operational backup/retention for the external data root remains an installation concern, not a second checkout-local authority. |
-| Publish orchestration | Studio approval discovers the live Postiz account/capability registry first (media advertised by default after the verified upload lifecycle; `POSTIZ_MEDIA_UPLOAD_VERIFIED=0` opts out) and chooses Postiz only for exact advertised support. A verified unsupported result permits the explicit Typefully/PostPeer/YouTube/manual fallback. Postiz dispatch places the source CTA per cta.yaml (inline, or as a thread reply / LinkedIn first comment through Postiz follow-up values), marks the row published, appends the publish log, and records the bets Placed row, the same bookkeeping as the Typefully path. A scheduled Postiz row can be moved to an exact time or the next free cadence slot, alone or as a cluster selected by pillar, slug, platform, or key (shift N days or re-flow after a date); the provider is re-saved in place, the slot ledger moved, and one publishing event appended so the Content page shows the new time at once. Typefully rows have no reschedule API and are reported as manual. | Deterministic policy, discovery, capability-first selection, scheduler, adapter, fallback, reschedule, and real-shape lifecycle coverage; the 2026-09-02 attended matrix and nine-channel scheduled canary passed. | Still open: first real scheduled delivery and first real move through Studio. Do not treat discovery transport failure as unsupported. |
-| Publishing status | Append-only normalized events record atomic claims, provider/account/object IDs, provider URLs, planned and observed timestamps, policy identity, uncertainty, human evidence, and delivered/deleted/canceled/failed/private/uncertain outcomes. A bounded reconciler runs under one cross-process lease every 15 minutes and now reads Postiz `scheduledAt` into `plannedFor`, so a move made inside Postiz itself reaches the Content page on the next pass. | Strong deterministic unit, cross-process, runner-wiring, all-state normalization, human-evidence, and no-blind-retry coverage; the 2026-09-02 matrix exercised authenticated Postiz and Typefully draft reconciliation; other providers unverified. | APIs that cannot prove terminal state remain explicitly `uncertain`. |
+| Publish orchestration | Studio approval discovers the live Postiz account/capability registry first and chooses it only for exact advertised support. Dispatch writes the publish log and Placed row; scheduled Postiz rows can move in place. Failed-object recovery now retracts the matching Placed event while the row lock is held, before retry is unlocked. Public media may be materialized under a configured HTTPS origin with a content-addressed filename. | Deterministic policy, discovery, scheduler, adapter, fallback, recovery, and reschedule coverage. Real Facebook and Instagram rows were scheduled, moved to ASAP, reconciled, and confirmed live through the production Studio HTTP path on 2026-09-13. TikTok and YouTube reached their provider slots; TikTok then exposed a wrong Direct Post scope, while YouTube exposed a rejected refresh grant. | Provision the durable media origin; activate/approve the TikTok scope repair, verify Google OAuth status, then reconnect and retry TikTok/YouTube. Complete one browser-operated approval-to-reconciliation journey so current UI wiring and rendered recovery are proven too. Typefully remains manual to move. Substack claims still lack a first-class ASAP move route. Never treat discovery transport failure as unsupported. |
+| Publishing status | Append-only normalized events record atomic claims, provider/account/object IDs, provider URLs, planned and observed timestamps, policy identity, uncertainty, human evidence, and terminal outcomes. A bounded reconciler runs under one cross-process lease. Failed-object `not-created` resolution is legal only after removal and now atomically invokes placement correction before clearing the retry fence. | Strong deterministic unit, cross-process, runner-wiring, all-state normalization, human-evidence, no-blind-retry, and Studio HTTP recovery coverage. The 2026-09-13 live run proved planned-to-live, planned-to-failed, removal, correction, and retry-ready outcomes. | Postiz's public list exposes `ERROR` but not its provider error message, so Studio currently shows a generic failure and local worker logs remain necessary for diagnosis. APIs that cannot prove terminal state remain explicitly `uncertain`. |
 
 ## Venture
 

@@ -7,3 +7,4 @@
 - 2026-09-12T17:12:11.763Z — linkedin-1 → postiz post cmtyn7k650000mn79v0uezmwt (linkedin, Sun, Sep 13, 8:30 AM PT, cta→inline)
 - 2026-09-12T17:12:13.793Z — mastodon-1 → postiz post cmtyn7lqr0001mn7939303ao7 (mastodon, Sun, Sep 13, 7:00 PM PT, cta→inline)
 - 2026-09-12T17:12:14.994Z — mastodon-2 → postiz post cmtyn7mo60003mn79x8motd8q (mastodon, Sun, Sep 20, 7:00 PM PT, cta→inline) Spaced from an earlier post from this piece on mastodon. First free slot past the spacing window is Sun, Sep 20, 7:00 PM PT.
+- 2026-09-13T23:41:39.395Z — x-1 → postiz post cmu0gk9f3000cqx8enm6lmx3y (x, Mon, Sep 14, 9:30 AM PT, cta→reply)

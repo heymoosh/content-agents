@@ -1065,7 +1065,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" id="publishedSheet" hidden>
       <div class="cw-steps" id="publishedSteps"></div>
       <div class="sheet-head"><h2>Publishing</h2><span class="grow"></span></div>
-      <div class="sheet-sub">Approved drafts wait in Pending until you choose Schedule. Text and cards go through Typefully, TikTok through PostPeer, Shorts through YouTube, and Notes through Substack. A provider is only shown as complete after its recorded result can be read back.</div>
+      <div class="sheet-sub">Approved drafts wait in Pending until you choose Schedule. Postiz is the primary social publisher when its live capability check supports the exact draft; a fallback is selected only after an explicit unsupported result. Substack Notes and Gmail use their constrained non-Postiz routes. A provider is only shown as complete after its recorded result can be read back.</div>
       <div class="sheet-sub" id="batchMovePanel" style="border:1px solid var(--line,#ccc);border-radius:6px;padding:10px">
         <strong>Move a batch</strong>
         <div class="cw-tabs" style="margin-top:8px">
@@ -1901,26 +1901,35 @@ function renderReviewFilters(){
   requestOptions.innerHTML=requestedPieces.map(p=>'<option value="'+esc(p.descriptor||p.title)+'">'+esc(p.slug)+'</option>').join("");
 }
 function publishingState(row){
-  if(row.publishingStatus&&row.publishingStatus.state==="uncertain") return "Needs reconciliation";
-  if(row.publishingStatus&&row.publishingStatus.state==="blocked") return "Blocked";
-  if(row.publishingStatus&&row.publishingStatus.state==="scheduling") return "Scheduling";
-  if(row.publishingStatus&&row.publishingStatus.state==="private") return "Uploaded private";
-  if(row.publishingStatus&&row.publishingStatus.state==="cleared") return "Ready to retry";
+  const state=row.publishingStatus&&row.publishingStatus.state;
+  if(state==="live"||state==="delivered") return "Live";
+  if(state==="failed") return "Needs attention";
+  if(state==="uncertain") return "Needs reconciliation";
+  if(state==="blocked") return "Blocked";
+  if(state==="scheduling") return "Scheduling";
+  if(state==="private") return "Uploaded private";
+  if(state==="cleared"||state==="canceled"||state==="deleted") return "Ready to retry";
   if(row.scheduleError||row.reconciled&&row.reconciled.state==="mismatch") return "Needs attention";
-  if(row.publishingStatus&&row.publishingStatus.state==="scheduled") return "Scheduled";
+  if(state==="scheduled"||state==="planned") return "Scheduled";
   if(row.reconciled&&row.reconciled.state==="scheduled"||row.scheduledWhen) return "Scheduled";
   if(row.status==="published") return "Scheduled / uploaded";
   return "Pending";
 }
+function publishingStatusMessage(state,error){
+  if(error) return error;
+  if(state==="Live") return "Confirmed live at the provider.";
+  if(state==="Pending") return "Waiting for the provider to accept it.";
+  if(state==="Scheduled"||state==="Scheduled / uploaded") return "Scheduled with the provider; live publication is not yet confirmed.";
+  if(state==="Needs reconciliation") return "Provider outcome is uncertain. Check the provider before retrying.";
+  if(state==="Needs attention") return "Provider delivery needs attention.";
+  if(state==="Ready to retry") return "The prior provider object is no longer active; this row may be approved and retried.";
+  if(state==="Uploaded private") return "Uploaded privately; public delivery is not confirmed.";
+  return "Provider status recorded.";
+}
 function publishingProvider(row){
   if(row.reconciled&&row.reconciled.provider) return row.reconciled.provider;
   if(row.publishingStatus&&row.publishingStatus.provider) return row.publishingStatus.provider;
-  const platform=String(row.platform||"").toLowerCase(), format=String(row.format||"").toLowerCase();
-  if(platform==="x"||platform==="linkedin"||platform==="bluesky"||platform.startsWith("quote-card")) return "Typefully";
-  if(platform==="tiktok") return "PostPeer";
-  if(platform==="youtube"||format==="short") return "YouTube";
-  if(platform==="substack") return "Substack";
-  return "No provider assigned";
+  return "Selected at Schedule";
 }
 const publishingSelected=new Set();
 function publishingKeyFor(slug,id){ return JSON.stringify([slug,id]); }
@@ -1953,12 +1962,13 @@ function renderPublished(){
       const state=publishingState(row), item=document.createElement("div"); item.className="publish-row";
       const error=(row.publishingStatus&&row.publishingStatus.error)||row.scheduleError||(row.reconciled&&row.reconciled.reason)||"";
       const provider=publishingProvider(row);
-      const planned=(row.reconciled&&row.reconciled.when)||(row.publishingStatus&&row.publishingStatus.plannedFor)||row.scheduledWhen||"No planned time recorded";
+      const planned=(row.publishingStatus&&row.publishingStatus.providerPublishedAt)||(row.reconciled&&row.reconciled.when)||(row.publishingStatus&&row.publishingStatus.plannedFor)||row.scheduledWhen||"No planned time recorded";
       const movable=row.publishingStatus&&row.publishingStatus.provider==="postiz"&&row.publishingStatus.state==="planned";
       const moveBtn=movable ? ' <button type="button" class="link-btn" data-move-slug="'+esc(piece.slug)+'" data-move-id="'+esc(row.id)+'">Move</button>' : '';
       const ref=row.publishingStatus&&row.publishingStatus.ref ? ' · '+esc(row.publishingStatus.ref) : '';
+      const canonical=row.publishingStatus&&row.publishingStatus.canonicalUrl ? '<span class="src" style="display:block">'+esc(row.publishingStatus.canonicalUrl)+'</span>' : '';
       const reconcile=row.publishingStatus&&(row.publishingStatus.state==="uncertain"||row.publishingStatus.state==="scheduling") ? '<div class="actions"><button data-publish-resolve="exists" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">I found it at the provider</button><button data-publish-resolve="not-created" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">Provider has nothing · allow retry</button></div>' : '';
-      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(planned)+moveBtn+'</span></span><span class="src"><strong>'+esc(provider)+'</strong>'+ref+'<br>'+(error?esc(error):state==="Pending"?'Waiting for the provider to accept it.':'Provider result recorded; live publication is not yet confirmed.')+reconcile+'</span>';
+      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(planned)+moveBtn+'</span></span><span class="src"><strong>'+esc(provider)+'</strong>'+ref+canonical+'<br>'+esc(publishingStatusMessage(state,error))+reconcile+'</span>';
       sec.appendChild(item);
     }
     main.appendChild(sec);

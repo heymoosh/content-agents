@@ -1233,6 +1233,12 @@ test("Content separates request-grouped draft approval from publishing", () => {
   assert.ok(html.includes("Approval records your decision"));
   assert.ok(html.includes("Open Publishing when you are ready to schedule it"));
   assert.ok(html.includes("Approved drafts wait in Pending until you choose Schedule"));
+  assert.ok(html.includes("Postiz is the primary social publisher when its live capability check supports the exact draft"));
+  assert.ok(!html.includes("Text and cards go through Typefully, TikTok through PostPeer, Shorts through YouTube"));
+  assert.ok(html.includes('if(state==="live"||state==="delivered") return "Live"'));
+  assert.ok(html.includes('if(state==="failed") return "Needs attention"'));
+  assert.ok(html.includes('row.publishingStatus.canonicalUrl'));
+  assert.ok(html.includes("Confirmed live at the provider."));
   assert.ok(html.includes("Open Focus Mode"));
   assert.ok(html.includes("Typefully"));
   assert.ok(html.includes("PostPeer"));
