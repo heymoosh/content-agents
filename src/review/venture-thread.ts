@@ -42,6 +42,7 @@ import type { VentureState, CheckpointState } from "../venture/state.js";
 import type { IntakeAnswers } from "../venture/intake.js";
 import type { WorkingContext } from "../venture/working-context.js";
 import type { VentureSeries, WebsiteMeasurement } from './venture-actions.js';
+import type { WebsiteAnalyticsReport } from './website-analytics-client.js';
 
 // ── the view model ───────────────────────────────────────────────────────────────────────────────
 
@@ -276,6 +277,7 @@ export type ThreadMsg =
 export interface VentureThread {
   executionSeries?: VentureSeries[];
   websiteMeasurement?: WebsiteMeasurement | null;
+  websiteAnalyticsReport?: WebsiteAnalyticsReport | null;
   workingContext?: WorkingContext;
   nextAction: { label: string; explanation: string; command: 'plan-init' | null; runnable: boolean };
   slug: string;
@@ -318,6 +320,7 @@ export interface RailItem {
 export interface ThreadInput {
   executionSeries?: VentureSeries[];
   websiteMeasurement?: WebsiteMeasurement | null;
+  websiteAnalyticsReport?: WebsiteAnalyticsReport | null;
   workingContext?: WorkingContext;
   slug: string;
   state: VentureState;
@@ -817,6 +820,7 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
     workingContext: input.workingContext,
     executionSeries: input.executionSeries,
     websiteMeasurement: input.websiteMeasurement,
+    websiteAnalyticsReport: input.websiteAnalyticsReport,
     nextAction: nextVentureAction(state.current_phase, artifacts, decisions, input.executionSeries),
     phase: state.current_phase,
     phaseStatus: state.phase_status,

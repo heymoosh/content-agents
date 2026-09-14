@@ -5,10 +5,13 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   fetchWebsiteAnalyticsReport,
+  readWebsiteAnalyticsReport,
   reportToWebsiteMeasurement,
   saveWebsiteAnalyticsReport,
   type WebsiteAnalyticsReport,
 } from './website-analytics-client.js';
+import { ventureSeriesSignalsHtml } from './page-venture-actions.js';
+import { renderPage } from './page.js';
 import { readWebsiteMeasurement, saveWebsiteMeasurement } from './venture-actions.js';
 
 function report(): WebsiteAnalyticsReport {
@@ -86,6 +89,21 @@ test('saved reports contain aggregate fields only and use a private file mode', 
   assert.equal(saved.rows[0].newSignups, 2);
   assert.equal('email' in saved, false);
   assert.equal('rawAnswers' in saved, false);
+});
+
+test('reads the saved aggregate report and renders the source funnel and needs in Studio', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'website-analytics-render-'));
+  const path = join(directory, 'website-analytics-report.json');
+  saveWebsiteAnalyticsReport(report(), path);
+  const saved = readWebsiteAnalyticsReport(path);
+  assert.equal(saved?.rows[0]?.landingPath, '/essays/example');
+  const html = ventureSeriesSignalsHtml([], null, String, saved);
+  assert.match(html, /Measured website funnel/);
+  assert.match(html, /linkedin \/ social/);
+  assert.match(html, /\/essays\/example/);
+  assert.match(html, /More freedom/);
+  assert.doesNotMatch(html, /server-only-token|rawAnswers/);
+  assert.match(renderPage({ repoRoot: '/fixture', isDevWorktree: true }), /const websiteAnalyticsReportHtml = function websiteAnalyticsReportHtml/);
 });
 
 test('the report summary can replace the legacy private measurement snapshot', () => {

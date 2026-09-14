@@ -18,7 +18,7 @@ import { contentReaderActionHtml, ventureConversionsHtml } from './page-conversi
 import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 import { intakeProgress } from "./intake-progress.js";
 import { ventureProgressHtml, ventureResearchPlanHtml } from "./page-venture-progress.js";
-import { ventureActionsHtml, ventureSeriesSignalsHtml } from './page-venture-actions.js';
+import { ventureActionsHtml, ventureSeriesSignalsHtml, websiteAnalyticsReportHtml } from './page-venture-actions.js';
 import { ventureGuideHtml, ventureStructuredHtml } from './page-venture-guide.js';
 export {
   formatElapsed,
@@ -4520,6 +4520,7 @@ async function openVentureCapture(item){
   if(target){ target.setAttribute("tabindex","-1"); target.focus({preventScroll:true}); }
 }
 const renderVentureProgress = ${ventureProgressHtml.toString()};
+const websiteAnalyticsReportHtml = ${websiteAnalyticsReportHtml.toString()};
 const renderVentureActions = ${ventureActionsHtml.toString()};
 const renderVentureGuide = ${ventureGuideHtml.toString()};
 const renderVentureStructured = ${ventureStructuredHtml.toString()};
@@ -4637,7 +4638,7 @@ function renderVenture(){
   if(VEN.pane==='conversions'&&ventureConversionData?.slug!==ventureSlug)loadVentureConversions();
   $('#ventureSavedConstraints').innerHTML='<h3>Saved operating constraints</h3>'+(t.workingContext?.constraints?'<p style="white-space:pre-wrap">'+esc(t.workingContext.constraints)+'</p>':'<p>No separate operating update recorded. Your original interview is preserved in Documents.</p>');
   const execution = t.phase===1 && (t.executionSeries||[]).length>0 && t.nextAction?.label==='Work through the actions below';
-  $('#ventureActions').innerHTML=execution?renderVentureActions(t.executionSeries,t.websiteMeasurement,esc):'';
+  $('#ventureActions').innerHTML=execution?renderVentureActions(t.executionSeries,t.websiteMeasurement,esc,t.websiteAnalyticsReport):'';
   // Keep the operating page short. Original context and every workflow gate remain in History.
   const detailsParent=execution?$('#ventureHistoryPane'):$('#venturePhaseWork');
   detailsParent.append($('#ventureTools'),$('#ventureAnalysisPanel'),$('#ventureProgress'),$('#ventureRead'));
@@ -6357,7 +6358,7 @@ function experimentCanProposeVenture(perf, interpretation){
 }
 function signalsExperimentsHtml(){
   const plans=(SIGNALS&&SIGNALS.experimentPlans)||[];
-  const series=renderVentureSeriesSignals((SIGNALS&&SIGNALS.ventureSeries)||[],SIGNALS&&SIGNALS.websiteMeasurement,esc);
+  const series=renderVentureSeriesSignals((SIGNALS&&SIGNALS.ventureSeries)||[],SIGNALS&&SIGNALS.websiteMeasurement,esc,SIGNALS&&SIGNALS.websiteAnalyticsReport);
   const propose='<div class="actions"><button class="sig-experiment-propose">Plan a test</button><span class="src">Requires an existing Content request and reviewed evidence. The analysis may recommend not testing yet.</span></div>';
   if(!plans.length) return series+(series?'<p>No controlled comparisons recorded. The exploratory Venture series above does not require inventing one.</p>':'<section><p>No experiments recorded for this brand yet.</p><p>Start with a question about an existing Content item. An approved test goes through Content review before publication.</p>'+propose+'</section>');
   const performanceById=new Map((((SIGNALS&&SIGNALS.experimentPerformance)||{}).experiments||[]).map(row=>[row.experimentId,row]));

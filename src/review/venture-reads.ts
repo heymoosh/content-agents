@@ -41,6 +41,7 @@ import { formatStatusReadOnly } from "../venture/status.js";
 import { buildVentureThread } from "./venture-thread.js";
 import { readWorkingContext } from "../venture/working-context.js";
 import { readSeriesProgress, readWebsiteMeasurement } from './venture-actions.js';
+import { readWebsiteAnalyticsReport } from './website-analytics-client.js';
 import { listVentureDocuments, readVentureDocument } from "./venture-documents.js";
 
 export interface VentureReadResult {
@@ -194,6 +195,7 @@ const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> =
       workingContext: readWorkingContext(slug),
       executionSeries: readSeriesProgress('human-inference').filter(s => s.ventureSlug === slug && readArtifact(slug,'p1-research-plan')?.updated_at === s.planUpdatedAt),
       websiteMeasurement: readWebsiteMeasurement(),
+      websiteAnalyticsReport: readWebsiteAnalyticsReport(),
       rulesVersion: rules.rules_version,
       minEvidence: Object.fromEntries(Object.entries(rules.artifact_kinds).map(([k, v]) => [k, v.min_evidence])),
       selectCounts: {

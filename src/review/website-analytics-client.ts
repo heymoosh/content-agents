@@ -1,6 +1,7 @@
-import { chmodSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { WebsiteMeasurement } from './venture-actions.js';
+import { dataRoot } from '../runtime/data-root.js';
 
 const REPORT_VERSION = 'website-funnel-v1';
 const MAX_ROWS = 500;
@@ -257,6 +258,17 @@ export function reportToWebsiteMeasurement(report: WebsiteAnalyticsReport): Webs
     unattributedSessions: report.coverage.unattributedSessions,
     newSignupsWithoutSession: report.coverage.newSignupsWithoutSession,
   };
+}
+
+export function readWebsiteAnalyticsReport(path = join(dataRoot(), 'website-analytics-report.json')): WebsiteAnalyticsReport | null {
+  if (!existsSync(path)) return null;
+  try {
+    return normalizeWebsiteAnalyticsReport(JSON.parse(readFileSync(path, 'utf8')));
+  } catch {
+    // A stale or partial derived report must not prevent the private dashboard from showing its
+    // separately stored website totals. The next explicit refresh replaces it atomically.
+    return null;
+  }
 }
 
 export function saveWebsiteAnalyticsReport(report: WebsiteAnalyticsReport, path: string) {
