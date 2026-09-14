@@ -885,5 +885,8 @@ test("configured generation preflights media inputs and never invents missing fi
     treatments: ["shorter-version"], platforms: ["linkedin"], media: ["short-video-script"],
     sourceProvenance: { kind: "source", sourceLines: [1] },
   });
-  assert.throws(() => buildConfiguredMediaOutputs(twoVideos.variants), /one staged script.*folder-scoped/);
+  const videoOutputs = buildConfiguredMediaOutputs(twoVideos.variants);
+  assert.equal(videoOutputs.length, 2);
+  assert.equal(new Set(videoOutputs.map(output=>output.queue.asset)).size, 2);
+  assert.ok(videoOutputs.every(output=>output.record.stage === 'storyboard-required'));
 });

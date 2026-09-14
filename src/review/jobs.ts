@@ -1002,9 +1002,6 @@ export function buildConfiguredMediaOutputs(
   cardRenderNames: ReadonlyMap<string, string> = new Map(),
 ): ConfiguredMediaOutput[] {
   const shortVideos = variants.filter((variant) => variant.media === "short-video-script");
-  if (shortVideos.length > 1) {
-    throw new Error("configured short-video generation currently supports one staged script per content folder; choose one control/treatment because the existing storyboard approval gate is folder-scoped");
-  }
   const stagedInputs = shortVideos.length ? { ...inputs, stagedStoryboard: true } : inputs;
   return variants.map((variant) => {
     const derivativePath = `derivatives/${variant.identity.id}.md`;

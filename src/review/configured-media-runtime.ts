@@ -513,6 +513,22 @@ function wordCaptions(text: string): { text: string; startMs: number; endMs: num
   return text.split(/\s+/).filter(Boolean).map((word, index) => ({ text: word, startMs: index * 320, endMs: (index + 1) * 320 }));
 }
 
+/** Prepare variant-local renderer inputs; callers still require the stage approval gate. */
+export function prepareConfiguredVideoRender(stage: PersistedConfiguredMediaStage, folder: string) {
+  if (!/^[\w.-]+$/.test(stage.id) || stage.id === '.' || stage.id === '..') throw new Error('unsafe video stage id');
+  const plan = stage.plan as { sourceText?: string; scenes?: string[] };
+  if (!plan.sourceText?.trim() || !plan.scenes?.length) throw new Error('approved short-video stage has no inspectable storyboard scenes');
+  const relative = `configured-media/${stage.id}`;
+  const renderFolder = join(folder, relative);
+  mkdirSync(join(renderFolder, 'derivatives'), { recursive: true });
+  mkdirSync(join(renderFolder, 'video'), { recursive: true });
+  copyFileSync(join(folder, 'source.md'), join(renderFolder, 'source.md'));
+  writeFileSync(join(renderFolder, 'derivatives', 'video-script.md'), `---\nplatform: video-script\nsource_ref: ../../media-stages/${stage.id}.json\n---\n\n${plan.sourceText.trim()}\n`);
+  writeFileSync(join(renderFolder, 'video', 'image-prompts.txt'), plan.scenes.map(scene=>`Source-bound visual treatment for: ${scene}`).join('\n')+'\n');
+  const assets = ['short.mp4', 'thumbnail.png', 'transcript.txt', 'captions.json'].map(name=>`${relative}/video/${name}`);
+  return { command: ['npm', 'run', 'render', '--', '--video', renderFolder], primaryAsset: assets[0], assets };
+}
+
 /** Production dispatcher. It is called only after executeConfiguredMediaStage proves approval. */
 export const defaultConfiguredMediaRenderer: ConfiguredMediaRenderer = async (stage, folder) => {
   const outDir = join(folder, "configured-media", stage.id);
@@ -550,17 +566,11 @@ export const defaultConfiguredMediaRenderer: ConfiguredMediaRenderer = async (st
     return { primaryAsset: render.primaryAsset, assets: [...render.assets], costUsd: 0 };
   }
   if (stage.media === "short-video-script") {
-    const plan = stage.plan as { sourceText?: string; scenes?: string[] };
-    if (!plan.sourceText?.trim() || !plan.scenes?.length) throw new Error("approved short-video stage has no inspectable storyboard scenes");
-    mkdirSync(join(folder, "derivatives"), { recursive: true });
-    mkdirSync(join(folder, "video"), { recursive: true });
-    writeFileSync(join(folder, "derivatives", "video-script.md"), `---\nplatform: video-script\nsource_ref: media-stages/${stage.id}.json\n---\n\n${plan.sourceText.trim()}\n`);
-    writeFileSync(join(folder, "video", "image-prompts.txt"), plan.scenes.map((scene) => `Source-bound visual treatment for: ${scene}`).join("\n") + "\n");
+    const render = prepareConfiguredVideoRender(stage, folder);
     // The configured stage is the storyboard: executeConfiguredMediaStage has already proved its
     // explicit approval and tamper digest. The low-level renderer retains every provider cost log.
-    execFileSync("npm", ["run", "render", "--", "--video", folder], { stdio: "inherit" });
-    const assets = ["video/short.mp4", "video/thumbnail.png", "video/transcript.txt", "video/captions.json"];
-    return { primaryAsset: assets[0], assets, costUsd: 0 };
+    execFileSync(render.command[0], render.command.slice(1), { stdio: "inherit" });
+    return { primaryAsset: render.primaryAsset, assets: render.assets, costUsd: 0 };
   }
   if (stage.media === "image") {
     const plan = stage.plan as { sourceExcerpt?: string };

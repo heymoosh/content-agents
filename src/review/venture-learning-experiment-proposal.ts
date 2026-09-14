@@ -43,6 +43,7 @@ function contentInput(request: ContentRequest): ContentRequestInput {
   return {
     id: request.id, origin: request.origin, descriptor: request.descriptor, originalInput: request.originalInput,
     treatments: request.selections.treatments, media: request.selections.media, platforms: request.selections.platforms,
+    testPlans: request.testPlans, excludedOutputs: request.excludedOutputs,
     includeUntreatedControl: request.control.enabled, ventureId: request.ventureId, ventureSource: request.ventureSource,
     sourceProvenance: request.sourceProvenance, sourceContext: request.sourceContext,
   };

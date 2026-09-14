@@ -15,7 +15,7 @@ import { INTAKE_QUESTIONS } from "../venture/intake.js";
 import { JOB_COLORS, jobRoom, type JobView } from "./studio-job-ui.js";
 import { CONTENT_CONFIG_OPTIONS } from "./content-request.js";
 import { contentReaderActionHtml, ventureConversionsHtml } from './page-conversions.js';
-import { contentPlanIdeas, contentPlanSummaryHtml } from './content-plan.js';
+import { contentPlanIdeas, contentPlanOutputs, contentPlanSummaryHtml } from './content-plan.js';
 import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 import { intakeProgress } from "./intake-progress.js";
 import { ventureProgressHtml, ventureResearchPlanHtml } from "./page-venture-progress.js";
@@ -3163,6 +3163,7 @@ function readsFromCells(t, cuts){
 const CW_STEPS = [["1","Input"],["2","Plan this piece"],["3","Approve the drafts"],["4","Publish"]];
 const renderContentReaderAction = ${contentReaderActionHtml.toString()};
 const contentPlanIdeas = ${contentPlanIdeas.toString()};
+const contentPlanOutputs = ${contentPlanOutputs.toString()};
 const contentPlanSummaryHtml = ${contentPlanSummaryHtml.toString()};
 const renderVentureConversions = ${ventureConversionsHtml.toString()};
 let contentInputText = "";
@@ -3184,7 +3185,7 @@ function cwEnsureConfig(){
   const stored=CW.requestFor===s.slug?CW.request:null;
   if(CW.config && CW.config.slug===s.slug && (!stored || CW.config.fromRequest===stored.id)) return CW.config;
   if(stored){
-    CW.config={slug:s.slug,fromRequest:stored.id,open:true,
+    CW.config={slug:s.slug,fromRequest:stored.id,open:true,testPlans:stored.testPlans,excludedOutputs:new Set(stored.excludedOutputs||[]),
       treatment:new Set(stored.selections.treatments),media:new Set(stored.selections.media.filter(x=>x!=='none')),
       platform:new Set(stored.selections.platforms),control:stored.control.enabled,saving:false,saved:false,readerAction:stored.readerAction||cwIntendedReaderAction()};
     return CW.config;
@@ -3410,7 +3411,7 @@ function cwStep2Html(){
   if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+crossContext+'<div class="empty">Reading recommendations…</div>';
   const cfg = cwEnsureConfig();
   const ideas=contentPlanIdeas(CW.conversion,((s.cuts||[]).find(c=>c.lens===CW.approvedLens)||{}).body||s.sourceBody||'');
-  const ideaHtml=ideas.length?'<section><h3>Suggested tests</h3><p>Source-based starting points for your Venture questions, not proven winners or a new AI analysis. Choose a batch; each button replaces the platform, format and angle selections below and includes controls. It does not create drafts.</p>'+ideas.map(idea=>'<div style="margin:16px 0"><b>'+esc(idea.title)+'</b><p>'+esc(idea.why)+'</p><button type="button" data-plan-idea="'+esc(idea.id)+'">Use this test plan</button></div>').join('')+'</section>':'';
+  const ideaHtml=ideas.length?'<section><h3>Suggested tests</h3><p>Combine any of these source-based starting points. They are not proven winners or a new AI analysis. Selecting tests does not create drafts.</p><button type="button" data-plan-all'+(cfg.saving?' disabled':'')+'>Select all suggested tests</button>'+ideas.map(idea=>'<div style="margin:16px 0"><b>'+esc(idea.title)+'</b><p>'+esc(idea.why)+'</p><button type="button" data-plan-idea="'+esc(idea.id)+'" aria-pressed="'+!!cfg.testPlans?.some(p=>p.id===idea.id)+'"'+(cfg.saving?' disabled':'')+'>'+(cfg.testPlans?.some(p=>p.id===idea.id)?'Remove this test':'Add this test')+'</button></div>').join('')+'</section>':'';
   const dist=CW.treat.distribution||{platforms:[],media:[],mediaRationale:""};
   const platformWhy=(dist.platforms||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
   const mediaWhy=(dist.media||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
@@ -3419,10 +3420,11 @@ function cwStep2Html(){
   return cwPickedHtml(s)+crossContext+
     '<section id="contentPlanSummary">'+contentPlanSummaryHtml(cfg,CONTENT_CONFIG_OPTIONS,CW.conversion,esc)+'</section>'+ideaHtml+recommendation+
     renderContentReaderAction(CW.conversion,cfg.readerAction,(s.rounds||[]).flatMap(r=>r.cards),esc)+
-    '<h3 style="margin-top:28px">Adjust the plan</h3>'+
+    (cfg.testPlans?'<p>Adjust individual outputs in the combined preview above, or <button type="button" data-plan-custom'+(cfg.saving?' disabled':'')+'>Use a custom plan instead</button></p>':'<h3 style="margin-top:28px">Adjust the plan</h3>'+
     cwConfigSectionHtml("platform","Platforms",CONTENT_CONFIG_OPTIONS.platform,s)+
     cwConfigSectionHtml("media","Formats · leave empty for text only",CONTENT_CONFIG_OPTIONS.media,s)+
-    cwConfigSectionHtml("treatment","Angle and presentation",CONTENT_CONFIG_OPTIONS.treatment,s)+
+    cwConfigSectionHtml("treatment","Angle and presentation",CONTENT_CONFIG_OPTIONS.treatment,s))+
+    (cfg.testPlans?'<p>Run with '+engineSelectHtml('contentTreatmentEngine')+'</p>':'')+
     '<details style="margin-top:24px"><summary>Ask the AI advisor for more tailored ideas</summary>'+cwAdvisorHtml(s,true)+'</details>'+
     '<label style="display:flex;gap:9px;align-items:flex-start;margin-top:22px;padding:14px;background:#faf7f0;border:1px solid #efe7d6;border-radius:8px"><input type="checkbox" id="contentControlEnabled"'+(cfg.control?" checked":"")+'><span><b>Untreated control</b><span class="src" style="display:block">Create one source-preserving control for each selected platform and media combination. You can disable it explicitly.</span></span></label>'+
     '<div class="cw-yesall"><button type="button" class="primary" id="contentConfigSave" data-config-save'+(cfg.saving?" disabled":"")+'>'+(cfg.saving?"Creating drafts…":cfg.saved?"Drafts created":"Use this plan and create drafts")+'</button>'+
@@ -3430,7 +3432,7 @@ function cwStep2Html(){
 }
 function cwRefreshPlanSummary(){
   const summary=$('#contentPlanSummary');
-  if(summary)summary.innerHTML=contentPlanSummaryHtml(cwEnsureConfig(),CONTENT_CONFIG_OPTIONS,CW.conversion,esc);
+  if(summary){const open=summary.querySelector('details')?.open;summary.innerHTML=contentPlanSummaryHtml(cwEnsureConfig(),CONTENT_CONFIG_OPTIONS,CW.conversion,esc);if(open&&summary.querySelector('details'))summary.querySelector('details').open=true;}
 }
 function cwStep3Html(){
   return '';
@@ -3487,7 +3489,8 @@ function cwSelectableConfigIds(kind){
 async function cwSaveConfig(){
   const s = cwSession(), cfg = cwEnsureConfig();
   if(!s || !cfg || cfg.saving) return;
-  if(!cfg.platform.size){ flash("Choose at least one platform"); return; }
+  if(cfg.testPlans){if(!contentPlanOutputs(cfg.testPlans,cfg.control).some(x=>!cfg.excludedOutputs?.has(x.key))){flash('Choose at least one output');return;}}
+  else if(!cfg.platform.size){ flash("Choose at least one platform"); return; }
   const engine = $("#contentTreatmentEngine")?.value || "codex";
   cfg.saving = true; renderContentWizard();
   const recommendedPlatforms = (CW.treat && CW.treat.channels || []).filter(c=>c.decision==="include").map(c=>c.channel);
@@ -3511,8 +3514,11 @@ async function cwSaveConfig(){
   const origin = contentRequestOrigin(s);
   const request = {
     id:s.slug, origin, descriptor:s.title, originalInput:((s.cuts||[]).find(c=>c.lens===CW.approvedLens)||{}).body||s.sourceBody,
-    treatments:[...cfg.treatment], media:[...cfg.media], platforms:[...cfg.platform],
+    treatments:cfg.testPlans?[...new Set(cfg.testPlans.flatMap(p=>p.treatments))]:[...cfg.treatment],
+    media:cfg.testPlans?[...new Set(cfg.testPlans.flatMap(p=>p.media.length?p.media:['none']))]:[...cfg.media],
+    platforms:cfg.testPlans?[...new Set(cfg.testPlans.flatMap(p=>p.platforms))]:[...cfg.platform],
     recommendationEvidence:evidence, includeUntreatedControl:cfg.control,
+    testPlans:cfg.testPlans,excludedOutputs:cfg.testPlans?[...(cfg.excludedOutputs||[])]:undefined,
     readerAction:cfg.readerAction||null,
     ventureId:origin==="fiction" ? "least-of-us-fiction" : null,
     sourceProvenance:(()=>{ const cut=(s.cuts||[]).find(c=>c.lens===CW.approvedLens); return cut?{kind:"approved-cut",lens:cut.lens,sourceLines:cut.sourceLines}:null; })(),
@@ -3549,13 +3555,20 @@ $("#contentWizard").addEventListener("click", async (e)=>{
 });
 $("#contentWizard").addEventListener("click", (e)=>{
   if(e.target.closest?.('[data-restore-control]')){const cfg=cwEnsureConfig();cfg.control=true;cfg.saved=false;renderContentWizard();return;}
-  const ideaButton=e.target.closest?.('[data-plan-idea]');
+  const customButton=e.target.closest?.('[data-plan-custom]');
+  if(customButton){const cfg=cwEnsureConfig();if(cfg.saving)return;cfg.testPlans=undefined;cfg.platform=new Set();cfg.media=new Set();cfg.treatment=new Set();cfg.excludedOutputs=new Set();cfg.saved=false;renderContentWizard();return;}
+  const ideaButton=e.target.closest?.('[data-plan-idea],[data-plan-all]');
   if(ideaButton){
     const s=cwSession(), cfg=cwEnsureConfig();
-    const idea=contentPlanIdeas(CW.conversion,((s.cuts||[]).find(c=>c.lens===CW.approvedLens)||{}).body||s.sourceBody||'').find(x=>x.id===ideaButton.dataset.planIdea);
-    if(!idea||cfg.saving)return;
-    cfg.platform=new Set(idea.platforms);cfg.media=new Set(idea.media);cfg.treatment=new Set(idea.treatments);cfg.control=true;cfg.saved=false;
-    renderContentWizard();flash('Test plan selected. Review the choices before creating drafts.');return;
+    if(cfg.saving)return;
+    const ideas=contentPlanIdeas(CW.conversion,((s.cuts||[]).find(c=>c.lens===CW.approvedLens)||{}).body||s.sourceBody||'');
+    const first=!cfg.testPlans;
+    if(ideaButton.dataset.planAll!==undefined)cfg.testPlans=ideas;
+    else {const idea=ideas.find(x=>x.id===ideaButton.dataset.planIdea);if(!idea)return;cfg.testPlans=cfg.testPlans?.some(p=>p.id===idea.id)?cfg.testPlans.filter(p=>p.id!==idea.id):[...(cfg.testPlans||[]),idea];}
+    if(first)cfg.control=true;
+    const possible=new Set(contentPlanOutputs(cfg.testPlans,true).map(x=>x.key));
+    cfg.excludedOutputs=new Set([...(cfg.excludedOutputs||[])].filter(key=>possible.has(key)));cfg.saved=false;
+    renderContentWizard();return;
   }
   const original=e.target.closest?.('[data-use-original]');
   if(original){original.disabled=true;post('/api/develop/use-original',{slug:CW.slug}).then(async r=>{if(!r.ok)throw new Error(r.error);CW.approvedLens=r.lens;await loadContent();const cfg=cwEnsureConfig();cfg.open=true;await cwLoadTreatment();}).catch(e=>{original.disabled=false;flash(e.message);});return;}
@@ -3602,6 +3615,8 @@ $("#contentWizard").addEventListener("change", (e)=>{
   const target = e.target, cfg = cwEnsureConfig();
   if(target&&target.dataset&&target.dataset.approvedCut!==undefined){ CW.approvedLens=target.value; renderContentWizard(); cwLoadTreatment(); return; }
   if(!cfg || !target) return;
+  if(cfg.saving)return;
+  if(target.dataset.planOutput!==undefined){cfg.excludedOutputs=cfg.excludedOutputs||new Set();if(target.checked)cfg.excludedOutputs.delete(target.dataset.planOutput);else cfg.excludedOutputs.add(target.dataset.planOutput);cfg.saved=false;cwRefreshPlanSummary();return;}
   if(target.id==='contentReaderAction'){
     const id=target.value, intended=CW.conversion?.intended;
     const suggestion=(cwSession()?.rounds||[]).flatMap(r=>r.cards).filter(c=>c.kind==='cta'&&c.destinationId===id&&c.status!=='dismissed').at(-1);

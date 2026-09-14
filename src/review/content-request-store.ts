@@ -45,6 +45,8 @@ function inputFromStored(request: ContentRequest): ContentRequestInput {
     platforms: request.selections.platforms,
     recommendationEvidence: evidence,
     includeUntreatedControl: request.control.enabled,
+    testPlans: request.testPlans,
+    excludedOutputs: request.excludedOutputs,
     ventureId: request.ventureId,
     readerAction: request.readerAction,
     ventureSource: request.ventureSource,
@@ -57,7 +59,7 @@ function inputFromStored(request: ContentRequest): ContentRequestInput {
 function withServerMechanismEvidence(candidate: ContentRequestInput, authoritativeBody: string, allowReviewedMechanisms: boolean): ContentRequestInput {
   const clientEvidence = (candidate.recommendationEvidence ?? []).filter((item) => !item.source.trim().toLowerCase().startsWith("research-dossier:"));
   const reviewed = allowReviewedMechanisms ? readReviewedMechanismRecommendations(authoritativeBody) : [];
-  if ((candidate.treatments ?? []).includes("belief-shift") && !reviewed.some((item) => item.option === "belief-shift")) {
+  if ([...(candidate.treatments ?? []), ...(candidate.testPlans ?? []).flatMap(p=>p.treatments ?? [])].includes("belief-shift") && !reviewed.some((item) => item.option === "belief-shift")) {
     throw new Error("belief-shift treatment requires a reviewed mechanism match against the authoritative approved cut");
   }
   return { ...candidate, recommendationEvidence: [...clientEvidence, ...reviewed] };

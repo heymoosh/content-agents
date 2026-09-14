@@ -211,6 +211,8 @@ export async function applyApprovedExperimentToContent(
     media: proposal.contentRequest.selections.media,
     platforms: proposal.contentRequest.selections.platforms,
     includeUntreatedControl: proposal.contentRequest.control.enabled,
+    testPlans: proposal.contentRequest.testPlans,
+    excludedOutputs: proposal.contentRequest.excludedOutputs,
     ventureId: proposal.contentRequest.ventureId,
     ventureSource: proposal.contentRequest.ventureSource,
     sourceProvenance: proposal.contentRequest.sourceProvenance,

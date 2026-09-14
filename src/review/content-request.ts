@@ -1,4 +1,5 @@
 import { readerActionSchema, type ReaderAction } from './reader-action.js';
+import { contentPlanOutputs, type ContentTestPlan } from './content-plan.js';
 /** Pure domain objects for configuring one piece of content. No persistence or generation. */
 export const CONTENT_REQUEST_VERSION = "content-request-v1" as const;
 
@@ -99,6 +100,8 @@ export interface CharlesSourceContext {
 export type ContentSourceContext = FictionSourceContext | CharlesSourceContext;
 
 export interface ContentRequestInput {
+  readonly testPlans?: readonly ContentTestPlan[];
+  readonly excludedOutputs?: readonly string[];
   readonly readerAction?: ReaderAction | null;
   readonly id: string;
   readonly origin: ContentOrigin;
@@ -166,6 +169,8 @@ export interface ContentVariant {
 }
 
 export interface ContentRequest {
+  readonly testPlans?: readonly ContentTestPlan[];
+  readonly excludedOutputs?: readonly string[];
   readonly readerAction?: ReaderAction | null;
   readonly kind: "content_request";
   readonly version: typeof CONTENT_REQUEST_VERSION;
@@ -350,22 +355,55 @@ function assembleContentRequest(input: ContentRequestInput, selectionSets: Conte
   };
   // Omitted selections use evidence-backed recommendations. Supplied selections are
   // authoritative, including an explicit empty array (the user may deselect everything).
-  const selected = {
+  let selected = {
     treatments: selections(input.treatments, "treatments", recs.treatments.map((item) => item.option), selectionSets.treatments),
     media: selections(input.media, "media", recs.media.map((item) => item.option), selectionSets.media),
     platforms: selections(input.platforms, "platforms", recs.platforms.map((item) => item.option), selectionSets.platforms),
   };
   const controlEnabled = input.includeUntreatedControl !== false;
+  let testPlans: ContentTestPlan[] | undefined;
+  if (input.testPlans !== undefined) {
+    if (!Array.isArray(input.testPlans) || !input.testPlans.length || input.testPlans.length > 20) throw new Error('Select between 1 and 20 test plans');
+    testPlans = input.testPlans.map((plan, index) => ({
+      id: required(plan?.id, `testPlans[${index}].id`),
+      title: required(plan?.title, `testPlans[${index}].title`),
+      ...(typeof plan?.why === 'string' ? { why: plan.why } : {}),
+      platforms: selections(plan?.platforms, 'test plan platforms', [], selectionSets.platforms),
+      media: selections(plan?.media, 'test plan media', [], selectionSets.media),
+      treatments: selections(plan?.treatments, 'test plan treatments', [], selectionSets.treatments),
+    }));
+    if (new Set(testPlans.map(p=>p.id)).size !== testPlans.length) throw new Error('Test plan IDs must be unique');
+    if (testPlans.some(p=>!p.platforms.length)) throw new Error('Each test plan needs a platform');
+    selected = {
+      platforms: [...new Set(testPlans.flatMap(p=>p.platforms))],
+      media: [...new Set(testPlans.flatMap(p=>p.media.length ? p.media : ['none']))],
+      treatments: [...new Set(testPlans.flatMap(p=>p.treatments))],
+    };
+  }
+  const excludedOutputs = selections(input.excludedOutputs, 'excluded outputs');
   const variants: ContentVariant[] = [];
-  if (controlEnabled) {
-    for (const platform of selected.platforms) for (const media of selected.media.length ? selected.media : ["none"]) {
-      variants.push({ identity: { id: variantId("control", platform, media), requestId: id, kind: "control" }, platform, media, treatments: [] });
+  if (testPlans) {
+    const outputs = contentPlanOutputs(testPlans, controlEnabled);
+    const possible = new Set(contentPlanOutputs(testPlans, true).map(x=>x.key));
+    if (excludedOutputs.some(key=>!possible.has(key))) throw new Error('Excluded output does not belong to the selected tests');
+    for (const output of outputs.filter(x=>!excludedOutputs.includes(x.key))) {
+      const kind = output.treatment === null ? 'control' : 'treated';
+      variants.push({ identity: { id: variantId(kind, output.platform, output.media, ...(output.treatment === null ? [] : [output.treatment])), requestId: id, kind }, platform: output.platform, media: output.media, treatments: output.treatment === null ? [] : [output.treatment] });
+    }
+    if (!variants.length) throw new Error('Choose at least one output');
+  } else {
+    if (excludedOutputs.length) throw new Error('Output exclusions require test plans');
+    if (controlEnabled) {
+      for (const platform of selected.platforms) for (const media of selected.media.length ? selected.media : ["none"]) {
+        variants.push({ identity: { id: variantId("control", platform, media), requestId: id, kind: "control" }, platform, media, treatments: [] });
+      }
+    }
+    for (const platform of selected.platforms) for (const media of selected.media.length ? selected.media : ["none"]) for (const treatment of selected.treatments) {
+      variants.push({ identity: { id: variantId("treated", platform, media, treatment), requestId: id, kind: "treated" }, platform, media, treatments: [treatment] });
     }
   }
-  for (const platform of selected.platforms) for (const media of selected.media.length ? selected.media : ["none"]) for (const treatment of selected.treatments) {
-    variants.push({ identity: { id: variantId("treated", platform, media, treatment), requestId: id, kind: "treated" }, platform, media, treatments: [treatment] });
-  }
   return {
+    ...(testPlans ? { testPlans, excludedOutputs } : {}),
     kind: "content_request", version: CONTENT_REQUEST_VERSION, id, origin: input.origin, descriptor, originalInput: input.originalInput,
     ...(input.readerAction != null ? { readerAction: readerActionSchema.parse(input.readerAction) } : {}),
     ventureId: input.ventureId ?? null, ventureSource: ventureSource(input.ventureSource), sourceProvenance: sourceProvenance(input.sourceProvenance), sourceContext: sourceContext(input.sourceContext, input.origin), experiment: experimentContext(input.experiment, variants), selections: selected, recommendations: recs,
@@ -400,6 +438,8 @@ export function mergeContentConfiguration(existing: ContentRequest, incoming: Co
     platforms: incoming.platforms,
     recommendationEvidence: incoming.recommendationEvidence,
     includeUntreatedControl: incoming.includeUntreatedControl,
+    testPlans: incoming.testPlans,
+    excludedOutputs: incoming.excludedOutputs,
     readerAction: incoming.readerAction === undefined ? existing.readerAction : incoming.readerAction,
   };
 }
