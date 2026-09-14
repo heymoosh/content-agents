@@ -241,6 +241,12 @@ Browser verification passed (57 passed, 0 failed, 16 deliberately blocked); `npm
 dotenv test input and concurrent-suite isolation interference; those were resolved with a temporary
 two-key nonsecret fixture and sequential execution, without changing tests or loading real credentials.
 Evidence: `/private/tmp/studio-approval-e2e.log` and `/private/tmp/studio-approval-check.log`.
-Remaining behavior fixes require their own outcome tests and independent review.
+Remaining fixes use agent judgment for testing under AGENTS.md. Independent review is reserved for high-risk boundaries such as G11 publishing-state integrity.
 
-Continuation: G1 is complete on local `main` after integration. G2 is next; G3/G11 and Charles resume remain authorized but unimplemented in this continuation. They change behavior and require outcome tests and independent review before integration. No temporary branch is required to resume; create an isolated worktree if the primary checkout is dirty.
+Continuation: G1 is complete on local `main` after integration. G2 is next; G3/G11 and Charles resume remain authorized but unimplemented in this continuation. Choose verification under AGENTS.md: focused checks may suit G2/G3/Charles resume; publishing-state integrity in G11 deserves particular scrutiny. No test suite is automatically required; G11 retains a bounded cross-family review because it changes publishing-state integrity. No temporary branch is required to resume; create an isolated worktree if the primary checkout is dirty.
+
+Owner correction, September 13: testing is discretionary, selected by the agent for the actual
+change and risk. No full-suite, browser-suite or unchanged post-merge rerun is mandatory. Independent
+review is limited to the high-risk boundaries named in AGENTS.md; ordinary UI fixes do not require it. The redundant G1 post-merge run was stopped; its successful worktree
+results remain the evidence. AGENTS.md was substantially shortened and CLAUDE.md aligned. Content
+approval, credential protection, identity separation and other-session work protection remain firm.
