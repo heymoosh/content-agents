@@ -77,3 +77,12 @@ test('research plan exposes hypotheses and the explicit review action; emitted b
   const result=new Function('plan','esc',renderers+';return renderVentureResearchPlan(plan,esc);')(plan,(s:unknown)=>String(s??''));
   assert.match(result,/Use this research plan/);
 });
+test('saving a working update keeps its editor and confirmation visible', () => {
+  const script=renderPage({repoRoot:'/fixture',isDevWorktree:true}).match(/<script>([\s\S]*?)<\/script>/)![1];
+  const start=script.indexOf('function renderWorkingContext(t){');
+  const code=script.slice(start,script.indexOf("document.addEventListener('input'",start));
+  const editor={open:true};
+  const elements:Record<string,unknown>={'#ventureWorkingEdit':editor,'#ventureNextExplanation':{},'#ventureRunStepBtn':{},'#ventureProgress':{set innerHTML(_v:string){editor.open=false;}}};
+  new Function('$',`const ventureWorkingDraft=()=>null,renderVentureProgress=()=>'',esc=String,ventureRunStepPending=false;${code};renderWorkingContext({nextAction:{label:'Next',runnable:true}});`)((key:string)=>elements[key]);
+  assert.equal(editor.open,true);
+});

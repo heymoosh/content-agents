@@ -4464,7 +4464,9 @@ function ventureWorkingDraft(){
 }
 function renderWorkingContext(t){
   const draft=ventureWorkingDraft();
+  const wasOpen=$('#ventureWorkingEdit')?.open;
   $('#ventureProgress').innerHTML=renderVentureProgress(t,esc);
+  if(wasOpen) $('#ventureWorkingEdit').open=true;
   if(draft){
     document.querySelectorAll('[data-working-field]').forEach(el=>{ if(typeof draft[el.dataset.workingField]==='string') el.value=draft[el.dataset.workingField]; });
     $('#ventureWorkingEdit').open=true;

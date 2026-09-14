@@ -8,9 +8,9 @@ export function ventureProgressHtml(t: VentureThread, esc: (s: unknown) => strin
   const quotes = t.messages.find(m=>m.kind==='quotes');
   const fallback = quotes?.kind === 'quotes' ? quotes.lines.filter(q=>['q-q1','q-q6'].includes(q.anchor)).map(q=>q.answer).join('\n\n') : '';
   const hasContext = !!c?.revision;
-  return '<section class="venture-progress"><h2>Where your venture stands</h2><p>Your business can already be underway even when its Venture workflow is new.</p>'
-    + (t.messages.some(m=>m.kind==='receipt')?'<p>Venture record saved. Your original context and activity remain available below and in History.</p>':'')
-    + (hasContext ? '<p class="vp-meta">Saved working update · '+esc(c.savedAt)+' · Reported context, not verified publication or performance.</p>' : '<p>Start from the context you already supplied. Add any developments since the interview below.</p>')
+  return '<section class="venture-progress"><h2>Where your venture stands</h2>'
+    + (t.messages.some(m=>m.kind==='receipt')?'<p>Interview saved. Your original context and activity remain in History and the details below.</p>':'')
+    + (hasContext ? '<p class="vp-meta">Saved working update · '+esc(c.savedAt?.slice(0,10))+' · Reported context, not verified publication or performance.</p>' : '<p>Start from the context you already supplied. Add any developments since the interview below.</p>')
     + '<div class="vp-grid">'+Object.entries(titles).filter(([key])=>key!=='constraints').map(([key,title])=>{
       const value=c?.[key as keyof typeof titles] || (key==='underway'?fallback:'');
       if(!value) return '';
