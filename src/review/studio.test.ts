@@ -170,6 +170,7 @@ test("Venture awaiting_user decisions and draft artifacts produce a needsYou row
     const withDraft = ventureNeedsYou();
     assert.equal(withDraft.length, 1);
     assert.equal(withDraft[0].room, "venture");
+    assert.equal(withDraft[0].venture, slug);
     assert.match(withDraft[0].text, /draft/i);
 
     writeFileSync(
@@ -214,6 +215,18 @@ test("a missing Venture root produces no row and does not throw", () => {
     process.env[VENTURE_ROOT_ENV] = join(root, "does-not-exist");
     assert.deepEqual(ventureNeedsYou(), []);
   });
+});
+
+test("Studio excludes hidden test ventures and links each pending real venture separately", () => {
+  const readers = {
+    listVentures: () => ['zz-test-phase4', 'e2e-intake', 'first-business', 'second-business'],
+    readDecisions: () => [],
+    readArtifacts: () => [{ editorial_status: 'draft' }],
+  } as unknown as NonNullable<Parameters<typeof ventureNeedsYou>[0]>;
+  const items = ventureNeedsYou(readers, false);
+  assert.deepEqual(items.map(item => item.venture), ['first-business', 'second-business']);
+  assert.ok(items.every(item => item.detail.includes(item.venture!)));
+  assert.equal(ventureNeedsYou(readers, true).length, 4);
 });
 
 test("every needsYou room from buildStudioHome is one renderStudio dispatches", async () => {

@@ -384,15 +384,24 @@ export async function handleFictionRoute({
       // words are never the AI register. A ?chapter= override is gone with the fallback rather
       // than gated: it had no caller, and any value it took could name a chapter she wrote.
       const n = beats?.chapter ?? null;
-      const chapter = n ? readFictionChapter(slug, n) : null;
+      let chapter = null;
+      let warning: string | null = null;
+      if (n) {
+        try { chapter = readFictionChapter(slug, n); }
+        catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT' && !(error instanceof Error && error.message === 'no such canon doc')) throw error;
+          warning = `Chapter ${n} is missing. Your saved direction is still here; review it before drafting again.`;
+        }
+      }
       json(res, 200, {
         ok: true,
         beats: beats?.beats ?? "",
         initialEngine: beats?.initialEngine ?? null,
         revisionHistory: beats?.revisionHistory ?? [],
         chapter,
-        continuity: n ? readContinuityReport(slug, n) : null,
-        comments: n ? listReviewCommentsSafe("fiction", fictionReviewSubject(slug, n)) : [],
+        warning,
+        continuity: chapter && n ? readContinuityReport(slug, n) : null,
+        comments: chapter && n ? listReviewCommentsSafe("fiction", fictionReviewSubject(slug, n)) : [],
       });
     } catch (e) {
       json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });

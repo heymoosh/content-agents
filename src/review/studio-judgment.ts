@@ -34,7 +34,15 @@ export function fictionNeedsYou(readers = fictionReaders): NeedsYouItem[] {
       // Only the Studio-owned scene is reviewable here. /story chapters retain their GitHub review flow.
       const beats = readers.readSceneBeats(s.slug);
       if (beats?.chapter) {
-        const chapter = readers.readFictionChapter(s.slug, beats.chapter);
+        let chapter;
+        try { chapter = readers.readFictionChapter(s.slug, beats.chapter); }
+        catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT' && !(error instanceof Error && error.message === 'no such canon doc')) throw error;
+          result.push({ room: 'fiction', label: 'Fiction', text: 'Saved scene direction has no draft to review.',
+            detail: `${s.title} · Chapter ${beats.chapter} is missing. Open your saved direction to continue.`,
+            action: 'Open direction', urgent: false, ...nav, page: 'write' });
+          continue;
+        }
         if (['drafting', 'draft', 'pending', 'review', 'needs-review'].includes(chapter.status)) result.push({ room: 'fiction', label: 'Fiction', text: 'A scene is ready for your review.', detail: `${s.title} · Chapter ${chapter.number}`, action: 'Review scene', urgent: false, ...nav, page: 'review' });
       }
     } catch { result.push(unavailable('fiction', `${s.title}: scene review state unavailable.`, { ...nav, page: 'review' })); }

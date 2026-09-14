@@ -505,14 +505,6 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .fu-origin .cap { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
   .fu-origin .cell { font-size:13px; line-height:1.5; color:#3a352c; }
   .fu-actions { margin-left:26px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  /* Outreach room subnav (Leads | Follow-ups): styled as the sheet's own tab strip, not a
-     floating pill hovering above the desk. Aligned to the sheet's own max-width/padding so it
-     reads as attached to the paper below it, rather than a separate piece of chrome. */
-  .subnav { display:flex; gap:22px; max-width:1040px; margin:26px auto 0; padding:0 56px; }
-  .subtab { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
-    letter-spacing:.06em; color:#a89a80; border:none; border-bottom:2px solid transparent;
-    background:none; border-radius:0; padding:0 0 8px; cursor:pointer; }
-  .subtab.on { font-weight:600; color:#3a2a12; border-bottom-color:#3a2a12; }
   .count { background:var(--accent); color:var(--paper); border-radius:20px; padding:2px 11px;
     font-size:13px; font-weight:600; }
   .grow { flex:1; }
@@ -1320,21 +1312,24 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomOutreach" hidden>
-    <div class="subnav">
+    <div class="sheet" style="padding-bottom:0">
+    <nav class="room-pages" aria-label="Outreach pages">
       <button class="subtab on" data-sub="leads">Leads</button>
       <button class="subtab" data-sub="followups">Follow-ups</button>
-    </div>
+    </nav>
     <div class="sheet" id="stripOutreach" hidden style="padding:24px 56px 10px"></div>
-    <div class="sheet" id="outreachPane">
+    <div id="outreachPane">
+      <div class="actions" style="margin-bottom:22px"><label class="engine-choice"><span>Find leads with</span><select class="engine-select" id="scoutEngine"><option value="codex">ChatGPT</option><option value="grok">Grok</option></select></label><button type="button" class="primary" id="scoutRunBtn">Find new leads</button><span class="src">Find podcasts, newsletters, and communities that might host you. Review the matches here.</span></div>
       <div id="outreachCaptureHandoff" hidden></div>
       <div id="outreachList"><div class="empty">Loading…</div></div>
-      <div class="sheet-foot" id="outreachFoot"><label class="engine-choice"><span>Scout with</span><select class="engine-select" id="scoutEngine"><option value="codex">ChatGPT</option><option value="grok">Grok</option></select></label></div>
+      <div class="sheet-foot" id="outreachFoot"></div>
     </div>
-    <div class="sheet" id="followupsPane" hidden>
+    <div id="followupsPane" hidden>
       <div class="sheet-head"><h2>Follow-ups</h2></div>
       <div class="sheet-sub">Everything you've sent, and what's next. The clock starts when you click Mark sent. Nothing here sends anything.</div>
       <div id="followupsNote"></div>
       <div id="followupsList" style="margin-top:14px"><div class="empty">Loading…</div></div>
+    </div>
     </div>
   </section>
 </main>
@@ -2097,8 +2092,11 @@ async function approveReviewSelection(){
 let currentTab = ${JSON.stringify(BOOT_ROOM)};
 const SHOW_TEST_VENTURES = ${JSON.stringify(Boolean(process.env.CONTENT_AGENTS_TEST_VENTURE_ROOT))};
 let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
-function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="venture" ? "Reread canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
+function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="venture" ? "Reread canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Refresh leads") : "Refresh"; }
 function setRoom(t){
+  if(!["studio","venture","content","outreach","fiction","charles","signals"].includes(t)) t="studio";
+  try { sessionStorage.setItem("studio.currentRoom", t); } catch(e) {}
+  if(currentTab!==t) window.scrollTo(0,0);
   currentTab = t;
   document.querySelectorAll(".room").forEach(b=>{
     const on = b.dataset.room===t;
@@ -2124,7 +2122,7 @@ function setRoom(t){
   if (t==="outreach"){ setOutreachSub(outreachSub); }
   if (t==="fiction"){ loadFiction(); }
   if (t==="charles"){ loadCharles(); }
-  if (t==="venture"){ loadVentureList(); }
+  if (t==="venture"){ return loadVentureList(); }
   renderCaptureHandoff();
 }
 document.querySelectorAll(".room").forEach(b=>b.addEventListener("click", ()=>setRoom(b.dataset.room)));
@@ -2137,6 +2135,7 @@ function setOutreachSub(s){
   if (s==="leads") loadOutreach(); else loadFollowups();
 }
 document.querySelectorAll(".subtab").forEach(b=>b.addEventListener("click", ()=>setOutreachSub(b.dataset.sub)));
+$("#scoutRunBtn").addEventListener("click", scoutRun);
 
 let lastRefreshedAt = null;
 function fmtHHMM(ms){ const d = new Date(ms); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
@@ -2151,7 +2150,7 @@ async function doRefresh(){
   try {
     if (currentTab === "content") { await loadContent(); await load(); await loadJobs(); }
     else if (currentTab === "signals") { await loadSignals(); await loadBrief(); await loadRaw(); }
-    else if (currentTab === "outreach") { if (outreachSub === "followups") await loadFollowups(); else await scoutRun(); }
+    else if (currentTab === "outreach") { if (outreachSub === "followups") await loadFollowups(); else await loadOutreach(); }
     else if (currentTab === "fiction") { await loadFiction(); }
     else if (currentTab === "charles") { await loadCharles(); }
     else if (currentTab === "venture") { await loadVenture(); }
@@ -2887,10 +2886,11 @@ async function outreachMsgRevise(b, engine){
   }
 }
 
-// "Scout new leads": the header button on this room's Leads pane. A real /scout run (minutes).
+// Explicit discovery action beside the engine selector. A real /scout run (minutes).
 async function scoutRun(){
   if(scoutInFlight) return;
   scoutInFlight = true;
+  $("#scoutRunBtn").disabled=true;
   const engine = $("#scoutEngine")?.value || "codex";
   const box = $("#outreachList");
   const banner = document.createElement("div");
@@ -2907,6 +2907,7 @@ async function scoutRun(){
     flash(e instanceof Error ? e.message : String(e));
   } finally {
     scoutInFlight = false;
+    $("#scoutRunBtn").disabled=false;
     await loadOutreach();
   }
 }
@@ -3081,7 +3082,10 @@ function readsFromCells(t, cuts){
 }
 // ── end of the treatment mirror ──
 
-const CW_STEPS = [["1","Pick a source"],["2","Review the treatment"],["3","Approve the drafts"],["4","Publish"]];
+const CW_STEPS = [["1","Input"],["2","Review the treatment"],["3","Approve the drafts"],["4","Publish"]];
+let contentInputText = "";
+try { contentInputText = sessionStorage.getItem("studio.contentInput") || ""; } catch(e) {}
+let contentInputSaving = false;
 const CW_TAGCLASS = { "SUBSTACK":"substack", "YOURS":"yours", "READ IN":"readin" };
 const CONTENT_CONFIG_OPTIONS = ${JSON.stringify(CONTENT_CONFIG_OPTIONS)};
 
@@ -3190,8 +3194,11 @@ function cwSourceMeta(s){
 }
 function cwStep1Html(){
   const sources = cwSources();
+  const input = '<div style="margin-top:22px"><label for="contentInput"><strong>What would you like to work on?</strong></label>'+
+    '<textarea id="contentInput" rows="5" style="display:block;width:100%;box-sizing:border-box;margin:12px 0" placeholder="Type an idea, paste your writing, or add a link.">'+esc(contentInputText)+'</textarea>'+
+    '<div class="actions"><button type="button" class="primary" data-content-input-save'+(contentInputSaving?' disabled':'')+'>'+(contentInputSaving?'Saving…':'Save input')+'</button><span class="src">Save it here, then choose Start on it to develop it with your advisor.</span></div></div>';
   if(!sources.length){
-    return '<div class="empty">Nothing on the desk yet. Start with an idea or source in Studio, then choose Content when it is ready for configuration.</div>';
+    return input;
   }
   const rows = sources.map(s=>{
     const tag = s.tag || "UNTAGGED";
@@ -3206,11 +3213,10 @@ function cwStep1Html(){
       '<span class="src" style="justify-self:end;white-space:nowrap">'+(on?"PICKED":"Make versions")+'</span>'+
       '</button>';
   }).join("");
-  return '<div style="margin-top:22px">'+
-    '<div class="fam-ask">WHAT YOU CAN MAKE VERSIONS OF</div>'+
-    '<div class="src" style="margin-top:6px;max-width:560px">Everything here has a source.md on disk. The tag says where it came from and the line under it says which fact the tag is standing on. Nothing leaves this room until you say yes to each draft.</div>'+
+  return input+'<div style="margin-top:30px">'+
+    '<div class="fam-ask">CONTINUE EXISTING WORK</div>'+
+    '<div class="src" style="margin-top:6px;max-width:560px">Writing brought in here or through Studio. Choose a piece to continue developing it or make platform versions.</div>'+
     '<div style="margin-top:16px">'+rows+'</div>'+
-    '<div class="src" style="margin-top:16px;max-width:520px">An essay from somewhere else comes in through Studio. Paste the link there and pick "Versions for Content".</div>'+
     '</div>';
 }
 // Shared expandable room queue — collapsed by default, showing a pending count in the summary.
@@ -3412,6 +3418,25 @@ async function cwSaveConfig(){
   finally{ cfg.saving = false; renderContentWizard(); }
 }
 // Delegated: the wizard is rebuilt wholesale on every render.
+$("#contentWizard").addEventListener("input", (e)=>{
+  if(e.target.id!=="contentInput") return;
+  contentInputText=e.target.value;
+  try { sessionStorage.setItem("studio.contentInput",contentInputText); } catch(e) {}
+});
+$("#contentWizard").addEventListener("click", async (e)=>{
+  if(!e.target.closest?.("[data-content-input-save]") || contentInputSaving) return;
+  const text=contentInputText.trim();
+  if(!text){ flash("Type an idea, writing, or a link first."); return; }
+  contentInputSaving=true; renderContentWizard();
+  try {
+    const r=await post("/api/captures",{room:"Content",text});
+    if(!r.ok) throw new Error(r.error||"Could not save this input.");
+    // Keep anything typed while the request was in flight.
+    if(contentInputText.trim()===text){ contentInputText=""; try { sessionStorage.removeItem("studio.contentInput"); } catch(e) {} }
+    await loadCaptures(); renderCaptureHandoff(); flash("Saved in Content. Choose Start on it when you are ready.");
+  } catch(e){ flash(e instanceof Error?e.message:String(e)); }
+  finally { contentInputSaving=false; renderContentWizard(); }
+});
 $("#contentWizard").addEventListener("click", (e)=>{
   const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-set-pane],[data-config-all],[data-config-none],[data-config-save],[data-dev-start],[data-dev-reply],[data-dev-accept],[data-dev-dismiss],[data-cut-save],[data-cut-comment],[data-open-config]") : null;
   if(!t) return;
@@ -5127,7 +5152,7 @@ function renderFiction(){
     '<div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap">'+
       '<span class="wb-label" style="margin:0">'+esc(series.title)+'</span>'+
       '<span style="font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:'+tone.fg+';background:'+tone.bg+';border:1px solid '+tone.bd+';border-radius:4px;padding:2px 7px">'+esc(word)+'</span>'+
-    '</div>';
+    '</div>'+(sc.warning||sc.error?'<div role="status" class="hint" style="margin:14px 0">'+esc(sc.warning||sc.error)+'</div>':'');
 
   const composer =
     '<div style="font:400 27px/1.35 Georgia,serif;margin:6px 0 18px;max-width:520px">What happens next?</div>'+
@@ -6381,8 +6406,8 @@ function renderStudio(){
   const items = [...captures, ...(STUDIO.needsYou||[])];
   const rows = items.map(n=>
     '<div class="ny-row'+(n.urgent?" urgent":"")+'"><span class="ny-room">'+esc(n.label)+'</span>'+
-    '<span class="ny-text">'+esc(n.text)+' <span class="ny-detail">'+esc(n.detail)+'</span></span>'+
-    '<button type="button" class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+(n.series?' data-series="'+esc(n.series)+'"':'')+(n.page?' data-page="'+esc(n.page)+'"':'')+(n.brand?' data-brand="'+esc(n.brand)+'"':'')+'>'+esc(n.action)+'</button></div>'
+    '<span class="ny-text"'+(n.captureId?' data-capture="'+esc(n.captureId)+'"':'')+'>'+esc(n.text)+' <span class="ny-detail">'+esc(n.detail)+'</span></span>'+
+    '<button type="button" class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+(n.series?' data-series="'+esc(n.series)+'"':'')+(n.venture?' data-venture="'+esc(n.venture)+'"':'')+(n.page?' data-page="'+esc(n.page)+'"':'')+(n.brand?' data-brand="'+esc(n.brand)+'"':'')+'>'+esc(n.action)+'</button></div>'
   ).join("");
   // Closing line uses the measured row count. The prototype's hardcoded "Four things" would lie
   // whenever the list is not exactly four.
@@ -6399,10 +6424,14 @@ function renderStudio(){
   renderTeamRail();
   document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
     const room = a.dataset.room;
-    if(room==="content"){ setRoom("content"); openReviewSheet(); }
+    if(room==="content"){
+      if(a.parentElement.querySelector("[data-capture]")){ CW.pane="wizard"; CW.step=1; CW.slug=null; setRoom("content"); }
+      else { setRoom("content"); openReviewSheet(); }
+    }
     else if(room==="outreach"){ if(a.dataset.dir) activeLeadDir=a.dataset.dir; setRoom("outreach"); setOutreachSub("leads"); }
     else if(room==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
     else if(room==="fiction"){ if(a.dataset.series) ficSeries=a.dataset.series; ficPage=a.dataset.page||"inbox"; setRoom("fiction"); }
+    else if(room==="venture"){ if(a.dataset.venture) ventureSlug=a.dataset.venture; VEN.pane="work"; renderVentureSheets(); setRoom("venture"); }
     else if(room==="signals"){ if(a.dataset.brand) $("#signalsBrand").value=a.dataset.brand; SIG.pane="reads"; renderSignalsSheets(); setRoom("signals"); }
     else setRoom(room);
   }));
@@ -6961,7 +6990,7 @@ let captureSubmitting = false;  // the two Studio handoffs share one guard, so E
 function captureHandoffSummary(capture){
   if(!capture || !String(capture.text || "").trim() || !String(capture.room || "").trim() || capture.promotion) return null;
   const room = String(capture.room);
-  return { room:room.toLowerCase(), label:room, text:"Capture waiting in "+room+".",
+  return { room:room.toLowerCase(), label:room, captureId:capture.id, text:"Capture waiting in "+room+".",
     detail:String(capture.text).trim().replace(/\\s+/g," ").slice(0,140), action:"Open" };
 }
 function setCaptureSubmitting(busy){
@@ -7300,7 +7329,9 @@ $("#publishedSheet").addEventListener("click", (e)=>{
   if(n===4) CW.pane="published"; else if(n===3) CW.pane="review"; else { CW.pane="wizard"; CW.step=n; if(n===2&&CW.slug&&CW.treatFor!==CW.slug) cwLoadTreatment(); }
   renderContentWizard();
 });
-setRoom(${JSON.stringify(BOOT_ROOM)});
+let restoredRoom = ${JSON.stringify(BOOT_ROOM)};
+try { restoredRoom = sessionStorage.getItem("studio.currentRoom") || restoredRoom; } catch(e) {}
+setRoom(restoredRoom);
 loadCaptures().then(renderCaptureHandoff);
 // The desk header's live date ("Thursday · Jul 17").
 {

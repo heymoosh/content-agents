@@ -22,6 +22,11 @@ test('Fiction real stores: pending ideas and owned scene, resolved state, corrup
     writeFileSync(chapter, '---\nstatus: locked\n---\nScene');
     writeFileSync(join(inbox, 'example', 'ideas.json'), '[]');
     assert.deepEqual(fictionNeedsYou(readers), []);
+    rmSync(chapter);
+    const missing = fictionNeedsYou(readers);
+    assert.equal(missing[0].page, 'write');
+    assert.equal(missing[0].action, 'Open direction');
+    assert.match(missing[0].detail, /Chapter 1 is missing/);
     writeFileSync(join(inbox, 'example', 'ideas.json'), 'broken');
     assert.match(fictionNeedsYou(readers)[0].detail, /inbox unavailable/);
     assert.equal(readSceneBeats('example', inbox, true), null);

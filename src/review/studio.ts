@@ -27,7 +27,8 @@ export interface NeedsYouItem {
   // navigation hint for the client: which room to open (and lead dir when applicable)
   dir?: string;
   series?: string;
-  page?: "inbox" | "review";
+  venture?: string;
+  page?: "inbox" | "review" | "write";
   brand?: import("../identity/brand.js").BrandId;
   urgent: boolean; // renders the amber accent (due today etc.)
 }
@@ -146,48 +147,53 @@ export function charlesNeedsYou(root?: string): NeedsYouItem[] {
  * Venture decisions awaiting a selection, and artifacts still in editorial draft.
  * Read-only: never writes a gate, checkpoint, or decision. Failure-tolerant per venture.
  */
-export function ventureNeedsYou(): NeedsYouItem[] {
+export function ventureNeedsYou(readers = { listVentures, readDecisions, readArtifacts }, showTests = Boolean(process.env.CONTENT_AGENTS_TEST_VENTURE_ROOT)): NeedsYouItem[] {
   try {
-    let decisions = 0;
-    let drafts = 0;
-    for (const slug of listVentures()) {
+    const items: NeedsYouItem[] = [];
+    for (const slug of readers.listVentures()) {
+      // Match the room picker: old test fixtures are not owner work.
+      if (!showTests && /^(?:e2e-|zz-test-)/.test(slug)) continue;
+      let decisions = 0;
+      let drafts = 0;
       try {
-        decisions += readDecisions(slug).filter((d) => d.status === "awaiting_user").length;
+        decisions = readers.readDecisions(slug).filter((d) => d.status === "awaiting_user").length;
       } catch {
         /* skip unreadable decisions for this slug */
       }
       try {
-        drafts += readArtifacts(slug).filter((a) => a.editorial_status === "draft").length;
+        drafts = readers.readArtifacts(slug).filter((a) => a.editorial_status === "draft").length;
       } catch {
         /* skip unreadable artifacts for this slug */
       }
-    }
-    if (!decisions && !drafts) return [];
+      if (!decisions && !drafts) continue;
 
-    let text: string;
-    let detail: string;
-    if (decisions && drafts) {
-      text = "Venture work is waiting on your decision.";
-      detail = `${decisions} decision${decisions === 1 ? "" : "s"} · ${drafts} draft${drafts === 1 ? "" : "s"}.`;
-    } else if (decisions) {
-      text = decisions === 1
-        ? "A Venture decision is waiting on your pick."
-        : `${decisions} Venture decisions are waiting on your pick.`;
-      detail = "Awaiting your selection.";
-    } else {
-      text = drafts === 1
-        ? "A Venture draft is waiting on your yes."
-        : `${drafts} Venture drafts are waiting on your yes.`;
-      detail = "Editorial approval still open.";
+      let text: string;
+      let detail: string;
+      if (decisions && drafts) {
+        text = "Venture work is waiting on your decision.";
+        detail = `${decisions} decision${decisions === 1 ? "" : "s"} · ${drafts} draft${drafts === 1 ? "" : "s"}.`;
+      } else if (decisions) {
+        text = decisions === 1
+          ? "A Venture decision is waiting on your pick."
+          : `${decisions} Venture decisions are waiting on your pick.`;
+        detail = "Awaiting your selection.";
+      } else {
+        text = drafts === 1
+          ? "A Venture draft is waiting on your yes."
+          : `${drafts} Venture drafts are waiting on your yes.`;
+        detail = "Editorial approval still open.";
+      }
+      items.push({
+        room: "venture",
+        label: "Venture",
+        urgent: false,
+        text,
+        detail: `${slug} · ${detail}`,
+        venture: slug,
+        action: "Open",
+      });
     }
-    return [{
-      room: "venture",
-      label: "Venture",
-      urgent: false,
-      text,
-      detail,
-      action: "Open",
-    }];
+    return items;
   } catch {
     return [];
   }

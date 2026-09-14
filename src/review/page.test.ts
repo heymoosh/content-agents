@@ -2840,7 +2840,7 @@ test("Venture run-step control: queues one selected-engine draft step at the cur
 // The desk boots into Studio (Muxin, 2026-08-23), because the capture box is there now and booting
 // into Content would open on a screen with no way to capture a thought. Three places have to agree,
 // and the first paint has to actually fetch what that room shows.
-test("boot room: Studio, with the nav highlight, currentTab and the first fetch all agreeing", () => {
+test("boot room: Studio by default, restored room after refresh", () => {
   assert.equal(BOOT_ROOM, "studio");
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const onButtons = [...html.matchAll(/<button class="room on" data-room="([a-z]+)"/g)].map((m) => m[1]);
@@ -2850,9 +2850,18 @@ test("boot room: Studio, with the nav highlight, currentTab and the first fetch 
   // Anchored at the boot call site itself: `setRoom("content")` is still legitimate elsewhere, as
   // the Studio needs-you rows' click-through into the Content room.
   assert.ok(
-    script.includes('setRoom("' + BOOT_ROOM + '");\nloadCaptures().then(renderCaptureHandoff);\n// The desk header'),
-    "the boot setRoom must name the boot room",
+    script.includes('setRoom(restoredRoom);\nloadCaptures().then(renderCaptureHandoff);\n// The desk header'),
+    "the boot call must use the restored room",
   );
+  const start = script.indexOf('let restoredRoom =');
+  const restore = new Function('sessionStorage', 'setRoom', script.slice(start, script.indexOf('loadCaptures().then(renderCaptureHandoff);', start)));
+  let selected = '';
+  restore({ getItem: () => 'signals' }, (room: string) => { selected = room; });
+  assert.equal(selected, 'signals');
+  restore({ getItem: () => null }, (room: string) => { selected = room; });
+  assert.equal(selected, 'studio');
+  restore({ getItem: () => { throw new Error('storage unavailable'); } }, (room: string) => { selected = room; });
+  assert.equal(selected, 'studio');
   // setRoom(boot) fires the room's own reads, but "last refreshed" is stamped off this list, and an
   // unfetched Studio first-paints as "Loading…". Both Studio reads have to be in it.
   const boot = script.slice(script.indexOf("Promise.all(["), script.indexOf("finally(markRefreshed)"));
