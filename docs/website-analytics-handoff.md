@@ -25,17 +25,21 @@ match to learn from historical content, or confuse historical engagement with pr
   It does not yet have website visits, attributable conversions, or the import/new-signup split.
 - Historical website traffic cannot be reconstructed unless an existing analytics source captured
   it. Inspect what is already installed before adding anything. Missing data stays unknown, not zero.
+- The landing-page implementation now has a first-party collector for page views, 30-minute
+  browser sessions, referrer host, and UTM/source-post attribution. It also records server-backed
+  new-signup and first-survey outcomes with idempotent event IDs. This is implemented locally but
+  has not been deployed or connected to Studio by this session.
 
 ## Running list
 
 | Priority | Question / measure | Definition and useful breakdown | Status / next step |
 |---|---|---|---|
-| First | Where do readers arrive? | Sessions and essay/landing-page views by date, page, referrer and tagged source/platform. Sessions are not unique people. | Not connected to Studio. Inspect existing instrumentation; add one free collector if absent. |
-| First | Which posts bring readers? | Campaign + stable source-post and variant IDs on incoming links; connect each variant to its source, platform and optional hypothesis. | Add consistent link tags and preserve attribution through signup/survey. Untagged or historical traffic remains unattributed unless evidence exists. |
-| First | Which visits lead to new signups? | Successful new website subscriptions, excluding imports, duplicates, existing subscribers and reactivations. Group by acquisition source, landing page and campaign/variant where known. | Database has total records, not a reliable acquisition funnel. Separate origin (`import`/`website`/`unknown`) from referrer; preserve import provenance. |
-| First | What is the signup conversion rate? | Sessions with a successful new signup / measured eligible sessions, using the same time range and attribution scope. Show numerator and denominator. | Requires session-to-success linkage. Do not divide all DB subscribers by browser sessions or silently mix tracked and untracked populations. |
-| First | Do people complete the survey? | First successful completion / eligible new-signup cohort, with a stated follow-up window. Separately report imported subscribers who later answer. | Saved completions exist; cohort attribution and first-completion tracking needed. Imported subscribers who never saw the survey are not funnel drop-offs. |
-| First | What do readers want? | Counts and shares of each saved survey choice, segmented by acquisition cohort/source where useful; show response count and unanswered fields. | Existing answer columns are available, currently empty. Keep personal records private; Studio receives aggregate categories, not emails or raw answers. |
+| First | Where do readers arrive? | Sessions and essay/landing-page views by date, page, referrer and tagged source/platform. Sessions are not unique people. | Implemented locally in `landing-page`: first-party `page_view` events retain a 30-minute session, landing path, referrer host and UTM fields. Deployment and Studio connection remain. |
+| First | Which posts bring readers? | Campaign + stable source-post and variant IDs on incoming links; connect each variant to its source, platform and optional hypothesis. | `utm_content` is the stable variant ID and `hi_source_post` is the stable source-post ID. Tag contract is documented in `landing-page/docs/website-analytics.md`; Studio mapping and future tagged-link rollout remain. |
+| First | Which visits lead to new signups? | Successful new website subscriptions, excluding imports, duplicates, existing subscribers and reactivations. Group by acquisition source, landing page and campaign/variant where known. | Implemented locally: the server writes one deterministic `signup_success` event only for a new website row. `subscriber_origin` defaults to `unknown`; existing import rows need verified owner classification. |
+| First | What is the signup conversion rate? | Sessions with a successful new signup / measured eligible sessions, using the same time range and attribution scope. Show numerator and denominator. | The private report now returns measured sessions, new-signup sessions, numerator/denominator-based rate, and session coverage gaps. It is not deployed or connected to Studio. |
+| First | Do people complete the survey? | First successful completion / eligible new-signup cohort, with a stated follow-up window. Separately report imported subscribers who later answer. | Implemented locally with `survey_first_completed_at`, one idempotent first-completion event, a 14-day website cohort, and separate imported/unknown counts. Legacy first-completion history is not invented. |
+| First | What do readers want? | Counts and shares of each saved survey choice, segmented by acquisition cohort/source where useful; show response count and unanswered fields. | The private report returns aggregate categories, response/unanswered counts and shares; free-text Other values are bucketed. It is not connected to Studio. |
 | Next | Where is the flow failing? | Signup attempts versus successful saves; survey starts versus completions; aggregate validation/server errors. | Add minimal events only if needed to diagnose loss. A button click is not a saved subscription. Never log form bodies or identifiers. |
 | Next | Does interest persist? | New subscribers, reactivations and unsubscribes per period; net audience change shown separately from imports. | Current active count exists; historical changes need dated events, not guesses from today's snapshot. |
 | Later | Which content sends people toward tools/products? | Explicit CTA clicks to existing destinations. Later add verified activation, qualified requests and purchases only when those flows exist. | Not a prerequisite for this test. No offer means sales conversion is not applicable, not a failed funnel. |
@@ -47,9 +51,11 @@ platform, time slot or hypothesis a winner from a few conversions or unequal exp
 
 ## Free tool approach
 
-**Suggested default: GA4 Standard for traffic/session reports, existing website Postgres for
-authoritative saved subscriptions and survey completions.** This is a proposal, not an installed
-integration. GA4 Standard is the free version; its Data API supports programmatic reports.
+**Original suggested default: GA4 Standard for traffic/session reports, existing website Postgres
+for authoritative saved subscriptions and survey completions.** This session chose a small
+first-party Postgres collector instead, so attribution and authoritative saved outcomes share one
+server-side event contract without adding a third-party tracker. GA4 is not installed; it remains
+an optional owner decision.
 Avoid Analytics 360, paid connectors, BigQuery billing and extra services for this first build.
 Sources: [Google's free Standard property guidance](https://support.google.com/analytics/answer/11828307),
 [Data API reports](https://developers.google.com/analytics/devguides/reporting/data/v1/basics).
@@ -89,6 +95,31 @@ One table: **source/platform → landing content → measured sessions → new s
 signup rate → survey completions**. Add a separate panel for audience needs and a coverage note.
 Show total existing audience separately. Offer requests, sales and revenue can wait until an offer exists.
 
-Next action in the landing-page session: inspect current tracking, implement the First rows as one
-small funnel, then connect its aggregate report to Content Studio. This document does not activate
-an automatic work queue or authorize changes to the website today.
+Next action in the landing-page session: deploy after the owner reviews the measurement wording and
+sets `WEBSITE_ANALYTICS_REPORT_TOKEN`, verify imported subscriber provenance, and connect the
+protected `/api/website-analytics` aggregate report to Content Studio server-side. No deployment,
+account setup, import classification, or Studio connection was performed by this session.
+
+## Landing-page implementation status — 2026-09-14
+
+Implemented in `/Users/Muxin/Documents/GitHub/landing-page`:
+
+- `site/src/scripts/lead-events.js` and `site/src/scripts/analytics-context.js` collect privacy-minimal page/session/referrer/UTM context. Query strings are stripped from stored paths and only the referrer hostname is retained.
+- `site/api/_analytics.ts` and `site/api/lead-events.ts` add bounded fields, stable event IDs, a unique event index, and client-event allowlisting.
+- `site/api/essays-subscribe.ts` records new website signups and first survey completions transactionally. Duplicate submissions, existing subscribers, reactivations and imports do not create new signup events.
+- `site/api/website-analytics.ts` exposes the token-protected aggregate report with date/timezone filters, page-view breakdowns, conversion rows, needs categories, audience origin totals and coverage gaps. It does not expose email addresses or raw survey answers.
+- `site/src/pages/terms-privacy.astro` discloses the first-party website measurement.
+- `docs/website-analytics.md` documents the URL-tagging contract and owner setup.
+
+Validation completed: focused analytics tests passed; the full site suite passed 15 tests; TypeScript
+passed; Astro build passed; `git diff --check` passed. No production database, deployment, real
+email send, or Content Studio connection was exercised. The owner still needs to review consent/
+privacy behavior, configure the report token, deploy, classify verified imports, and connect Studio.
+
+The landing-page implementation is now committed locally in commit `b16618b`
+(`feat: add first-party website analytics funnel`). The next verification pass is still owner-gated:
+review the measurement wording and consent requirement, set `WEBSITE_ANALYTICS_REPORT_TOKEN` in the
+deployment, run isolated new/duplicate/import/reactivation and first/repeat-survey checks against a
+disposable or approved database, then connect Content Studio's server-side reader to the protected
+report. Until that happens, the implementation is complete in source control but collection and
+historical import classification remain unverified.
