@@ -1596,8 +1596,6 @@ function rowEl(piece, row){
     .filter((p) => p !== row.platform)
     .map((p) => '<option value="'+esc(p)+'">'+esc(p)+'</option>')
     .join("");
-  const schedulable = ["x","linkedin","bluesky"].includes(row.platform);
-  const approveLabel = schedulable ? "Approve → schedule" : "Approve";
   // Keep warning + disabled state even once status is "approve" — that's the phantom-approval
   // case (hand-edited row, or the asset removed after a valid approval) this guard exists to catch.
   const approveDisabled = !!row.approveBlocked;
@@ -1612,7 +1610,7 @@ function rowEl(piece, row){
     replyContext + preview + notes + sched + reconHtml + cancelErr + manual + blockedNote +
     '<div class="actions">'+
       '<button class="approve'+(row.status==="approve"?" on":"")+'" data-act="approve"'+
-        (approveDisabled ? ' disabled title="'+esc(row.approveBlocked)+'"' : "")+'>'+approveLabel+'</button>'+
+        (approveDisabled ? ' disabled title="'+esc(row.approveBlocked)+'"' : "")+'>Approve</button>'+
       '<button class="revise'+(row.status==="revise"?" on":"")+'" data-act="revise">Revise</button>'+
       '<button class="discard'+(row.status==="discard"?" on":"")+'" data-act="discard">Discard</button>'+
       '<span class="spacer"></span>'+ storyboardBtn + mediaPlanBtns + editBtn + aiBtn + dupBtn + cancelBtn +
