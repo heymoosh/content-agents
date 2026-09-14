@@ -1,4 +1,4 @@
-import { lstat, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { buildContentRequest, mergeContentConfiguration, rebuildStoredContentRequest, type ContentRequest, type ContentRequestInput, type RecommendationEvidence } from "./content-request.js";
@@ -46,6 +46,7 @@ function inputFromStored(request: ContentRequest): ContentRequestInput {
     recommendationEvidence: evidence,
     includeUntreatedControl: request.control.enabled,
     ventureId: request.ventureId,
+    readerAction: request.readerAction,
     ventureSource: request.ventureSource,
     sourceProvenance: request.sourceProvenance,
     sourceContext: request.sourceContext,
@@ -139,12 +140,14 @@ export async function authorizeGuiContentRequest(contentRoot: string, input: Con
   if (!requested) throw new Error("an approved advisor cut is required before Content configuration");
   const lens = requested.lens?.trim() ?? "";
   const cut = await readAuthoritativeApprovedCut(root, lens);
-  if (candidate.originalInput.trim() !== cut.body) throw new Error("content request body does not match the approved cut");
+  const changedLens = existing && existing.sourceProvenance?.lens !== lens;
+  if (changedLens && existsSync(join(root,'derivatives')) && (await readdir(join(root,'derivatives'))).length) throw new Error('This piece already has drafts. Keep its source or create a new piece for another angle.');
+  if (!changedLens && candidate.originalInput.trim() !== cut.body) throw new Error("content request body does not match the approved cut");
   return withServerMechanismEvidence({
     ...candidate,
     origin: "human-inference",
     originalInput: cut.body,
-    ventureId: null,
+    ventureId: existing?.ventureId ?? null,
     ventureSource: null,
     sourceProvenance: { kind: "approved-cut", lens, sourceLines: cut.sourceLines, ...(cut.canonicalUrl ? { canonicalUrl: cut.canonicalUrl } : {}) },
     sourceContext: null,

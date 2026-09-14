@@ -58,6 +58,7 @@ export const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
 type Kind = "text" | "image" | "video" | "storyboard" | "outreach-message" | "unknown";
 
 interface EnrichedRow extends QueueRow {
+  readerAction?: { url: string; label: string; reason: string; ventureId: string };
   kind: Kind;
   body?: string; // derivative text / storyboard text (what a human reads)
   spin?: boolean;
@@ -338,6 +339,11 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     if (!existsSync(p)) return false;
     const { body, fm } = splitFrontmatter(readFileSync(p, "utf8"));
     out.body = body;
+    if (typeof fm.cta_id === 'string' || fm.cta === 'none') out.readerAction = {
+      url: typeof fm.cta === 'string' && /^https:\/\//.test(fm.cta) ? fm.cta : '',
+      label: fm.cta === 'none' ? 'No CTA for this piece' : String(fm.cta_label || ''),
+      reason: String(fm.cta_reason || ''), ventureId: String(fm.cta_venture_id || ''),
+    };
     out.spin = fm.spin === true;
     out.angle = typeof fm.angle === "string" ? fm.angle : undefined;
     out.media = typeof fm.media === "string" ? fm.media : undefined;

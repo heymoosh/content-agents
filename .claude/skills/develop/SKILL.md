@@ -47,10 +47,16 @@ platforms" runs the normal `/atomize --continue` pipeline afterward.
      and propose a lens slug matching `^[a-z][a-z0-9-]*$` (never `extract` — that's the default
      top-level cut). If the source can't honestly support more than one angle, produce fewer, or
      a `note` card saying so.
-   - **CTA sense-check** (kind `cta`, one card): judge the `content_type` classification per
-     `config/content-types.yaml` and `/atomize` step 4.5's rules; flag when a `project_url`
-     question should be put to Muxin (never guess or invent a project link) and when a literal
-     `cta` override (e.g. civic-tech's voting tool) likely applies.
+   - **Reader's next step** (kind `cta`, one card): use the server-supplied Venture conversion
+     context. Check an intended CTA first; do not replace it just to produce a new idea. Explain
+     the audience need, benefit, fit with this piece and conversion action. If none was supplied
+     or it does not fit, compare ready destinations in the same Venture and recommend the best
+     relevant one by `destinationId`. Never assume one is best just because it exists. Proposed,
+     building or retired assets are not usable CTAs. With no suitable ready destination, say
+     "No CTA for this piece" and flag any missing asset for Venture to consider. Do not invent
+     an offer, link, consulting service or availability close. A canonical long-form source
+     remains the default unless Muxin explicitly selects a different destination or no CTA.
+     Cards are recommendations only; the GUI requires her fit/value review before drafting.
    - **Platform spin fit** (kind `spin`, one card): for each platform with a
      `config/platforms.yaml` `spin_angles` entry, one line on how this piece does or doesn't fit
      that channel's approved angle.
@@ -80,6 +86,7 @@ platforms" runs the normal `/atomize --continue` pipeline afterward.
              "title": "Belief under audit: ...",
              "summary": "Reader + payoff, altitude -> platform, the observable. Your rationale prose; it never enters content.",
              "lens": "belief-audit",     // angle only
+             "destinationId": "existing-resource-id", // cta only, from supplied ready destinations; omit if none
              "sourceLines": [12, "31-33"],  // angle only: verbatim source.md lines that carry it
              "status": "open",           // always "open" when you write it
              "acceptedLens": null,

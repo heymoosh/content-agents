@@ -233,7 +233,7 @@ spin_angles:
   linkedin:
     audience: business/career
     angle: |-
-      Case-first beat template. Five beats, in this order, each with a pass/fail test. Beat 2 is
+      Case-first beat template. Four beats, in this order, each with a pass/fail test. Beat 2 is
       the load-bearing one: if the source material can't produce a literal quoted belief statement,
       this piece does NOT fit the case skeleton — fall back to normal (non-case) extraction/spin.
       Never fabricate a quote or a scene to force the fit.
@@ -247,8 +247,8 @@ spin_angles:
       lost opportunity, a stalled metric, something concrete, never a vague "it didn't work."
       Beat 4 — Zoom-out: a one-line zoom-out to the broader pattern. Placed LAST — the closing line
       is the zoom-out, the final one or two sentences only. Never the opener.
-      Beat 5 — Close: a soft availability signal, what Muxin would look for in scoping this kind of
-      engagement. Explicitly NOT a hard sales ask — no "book a call," no "DM me."
+      No consulting or availability close. The Content plan supplies any separately reviewed
+      reader action from an existing Venture destination. If none fits, finish on the point.
   mastodon:
     audience: decentralized-tech
     angle: >-

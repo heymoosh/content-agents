@@ -1,3 +1,6 @@
+import { contentConversionContext, authorizeReaderAction, protectDraftReaderAction } from './content-conversions.js';
+import { readConversionPlan, saveConversionPlan, conversionDestinations } from '../venture/conversions.js';
+import { useOriginalSource } from './develop.js';
 // Unified review + approval GUI.
 //
 // One local page that aggregates every content/<slug>/review-queue.md, previews the actual
@@ -1118,6 +1121,12 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
       json(res, 403, { ok: false, error: FIXTURE_WRITE_REFUSAL });
       return;
     }
+    if (req.method === 'POST' && (url.pathname.endsWith('/conversions') || url.pathname === '/api/develop/use-original' || url.pathname === '/api/content/request')) {
+      const origin=req.headers.origin;
+      if ((origin && origin !== `http://${req.headers.host}`) || req.headers['sec-fetch-site'] === 'cross-site') {
+        json(res,403,{ok:false,error:'Use the local dashboard to save this plan.'});return;
+      }
+    }
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(renderReviewPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE, fixtures: FIXTURES_ON }));
@@ -1640,6 +1649,11 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     }
     // The Content room's workbench aggregate: per active piece — Muxin's source verbatim, the
     // advisor rounds, each cut as a readable message with provenance, pending review count.
+    if (req.method === 'POST' && url.pathname === '/api/develop/use-original') {
+      const b = await readBody(req);
+      json(res, 200, { ok: true, lens: useOriginalSource(safeFolder(String(b.slug ?? ''))) });
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/api/content") {
       json(res, 200, { sessions: listContentSessions() });
       return;
@@ -1678,7 +1692,9 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     if (req.method === "GET" && url.pathname === "/api/content/request") {
       const slug = (url.searchParams.get("slug") ?? "").trim();
       try {
-        json(res, 200, { ok: true, request: await readContentRequest(safeFolder(slug)) });
+        const folder = safeFolder(slug);
+        const request = await readContentRequest(folder);
+        json(res, 200, { ok: true, request, conversion: contentConversionContext(folder, request) });
       } catch (e) {
         const error = e instanceof Error ? e.message : String(e);
         if (/ENOENT|no such file/i.test(error)) json(res, 200, { ok: true, request: null });
@@ -1696,7 +1712,10 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
         const folder = safeFolder(slug);
         const storedPath = join(folder, "content-request.json");
         const existing = existsSync(storedPath) ? await readContentRequest(folder) : undefined;
-        const safeInput = await authorizeGuiContentRequest(folder, input, existing);
+        let safeInput = await authorizeGuiContentRequest(folder, input, existing);
+        const readerAction = authorizeReaderAction(folder, input.readerAction === undefined ? existing?.readerAction : input.readerAction, safeInput);
+        protectDraftReaderAction(folder, existing, readerAction);
+        safeInput = { ...safeInput, readerAction, ventureId: contentConversionContext(folder).ventureId ?? safeInput.ventureId };
         const request = await writeContentRequest(folder, safeInput);
         json(res, 200, { ok: true, request });
       } catch (e) {
@@ -2544,6 +2563,14 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     // owns the rule -- see src/review/venture-writes.ts. Placed before the read dispatcher below
     // (they cannot collide: one is POST-only, the other GET-only) and after the intake-draft
     // routes above, so POST :slug/intake/<n>/draft still reaches its own handler.
+    const conversionRoute = /^\/api\/venture\/([a-z0-9-]+)\/conversions$/.exec(url.pathname);
+    if (conversionRoute && (req.method === 'GET' || req.method === 'POST')) {
+      const slug = conversionRoute[1]!;
+      const pieces = listContentSessions().filter(s => contentConversionContext(safeFolder(s.slug)).ventureId === slug).map(s=>({id:s.slug,title:s.title}));
+      const plan = req.method === 'POST' ? await saveConversionPlan(slug, await readBody(req)) : readConversionPlan(slug);
+      json(res, 200, { ok: true, plan, destinations: conversionDestinations(slug, plan), pieces });
+      return;
+    }
     if (req.method === "POST" && url.pathname.startsWith("/api/venture/")) {
       const ventureWrite = handleVentureWrite(req.method, url.pathname, await readBody(req));
       if (ventureWrite) {

@@ -30,6 +30,7 @@ export interface AdviceCard {
   title: string;
   summary: string; // advisor rationale — NEVER enters content
   lens?: string; // angle only: proposed cut lens slug
+  destinationId?: string; // CTA: an existing Venture destination, not a model-invented URL
   sourceLines?: (number | string)[]; // angle only: Muxin's verbatim source.md lines (e.g. [12, "31-33"])
   status: AdviceCardStatus;
   acceptedLens?: string | null;
@@ -93,6 +94,7 @@ export function readAdvice(folder: string): Advice | null {
         title: typeof c.title === "string" ? c.title : "",
         summary: typeof c.summary === "string" ? c.summary : "",
         lens: typeof c.lens === "string" ? c.lens : undefined,
+        destinationId: typeof c.destinationId === 'string' ? c.destinationId : undefined,
         sourceLines: Array.isArray(c.sourceLines) ? c.sourceLines : undefined,
         status: CARD_STATUSES.has(String(c.status)) ? (c.status as AdviceCardStatus) : "open",
         acceptedLens: typeof c.acceptedLens === "string" ? c.acceptedLens : null,
@@ -212,6 +214,25 @@ export function dismissCard(folder: string, cardId: string): void {
   card.status = "dismissed";
   card.decidedAt = new Date().toISOString();
   writeAdvice(folder, advice);
+}
+
+/** Owner's explicit choice of the whole source, without an unnecessary model round. */
+export function useOriginalSource(folder: string): string {
+  const raw = readFileSync(join(folder, 'source.md'), 'utf8');
+  const { fm, body, header } = splitFrontmatter(raw);
+  if (/^(fiction|charles|venture):/.test(String(fm.origin || '')) || ['fiction-promotion','charles','venture'].includes(String(fm.source_kind || ''))) throw new Error('Use the approved source from its owning room');
+  if (!body.trim()) throw new Error('The source is empty');
+  const bodyLines = body.split('\n');
+  const first = raw.slice(0, raw.indexOf(body, header.length)).split('\n').length;
+  const refs = [`${first}-${first + bodyLines.length - 1}`];
+  const lens = 'original-post';
+  const existing = join(folder, 'cuts', lens, 'cut.md');
+  if (existsSync(existing)) {
+    if (splitFrontmatter(readFileSync(existing,'utf8')).body.trim() !== body.trim()) throw new Error('Original source changed; review a new source version instead of overwriting the saved one');
+    return lens;
+  }
+  addCut(folder,{lens,title:'Original post',text:extractSourceLines(folder,refs),sourceLines:refs});
+  return lens;
 }
 
 // Persist Muxin's reply into log.md BEFORE the reply job is enqueued (serve.ts does the ordering):

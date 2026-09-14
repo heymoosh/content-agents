@@ -1,3 +1,4 @@
+import { readerActionSchema, type ReaderAction } from './reader-action.js';
 /** Pure domain objects for configuring one piece of content. No persistence or generation. */
 export const CONTENT_REQUEST_VERSION = "content-request-v1" as const;
 
@@ -98,6 +99,7 @@ export interface CharlesSourceContext {
 export type ContentSourceContext = FictionSourceContext | CharlesSourceContext;
 
 export interface ContentRequestInput {
+  readonly readerAction?: ReaderAction | null;
   readonly id: string;
   readonly origin: ContentOrigin;
   readonly descriptor: string;
@@ -164,6 +166,7 @@ export interface ContentVariant {
 }
 
 export interface ContentRequest {
+  readonly readerAction?: ReaderAction | null;
   readonly kind: "content_request";
   readonly version: typeof CONTENT_REQUEST_VERSION;
   readonly id: string;
@@ -364,6 +367,7 @@ function assembleContentRequest(input: ContentRequestInput, selectionSets: Conte
   }
   return {
     kind: "content_request", version: CONTENT_REQUEST_VERSION, id, origin: input.origin, descriptor, originalInput: input.originalInput,
+    ...(input.readerAction != null ? { readerAction: readerActionSchema.parse(input.readerAction) } : {}),
     ventureId: input.ventureId ?? null, ventureSource: ventureSource(input.ventureSource), sourceProvenance: sourceProvenance(input.sourceProvenance), sourceContext: sourceContext(input.sourceContext, input.origin), experiment: experimentContext(input.experiment, variants), selections: selected, recommendations: recs,
     control: { enabled: controlEnabled }, variants,
   };
@@ -396,6 +400,7 @@ export function mergeContentConfiguration(existing: ContentRequest, incoming: Co
     platforms: incoming.platforms,
     recommendationEvidence: incoming.recommendationEvidence,
     includeUntreatedControl: incoming.includeUntreatedControl,
+    readerAction: incoming.readerAction === undefined ? existing.readerAction : incoming.readerAction,
   };
 }
 

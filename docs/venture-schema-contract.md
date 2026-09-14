@@ -1,5 +1,31 @@
 # Venture Build — the data contract to design against
 
+## Reader destinations and Content CTA handoff (implemented 2026-09-14)
+
+`venture/<slug>/conversions.json` is the Venture-owned destination registry: `version: 1`,
+`revision`, `goal`, `destinations[]`, and `assignments[]`. Owner saves compare the revision under
+a file lock and atomically replace the document. They never change phase or editorial gates.
+Each destination has a stable `id`, `name`, `audience`, `benefit`, `action` (CTA label),
+`measurement` (including “Not connected yet”), `status` (`proposed`, `building`, `ready`,
+`retired`), and `url`. Ready custom destinations require an owner-supplied existing HTTPS URL.
+Lead-magnet and landing-page artifacts are also discovered from `artifacts.jsonl`; their IDs
+stay stable, and their readiness requires editorial approval, live confirmation and URL evidence.
+Registry metadata cannot promote an unfinished artifact. Assignments contain `contentId`,
+`destinationId`, and a per-piece `reason`; an artifact's existing `cta_id` is a fallback intention.
+
+Content resolves Venture identity from its stored request or the existing-series handoff, not
+browser assertions. Fiction/Charles cannot borrow these Human Inference destinations. The advisor
+receives the goal, series questions, intended CTA and destination list, not private interview or
+survey contents. Its optional `cta` card `destinationId` is a recommendation, never approval.
+
+`content-request.json` optionally stores `readerAction`: `mode: none`, `mode: source`, or a
+reviewed `mode: destination` snapshot with `destinationId`, `ventureId`, `url`, `label`, `reason`,
+`measurement`, `from` (`venture`, `advisor`, `owner`) and `reviewed: true`. The server resolves IDs
+to URLs; the owner explicitly reviews fit and reader value. No selection keeps the source-link
+default. Generation checks readiness again, preserves the choice in derivative CTA frontmatter,
+and leaves drafts pending. Existing drafts are never silently rewritten when a selection changes.
+The registry records what to measure; it does not install analytics or fabricate measurement data.
+
 ## Post-intake working context (implemented 2026-09-14)
 
 `venture/<slug>/working-context.jsonl` keeps append-only revisions of owner-reported operating

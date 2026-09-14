@@ -192,9 +192,8 @@ produces exactly the drift PR #185 hit (see counter-example below).
   — concrete numbers and a named outcome, not "it got better."
 - **Beat 4 (zoom-out, last):** "That's usually a sign the team is optimizing a variable that was
   never the real constraint" — one line, the close of the piece, not the opener.
-- **Beat 5 (soft availability close):** the final paragraph — what Muxin looks for when pulled into
-  something like this ("we've already tried a few things and the number hasn't moved") — a
-  diagnostic signal, not "book a call" or "DM me."
+- **Current close:** end on the source-supported point. The historical fifth, availability
+  beat is retired. Any CTA comes from the separately reviewed Content/Venture destination.
 
 **Counter-example — labeled "wrong: thesis-first, subject is me."** This is PR #185's own hand-
 drafted "NEW" sample, and PR #185's own PR body already admitted it drifted thesis-first despite
@@ -245,9 +244,8 @@ whose source wasn't triaged `--case found` is a hard violation, not just a promp
 config entries — never merged. Voice (`config/voice.yaml`, Muxin's cadence) is constant across both;
 what differs is compression and register only. X compresses the same underlying beats into 2-3
 visible beats (situation + assumption folded together, cost, zoom-out folded into the closing
-line), keeps its own non-engineer-outsider register with real named tools/mechanisms, and drops
-beat 5 (the soft-availability close) entirely — that beat is LinkedIn-only, X has no engagement-
-scoping subtext.
+line), and keeps its own non-engineer-outsider register with real named tools/mechanisms.
+Neither platform adds consulting or availability subtext.
 
 **Follow-up not done here:** X's beat count/shape is provisional until real technical-mechanism
 source material (a genuine tool/mechanism failure case, not an essay excerpt) exists to test it

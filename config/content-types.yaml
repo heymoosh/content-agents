@@ -11,9 +11,9 @@
 # carries cta_reviewed: true, cta_fit: high, and cta_value: high. Missing qualification means no
 # forced promotional CTA; the system never invents a lead magnet.
 #
-# Three destinations:
+# Two fallback destination kinds:
 #   - `source`  -- the essay/Substack link. Resolves like any other CTA (the essay's own
-#     canonical_url, falling back to source_fallback in cta.yaml).
+#     canonical_url; no generic homepage is substituted).
 #   - `project` -- a PER-POST url, supplied at atomize time as that derivative's own `project_url`
 #     frontmatter field (see .claude/skills/atomize/SKILL.md step 4.5) -- and ONLY when it's
 #     genuinely relevant to that specific post's content, never attached just because the content
@@ -22,14 +22,10 @@
 #     that CTA entry is simply dropped from the resolved output, never substituted with the essay
 #     link instead (an essay link doesn't serve a "see the project" ask, and the essay may not even
 #     be on-topic with the builder/project content -- Muxin, 2026-07-08).
-#   - `work_with_me` -- a fixed, config-level url (below): Muxin's LinkedIn profile, standing in for
-#     the not-yet-built "work with me" landing-page destination (Muxin, 2026-07-08). The 4
-#     "work"-flavored types (product_builder_insight, project_demo, offer_adjacent_post, case_study)
-#     use this instead of a `source` fallback, because their intent is "connect for work," which an
-#     essay/subscribe link doesn't serve regardless of topical relevance. Swap `work_with_me_url` for
-#     the real landing-page URL once card 87c86b16 ships -- a pure config change, no reclassification.
+# Venture-specific resources and offers are selected per piece in the Content plan. There is
+# no fixed profile/consulting destination. Never invent a resource to fill a missing CTA.
 
-work_with_me_url: "https://www.linkedin.com/in/muxinli"
+# Retired: no consulting/availability or generic LinkedIn-profile fallback.
 
 types:
   essay_excerpt:
@@ -68,28 +64,19 @@ types:
     primary:
       text: "See how I think/work"
       destination: project
-    secondary:
-      text: "Connect on LinkedIn"
-      destination: work_with_me
 
   project_demo:
     primary:
       text: "Explore the project"
       destination: project
-    secondary:
-      text: "Connect on LinkedIn"
-      destination: work_with_me
 
   offer_adjacent_post:
     primary:
-      text: "Connect on LinkedIn"
-      destination: work_with_me
-    # no secondary -- this type has no inherent project to fall back to
+      text: "Explore the offer"
+      destination: project
+    # Only an explicitly supplied, relevant offer URL; no invented offer.
 
   case_study:
     primary:
       text: "See projects"
       destination: project
-    secondary:
-      text: "Connect on LinkedIn"
-      destination: work_with_me

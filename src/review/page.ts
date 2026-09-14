@@ -14,6 +14,7 @@ import {
 import { INTAKE_QUESTIONS } from "../venture/intake.js";
 import { JOB_COLORS, jobRoom, type JobView } from "./studio-job-ui.js";
 import { CONTENT_CONFIG_OPTIONS } from "./content-request.js";
+import { contentReaderActionHtml, ventureConversionsHtml } from './page-conversions.js';
 import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 import { intakeProgress } from "./intake-progress.js";
 import { ventureProgressHtml, ventureResearchPlanHtml } from "./page-venture-progress.js";
@@ -1270,6 +1271,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       </div>
       </div>
       </div>
+      <div id="ventureConversionsPane" hidden></div>
       <div id="ventureDocumentsPane" hidden><div id="ventureDocuments"></div><div id="ventureDocumentReader" hidden></div></div>
       <div id="ventureHistoryPane" hidden><div id="ventureRail"></div></div>
       <div id="ventureIntakePane" hidden>
@@ -1750,6 +1752,7 @@ function openReviewFocus(piece,row,returnTo){
   body.innerHTML='<div class="rowhead"><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span class="fmt">'+esc(row.format||row.kind||"content")+' · '+esc(row.id)+'</span><span class="pill '+pillClass(row.status)+'">'+esc(reviewStateLabel(row.status))+'</span></div>'+
     '<label class="wb-label" for="reviewFocusEditor" style="display:block;margin-top:18px">EDIT THE DRAFT DIRECTLY</label>'+
     '<textarea id="reviewFocusEditor" class="review-focus-editor">'+esc(row.body||"")+'</textarea>'+
+    (row.readerAction?'<section><h3>Reader’s next step</h3><p>'+esc(row.readerAction.label)+(row.readerAction.url?' <a href="'+esc(row.readerAction.url)+'" target="_blank" rel="noopener noreferrer">'+esc(row.readerAction.url)+'</a>':'')+'</p><p>'+esc(row.readerAction.reason)+'</p><p class="src">'+esc(row.readerAction.ventureId)+' · Included in your draft review; placed by the publisher.</p></section>':'')+
     '<div class="actions"><button type="button" id="reviewFocusSave"'+(row.editable?'':' disabled')+'>Save edit</button><button type="button" class="approve" data-focus-act="approve">Approve</button><button type="button" class="revise" data-focus-act="revise">Request changes</button><button type="button" class="discard" data-focus-act="discard">Discard</button></div>'+
     '<div class="src">Approval records your review decision. Open Publishing when you are ready to schedule it.</div>'+
     (row.editable?'':'<div class="src">This asset is not text-editable here.</div>');
@@ -3156,7 +3159,9 @@ function readsFromCells(t, cuts){
 }
 // ── end of the treatment mirror ──
 
-const CW_STEPS = [["1","Input"],["2","Review the treatment"],["3","Approve the drafts"],["4","Publish"]];
+const CW_STEPS = [["1","Input"],["2","Plan this piece"],["3","Approve the drafts"],["4","Publish"]];
+const renderContentReaderAction = ${contentReaderActionHtml.toString()};
+const renderVentureConversions = ${ventureConversionsHtml.toString()};
 let contentInputText = "";
 try { contentInputText = sessionStorage.getItem("studio.contentInput") || ""; } catch(e) {}
 let contentInputSaving = false;
@@ -3178,7 +3183,7 @@ function cwEnsureConfig(){
   if(stored){
     CW.config={slug:s.slug,fromRequest:stored.id,open:true,
       treatment:new Set(stored.selections.treatments),media:new Set(stored.selections.media.filter(x=>x!=='none')),
-      platform:new Set(stored.selections.platforms),control:stored.control.enabled,saving:false,saved:false};
+      platform:new Set(stored.selections.platforms),control:stored.control.enabled,saving:false,saved:false,readerAction:stored.readerAction||cwIntendedReaderAction()};
     return CW.config;
   }
   const routed = (CW.treat && CW.treat.channels || []).filter(c=>c.decision==="include").map(c=>c.channel);
@@ -3208,11 +3213,10 @@ function cwEnsureConfig(){
 }
 function cwConfigSectionHtml(kind, title, options, s){
   const cfg = cwEnsureConfig();
-  const choices = options.map(([id,label])=>{
+  const choices = options.filter(([id])=>id!=="cta").map(([id,label])=>{
     const audioOnly = id==="audiogram" && !/audio|podcast/i.test(String(s.sourceKind||""));
-    const mappingBlocked = id==="cta";
-    const disabled = audioOnly || mappingBlocked;
-    const why = mappingBlocked ? "CTA mapping required before this can be selected." : audioOnly ? "Available when the source includes audio." : "";
+    const disabled = audioOnly;
+    const why = audioOnly ? "Available when the source includes audio." : "";
     return '<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" data-config-kind="'+kind+'" value="'+id+'"'+(cfg[kind].has(id)?" checked":"")+(disabled?" disabled":"")+'><span>'+label+(why?'<span class="src" style="display:block">'+why+'</span>':"")+'</span></label>';
   }).join("");
   const model = kind==="treatment" ? engineSelectHtml("contentTreatmentEngine") : "";
@@ -3220,6 +3224,10 @@ function cwConfigSectionHtml(kind, title, options, s){
     '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="fam-ask">'+title+'</span>'+model+'<span class="grow"></span>'+
     '<button type="button" class="cw-back" data-config-all="'+kind+'">Select all</button><button type="button" class="cw-back" data-config-none="'+kind+'">Deselect all</button></div>'+
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 18px;margin-top:14px">'+choices+'</div></section>';
+}
+function cwIntendedReaderAction(){
+  const intended=CW.conversion?.intended;
+  return intended&&CW.conversion.destinations.some(d=>d.id===intended.destinationId&&d.status==='ready')?{mode:'destination',destinationId:intended.destinationId,reason:intended.reason,reviewed:false}:null;
 }
 
 function cwSources(){ return WB_SESSIONS || []; }
@@ -3369,18 +3377,18 @@ function cwChannelHtml(c){
     '<div class="slot">NEXT FREE SLOT · '+esc(c.slot ? c.slot.label : "")+'</div>'+
     '</div>';
 }
-function cwAdvisorHtml(s){
+function cwAdvisorHtml(s, embedded=false){
   const rounds=(s.rounds||[]).map(r=>'<section style="margin-top:18px"><div class="fam-ask">ADVISOR ROUND '+esc(r.index)+'</div>'+
     (r.replyText?'<div class="src" style="margin-top:6px">You: '+esc(r.replyText)+'</div>':'')+
     r.cards.map(c=>'<div style="margin-top:12px;padding:13px;border:1px solid #e5dcc9;border-radius:8px"><b>'+esc(c.title||c.kind)+'</b><div class="src" style="margin-top:5px">'+esc(c.summary||'')+'</div>'+
       (c.previewText?'<pre style="white-space:pre-wrap;font:14px/1.55 Georgia,serif">'+esc(c.previewText)+'</pre>':'')+
-      (c.status==='open'?'<div class="actions"><button data-dev-accept data-card="'+esc(c.id)+'" data-slug="'+esc(s.slug)+'">Accept exact-source cut</button><input class="dev-lens" value="'+esc(c.lens||'')+'" aria-label="Cut name"><button data-dev-dismiss data-card="'+esc(c.id)+'" data-slug="'+esc(s.slug)+'">Dismiss</button></div>':'<div class="src">'+esc(c.status)+'</div>')+'</div>').join('')+'</section>').join('');
+      (c.status==='open'?'<div class="actions">'+(c.kind==='angle'?'<button data-dev-accept data-card="'+esc(c.id)+'" data-slug="'+esc(s.slug)+'">Use this source-supported angle</button><input class="dev-lens" value="'+esc(c.lens||'')+'" aria-label="Cut name">':c.kind==='cta'&&c.destinationId?'<button data-cta-suggestion="'+esc(c.destinationId)+'">Review this CTA in the plan</button>':'')+'<button data-dev-dismiss data-card="'+esc(c.id)+'" data-slug="'+esc(s.slug)+'">Dismiss</button></div>':'<div class="src">'+esc(c.status)+'</div>')+'</div>').join('')+'</section>').join('');
   const cuts=(s.cuts||[]).map(c=>'<label style="display:block;margin-top:14px;padding:14px;border:1px solid #ded4bd;border-radius:8px"><input type="radio" name="approvedCut" data-approved-cut value="'+esc(c.lens)+'"'+(CW.approvedLens===c.lens?' checked':'')+'> <b>'+esc(c.title||c.lens)+'</b><span class="src" style="display:block">Exact source '+esc(lineRefsText(c.sourceLines))+'</span><textarea data-cut-body="'+esc(c.lens)+'" rows="6" style="width:100%;margin-top:9px">'+esc(c.body)+'</textarea><div class="actions"><button data-cut-save data-lens="'+esc(c.lens)+'">Save edit</button><input data-cut-comment-text placeholder="Comment on this cut"><input data-cut-comment-line type="number" min="1" value="1" aria-label="Line"><button data-cut-comment data-lens="'+esc(c.lens)+'">Add comment</button></div></label>').join('');
-  return cwPickedHtml(s)+'<div class="src" style="margin-top:16px">The advisor conversation is restored from develop/advice.json. Accept builds only from the cited source lines. Pick one approved cut before configuration.</div>'+rounds+
+  return (embedded?'':cwPickedHtml(s))+'<p>Explore source-supported angles, audiences, platforms and a useful next action for readers. The advisor checks your Venture destinations when linked. You choose what becomes a draft.</p>'+(!embedded?'<button class="primary" data-use-original>Use this post as it is</button>':'')+rounds+
     (!rounds?'<button class="primary" data-dev-start data-slug="'+esc(s.slug)+'" style="margin-top:18px">Ask the advisor</button>':'')+
-    '<div style="margin-top:24px"><div class="fam-ask">APPROVED CUTS</div>'+ (cuts||'<div class="empty">Accept an exact-source cut before choosing treatments.</div>')+'</div>'+
+    '<details style="margin-top:24px"><summary>Source versions and edits</summary>'+ (cuts||'<p>No alternate source versions yet.</p>')+'</details>'+
     '<div class="wb-reply"><input class="wb-reply-input" placeholder="Reply to the advisor"><button data-dev-reply data-slug="'+esc(s.slug)+'">Reply</button></div>'+
-    (CW.approvedLens?'<button class="primary" data-open-config style="margin-top:20px">Configure this approved cut</button>':'');
+    (!embedded&&CW.approvedLens?'<button class="primary" data-open-config style="margin-top:20px">Plan this version</button>':'');
 }
 function cwStep2Html(){
   const s = cwSession();
@@ -3389,6 +3397,10 @@ function cwStep2Html(){
   // advisor/cut gate is for ordinary Muxin-voice Content sources, not a second approval system for
   // Fiction, Charles, or Venture.
   if(contentRequestOrigin(s)!=="human-inference"){ const crossCfg=cwEnsureConfig(); crossCfg.open=true; }
+  if(CW.requestFor===s.slug && CW.request){
+    const savedCfg=cwEnsureConfig(); savedCfg.open=true;
+    if(!CW.approvedLens) CW.approvedLens=CW.request.sourceProvenance?.lens||null;
+  }
   if(!CW.config || !CW.config.open) return cwAdvisorHtml(s);
   const crossContext=cwCrossRoomContextHtml();
   if(CW.treatErr) return cwPickedHtml(s)+crossContext+'<div class="fam-note t-amber" style="margin-top:16px">Could not read recommendations for this piece: '+esc(CW.treatErr)+'</div>';
@@ -3400,12 +3412,14 @@ function cwStep2Html(){
   const mechanismWhy=(CW.treat.mechanismRecommendations||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div><div class="src">'+esc(x.source)+'</div></div>').join('');
   const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these recommendations?</summary><div style="margin-top:8px;max-width:680px">'+mechanismWhy+platformWhy+(mediaWhy||'<div class="src" style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<div class="src" style="margin-top:10px">Reviewed mechanisms are hypotheses matched to this source, never winner claims. Source fit supplies the cold-start distribution recommendation. Existing measured performance evidence remains stronger when available. Every checkbox remains yours to change.</div></div></details>';
   return cwPickedHtml(s)+crossContext+
-    '<div class="src" style="margin-top:18px;max-width:640px">Choose treatments, media, and platforms independently. Recommendations preselect a starting point; they never remove your control.</div>'+
-    cwConfigSectionHtml("treatment","TREATMENTS",CONTENT_CONFIG_OPTIONS.treatment,s)+
-    cwConfigSectionHtml("media","MEDIA",CONTENT_CONFIG_OPTIONS.media,s)+
-    cwConfigSectionHtml("platform","PLATFORMS",CONTENT_CONFIG_OPTIONS.platform,s)+recommendation+
+    '<p>Choose where this piece will go, how to present it, and what readers can do next.</p>'+
+    cwConfigSectionHtml("platform","Platforms",CONTENT_CONFIG_OPTIONS.platform,s)+
+    cwConfigSectionHtml("media","Formats · leave empty for text only",CONTENT_CONFIG_OPTIONS.media,s)+
+    cwConfigSectionHtml("treatment","Angle and presentation",CONTENT_CONFIG_OPTIONS.treatment,s)+recommendation+
+    renderContentReaderAction(CW.conversion,cfg.readerAction,(s.rounds||[]).flatMap(r=>r.cards),esc)+
+    '<details style="margin-top:24px"><summary>Explore alternatives with the advisor</summary>'+cwAdvisorHtml(s,true)+'</details>'+
     '<label style="display:flex;gap:9px;align-items:flex-start;margin-top:22px;padding:14px;background:#faf7f0;border:1px solid #efe7d6;border-radius:8px"><input type="checkbox" id="contentControlEnabled"'+(cfg.control?" checked":"")+'><span><b>Untreated control</b><span class="src" style="display:block">Create one source-preserving control for each selected platform and media combination. You can disable it explicitly.</span></span></label>'+
-    '<div class="cw-yesall"><button type="button" class="primary" id="contentConfigSave" data-config-save'+(cfg.saving?" disabled":"")+'>'+(cfg.saving?"Creating drafts…":cfg.saved?"Drafts created":"Save and create drafts")+'</button>'+
+    '<div class="cw-yesall"><button type="button" class="primary" id="contentConfigSave" data-config-save'+(cfg.saving?" disabled":"")+'>'+(cfg.saving?"Creating drafts…":cfg.saved?"Drafts created":"Use this plan and create drafts")+'</button>'+
     '<span class="src">This stores the request, creates its untreated control and treated drafts, then sends them to Approve Drafts. It does not approve, schedule, or publish anything.</span></div>';
 }
 function cwStep3Html(){
@@ -3442,8 +3456,11 @@ async function cwLoadTreatment(){
       fetch("/api/content/request?slug="+encodeURIComponent(slug)).then(x=>x.json()).catch(()=>null),
     ]);
     const d = await r.json();
+    if(CW.slug!==slug)return;
     CW.signalDefaults = signals && signals.contentDefaults || null;
     CW.request = requestResult&&requestResult.ok ? requestResult.request : null; CW.requestFor=slug;
+    CW.conversion = requestResult?.conversion || null;
+    if(requestResult && !requestResult.ok) throw new Error(requestResult.error||'Could not read the saved plan');
     if(d && d.error){ CW.treat = null; CW.treatFor = null; CW.treatErr = d.error; }
     else { CW.treat = d; CW.treatFor = slug; CW.treatErr = null; }
   } catch(e){
@@ -3486,6 +3503,7 @@ async function cwSaveConfig(){
     id:s.slug, origin, descriptor:s.title, originalInput:((s.cuts||[]).find(c=>c.lens===CW.approvedLens)||{}).body||s.sourceBody,
     treatments:[...cfg.treatment], media:[...cfg.media], platforms:[...cfg.platform],
     recommendationEvidence:evidence, includeUntreatedControl:cfg.control,
+    readerAction:cfg.readerAction||null,
     ventureId:origin==="fiction" ? "least-of-us-fiction" : null,
     sourceProvenance:(()=>{ const cut=(s.cuts||[]).find(c=>c.lens===CW.approvedLens); return cut?{kind:"approved-cut",lens:cut.lens,sourceLines:cut.sourceLines}:null; })(),
   };
@@ -3500,6 +3518,7 @@ async function cwSaveConfig(){
 }
 // Delegated: the wizard is rebuilt wholesale on every render.
 $("#contentWizard").addEventListener("input", (e)=>{
+  if(e.target.id==='contentReaderReason'){ const cfg=cwEnsureConfig(); if(cfg?.readerAction)cfg.readerAction.reason=e.target.value; return; }
   if(e.target.id!=="contentInput") return;
   contentInputText=e.target.value;
   try { sessionStorage.setItem("studio.contentInput",contentInputText); } catch(e) {}
@@ -3519,6 +3538,10 @@ $("#contentWizard").addEventListener("click", async (e)=>{
   finally { contentInputSaving=false; renderContentWizard(); }
 });
 $("#contentWizard").addEventListener("click", (e)=>{
+  const original=e.target.closest?.('[data-use-original]');
+  if(original){original.disabled=true;post('/api/develop/use-original',{slug:CW.slug}).then(async r=>{if(!r.ok)throw new Error(r.error);CW.approvedLens=r.lens;await loadContent();const cfg=cwEnsureConfig();cfg.open=true;await cwLoadTreatment();}).catch(e=>{original.disabled=false;flash(e.message);});return;}
+  const cta=e.target.closest?.('[data-cta-suggestion]');
+  if(cta){const cfg=cwEnsureConfig(), id=cta.dataset.ctaSuggestion, d=CW.conversion?.destinations.find(x=>x.id===id&&x.status==='ready');if(!d){flash('This destination is not ready in the linked Venture.');return;}const card=(cwSession()?.rounds||[]).flatMap(r=>r.cards).filter(c=>c.kind==='cta'&&c.destinationId===id&&c.status!=='dismissed').at(-1);cfg.readerAction={mode:'destination',destinationId:id,reason:card?.summary||'',reviewed:false};cfg.open=true;renderContentWizard();$('#contentReaderAction')?.focus();return;}
   const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-set-pane],[data-config-all],[data-config-none],[data-config-save],[data-dev-start],[data-dev-reply],[data-dev-accept],[data-dev-dismiss],[data-cut-save],[data-cut-comment],[data-open-config]") : null;
   if(!t) return;
   if(t.dataset.openConfig!==undefined){ const cfg=cwEnsureConfig(); cfg.open=true; renderContentWizard(); cwLoadTreatment(); return; }
@@ -3543,7 +3566,7 @@ $("#contentWizard").addEventListener("click", (e)=>{
   if(t.dataset.slug !== undefined){
     CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.request=null; CW.requestFor=null; CW.yesErrors = []; CW.pane = "wizard"; CW.config = null; CW.approvedLens=null;
     renderContentWizard();
-    if(contentRequestOrigin(cwSession())!=="human-inference") cwLoadTreatment();
+    CW.conversion=null; cwLoadTreatment();
     return;
   }
   if(t.dataset.step !== undefined){
@@ -3558,8 +3581,15 @@ $("#contentWizard").addEventListener("click", (e)=>{
 });
 $("#contentWizard").addEventListener("change", (e)=>{
   const target = e.target, cfg = cwEnsureConfig();
-  if(target&&target.dataset&&target.dataset.approvedCut!==undefined){ CW.approvedLens=target.value; renderContentWizard(); return; }
+  if(target&&target.dataset&&target.dataset.approvedCut!==undefined){ CW.approvedLens=target.value; renderContentWizard(); cwLoadTreatment(); return; }
   if(!cfg || !target) return;
+  if(target.id==='contentReaderAction'){
+    const id=target.value, intended=CW.conversion?.intended;
+    const suggestion=(cwSession()?.rounds||[]).flatMap(r=>r.cards).filter(c=>c.kind==='cta'&&c.destinationId===id&&c.status!=='dismissed').at(-1);
+    cfg.readerAction=id==='none'?{mode:'none'}:id?{mode:'destination',destinationId:id,reason:intended?.destinationId===id?intended.reason:suggestion?.summary||'',reviewed:false}:null;
+    renderContentWizard(); return;
+  }
+  if(target.id==='contentReaderReviewed'){cfg.readerAction.reviewed=target.checked;return;}
   if(target.id==="contentControlEnabled"){ cfg.control = !!target.checked; cfg.saved = false; return; }
   const kind = target.dataset && target.dataset.configKind;
   if(!kind) return;
@@ -3673,6 +3703,7 @@ function renderVentureSheets(){
   $("#ventureDocumentsPane").hidden = VEN.pane !== "documents";
   $("#ventureHistoryPane").hidden = VEN.pane !== "history";
   $("#ventureIntakePane").hidden = VEN.pane !== "intake";
+  $('#ventureConversionsPane').hidden = VEN.pane !== 'conversions';
   document.querySelectorAll(".venture-stage").forEach(b=>b.classList.toggle("on", b.dataset.setVenPane===VEN.pane));
 }
 let VENTURE_SLUGS = [];
@@ -4494,6 +4525,33 @@ const renderVentureGuide = ${ventureGuideHtml.toString()};
 const renderVentureStructured = ${ventureStructuredHtml.toString()};
 const renderVentureSeriesSignals = ${ventureSeriesSignalsHtml.toString()};
 const renderVentureResearchPlan = ${ventureResearchPlanHtml.toString()};
+const conversionTab=document.createElement('button');
+conversionTab.className='venture-stage';conversionTab.dataset.setVenPane='conversions';conversionTab.textContent='Reader destinations';
+$('#roomVenture .venture-stages').append(conversionTab);
+let ventureConversionData=null;
+async function loadVentureConversions(force=false){
+  if(!ventureSlug||ventureSlug==='__example__'){$('#ventureConversionsPane').textContent='Choose a real venture first.';return;}
+  if(!force&&ventureConversionData?.slug===ventureSlug)return;
+  const slug=ventureSlug;
+  $('#ventureConversionsPane').textContent='Loading reader destinations…';
+  try{const r=await fetch('/api/venture/'+encodeURIComponent(slug)+'/conversions').then(x=>x.json());if(!r.ok)throw new Error(r.error||'Could not load destinations');if(slug!==ventureSlug)return;ventureConversionData={...r,slug};$('#ventureConversionsPane').innerHTML=renderVentureConversions(r,esc);}
+  catch(e){$('#ventureConversionsPane').textContent=e.message;}
+}
+$('#ventureConversionsPane').addEventListener('click',async e=>{
+  if(e.target.closest?.('[data-conversion-add]')){
+    const id='destination-'+Date.now().toString(36);
+    const d={id,name:'New destination',audience:'',benefit:'',action:'',measurement:'Not connected yet',status:'proposed',url:''};
+    const scratch=document.createElement('div');scratch.innerHTML=renderVentureConversions({plan:{goal:'',destinations:[d],assignments:[]},destinations:[],pieces:[]},esc);
+    $('#newConversionRows').append(scratch.querySelector('[data-conversion-row]'));return;
+  }
+  const button=e.target.closest?.('[data-conversion-save]');if(!button||!ventureConversionData)return;
+  button.disabled=true;const pane=$('#ventureConversionsPane'), data=ventureConversionData;
+  const destinations=Array.from(pane.querySelectorAll('[data-conversion-row]')).map(row=>Object.fromEntries([['id',row.dataset.conversionRow],...Array.from(row.querySelectorAll('[data-conversion-field]')).map(i=>[i.dataset.conversionField,i.value])]));
+  const visibleIds=new Set(data.pieces.map(p=>p.id));
+  const assignments=data.plan.assignments.filter(a=>!visibleIds.has(a.contentId)).concat(Array.from(pane.querySelectorAll('[data-conversion-piece]')).map(row=>({contentId:row.dataset.conversionPiece,destinationId:row.querySelector('[data-conversion-assignment]').value,reason:row.querySelector('[data-conversion-reason]').value})).filter(a=>a.destinationId));
+  try{const r=await post('/api/venture/'+encodeURIComponent(data.slug)+'/conversions',{...data.plan,goal:$('#ventureConversionGoal').value,destinations,assignments});if(!r.ok)throw new Error(r.error||'Could not save');ventureConversionData={...r,slug:data.slug};if(ventureSlug===data.slug){pane.innerHTML=renderVentureConversions(r,esc);$('#ventureConversionStatus').textContent='Destinations and assignments saved. Content will check these when you plan a piece.';}}
+  catch(error){$('#ventureConversionStatus').textContent=error.message;}finally{button.disabled=false;}
+});
 const ventureWorkingDrafts = {};
 function ventureWorkingDraft(){
   if(ventureWorkingDrafts[ventureSlug]) return ventureWorkingDrafts[ventureSlug];
@@ -4576,6 +4634,7 @@ function renderVenture(){
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
   renderWorkingContext(t);
   renderVenturePhasePreview();
+  if(VEN.pane==='conversions'&&ventureConversionData?.slug!==ventureSlug)loadVentureConversions();
   $('#ventureSavedConstraints').innerHTML='<h3>Saved operating constraints</h3>'+(t.workingContext?.constraints?'<p style="white-space:pre-wrap">'+esc(t.workingContext.constraints)+'</p>':'<p>No separate operating update recorded. Your original interview is preserved in Documents.</p>');
   const execution = t.phase===1 && (t.executionSeries||[]).length>0 && t.nextAction?.label==='Work through the actions below';
   $('#ventureActions').innerHTML=execution?renderVentureActions(t.executionSeries,t.websiteMeasurement,esc):'';
@@ -4711,6 +4770,7 @@ $("#roomVenture").addEventListener("click", (e)=>{
   if(!t) return;
   VEN.pane = t.dataset.setVenPane;
   renderVentureSheets();
+  if(VEN.pane==='conversions') loadVentureConversions();
 });
 // One delegated listener: renderVenture() replaces the whole subtree on every refetch, so per-node
 // handlers would be re-bound constantly and a stale one could fire against a rebuilt thread.
