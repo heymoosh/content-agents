@@ -14,6 +14,7 @@ import {
 import { INTAKE_QUESTIONS } from "../venture/intake.js";
 import { JOB_COLORS, jobRoom, type JobView } from "./studio-job-ui.js";
 import { CONTENT_CONFIG_OPTIONS } from "./content-request.js";
+import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 export {
   formatElapsed,
   ANSWERED_FOOTER,
@@ -328,6 +329,32 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .room-pages { display:flex; align-items:baseline; gap:24px; flex-wrap:wrap; padding-bottom:14px; margin-bottom:22px; border-bottom:1px solid #dfd4bb; }
   .room-pages button { border:0; border-bottom:1.5px solid transparent; border-radius:0; background:none; color:#9b907b; padding:0 0 5px; font:inherit; cursor:pointer; }
   .room-pages button.on { color:var(--ink); border-bottom-color:var(--ink); font-weight:600; }
+  #signalsReads { color:#24211c; font-size:16px; line-height:1.55; }
+  #signalsReads h3 { font-size:21px; margin:26px 0 10px; }
+  #signalsReads h4 { font-size:17px; margin:16px 0 8px; }
+  #signalsReads p { margin:10px 0; }
+  #signalsReads .room-pages { margin-top:24px; }
+  #signalsReads .room-pages button { color:#625a4c; }
+  #signalsReads .room-pages button.on { color:#24211c; }
+  #signalsReads .src, #signalsReads .dev-summary { color:#514a3f; font-size:14px; line-height:1.55; }
+  #signalsReads .empty { padding:18px 0; text-align:left; color:#514a3f; }
+  #signalsReads .sig-meta, #signalsReads small { color:#625a4c; font-size:13px; line-height:1.5; }
+  .sig-table-wrap { overflow-x:auto; }
+  .sig-table { width:100%; border-collapse:collapse; margin:14px 0; text-align:left; }
+  .sig-table th, .sig-table td { padding:12px 16px 12px 0; border-bottom:1px solid #e5ddcf; vertical-align:top; }
+  .sig-table th { font-weight:600; }
+  .sig-table small { display:block; }
+  .sig-detail { border-top:1px solid #e5ddcf; padding:16px 0; margin-top:14px; }
+  .sig-detail summary, .sig-outcome summary { cursor:pointer; font-weight:600; color:#393329; }
+  .sig-outcomes { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:18px 0; }
+  .sig-outcome { border:1px solid #e5ddcf; border-radius:10px; padding:18px 22px; }
+  .sig-outcome dl { margin:14px 0; }
+  .sig-outcome dl>div { display:flex; justify-content:space-between; gap:16px; margin:6px 0; }
+  .sig-outcome dd { margin:0; font-weight:600; }
+  .sig-post { padding:8px 0 16px; border-bottom:1px solid #e5ddcf; }
+  #signalsReads .wb-proposal { margin:16px 0; padding:18px 22px; }
+  #signalsReads .sig-experiment-title { font-size:18px; font-weight:600; }
+  @media(max-width:700px) { .sig-outcomes { grid-template-columns:1fr; } #signalsReads { padding:24px 20px; } .sig-table { font-size:14px; } }
   .request-search { width:min(680px,calc(100vw - 220px)); min-width:420px; padding:9px 12px; }
   .publish-row { display:grid; grid-template-columns:minmax(150px,1.2fr) minmax(110px,.7fr) minmax(150px,1fr) minmax(150px,1fr); gap:14px;
     align-items:start; padding:13px 4px; border-top:1px solid var(--line); }
@@ -1256,21 +1283,18 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" id="stripSignals" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet" id="signalsReads">
     <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><label class="src">Brand <select id="signalsBrand"><option value="human-inference">Human Inference</option><option value="charles">Charles</option><option value="fiction">Fiction</option></select></label><span class="src" id="signalsBriefDate"></span></div>
-    <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
-    <div class="src" style="margin-top:8px">The selected brand scopes measurements, strategy recommendations, decisions, and experiments. Unassigned legacy records stay excluded.</div>
-    <div id="signalsTop"><div class="empty">Loading…</div></div>
-    <details style="margin-top:26px"><summary class="wb-label">Measurement inventory</summary><div style="margin-top:18px">
-      <div style="font:italic 400 14px/1.5 Georgia,serif;color:#a89a80">This read</div>
-      <div style="font:400 27px/1.35 Georgia,'Times New Roman',serif;color:#1c1a17;margin:8px 0 0;max-width:520px">Four things, kept apart</div>
-      <div class="sheet-sub" style="max-width:560px">One number across all four would hide the thing you most need to see. Nothing on this page adds them up, and two of them are never allowed to argue for dropping a pillar or a platform.</div>
-      <div id="signalsFamilies"><div class="empty">Loading…</div></div>
-    </div><div id="signalsResearch"></div></details>
-    <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
+    <p>How your content is performing, what we’re learning, and what to do next.</p>
+    <div class="actions"><label class="engine-choice"><span>Analysis model</span><select class="engine-select" id="signalsAnalysisEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label><span class="sig-meta">Used only when you request analysis.</span></div>
+    <nav class="room-pages" aria-label="Signals pages"><button type="button" class="on" data-signals-tab="overview" aria-current="page">What we know</button><button type="button" data-signals-tab="experiments">Experiments and learnings</button><button type="button" data-signals-tab="decisions">Decisions</button></nav>
+    <div id="signalsOverviewPanel">
+    <div id="signalsPerformance"><p>Loading performance…</p></div>
+    <div id="signalsFamilies"><p>Loading outcomes…</p></div>
+    <details class="sig-detail"><summary>Audience comments and research</summary><div id="signalsResearch"></div></details>
+    <h3>Explore the results</h3>
     <div class="strategy" style="max-width:none;margin-top:14px">
       <div class="strategy-actions">
-        <label class="engine-choice"><span>Run analysis with</span><select class="engine-select" id="signalsAnalysisEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-        <button class="primary" id="insightsBtn">Generate insights</button>
-        <span class="hint">Runs the analytics reports live, then asks your selected engine for a short skim. Nothing here writes data or publishes anything.</span>
+        <button class="primary" id="insightsBtn">Analyze my results</button>
+        <span class="hint">Ask the selected model to explain the available reports. This does not import fresh analytics, change settings, or publish.</span>
       </div>
       <div class="insights-panel" id="insightsPanel" hidden>
         <div class="md" id="insightsOut"></div>
@@ -1281,11 +1305,16 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         </div>
       </div>
     </div>
+    </div>
+    <div id="signalsExperimentsPanel" hidden><h3>What are we testing, and what have we learned?</h3><div id="signalsExperiments"></div></div>
+    <div id="signalsDecisionsPanel" hidden><h3>What should we do next?</h3><p>Review proposed changes here. Agreeing with a recommendation and applying a settings change are separate steps.</p><div id="signalsTop"><p>Loading decisions…</p></div></div>
+    <details class="sig-detail"><summary>Sources and reports</summary>
     <div class="sheet-foot" style="justify-content:flex-start;align-items:baseline;gap:14px;flex-wrap:wrap">
       <button type="button" class="cw-back" data-set-sig-pane="brief">Show the latest strategy brief</button>
       <button type="button" class="cw-back" data-set-sig-pane="raw">Show the raw downloaded exports</button>
-      <span class="src">The brief file and the on-disk CSV/JSON/XLSX pulls live there. This room opens on the reads.</span>
+      <span class="sig-meta">Opening a report does not import data or generate new analysis.</span>
     </div>
+    </details>
     </div>
     <div class="sheet" id="signalsBriefSheet" hidden>
       <div class="sheet-head">
@@ -2105,7 +2134,7 @@ async function approveReviewSelection(){
 let currentTab = ${JSON.stringify(BOOT_ROOM)};
 const SHOW_TEST_VENTURES = ${JSON.stringify(Boolean(process.env.CONTENT_AGENTS_TEST_VENTURE_ROOT))};
 let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
-function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="venture" ? "Reread canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Refresh leads") : "Refresh"; }
+function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Refresh the dashboard" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="venture" ? "Reread canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Refresh leads") : "Refresh"; }
 function setRoom(t){
   if(!["studio","venture","content","outreach","fiction","charles","signals"].includes(t)) t="studio";
   try { sessionStorage.setItem("studio.currentRoom", t); } catch(e) {}
@@ -2221,7 +2250,17 @@ function mdToHtml(md){
 let briefLoaded = false;
 // SIG.pane picks which of the Signals room's three sheets is on screen: "reads" (default),
 // "brief", or "raw". Exactly one shows at a time — see renderSignalsSheets.
-let SIG = { pane: "reads" };
+let SIG = { pane: "reads", tab: "overview" };
+try { const saved=sessionStorage.getItem("signals-tab"); if(["overview","experiments","decisions"].includes(saved)) SIG.tab=saved; } catch {}
+try { const brand=sessionStorage.getItem("signals-brand"); if(["human-inference","charles","fiction"].includes(brand)) $("#signalsBrand").value=brand; } catch {}
+function setSignalsTab(tab){
+  if(!["overview","experiments","decisions"].includes(tab)) return;
+  SIG.tab=tab;
+  try { sessionStorage.setItem("signals-tab",tab); } catch {}
+  [["overview","signalsOverviewPanel"],["experiments","signalsExperimentsPanel"],["decisions","signalsDecisionsPanel"]].forEach(([key,id])=>$("#"+id).hidden=key!==tab);
+  document.querySelectorAll("[data-signals-tab]").forEach(b=>{ b.classList.toggle("on",b.dataset.signalsTab===tab); if(b.dataset.signalsTab===tab)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current"); });
+}
+setSignalsTab(SIG.tab);
 function renderSignalsSheets(){
   $("#signalsReads").hidden = SIG.pane !== "reads";
   $("#signalsBriefSheet").hidden = SIG.pane !== "brief";
@@ -2234,7 +2273,9 @@ function openSignalsBrief(){
 }
 async function loadBrief(){
   briefLoaded = true;
-  const r = await fetch("/api/strategy/brief?brand="+encodeURIComponent(signalsBrand())); const d = await r.json();
+  const brand=signalsBrand();
+  const r = await fetch("/api/strategy/brief?brand="+encodeURIComponent(brand)); const d = await r.json();
+  if(brand!==signalsBrand()) return;
   if(!d.ok){ $("#briefBody").textContent = d.error; $("#briefPath").textContent = ""; return; }
   $("#briefBody").innerHTML = mdToHtml(d.content);
   $("#briefPath").textContent = d.path;
@@ -2254,11 +2295,14 @@ document.addEventListener("click", (e)=>{
   if(a){ openSignalsBrief(); }
 });
 $("#roomSignals").addEventListener("click", (e)=>{
+  const tab=e.target.closest ? e.target.closest("[data-signals-tab]") : null;
+  if(tab){ setSignalsTab(tab.dataset.signalsTab); return; }
   const t = e.target.closest ? e.target.closest("[data-set-sig-pane]") : null;
   if(!t) return;
   SIG.pane = t.dataset.setSigPane;
   renderSignalsSheets();
-  if(SIG.pane === "brief") setBriefExpanded(true);
+  if(SIG.pane === "brief") { loadBrief(); setBriefExpanded(true); }
+  if(SIG.pane === "raw") loadRaw();
 });
 async function askBrief(){
   const inp = $("#briefAskInput"); const instruction = inp.value.trim();
@@ -2323,6 +2367,7 @@ function renderInsightsMeta(r){
 }
 let insightsHistory = [];
 async function generateInsights(){
+  const brand=signalsBrand();
   $("#insightsBtn").disabled = true;
   $("#insightsPanel").hidden = false;
   insightsHistory = [];
@@ -2332,8 +2377,9 @@ async function generateInsights(){
   const engine = $("#signalsAnalysisEngine").value;
   const intro = engine === "claude" ? "Running the reports, then asking Claude for a synthesis." : "Running the reports, then asking "+engineLabel(engine)+" for a synthesis.";
   $("#insightsOut").innerHTML = '<p class="hint">'+esc(intro)+' The room strip carries the live clock.</p>';
-  const r = await post("/api/strategy/insights", {engine, brand:signalsBrand()});
+  const r = await post("/api/strategy/insights", {engine, brand});
   $("#insightsBtn").disabled = false;
+  if(brand!==signalsBrand()) return;
   if(r.ok){ $("#insightsOut").innerHTML = renderInsightsMeta(r) + mdToHtml(r.summary); insightsHistory = [{role:"assistant", content:r.summary}]; }
   else { $("#insightsOut").innerHTML = "<p>Failed: "+esc(r.error||"error")+"</p>"; }
 }
@@ -2349,6 +2395,7 @@ function renderThread(){
   }
 }
 async function askInsights(){
+  const brand=signalsBrand();
   const inp = $("#insightsAskInput"); const q = inp.value.trim();
   if(!q){ flash("Ask something first"); return; }
   if(!insightsHistory.length){ flash("Generate insights first"); return; }
@@ -2364,8 +2411,9 @@ async function askInsights(){
   const engine = $("#signalsAnalysisEngine").value;
   thinking.innerHTML = esc(engineLabel(engine))+' is looking into it. It may re-run a report first. The room strip carries the live clock.';
   $("#insightsThread").appendChild(thinking);
-  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory, engine, brand:signalsBrand()});
+  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory, engine, brand});
   $("#insightsAskBtn").disabled = false;
+  if(brand!==signalsBrand()) return;
   insightsHistory.push({role:"assistant", content: r.ok ? r.answer : "Failed: "+(r.error||"error")});
   renderThread();
 }
@@ -6027,28 +6075,13 @@ function signalDeltaHtml(p){
   return '<div class="fam-note"><strong>Exact preview</strong><br>'+esc(exact)+'</div><div class="actions">'+controls+'</div>';
 }
 function signalsConfigurationReviewsHtml(){
-  const proposals=(SIGNALS.changeProposals||[]).filter(p=>p.status==="pending"||p.status==="approved");
-  if(!proposals.length) return "";
-  return '<section><h3>Configuration changes awaiting your action</h3>'+proposals.map(p=>'<div class="wb-proposal"><strong>'+esc(p.recommendation.title)+'</strong>'+signalDeltaHtml(p)+'</div>').join("")+'</section>';
+  const all=SIGNALS.changeProposals||[];
+  const pending=all.filter(p=>p.status==="pending"||p.status==="approved");
+  const history=all.filter(p=>p.status!=="pending"&&p.status!=="approved");
+  const cards=rows=>rows.map(p=>'<div class="wb-proposal"><strong>'+esc(p.recommendation.title)+'</strong>'+signalDeltaHtml(p)+'</div>').join("");
+  return (pending.length?'<section><h3>Settings changes awaiting your action</h3>'+cards(pending)+'</section>':'')+(history.length?'<details class="sig-detail"><summary>Previously reviewed settings changes</summary>'+cards(history)+'</details>':'');
 }
-function signalsPracticalHtml(){
-  const read=SIGNALS&&SIGNALS.performance;
-  if(read&&read.summary){
-    const top=read.summary.top;
-    return '<section style="margin-top:22px"><div class="wb-label">WHAT IS WORKING NOW</div><div class="src" style="margin:5px 0 12px">Sample data · illustrative, not measured</div><div class="stat-tiles">'+
-      '<div class="stat-tile"><strong>Topics earning engagement</strong><span class="l">'+esc(top.topic)+'</span></div>'+
-      '<div class="stat-tile"><strong>Platforms working</strong><span class="l">'+esc(top.platform)+' for the illustrative sample</span></div>'+
-      '<div class="stat-tile"><strong>Media and formats</strong><span class="l">'+esc(top.media)+' with '+esc(top.format)+'</span></div>'+
-      '<div class="stat-tile"><strong>Content defaults</strong><span class="l">'+esc(read.summary.action)+'</span></div>'+
-      '</div><div class="src" style="margin-top:10px">This sample never preselects a real request. Real requests use separate safe defaults and every choice remains editable.</div></section>';
-  }
-  return '<section style="margin-top:22px"><div class="wb-label">WHAT IS WORKING NOW</div><div class="src" style="margin:5px 0 12px">Sample data · illustrative, not measured</div><div class="stat-tiles">'+
-    '<div class="stat-tile"><strong>Topics earning engagement</strong><span class="l">Work, status, and institutional incentives</span></div>'+
-    '<div class="stat-tile"><strong>Platforms working</strong><span class="l">LinkedIn for the sample topic</span></div>'+
-    '<div class="stat-tile"><strong>Media and formats</strong><span class="l">Carousel outperforming plain text in the sample</span></div>'+
-    '<div class="stat-tile"><strong>Content defaults</strong><span class="l">Preselect short post + image; every choice remains editable</span></div>'+
-    '</div><div class="src" style="margin-top:10px">Insufficient measured evidence keeps the current safe defaults. A measured zero will appear as 0; unavailable outcomes say not measured.</div></section>';
-}
+${SIGNALS_DASHBOARD_SCRIPT}
 function displayLabel(value){
   const normalized=String(value||"").replaceAll("-"," ");
   return normalized ? normalized[0].toUpperCase()+normalized.slice(1) : "";
@@ -6092,11 +6125,11 @@ function experimentCanProposeVenture(perf, interpretation){
 }
 function signalsExperimentsHtml(){
   const plans=(SIGNALS&&SIGNALS.experimentPlans)||[];
-  const propose='<div class="actions"><button class="sig-experiment-propose primary">Ask Signals to evaluate a Content request</button><span class="src">Uses reviewed evidence and body-free Content metadata. It may honestly recommend no experiment.</span></div>';
-  if(!plans.length) return '<section style="margin-top:26px"><div class="wb-label">EXPERIMENTS</div>'+propose+'<div class="empty" style="padding:14px">Signals has not retained a sufficiently useful experiment proposal yet.</div></section>';
+  const propose='<div class="actions"><button class="sig-experiment-propose">Plan a test</button><span class="src">Requires an existing Content request and reviewed evidence. The analysis may recommend not testing yet.</span></div>';
+  if(!plans.length) return '<section><p>No experiments recorded for this brand yet.</p><p>Start with a question about an existing Content item. An approved test goes through Content review before publication.</p>'+propose+'</section>';
   const performanceById=new Map((((SIGNALS&&SIGNALS.experimentPerformance)||{}).experiments||[]).map(row=>[row.experimentId,row]));
   const interpretationById=new Map(((SIGNALS&&SIGNALS.experimentInterpretations)||[]).map(row=>[row.experimentId,row]));
-  return '<section style="margin-top:26px"><div class="wb-label">EXPERIMENTS</div>'+propose+'<div class="src" style="margin:5px 0 12px">High-confidence proposals appear first. Approving a plan creates pending drafts in Content; it does not approve their copy or publish anything.</div>'+plans.map(p=>{
+  return '<section>'+propose+'<p class="sig-meta">Plan approval, copy review and publication remain separate. Expanding a test shows its evidence and design.</p>'+plans.map(p=>{
     const status=String(p.status||"proposed");
     const confidence=String(p.confidence||"unknown");
     const controls=status==="proposed"
@@ -6129,7 +6162,10 @@ function signalsExperimentsHtml(){
         (reviewStatus==="pending"?'<div class="actions"><button class="sig-experiment-interpret-review primary" data-id="'+esc(p.experimentId)+'" data-action="accept">Accept interpretation</button><button class="sig-experiment-interpret-review" data-id="'+esc(p.experimentId)+'" data-action="reject">Reject analysis</button><span class="src">Your review records the learning. It does not change routing or select a winner.</span></div>'
           : '<div class="src">Interpretation review: '+esc(reviewStatus)+' by Muxin. Winner remains unset.</div>'+(experimentCanProposeVenture(perf, interpretation)?'<div class="actions"><button class="sig-venture-propose primary" data-id="'+esc(p.experimentId)+'">Propose as Venture input</button><span class="src">Requires a named Venture and phase. Signals records the proposal only.</span></div>':'') );
     }
-    return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(confidence)+' confidence</span><span style="font-weight:600;font-size:14px;">'+esc(p.hypothesis)+'</span></div>'+
+    const statusLabel=signalsExperimentStatus(p,perf,interpretation);
+    return '<article class="wb-proposal"><div class="sig-meta">'+esc(statusLabel)+'</div><p class="sig-experiment-title">'+esc(p.hypothesis)+'</p>'+
+      '<p><strong>Testing:</strong> '+esc(p.controlledVariable)+'</p>'+measurement+'<div class="actions">'+controls+'</div>'+
+      '<details class="sig-detail"><summary>Test design and supporting evidence</summary><p>'+esc(confidence)+' confidence</p>'+
       '<div class="dev-summary"><strong>Observation:</strong> '+esc(p.observation)+'</div>'+
       '<div class="dev-summary"><strong>Evidence:</strong> '+(p.evidenceRefs||[]).map(esc).join(', ')+'</div>'+
       '<div class="dev-summary"><strong>Interpretation:</strong> '+esc(p.interpretation)+'</div>'+
@@ -6145,7 +6181,7 @@ function signalsExperimentsHtml(){
       ((p.caveats||[]).length?'<div class="src"><strong>Caveats:</strong> '+p.caveats.map(esc).join('; ')+'</div>':'')+
       (p.planDecision&&p.planDecision.rationale?'<div class="src"><strong>Decision rationale:</strong> '+esc(p.planDecision.rationale)+'</div>':'')+
       signalsHandoffMetaHtml(p, perf, interpretation)+
-      '<div class="actions">'+controls+'</div>'+measurement+'</div>';
+      '</details></article>';
   }).join('')+'</section>';
 }
 function signalsVentureHandoffsHtml(){
@@ -6161,22 +6197,29 @@ function signalsVentureHandoffsHtml(){
 }
 function renderSignals(){
   if(!SIGNALS) return;
-  $("#signalsBriefDate").textContent = SIGNALS.briefDate ? "data through "+SIGNALS.briefDate : "";
   const box = $("#signalsTop");
+  const experimentBox=$("#signalsExperiments");
+  if(SIGNALS.error){
+    box.innerHTML='<p role="alert">Could not load decisions: '+esc(SIGNALS.error)+'</p><p>Refresh the dashboard to retry. Previously saved decisions have not been changed.</p>';
+    experimentBox.innerHTML='<p role="alert">Could not load experiments. Refresh the dashboard to retry.</p>';
+    return;
+  }
+  experimentBox.innerHTML=signalsExperimentsHtml();
+  bindSignalsExperimentActions(experimentBox);
+  experimentBox.querySelectorAll(".sig-venture-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsVenture(b)));
+  const plans=SIGNALS.experimentPlans||[];
+  const interpretations=SIGNALS.experimentInterpretations||[];
+  const pendingPlans=plans.filter(p=>p.status==="proposed"||p.status==="plan-approved").length;
+  const pendingLearning=interpretations.filter(p=>p.reviewStatus==="pending").length;
+  const experimentDecisions=pendingPlans||pendingLearning?'<p>Awaiting review: '+[pendingPlans?pendingPlans+' test plan'+(pendingPlans===1?'':'s'):'',pendingLearning?pendingLearning+' interpretation'+(pendingLearning===1?'':'s'):''].filter(Boolean).join(' and ')+'.</p><button type="button" data-signals-tab="experiments">Review experiments and learnings</button>':'';
   if(!SIGNALS.briefPath){
-    box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+signalsConfigurationReviewsHtml()+'<div class="empty">No live strategy brief yet. The clearly labeled sample above demonstrates the intended read; open the latest strategy brief below to replace it with evidence.</div>';
+    box.innerHTML = experimentDecisions+signalsVentureHandoffsHtml()+signalsConfigurationReviewsHtml()+'<p>No strategy recommendations recorded for this brand yet. This does not mean there are no performance measurements.</p><button type="button" data-set-sig-pane="brief">Open strategy report options</button><p class="sig-meta">A strategy report can propose changes from the available evidence. Generating it is a separate action.</p>';
     bindSignalsExperimentActions(box);
     box.querySelectorAll(".sig-venture-decision").forEach(b=>b.addEventListener("click", ()=>decideSignalsVenture(b)));
     box.querySelectorAll(".sig-venture-open").forEach(b=>b.addEventListener("click", ()=>{ setRoom("venture"); switchVenture(b.dataset.slug); }));
     box.querySelectorAll(".sig-venture-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsVenture(b)));
     return;
   }
-  const fitCards = (SIGNALS.confidence||[]).map(c=>{
-    const ok = c.status.startsWith("OK");
-    return '<div class="stat-tile"><span style="font:600 14px/1.3 Georgia,serif;">'+esc(c.channel)+'</span>'+
-      '<span class="l" style="color:'+(ok?"#2f7d46":"#9a6b12")+'">'+esc(signalStatusLabel(c))+'</span>'+
-      '<span class="l">'+c.posts+' posts on record</span></div>';
-  }).join("");
   const weak = (SIGNALS.confidence||[]).filter(c=>!c.status.startsWith("OK"));
   const declined = (SIGNALS.recommendations||[]).filter(r=>(r.decision || (SIGNALS.decisions&&SIGNALS.decisions[signalKey(r)]||{}).decision)==="decline");
   const recs = (SIGNALS.recommendations||[]).map((r,i)=>{
@@ -6194,19 +6237,18 @@ function renderSignals(){
       '</div>'+((proposal&&["pending","approved"].includes(proposal.status))?'':signalDeltaHtml(proposal))+'</div>';
   }).join("");
   const declinedHtml = declined.length
-    ? '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:6px;">Declined</div>'+declined.map(r=>
+    ? '<details class="sig-detail"><summary>Declined recommendations</summary>'+declined.map(r=>
       '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(r.type.toLowerCase())+'</span><span style="font-weight:600;font-size:14px;">'+esc(r.title)+'</span></div>'+
       '<div class="dev-summary">'+esc(r.rationale)+'</div><div class="src">Decision saved. No configuration changed.</div></div>'
-    ).join("")+'</div>'
+    ).join("")+'</details>'
     : "";
   const weakHtml = weak.length
-    ? '<div class="src" style="margin-top:10px">Too weak to trust yet: '+weak.map(c=>esc(c.channel)).join(", ")+'. We will not build on those.</div>'
+    ? '<p class="sig-meta">The brief marks these platforms as insufficient evidence: '+weak.map(c=>esc(c.channel)).join(", ")+'. Treat their recommendations as provisional.</p>'
     : "";
-  const briefNote = '<div class="src" style="margin-bottom:6px">Straight from the latest brief. These do not change anything by themselves.</div>';
-  box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+signalsConfigurationReviewsHtml()+
-    '<div style="margin-top:16px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Where you fit, so far</div><div class="stat-tiles" style="margin-top:8px">'+fitCards+'</div></div>'+
+  const briefNote = '<p class="sig-meta">From the strategy brief dated '+esc(SIGNALS.briefDate||'date unknown')+'. This is the analysis date, not the latest measurement date. Recommendations do not change settings by themselves.</p>';
+  box.innerHTML = experimentDecisions+signalsVentureHandoffsHtml()+signalsConfigurationReviewsHtml()+
     weakHtml+
-    '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+briefNote+
+    '<div><h3>Recommended changes</h3>'+briefNote+
     (recs||'<div class="empty" style="padding:14px">No active recommendations this session.</div>')+'</div>'+declinedHtml;
   box.querySelectorAll(".sig-adopt").forEach(b=>b.addEventListener("click", ()=>saveSignalDecision(Number(b.dataset.i),"adopt",b)));
   box.querySelectorAll(".sig-decline").forEach(b=>b.addEventListener("click", ()=>saveSignalDecision(Number(b.dataset.i),"decline",b)));
@@ -6324,14 +6366,32 @@ async function saveSignalDecision(index, decision, button){
 }
 async function loadSignals(){
   const brand=signalsBrand();
-  const r = await fetch("/api/signals"+"?brand="+encodeURIComponent(brand));
-  SIGNALS = await r.json();
-  renderSignals();
-  await loadOutcomes();
+  try { sessionStorage.setItem("signals-brand",brand); } catch {}
+  const version=++signalsLoadVersion;
+  SIGNALS=null; OUTCOMES=null; RESEARCH=null;
+  $("#signalsTop").innerHTML='<p>Loading decisions…</p>';
+  $("#signalsExperiments").innerHTML='<p>Loading experiments…</p>';
+  $("#signalsPerformance").innerHTML='<p>Loading performance…</p>';
+  $("#signalsFamilies").innerHTML='<p>Loading outcomes…</p>';
+  $("#signalsResearch").innerHTML='';
+  const current=()=>version===signalsLoadVersion&&brand===signalsBrand();
+  const get=async path=>{ try { const r=await fetch(path+'?brand='+encodeURIComponent(brand));const data=await r.json();return r.ok?data:{error:data.error||'Request failed'}; } catch(error){return {error:String(error)};} };
+  await Promise.all([
+    get('/api/signals').then(data=>{if(current()){SIGNALS=data;renderSignals();}}),
+    get('/api/signals/performance').then(data=>{if(current())$("#signalsPerformance").innerHTML=signalsPerformanceHtml(data);}),
+    get('/api/signals/outcomes').then(data=>{if(current()){OUTCOMES=data;renderOutcomes();}}),
+    get('/api/research/report').then(data=>{if(current()){RESEARCH=data;renderResearch();}}),
+  ]);
 }
+let signalsLoadVersion=0;
 document.getElementById("signalsBrand")?.addEventListener("change", () => {
   briefLoaded=false;
   insightsHistory=[];
+  $("#insightsPanel").hidden=true;
+  $("#insightsOut").innerHTML='';
+  $("#insightsThread").innerHTML='';
+  $("#briefBody").innerHTML='';
+  $("#briefPath").textContent='';
   loadSignals();
   if(SIG.pane==="brief") loadBrief();
 });
@@ -6421,23 +6481,7 @@ function familyHtml(fam, metrics){
 }
 function renderOutcomes(){
   const box = $("#signalsFamilies");
-  if(!OUTCOMES){ box.innerHTML = '<div class="empty">Loading…</div>'; return; }
-  if(OUTCOMES.error){ box.innerHTML = '<div class="empty">Could not read the outcome families: '+esc(OUTCOMES.error)+'</div>'; return; }
-  const conf = OUTCOMES.confidence || [];
-  const excluded = OUTCOMES.excluded_unassigned || {};
-  const excludedLine = ["posts","metrics","audience","research","outcomes"].map(k=>k+" "+(Number(excluded[k])||0)).join(", ");
-  const plats = conf.map(c=>
-    '<div class="sig-plat"><span style="font-weight:600">'+esc(c.platform)+'</span>'+
-    '<span class="t-'+(c.sufficient?"green":"amber")+'" style="font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace">'+esc(c.sufficient?"enough data":"insufficient")+'</span>'+
-    '<span style="color:#5a5346">'+c.posts+' post'+(c.posts===1?"":"s")+' on record over '+c.weeks+' week'+(c.weeks===1?"":"s")+'. '+esc(c.status)+'</span></div>'
-  ).join("");
-  box.innerHTML =
-    '<div class="sig-sample">'+esc(sampleNote(conf, OUTCOMES.sample_rule))+'</div>'+
-    '<div class="src" style="margin-top:4px">Legacy rows excluded from this brand view: '+esc(excludedLine)+'. They remain unassigned, never silently attributed.</div>'+
-    '<div class="src" style="margin-top:4px">Sample rule: '+esc(OUTCOMES.sample_rule ? OUTCOMES.sample_rule.source : "")+'</div>'+
-    FAMILY_METRICS.map(pair=>OUTCOMES[pair[0]] ? familyHtml(OUTCOMES[pair[0]], pair[1]) : "").join("")+
-    (plats?'<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:2px;">How much data is behind this</div>'+
-      '<div class="src" style="margin-bottom:4px">Counted straight off the posts table, one row per platform. No trend words: nothing in this repo computes one.</div>'+plats+'</div>':"");
+  box.innerHTML=signalsOutcomeCardsHtml(OUTCOMES);
 }
 function researchLine(k, v){
   return '<div class="sig-plat" style="grid-template-columns:220px minmax(0,1fr)"><span class="src">'+esc(k)+'</span><span>'+esc(String(v))+'</span></div>';
@@ -6445,6 +6489,7 @@ function researchLine(k, v){
 function renderResearch(){
   const box = $("#signalsResearch");
   if(!RESEARCH){ box.innerHTML = ""; return; }
+  if(RESEARCH.error){box.innerHTML='<p role="alert">Research could not be loaded: '+esc(RESEARCH.error)+'</p>';return;}
   const head = '<div class="wb-sep" style="margin-top:34px"><span class="rule"></span><span class="txt">reply signals, redacted</span><span class="rule"></span></div>';
   if(RESEARCH.state !== "available"){
     box.innerHTML = head+'<div class="fam-note t-grey" style="margin-top:12px">'+esc(RESEARCH.reason||"")+'</div>'+
@@ -6470,15 +6515,6 @@ function renderResearch(){
     researchLine("largest single thread", (thread.observation_count==null?"not recorded":thread.observation_count)+" observations, "+(thread.known_respondents==null?"an unrecorded number of":thread.known_respondents)+" known respondents")+
     cov+
     (replies?'<div class="src" style="margin-top:10px">A few redacted lines, as stored:</div>'+replies:"");
-}
-async function loadOutcomes(){
-  const brand = signalsBrand();
-  const [o, rr] = await Promise.all([
-    fetch("/api/signals/outcomes"+"?brand="+encodeURIComponent(brand)).then(r=>r.json()).catch(e=>({error:String(e)})),
-    fetch("/api/research/report"+"?brand="+encodeURIComponent(brand)).then(r=>r.json()).catch(()=>null),
-  ]);
-  OUTCOMES = o; RESEARCH = rr;
-  renderOutcomes(); renderResearch();
 }
 
 // ── Studio home (Content Studio Riff 3c) ──
@@ -6547,7 +6583,7 @@ function renderStudio(){
     else if(room==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
     else if(room==="fiction"){ if(a.dataset.series) ficSeries=a.dataset.series; ficPage=a.dataset.page||"inbox"; setRoom("fiction"); }
     else if(room==="venture"){ if(a.dataset.venture) ventureSlug=a.dataset.venture; VEN.pane="work"; renderVentureSheets(); setRoom("venture"); }
-    else if(room==="signals"){ if(a.dataset.brand) $("#signalsBrand").value=a.dataset.brand; SIG.pane="reads"; renderSignalsSheets(); setRoom("signals"); }
+    else if(room==="signals"){ if(a.dataset.brand) $("#signalsBrand").value=a.dataset.brand; SIG.pane="reads"; setSignalsTab("decisions"); renderSignalsSheets(); setRoom("signals"); }
     else setRoom(room);
   }));
 }

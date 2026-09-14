@@ -25,6 +25,25 @@ function harness(method: string, path: string, body: Record<string, unknown> = {
   };
 }
 
+test("Signals performance route requires a valid brand", async () => {
+  for (const path of ["/api/signals/performance", "/api/signals/performance?brand=invalid"]) {
+    const h=harness("GET",path);
+    assert.equal(await handleSignalsRoute({...h,res:{} as any}),true);
+    assert.equal(h.response()?.code,400);
+  }
+});
+
+test("Signals performance route returns measurements independently of a missing brief", async () => {
+  const h=harness("GET","/api/signals/performance?brand=fiction");
+  assert.equal(await handleSignalsRoute({...h,res:{} as any}),true);
+  assert.equal(h.response()?.code,200);
+  const data=h.response()?.value as any;
+  assert.equal(data.brandId,"fiction");
+  assert.ok(Array.isArray(data.platforms));
+  assert.equal(typeof data.posts,"number");
+  assert.equal(data.briefPath,undefined);
+});
+
 test("Signals outcomes route reads the canonical brand-scoped outcome ledger", async () => {
   const root = mkdtempSync(join(tmpdir(), "serve-signals-outcomes-"));
   const ledger = join(root, "outcomes.jsonl");
@@ -122,6 +141,11 @@ test("Signals Venture handoff decision returns the named Venture and never write
   const root = mkdtempSync(join(tmpdir(), "serve-signals-venture-"));
   const handoffs = join(root, "handoffs.jsonl");
   try {
+    const input = { id: "handoff-content", origin: "human-inference" as const, descriptor: "input", originalInput: "source", treatments: ["summary"], media: ["none"], platforms: ["linkedin"], sourceProvenance: { kind: "source" as const, sourceLines: [1] } };
+    const request=buildContentRequest(input);
+    const treated=request.variants.find(v=>v.identity.kind==="treated")!.identity.id;
+    const control=request.variants.find(v=>v.identity.kind==="control")!.identity.id;
+    recordExperimentPlan(buildExperimentPlan({ recommendation: {...signalsExperimentRecommendation({variantId:treated,comparisonRef:control}),id:"e",confidence:"high"},contentRequest:input,variablesByVariant:Object.fromEntries(request.variants.map(v=>[v.identity.id,{opening:v.identity.kind}])),capacity:{availablePublishingUnits:10,availableDays:7} }),join(root,"plans"));
     const p = recordSignalsVentureProposal({ id: "learn-1", ventureSlug: "venture-a", phase: 2, sourceId: "s", variantId: "v", experimentId: "e", title: "A bounded input", factualSummary: "Observed fact", proposedInput: "Try this", rationale: "Useful next test", confidence: "medium", evidenceRefs: ["outcome:1"], inputKind: "funnel", contentItemRefs: ["item-1"], scope: "one venture", sampleSize: { treatment: 10, control: 10 }, provenance: { planDigest: "sha256:plan", interpretationId: "sha256:interp" }, caveats: ["caveat"], qualification: "qualified", evidenceStatus: "measured" }, handoffs);
     const h = harness("POST", `/api/signals/venture-handoff/${p.id}/decision`, { decision: "adopt", rationale: "I want to use this input" });
     assert.equal(await handleSignalsRoute({ ...h, res: {} as any, ventureHandoffsPath: handoffs }), true);
@@ -131,6 +155,9 @@ test("Signals Venture handoff decision returns the named Venture and never write
     const read = harness("GET", "/api/signals?brand=human-inference");
     await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), ventureHandoffsPath: handoffs, proposalsPath: join(root, "changes"), experimentPlansPath: join(root, "plans") });
     assert.equal((read.response()?.value as any).ventureHandoffs[0].status, "adopted");
+    const other=harness("GET","/api/signals?brand=charles");
+    await handleSignalsRoute({...other,res:{} as any,decisionsPath:join(root,"decisions"),ventureHandoffsPath:handoffs,proposalsPath:join(root,"changes"),experimentPlansPath:join(root,"plans")});
+    assert.deepEqual((other.response()?.value as any).ventureHandoffs,[]);
     assert.equal((read.response()?.value as any).ventureHandoffs[0].ventureGate, "blocked");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

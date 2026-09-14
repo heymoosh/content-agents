@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { openDb } from "../db/db.js";
 import { readSignals, readOutcomeFamilies, readResearchReport } from "./signals.js";
 import { buildSignalsRecommendationRead } from "./signals-recommendations.js";
+import { readSignalsPerformance } from "./signals-performance.js";
 import { appendSignalsDecision, readSignalsDecisions, recommendationKey, type SignalsDecisionKind, type SignalsRecommendationType } from "./signals-decisions.js";
 import { applySignalsProposal, proposeSignalsChange, readSignalsProposals, reconcileSignalsApplyIntents, reviewSignalsProposal, rollbackSignalsProposal } from "./signals-change-proposals.js";
 import { applyApprovedExperimentToContent, approveExperimentPlan, assertExperimentPlanCanGenerate, type AppliedExperimentContentHandoff, type ExperimentPlan, type ExperimentPlanDecision } from "../grow/experiment-content-handoff.js";
@@ -99,6 +100,15 @@ export function prepareLiveExperimentInterpretation(id: string, experimentPlansP
 // Signals stays split by its existing response contracts: signal summary, outcome families, and
 // redacted research report remain separate reads; decisions are explicit append-only writes.
 export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, experimentResultsPath, ventureHandoffsPath, readVentureState, readExperimentPerformance, interpretExperiment, applyExperimentPlan, proposeExperiment, outcomeLedgerPath }: SignalsRouteContext): Promise<boolean> {
+  if (req.method === "GET" && url.pathname === "/api/signals/performance") {
+    const brand = requestedBrand(url);
+    if (!brand) { json(res, 400, { ok: false, error: "A valid brand is required" }); return true; }
+    const db = openDb();
+    try { json(res, 200, readSignalsPerformance(db, brand)); }
+    catch (error) { json(res, 500, { error: `Performance unavailable: ${error instanceof Error ? error.message : String(error)}` }); }
+    finally { db.close(); }
+    return true;
+  }
   // Signals room (design 3e): deterministic brief + durable user decisions. Muxin decides;
   // adoption records intent only and never mutates configuration or the repository backlog.
   if (req.method === "GET" && url.pathname === "/api/signals") {
@@ -107,6 +117,8 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
     reconcileSignalsApplyIntents({ root: configRoot, path: proposalsPath });
     const decisions = Object.fromEntries(Object.entries(readSignalsDecisions(decisionsPath)).filter(([, decision]) => decision.brandId === brand));
     const signals = readSignals(brand);
+    const brandPlans = readExperimentPlans(experimentPlansPath).filter(plan => plan.brandId === brand);
+    const brandExperiments = new Set(brandPlans.map(plan => plan.experimentId));
     json(res, 200, {
       ...signals,
       ...buildSignalsRecommendationRead(brand),
@@ -116,12 +128,14 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
         decision: decisions[recommendationKey(recommendation.type, recommendation.title, brand)]?.decision ?? null,
       })),
       changeProposals: readSignalsProposals(proposalsPath).filter((proposal) => proposal.brandId === brand),
-      experimentPlans: readExperimentPlans(experimentPlansPath).filter((plan) => plan.brandId === brand),
+      experimentPlans: brandPlans,
       experimentPerformance: (() => { const value = (readExperimentPerformance?.() ?? readLiveExperimentPerformance(experimentPlansPath)) as { experiments?: readonly { brandId?: BrandId | null }[]; [key: string]: unknown }; return { ...value, experiments: (value.experiments ?? []).filter((item) => item.brandId === brand) }; })(),
       experimentInterpretations: readExperimentInterpretations(experimentResultsPath).filter((item) => item.brandId === brand),
       // A missing/unavailable optional handoff ledger is an honest empty read, like the other
       // Signals projections. It must not make the core Signals room fail to load.
-      ventureHandoffs: readSignalsVentureProposals(ventureHandoffsPath).map((proposal) => {
+      // Handoffs predate explicit brand fields. Resolve ownership through their source plan,
+      // never through the selected brand or the destination Venture's name.
+      ventureHandoffs: readSignalsVentureProposals(ventureHandoffsPath).filter(proposal => brandExperiments.has(proposal.experimentId)).map((proposal) => {
         const decision = readCanonEvents(proposal.ventureSlug).find((event) => event.type === "signals-input-decision" && event.id === `${proposal.ventureSlug}/signals-input/${proposal.id}`);
         return { ...proposal, ventureDecision: decision ? { outcome: decision.fields.outcome, decidedAt: decision.at, decisionRef: decision.fields.decision_ref } : null };
       }),
