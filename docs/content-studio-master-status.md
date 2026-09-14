@@ -8,13 +8,13 @@
 - Confirmed public: X, LinkedIn, Bluesky, Mastodon, Threads, Facebook, and Instagram.
 - TikTok Direct Post sandbox fix is applied; OAuth reconnection and the approved retry remain.
 - YouTube's actual Postiz OAuth client is in `voter-choice-493119`, confirmed External / Testing.
-- Next: owner resolves Postiz's Chrome certificate warning and authorizes the shared Google app's
-  Production transition; then reconnect TikTok/YouTube and run their bounded Studio browser retries.
+- Postiz browser access is restored. Owner authorized the existing YouTube channel's reconnection.
+- Next: repair Postiz's YouTube callback mismatch; leave Voter Choice's Google settings unchanged.
 - Substack is not live; a fresh attended retry budget is required. Gmail remains optional/manual.
 - Durable HTTPS media hosting and attended Bitwarden injection for Studio's API key remain open.
 - Last accepted runtime: `ea05080`, including 8F/8G/8H and publishing recovery; Grok accepted,
   clean E2E passed, and the final gate passed 4,593/4,593. No new live retry ran in this continuation.
-- Latest investigation: Progress log -> 2026-09-13 (OAuth project verified; attended recovery blocked).
+- Latest investigation: Progress log -> 2026-09-13 (Postiz access restored; YouTube callback mismatch).
 - Keep the read-only Bitwarden token in attended shell scope only.
 
 ## Standing constraints
@@ -177,8 +177,13 @@ rendered, approved, and scheduled. **Process note:** the stale wording
    (Voter Choice), whose Audience page says External / Testing. The separate
    `content-agents-499618` project is In production but has a different client and is not the
    Postiz connection. This confirms the current expiry policy, not the historical cause of this
-   individual `invalid_grant`. Production transition for the shared Voter Choice OAuth app needs
-   owner authorization before reconnection; see the latest Progress log entry.
+   individual `invalid_grant`. **Owner correction:** leave Voter Choice settings unchanged;
+   moving that shared app to Production is not a prerequisite for the authorized temporary
+   reconnection. The Testing lifetime remains a durability issue, to isolate within Content Studio
+   rather than broaden another project's OAuth audience. The current immediate blocker is a
+   callback mismatch: Google registers `http://localhost:4007/integrations/social/youtube`, while
+   Postiz sends `https://postiz-threads.meta:4443/integrations/social/youtube` and Google rejects
+   it with `400 invalid_request` before consent.
    The installed override now requests `video.publish`; the single app container was
    restarted healthy and both backend and orchestrator load the corrected bind mount. TikTok's
    existing `Local Postiz Test` sandbox has Login Kit, Content Posting API, target user
@@ -195,10 +200,9 @@ rendered, approved, and scheduled. **Process note:** the stale wording
    text is absent from the public feed. The false success, Placed row, and queue state were corrected.
    Gmail remains unconfigured and uncanaried. Destination coverage is therefore not complete.
    Format/provider-specific gaps such as Facebook text-only, the real carousel run, and unverified
-   fallback routes remain separately explicit in the capability matrix below. Next: resolve Chrome's
-   `ERR_CERT_AUTHORITY_INVALID` at the Postiz HTTPS origin through an
-   owner-attended browser action, authorize the shared Voter Choice OAuth app's Production
-   transition, then reconnect TikTok/YouTube inside Postiz and run one ASAP retry each; grant a fresh attended Substack retry after the exhausted attempt/retry budget,
+   fallback routes remain separately explicit in the capability matrix below. Next: repair the local YouTube callback configuration and complete the owner-authorized
+   reconnection without changing Voter Choice. Postiz browser access is now restored. Reconnect
+   TikTok, then run the separately approved one ASAP Studio retry per destination; grant a fresh attended Substack retry after the exhausted attempt/retry budget,
    then configure and explicitly approve the exact Gmail canary envelope. The shared retry video is
    now a real tracked candidate at its canonical `configured-media` path; the earlier untracked
    symlink to an ignored render was removed so another checkout will not inherit a broken row.
@@ -278,6 +282,56 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-13 (Postiz access restored; YouTube callback mismatch)
+
+The owner showed that `Postiz-Local-CA` was already trusted in Keychain Access, then restarted
+Chrome and signed into Postiz. A fresh browser inspection reached the real Postiz calendar and
+connected-channel list. The earlier instruction to import/trust the CA was based on an incomplete
+diagnosis; the browser trust blocker is resolved, and no further trust change is required.
+The owner explicitly authorized reconnecting the existing Human Inference YouTube channel.
+Voter Choice Google project settings remain unchanged; the earlier proposed shared-app Production
+transition is withdrawn as a prerequisite, per the owner correction.
+
+The reconnect route reached Google's `Access blocked: Authorization Error`, `400 invalid_request`.
+The error details name `https://postiz-threads.meta:4443/integrations/social/youtube`.
+Read-only inspection of the exact existing Google client shows its sole registered redirect is
+`http://localhost:4007/integrations/social/youtube`. The installed Postiz YouTube provider derives
+both its OAuth2 client `redirectUri` and authorization request `redirect_uri` from the shared
+`FRONTEND_URL`, currently the Meta-specific HTTPS origin. Google's
+[redirect URI rules](https://developers.google.com/identity/protocols/oauth2/web-server#uri-validation)
+require valid public-suffix hostnames, with a localhost exception, and exact registered matching.
+This is a local Postiz callback configuration defect, not a request to alter Voter Choice's audience.
+No OAuth grant or public post was created. Reconnection is not complete.
+
+Engineering review by `sol_advisor` confirms the narrow repair: use one YouTube-specific callback
+value in both the OAuth2 constructor and authorization request, leaving `FRONTEND_URL` unchanged.
+The callback's no-auth social-connect endpoint resolves the reconnect identity and organization
+from Redis state, so a missing HTTPS-domain browser cookie is not by itself a blocker. The
+localhost callback page still calls the HTTPS API; exact localhost CORS acceptance needs a real
+browser check before claiming the flow works. The advisor provided guidance only, not independent
+cross-family acceptance. No runtime candidate was applied or accepted.
+
+Durable rollout is currently engineering-blocked by the existing secure launcher's configuration
+hash gate. The accepted `scripts/postiz-secure` in the external Postiz checkout calls
+`read_stage(stage, candidate_hash(compose))` for `up-app`; `read_stage` rejects a changed hash.
+Adding provider bind mounts therefore cannot use the existing COMPLETE record. The next
+engineering action is to prepare the scoped callback override together with a reviewed maintenance
+path for the new configuration hash, then deploy through attended Bitwarden injection and verify
+existing-channel reconnection. Do not forge/reset the cutover record, rerun database cutover merely
+to change an OAuth callback, copy an ephemeral patch into the live container, or change the global
+frontend origin. Google project settings and provider credentials remain unchanged.
+
+Documentation-only closeout: session review and `git diff --check` PASS. The existing primary
+checkout change `data/notes-spread-ledger.jsonl` is left in place. No runtime tests or publish
+canary ran because this continuation applied no runtime change. `bash scripts/repo-hygiene.sh --rescue --base main` ran; its output was reviewed. In the sibling
+`content-agents-magic-outcome-operations` worktree, these other-session captures were rescued and
+left in place: `content/2026-09-14-job-capture-471fc648b1ad938d29dc/`,
+`content/2026-09-14-job-capture-71f3655ec1acef8a5614/`, and
+`content/2026-09-14-job-capture-c6fa2b74f959fa111be9/`. Existing branches
+`codex/magic-outcome-operations`, `slice-6m-worker`, and `slice-6s-worker` were left in place.
+Only this master document is committed by this continuation; no untracked artifact was created.
+
 
 ### 2026-09-13 (OAuth project verified; attended recovery blocked)
 
