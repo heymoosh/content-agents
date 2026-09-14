@@ -21,25 +21,26 @@ match to learn from historical content, or confuse historical engagement with pr
 - `site/api/essays-subscribe.ts` stores subscriber/source and survey fields. It upserts by email;
   repeated submissions and reactivations must not count as new acquisition. Survey answers can
   change, so latest answers and first completion need distinct treatment.
-- Content Studio can refresh aggregate subscriber/survey counts from the database read-only.
-  It does not yet have website visits, attributable conversions, or the import/new-signup split.
+- Content Studio can refresh aggregate subscriber/survey counts from the database read-only, and
+  its configured analytics path can now display the saved website funnel report. No live refresh
+  has been run, so the report still has no collected website rows in this session.
 - Historical website traffic cannot be reconstructed unless an existing analytics source captured
   it. Inspect what is already installed before adding anything. Missing data stays unknown, not zero.
 - The landing-page implementation now has a first-party collector for page views, 30-minute
   browser sessions, referrer host, and UTM/source-post attribution. It also records server-backed
-  new-signup and first-survey outcomes with idempotent event IDs. This is implemented locally but
-  has not been deployed or connected to Studio by this session.
+  new-signup and first-survey outcomes with idempotent event IDs. Content Studio now has a
+  server-side reader and aggregate dashboard renderer, pending deployment and live refresh.
 
 ## Running list
 
 | Priority | Question / measure | Definition and useful breakdown | Status / next step |
 |---|---|---|---|
-| First | Where do readers arrive? | Sessions and essay/landing-page views by date, page, referrer and tagged source/platform. Sessions are not unique people. | Implemented locally in `landing-page`: first-party `page_view` events retain a 30-minute session, landing path, referrer host and UTM fields. Deployment and Studio connection remain. |
+| First | Where do readers arrive? | Sessions and essay/landing-page views by date, page, referrer and tagged source/platform. Sessions are not unique people. | Implemented locally in `landing-page`; Content Studio can render the saved aggregate rows after a configured refresh. Deployment and live collection remain. |
 | First | Which posts bring readers? | Campaign + stable source-post and variant IDs on incoming links; connect each variant to its source, platform and optional hypothesis. | `utm_content` is the stable variant ID and `hi_source_post` is the stable source-post ID. Tag contract is documented in `landing-page/docs/website-analytics.md`; Studio mapping and future tagged-link rollout remain. |
 | First | Which visits lead to new signups? | Successful new website subscriptions, excluding imports, duplicates, existing subscribers and reactivations. Group by acquisition source, landing page and campaign/variant where known. | Implemented locally: the server writes one deterministic `signup_success` event only for a new website row. `subscriber_origin` defaults to `unknown`; existing import rows need verified owner classification. |
-| First | What is the signup conversion rate? | Sessions with a successful new signup / measured eligible sessions, using the same time range and attribution scope. Show numerator and denominator. | The private report now returns measured sessions, new-signup sessions, numerator/denominator-based rate, and session coverage gaps. It is not deployed or connected to Studio. |
+| First | What is the signup conversion rate? | Sessions with a successful new signup / measured eligible sessions, using the same time range and attribution scope. Show numerator and denominator. | The private report returns measured sessions, new-signup sessions, numerator/denominator-based rate, and session coverage gaps; the Studio dashboard now renders these rows. Deployment and live collection remain. |
 | First | Do people complete the survey? | First successful completion / eligible new-signup cohort, with a stated follow-up window. Separately report imported subscribers who later answer. | Implemented locally with `survey_first_completed_at`, one idempotent first-completion event, a 14-day website cohort, and separate imported/unknown counts. Legacy first-completion history is not invented. |
-| First | What do readers want? | Counts and shares of each saved survey choice, segmented by acquisition cohort/source where useful; show response count and unanswered fields. | The private report returns aggregate categories, response/unanswered counts and shares; free-text Other values are bucketed. It is not connected to Studio. |
+| First | What do readers want? | Counts and shares of each saved survey choice, segmented by acquisition cohort/source where useful; show response count and unanswered fields. | The private report returns aggregate categories, response/unanswered counts and shares; free-text Other values are bucketed. Studio now renders the normalized categories without raw answers. |
 | Next | Where is the flow failing? | Signup attempts versus successful saves; survey starts versus completions; aggregate validation/server errors. | Add minimal events only if needed to diagnose loss. A button click is not a saved subscription. Never log form bodies or identifiers. |
 | Next | Does interest persist? | New subscribers, reactivations and unsubscribes per period; net audience change shown separately from imports. | Current active count exists; historical changes need dated events, not guesses from today's snapshot. |
 | Later | Which content sends people toward tools/products? | Explicit CTA clicks to existing destinations. Later add verified activation, qualified requests and purchases only when those flows exist. | Not a prerequisite for this test. No offer means sales conversion is not applicable, not a failed funnel. |
@@ -96,9 +97,10 @@ signup rate → survey completions**. Add a separate panel for audience needs an
 Show total existing audience separately. Offer requests, sales and revenue can wait until an offer exists.
 
 Next action in the landing-page session: deploy after the owner reviews the measurement wording and
-sets `WEBSITE_ANALYTICS_REPORT_TOKEN`, verify imported subscriber provenance, and connect the
-protected `/api/website-analytics` aggregate report to Content Studio server-side. No deployment,
-account setup, import classification, or Studio connection was performed by this session.
+sets `WEBSITE_ANALYTICS_REPORT_TOKEN`, verify imported subscriber provenance, then configure
+Content Studio's `WEBSITE_ANALYTICS_REPORT_URL` and matching token and run one isolated refresh.
+No deployment, account setup, import classification, or live endpoint refresh was performed by
+this session.
 
 ## Landing-page implementation status — 2026-09-14
 
@@ -113,8 +115,9 @@ Implemented in `/Users/Muxin/Documents/GitHub/landing-page`:
 
 Validation completed: focused analytics tests passed; the full site suite passed 15 tests; TypeScript
 passed; Astro build passed; `git diff --check` passed. No production database, deployment, real
-email send, or Content Studio connection was exercised. The owner still needs to review consent/
-privacy behavior, configure the report token, deploy, classify verified imports, and connect Studio.
+email send, or live Content Studio refresh was exercised. The owner still needs to review consent/
+privacy behavior, configure the report token, deploy, classify verified imports, configure Studio,
+and run the isolated refresh.
 
 The landing-page implementation is now committed locally in commit `b16618b`
 (`feat: add first-party website analytics funnel`). The next verification pass is still owner-gated:
@@ -132,8 +135,16 @@ server environment, its existing read-only website refresh route fetches the pro
 validates and stores an aggregate-only snapshot, and updates the existing private summary. With
 those variables absent, the prior read-only database totals path remains available.
 
-Adapter validation: four focused analytics tests passed; the landing-page suite passed 15 tests,
-TypeScript passed, and the Astro build passed. The Content Studio repository-wide test run reported
+The Studio presentation pass is committed in `3131c93` (`feat: show website analytics in Studio`).
+Studio reads and validates the saved aggregate snapshot on each private Signals/Venture read, then
+renders the top 25 source/platform-to-landing rows with measured sessions, new signups, signup rate,
+and survey completions, plus normalized saved-needs categories. It also renders the report when no
+Venture series exists. The full snapshot remains capped at 500 rows and contains no subscriber
+identifiers or raw survey answers; a malformed derived snapshot is ignored while the separate
+summary remains readable.
+
+Adapter validation: five focused analytics tests passed after the presentation pass; the landing-page suite,
+TypeScript check, and Astro build passed. The Content Studio repository-wide test run reported
 at least 2,729 passing subtests but did not emit its final summary or exit, so it was stopped after
 the hang. Content Studio typecheck still reports three unrelated pre-existing test typing errors in
 `src/review/publishing-status.test.ts` and `src/review/venture-guide.test.ts`. No live endpoint,
