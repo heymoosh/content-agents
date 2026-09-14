@@ -14,6 +14,7 @@ import { resolveCtaLines } from '../publish/cta.js';
 import { setReviewRootsForTest } from './rows.js';
 import { generateConfiguredContent, developSpawnPrompt } from './jobs.js';
 import { renderPage } from './page.js';
+import { contentReaderActionHtml, ventureConversionsHtml } from './page-conversions.js';
 
 test('a per-piece CTA choice survives configuration without changing Venture ownership', () => {
   const input = { id: 'post', origin: 'human-inference' as const, ventureId: 'demo', descriptor: 'Post', originalInput: 'My writing' };
@@ -82,6 +83,10 @@ test('the embedded browser code parses after the plan and destination UI changes
   const html=renderPage({repoRoot:'/fixture',isDevWorktree:true});
   const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(script);assert.doesNotThrow(()=>new Function(script));
+  const renderDestinations=new Function('return ('+ventureConversionsHtml.toString()+')')();
+  assert.match(renderDestinations({plan:{goal:'',destinations:[{id:'signup',name:'Newsletter',status:'ready'}],assignments:[]},destinations:[],pieces:[]},String),/Newsletter/);
+  const renderAction=new Function('return ('+contentReaderActionHtml.toString()+')')();
+  assert.match(renderAction({destinations:[]},null,[],String),/Reader/);
 });
 
 test('default content-type routing contains no consulting destinations', () => {
