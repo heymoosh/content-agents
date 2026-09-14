@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { analyzeNotes, confirmNotes, INTAKE_NOTE_FIELDS, notesPrompt, parseNotesAnalysis, readNotes, saveNotes, submitInterviewReply } from './intake-notes.js';
+import { intakeProgress } from './intake-progress.js';
 
 const notes = 'I help civic organizers build tools. I have no customer evidence yet. I prefer plain writing and refuse hype. Three initial posts are sustainable.';
 function reply() {
@@ -46,14 +47,14 @@ test('chat saves a draft, preserves failed turns for retry, and maps a natural r
     assert.equal(state.messages?.length, 1, 'retry never duplicates the saved user reply');
     const suggested = { ...reply(), reply: 'One possibility is a short checklist. Would you like to test that?' };
     state = await analyzeNotes('chat-example', state.revision, 'codex', { root, legacy: {}, analyst: analyst(suggested) });
-    assert.equal(state.messages?.[1].text, suggested.reply);
+    assert.match(state.messages?.[1].text ?? '', /ready for closeout review/);
     state = saveNotes('chat-example', state.revision, notes, {}, root, 'Yes, test that checklist. I can spend four hours weekly.');
     state = submitInterviewReply('chat-example', state.revision, root);
     const mapped = reply();
     mapped.fields[0] = { key: 'q1', text: 'Test a short checklist', basis: 'inferred', evidence: ['Yes, test that checklist.'] };
     mapped.fields[1] = { key: 'q2', text: 'Four hours weekly', basis: 'stated', evidence: ['I can spend four hours weekly.'] };
     const provider = { ...analyst(mapped), analyze: async (input: { prompt: string }) => {
-      assert.match(input.prompt, /short checklist/);
+      assert.match(input.prompt, /PREVIOUS WORKING CONTEXT/);
       assert.match(input.prompt, /Yes, test that checklist/);
       assert.match(input.prompt, /unaccepted assistant suggestion/);
       return { text: JSON.stringify(mapped), engine: 'fixture', costUsd: 0 };
@@ -63,6 +64,58 @@ test('chat saves a draft, preserves failed turns for retry, and maps a natural r
     assert.equal(state.analysis?.fields[1].text, 'Four hours weekly');
     assert.equal(readNotes('chat-example', root).messages?.length, 4);
     assert.equal(state.notes, notes, 'original notes remain unchanged');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a premature completion response cannot hide missing or invalid context', () => {
+  const state = { revision: 0, notes, corrections: {}, history: [], analysis: null, legacy: {}, legacyHash: '' };
+  const raw = { ...reply(), reply: 'We are done. No further interview question is needed.' };
+  raw.fields[0].evidence = ['unsupported proof'];
+  raw.fields.find(f => f.key === 'scorecard.required_live_posts')!.text = 'several';
+  const parsed = parseNotesAnalysis(JSON.stringify(raw), state, {}, 'fixture');
+  assert.doesNotMatch(parsed.reply!, /We are done|No further interview/);
+  assert.match(parsed.reply!, /2 context details/);
+  assert.ok(parsed.reply!.includes(parsed.questions[0].question));
+  const progress = intakeProgress(INTAKE_NOTE_FIELDS, Object.fromEntries(parsed.fields.map(f => [f.key, f.text])));
+  assert.equal(progress.ready, false);
+  assert.deepEqual(progress.missing.map(f => f.key), ['q1', 'scorecard.required_live_posts']);
+});
+
+test('working answers survive submit/retry and unchanged answers reuse founder evidence, not model inventions', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'intake-memory-'));
+  try {
+    let state = saveNotes('memory', 0, notes, {}, root);
+    const initial = reply(); initial.fields[1] = { key: 'q2', text: '', basis: 'missing', evidence: [] };
+    state = await analyzeNotes('memory', state.revision, 'codex', { root, legacy: {}, analyst: analyst(initial) });
+    state = saveNotes('memory', state.revision, notes, {}, root, 'Local civic organizers first.');
+    state = submitInterviewReply('memory', state.revision, root);
+    assert.equal(state.analysis, null);
+    assert.equal(state.workingAnalysis?.fields[0].text, 'Context to review');
+    assert.match(notesPrompt(state, {}), /PREVIOUS WORKING CONTEXT.*Context to review/);
+    const raw = { ...reply(), fields: INTAKE_NOTE_FIELDS.map(f => f.key === 'q2'
+      ? { key: f.key, text: 'Local civic organizers', basis: 'stated', evidence: ['Local civic organizers first.'] }
+      : { key: f.key, basis: 'unchanged' }) };
+    state = await analyzeNotes('memory', state.revision, 'codex', { root, legacy: {}, analyst: { ...analyst(), analyze: async () => ({ text: JSON.stringify(raw), costUsd: 0, engine: 'fixture' }) } });
+    assert.equal(state.analysis?.fields[0].text, 'Context to review');
+    assert.equal(state.analysis?.fields[1].text, 'Local civic organizers');
+    assert.deepEqual(state.analysis?.questions, []);
+    assert.match(state.analysis?.reply ?? '', /Start venture/);
+    assert.equal(readNotes('memory', root).messages?.length, 3);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('explicit unknowns are valid founder context, while invalid post counts cannot pass closeout', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'intake-closeout-'));
+  try {
+    let state = saveNotes('closeout', 0, notes + ' I do not know the paid offer yet.', {}, root);
+    const raw = reply();
+    raw.fields.find(f => f.key === 'q21')!.text = 'Paid offer is not yet known.';
+    raw.fields.find(f => f.key === 'q21')!.evidence = ['I do not know the paid offer yet.'];
+    raw.fields.find(f => f.key === 'scorecard.required_live_posts')!.text = '0';
+    state = await analyzeNotes('closeout', state.revision, 'codex', { root, legacy: {}, analyst: analyst(raw) });
+    assert.equal(state.analysis?.fields.find(f => f.key === 'q21')?.text, 'Paid offer is not yet known.');
+    assert.deepEqual(state.analysis?.questions[0].fields, ['scorecard.required_live_posts']);
+    assert.throws(() => confirmNotes('closeout', state.revision, root), /Number of initial posts/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

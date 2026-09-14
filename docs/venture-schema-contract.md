@@ -71,6 +71,15 @@ false:
 
 ### 0.1 Physical layout (markdown option)
 
+The pre-kickoff interview scratch state retains `workingAnalysis` when a new user turn
+invalidates `analysis`. The model receives this prior map plus the full founder conversation;
+an `unchanged` field response reuses its prior text only after revalidating founder evidence.
+Completion uses the same field validator in the UI and confirmation handler, including a
+positive whole-number initial-post count. Missing context always has a visible next question.
+Complete context automatically opens closeout review; Muxin's **Start venture** action saves
+the intake and conversation provenance, records kickoff, and opens the Venture workspace.
+This confirmation does not select phase decisions, approve drafts, or publish anything.
+
 Contingent on open question #2. If that answer flips to SQLite, every field name, enum and
 transition below survives unchanged and only this subsection is replaced.
 

@@ -15,6 +15,7 @@ import { INTAKE_QUESTIONS } from "../venture/intake.js";
 import { JOB_COLORS, jobRoom, type JobView } from "./studio-job-ui.js";
 import { CONTENT_CONFIG_OPTIONS } from "./content-request.js";
 import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
+import { intakeProgress } from "./intake-progress.js";
 export {
   formatElapsed,
   ANSWERED_FOOTER,
@@ -5110,36 +5111,44 @@ async function ivNotesAction(action){
   finally { if(ivSlug===slug){ ivNotesBusy=false; renderIntake(); } }
   return succeeded;
 }
+const ivContextProgress = ${intakeProgress.toString()};
 function ivNotesHtml(){
   if(!ivNotesState) return '<div role="status">'+esc(ivNotesMessage||"Loading your saved notes…")+'</div><button id="ivNotesReload">Try again</button><button id="ivLeave">Leave for now</button>';
   const s=ivNotesState, a=s.analysis, disabled=ivNotesBusy?' disabled':'';
   const value=key=>Object.prototype.hasOwnProperty.call(s.corrections,key)?s.corrections[key]:(a?.fields.find(f=>f.key===key)?.text||"");
-  const missing=ivNotesFields.filter(f=>!value(f.key).trim());
+  const progress=ivContextProgress(ivNotesFields,Object.fromEntries(ivNotesFields.map(f=>[f.key,value(f.key)])));
+  const missing=progress.missing;
   const messages=s.messages||[], started=!!(s.notes||a||messages.length);
   const migration=a&&!messages.length?'<div class="iv-chat-message"><strong>Working understanding from your earlier notes</strong>'+esc(a.summary)+'<p>We can continue the interview here. You do not need to fill in the fields. Tell me what you want help thinking through, or ask me to suggest a next step.</p></div>':'';
   const conversation=messages.map(m=>'<div class="iv-chat-message '+(m.role==='user'?'user':'assistant')+'"><strong>'+ (m.role==='user'?'You':'Interviewer')+'</strong>'+(m.role==='user'&&m.text.length>1200?'<details><summary>'+esc(m.text.slice(0,180))+'…</summary>'+esc(m.text)+'</details>':esc(m.text))+'</div>').join('');
-  const ready=!!a&&!missing.length&&s.notes===ivNotesAnalyzedText;
-  const context=a?'<details><summary>'+(ready?'Review the context before creating your venture':'Working context · updated as we talk')+'</summary><p>'+esc(a.summary)+'</p>'+ivNotesFields.filter(f=>value(f.key).trim()).map(f=>{
+  const ready=!!a&&progress.ready&&s.notes===ivNotesAnalyzedText&&!s.draft?.trim()&&!ivNotesConflict;
+  const nextQuestion=a?.questions?.find(q=>q.fields?.some(key=>missing.some(f=>f.key===key)))?.question||missing[0]?.label;
+  const closeout=ready?'<section class="iv-closeout" aria-label="Interview closeout"><h2>Ready to start your venture</h2><p>'+esc(a.summary)+'</p><p>Your context is covered. Review the answers below, including hypotheses and explicit unknowns. Start venture saves this context and your full conversation, records kickoff, and opens the Venture workspace. Research, content, and phase decisions still need your approval.</p><button class="primary" id="ivNotesConfirm"'+disabled+'>Start venture</button></section>':'';
+  const context=a?'<details'+(ready?' open':'')+'><summary>'+(ready?'Review your venture context':'Working context · updated as we talk')+'</summary><p>'+esc(a.summary)+'</p>'+ivNotesFields.filter(f=>value(f.key).trim()).map(f=>{
     const field=a.fields.find(x=>x.key===f.key);
     return '<div class="iv-context-item"><strong>'+esc(f.label)+'</strong><p>'+esc(value(f.key))+'</p><span class="iv-hint">'+esc(Object.prototype.hasOwnProperty.call(s.corrections,f.key)?'Your correction':field?.basis==='inferred'?'Inferred from your answers':'From your answers')+'</span><details><summary>Evidence and manual correction</summary><p class="iv-hint">'+esc(field?.evidence?.join(' / ')||'Your supplied correction')+'</p><textarea aria-label="'+esc(f.label)+'" class="iv-in" rows="2" data-notes-field="'+esc(f.key)+'"'+disabled+'>'+esc(value(f.key))+'</textarea></details></div>';
   }).join('')+(missing.length?'<p>We are still exploring some details together. There are no blank fields for you to fill out here.</p>':'')+'</details>':'';
-  return '<div class="iv-chat"><h2>Let’s shape your venture</h2><p>Share what you know, ask for ideas, or say you’re unsure. We’ll work through it together, one step at a time.</p>'+
+  return '<div class="iv-chat">'+closeout+(ready?context:'')+'<h2>'+(ready?'Interview saved':'Let’s shape your venture')+'</h2><p>'+(ready?'You can still send a correction or ask a question before starting.':'Share what you know, ask for ideas, or say you’re unsure. We’ll work through it together, one step at a time.')+'</p>'+
+    (a?'<p role="status">'+progress.completed+' of '+progress.total+' context details captured'+(ready?' · Ready for your review':missing.length?' · '+missing.length+' still need clarification':' · Submit your latest changes before closeout')+'. These are mapped from your conversation, not separate questions to fill out.</p>':'')+
     (s.notes?'<details><summary>Your original notes</summary><div class="iv-chat-message user">'+esc(s.notes)+'</div></details>':'')+
     migration+'<div class="iv-chat-log" aria-label="Interview conversation">'+conversation+'</div>'+
+    (a&&missing.length?'<section aria-label="Next interview question"><h3>Let’s resolve this next</h3><p>'+esc(nextQuestion)+'</p><p>Answer naturally below, point me to an earlier answer, or ask for a recommendation. If you do not know yet, say so and we can record that honestly.</p></section>':'')+
     (started&&!a&&messages[messages.length-1]?.role==='user'&&!ivNotesBusy?'<p>Your message is saved. Choose “Continue interview” to get a reply.</p>':'')+
     '<label for="ivChatDraft">'+(started?'Your reply':'What are you thinking about building?')+'</label><textarea class="iv-in" id="ivChatDraft" rows="4" placeholder="'+(started?'Answer naturally, ask a question, or tell me what you’re unsure about.':'Paste your existing notes or describe your idea. We can start wherever you are.')+'"'+disabled+'>'+esc(s.draft||'')+'</textarea>'+
     '<div class="iv-nav"><label>Talk with <select id="ivNotesEngine"'+disabled+'><option value="claude"'+(ivNotesEngine==='claude'?' selected':'')+'>Claude</option><option value="codex"'+(ivNotesEngine==='codex'?' selected':'')+'>GPT (Codex)</option></select></label><button class="primary" id="ivNotesAnalyze"'+disabled+'>'+(ivNotesBusy?'Thinking…':started?'Continue interview':'Start conversation')+'</button>'+(started?'<button id="ivNotesIdeas"'+disabled+'>Help me think this through</button>':'')+'<button id="ivNotesSave"'+disabled+'>Save for later</button><button id="ivLeave"'+disabled+'>Leave for now</button></div>'+
     '<div role="status" style="margin:14px 0">'+esc(ivNotesMessage)+'</div>'+
     (ivNotesConflict?'<button id="ivNotesUseSaved">Discard this tab’s edits and load saved version</button>':'')+
-    context+(ready?'<button class="primary" id="ivNotesConfirm"'+(ivNotesBusy||s.draft?.trim()?' disabled':'')+'>Confirm understanding and create venture</button><p class="iv-hint">Review the context above first. Creating the venture requires your confirmation. Nothing publishes.</p>':'<p class="iv-hint">This is a work in progress, not your final intake. The context will be ready for review once we have worked through the remaining details.</p>')+'</div>';
+    (ready?'':context)+'</div>';
 }
 function renderIntake(){
   const box = $("#intakeBox");
   if(!box) return;
   if(!ivSlug){ box.innerHTML = ivStartHtml(); const s = $("#ivSlugIn"); if(s) s.focus(); return; }
+  const hadCloseout=!!box.querySelector('.iv-closeout');
   const body = ivNotesHtml();
   box.innerHTML = '<div class="iv"><div class="vmono">INTAKE: '+esc(ivSlug)+'</div>'+body+'</div>';
   const log=box.querySelector('.iv-chat-log'); if(log) log.scrollTop=log.scrollHeight;
+  const closeout=box.querySelector('.iv-closeout'); if(closeout&&!hadCloseout) closeout.scrollIntoView({block:'start'});
 }
 
 // One delegated listener each, like the Venture thread above: renderIntake() replaces the whole
@@ -5147,12 +5156,16 @@ function renderIntake(){
 document.addEventListener("input", e=>{
   const t = e.target;
   if(!t || !t.closest || !t.closest("#ventureIntake")) return;
-  if(t.id==="ivChatDraft"){ ivNotesState.draft=t.value; ivBackupNotes(); const confirm=$("#ivNotesConfirm"); if(confirm) confirm.disabled=!!t.value.trim(); return; }
+  if(t.id==="ivChatDraft"){
+    ivNotesState.draft=t.value; ivBackupNotes(); const confirm=$("#ivNotesConfirm"),s=ivNotesState;
+    if(confirm) confirm.disabled=ivNotesBusy||ivNotesConflict||!!s.draft.trim()||s.notes!==ivNotesAnalyzedText||!ivContextProgress(ivNotesFields,Object.fromEntries(ivNotesFields.map(f=>[f.key,Object.prototype.hasOwnProperty.call(s.corrections,f.key)?s.corrections[f.key]:s.analysis?.fields.find(x=>x.key===f.key)?.text||""]))).ready;
+    return;
+  }
   if(t.id==="ivNotes"){ ivNotesState.notes=t.value; ivBackupNotes(); const confirm=$("#ivNotesConfirm"); if(confirm) confirm.disabled=true; return; }
   if(t.dataset.notesField){
     ivNotesState.corrections[t.dataset.notesField]=t.value; ivBackupNotes();
     const confirm=$("#ivNotesConfirm"), s=ivNotesState;
-    if(confirm) confirm.disabled=ivNotesBusy||s.notes!==ivNotesAnalyzedText||ivNotesFields.some(f=>!(Object.prototype.hasOwnProperty.call(s.corrections,f.key)?s.corrections[f.key]:s.analysis?.fields.find(x=>x.key===f.key)?.text||"").trim());
+    if(confirm) confirm.disabled=ivNotesBusy||!!s.draft?.trim()||s.notes!==ivNotesAnalyzedText||!ivContextProgress(ivNotesFields,Object.fromEntries(ivNotesFields.map(f=>[f.key,Object.prototype.hasOwnProperty.call(s.corrections,f.key)?s.corrections[f.key]:s.analysis?.fields.find(x=>x.key===f.key)?.text||""]))).ready;
     return;
   }
   if(t.id === "ivIn") return ivQueue(Number(t.dataset.ivq), t.value);
