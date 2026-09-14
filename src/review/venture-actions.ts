@@ -130,7 +130,10 @@ export async function queueExistingSeries(input: {
     const cutPath = join(folder, 'cuts', 'existing-post', 'cut.md');
     if (existsSync(cutPath) && readFileSync(cutPath, 'utf8') !== cut) throw new Error('Selected source differs; refusing overwrite');
     if (!existsSync(cutPath)) writeFileSync(cutPath, cut, { flag: 'wx' });
-    if (!existsSync(join(folder, 'review-queue.md'))) writeFileSync(join(folder, 'review-queue.md'), '# Review queue\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n', { flag: 'wx' });
+    const queuePath=join(folder,'review-queue.md');
+    const emptyQueue='# Review queue\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n';
+    if (!existsSync(queuePath)) writeFileSync(queuePath, emptyQueue.replace('# Review queue','# '+post.title), { flag:'wx' });
+    else if(readFileSync(queuePath,'utf8')===emptyQueue) writeFileSync(queuePath,emptyQueue.replace('# Review queue','# '+post.title));
     if (!existsSync(join(folder, 'content-request.json'))) await writeContentRequest(folder, {
       id: post.contentSlug, origin: 'human-inference', ventureId: input.ventureSlug, descriptor: post.title,
       originalInput: body, sourceProvenance: { kind: 'approved-cut', lens: 'existing-post', sourceLines: refs },

@@ -4514,7 +4514,7 @@ document.addEventListener('click',async e=>{
   if(!button) return;
   if(button.hasAttribute('data-venture-content')){
     await setRoom('content'); CW.pane='wizard'; CW.slug=button.dataset.ventureContent; CW.approvedLens='existing-post'; CW.step=2;
-    await cwLoadTreatment(); renderContentWizard();
+    await cwLoadTreatment(); cwEnsureConfig().open=true; renderContentWizard();
   } else if(button.hasAttribute('data-venture-signals')){
     $('#signalsBrand').value='human-inference'; setSignalsTab('experiments'); await setRoom('signals');
   } else {
