@@ -5842,6 +5842,11 @@ function signalDeltaHtml(p){
   const controls=p.status==="pending" ? '<button class="sig-proposal-review primary" data-id="'+esc(p.id)+'" data-action="approve">Approve exact change</button><button class="sig-proposal-review" data-id="'+esc(p.id)+'" data-action="reject">Reject</button>' : p.status==="approved" ? '<button class="sig-proposal-apply primary" data-id="'+esc(p.id)+'">Apply approved change</button>' : p.status==="applied" ? '<span class="src">Applied. Audit record saved.</span><button class="sig-proposal-rollback" data-id="'+esc(p.id)+'">Rollback</button>' : '<span class="src">'+esc(p.status.replaceAll("_"," "))+'</span>';
   return '<div class="fam-note"><strong>Exact preview</strong><br>'+esc(exact)+'</div><div class="actions">'+controls+'</div>';
 }
+function signalsConfigurationReviewsHtml(){
+  const proposals=(SIGNALS.changeProposals||[]).filter(p=>p.status==="pending"||p.status==="approved");
+  if(!proposals.length) return "";
+  return '<section><h3>Configuration changes awaiting your action</h3>'+proposals.map(p=>'<div class="wb-proposal"><strong>'+esc(p.recommendation.title)+'</strong>'+signalDeltaHtml(p)+'</div>').join("")+'</section>';
+}
 function signalsPracticalHtml(){
   const read=SIGNALS&&SIGNALS.performance;
   if(read&&read.summary){
@@ -5975,7 +5980,7 @@ function renderSignals(){
   $("#signalsBriefDate").textContent = SIGNALS.briefDate ? "data through "+SIGNALS.briefDate : "";
   const box = $("#signalsTop");
   if(!SIGNALS.briefPath){
-    box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+'<div class="empty">No live strategy brief yet. The clearly labeled sample above demonstrates the intended read; open the latest strategy brief below to replace it with evidence.</div>';
+    box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+signalsConfigurationReviewsHtml()+'<div class="empty">No live strategy brief yet. The clearly labeled sample above demonstrates the intended read; open the latest strategy brief below to replace it with evidence.</div>';
     bindSignalsExperimentActions(box);
     box.querySelectorAll(".sig-venture-decision").forEach(b=>b.addEventListener("click", ()=>decideSignalsVenture(b)));
     box.querySelectorAll(".sig-venture-open").forEach(b=>b.addEventListener("click", ()=>{ setRoom("venture"); switchVenture(b.dataset.slug); }));
@@ -6002,7 +6007,7 @@ function renderSignals(){
         '<button class="'+(adopted?'':'primary ')+'sig-adopt" data-i="'+i+'"'+(adopted?' disabled':'')+'>'+(adopted?'Adopted':'Adopt')+'</button>'+
         '<button class="sig-decline" data-i="'+i+'">Decline</button>'+
         (adopted ? '<span class="src">Intent saved. Configuration still unchanged.</span>' : '')+
-      '</div>'+signalDeltaHtml(proposal)+'</div>';
+      '</div>'+((proposal&&["pending","approved"].includes(proposal.status))?'':signalDeltaHtml(proposal))+'</div>';
   }).join("");
   const declinedHtml = declined.length
     ? '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:6px;">Declined</div>'+declined.map(r=>
@@ -6014,16 +6019,13 @@ function renderSignals(){
     ? '<div class="src" style="margin-top:10px">Too weak to trust yet: '+weak.map(c=>esc(c.channel)).join(", ")+'. We will not build on those.</div>'
     : "";
   const briefNote = '<div class="src" style="margin-bottom:6px">Straight from the latest brief. These do not change anything by themselves.</div>';
-  box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+
+  box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+signalsConfigurationReviewsHtml()+
     '<div style="margin-top:16px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Where you fit, so far</div><div class="stat-tiles" style="margin-top:8px">'+fitCards+'</div></div>'+
     weakHtml+
     '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+briefNote+
     (recs||'<div class="empty" style="padding:14px">No active recommendations this session.</div>')+'</div>'+declinedHtml;
   box.querySelectorAll(".sig-adopt").forEach(b=>b.addEventListener("click", ()=>saveSignalDecision(Number(b.dataset.i),"adopt",b)));
   box.querySelectorAll(".sig-decline").forEach(b=>b.addEventListener("click", ()=>saveSignalDecision(Number(b.dataset.i),"decline",b)));
-  box.querySelectorAll(".sig-proposal-review").forEach(b=>b.addEventListener("click", ()=>reviewSignalProposal(b.dataset.id,b.dataset.action,b)));
-  box.querySelectorAll(".sig-proposal-apply").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"apply",b)));
-  box.querySelectorAll(".sig-proposal-rollback").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"rollback",b)));
   bindSignalsExperimentActions(box);
   box.querySelectorAll(".sig-venture-decision").forEach(b=>b.addEventListener("click", ()=>decideSignalsVenture(b)));
   box.querySelectorAll(".sig-venture-open").forEach(b=>b.addEventListener("click", ()=>{ setRoom("venture"); switchVenture(b.dataset.slug); }));
@@ -6049,6 +6051,10 @@ async function decideSignalsVenture(button){
   await loadSignals();
 }
 function bindSignalsExperimentActions(box){
+  box.querySelectorAll(".sig-proposal-review").forEach(b=>b.addEventListener("click", ()=>reviewSignalProposal(b.dataset.id,b.dataset.action,b)));
+  box.querySelectorAll(".sig-proposal-apply").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"apply",b)));
+  box.querySelectorAll(".sig-proposal-rollback").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"rollback",b)));
+
   box.querySelectorAll(".sig-experiment-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsExperiment(b)));
   box.querySelectorAll(".sig-experiment").forEach(b=>b.addEventListener("click", ()=>actOnSignalsExperiment(b.dataset.id,b.dataset.action,b)));
   box.querySelectorAll(".sig-experiment-open").forEach(b=>b.addEventListener("click", ()=>openExperimentDrafts(b.dataset.request)));
@@ -6332,7 +6338,7 @@ function renderStudio(){
   const rows = items.map(n=>
     '<div class="ny-row'+(n.urgent?" urgent":"")+'"><span class="ny-room">'+esc(n.label)+'</span>'+
     '<span class="ny-text">'+esc(n.text)+' <span class="ny-detail">'+esc(n.detail)+'</span></span>'+
-    '<button type="button" class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+'>'+esc(n.action)+'</button></div>'
+    '<button type="button" class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+(n.series?' data-series="'+esc(n.series)+'"':'')+(n.page?' data-page="'+esc(n.page)+'"':'')+(n.brand?' data-brand="'+esc(n.brand)+'"':'')+'>'+esc(n.action)+'</button></div>'
   ).join("");
   // Closing line uses the measured row count. The prototype's hardcoded "Four things" would lie
   // whenever the list is not exactly four.
@@ -6352,6 +6358,8 @@ function renderStudio(){
     if(room==="content"){ setRoom("content"); openReviewSheet(); }
     else if(room==="outreach"){ if(a.dataset.dir) activeLeadDir=a.dataset.dir; setRoom("outreach"); setOutreachSub("leads"); }
     else if(room==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
+    else if(room==="fiction"){ if(a.dataset.series) ficSeries=a.dataset.series; ficPage=a.dataset.page||"inbox"; setRoom("fiction"); }
+    else if(room==="signals"){ if(a.dataset.brand) $("#signalsBrand").value=a.dataset.brand; SIG.pane="reads"; renderSignalsSheets(); setRoom("signals"); }
     else setRoom(room);
   }));
 }

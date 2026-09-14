@@ -104,14 +104,18 @@ function inboxPath(series: string, root = defaultHome()): string {
   safeSeries(series);
   return join(resolve(root), series, "ideas.json");
 }
-function readAll(series: string, root?: string): IdeaRecord[] {
+function readAll(series: string, root?: string, strict = false): IdeaRecord[] {
   try {
     const value = JSON.parse(readFileSync(inboxPath(series, root), "utf8")) as unknown;
+    if (strict && !Array.isArray(value)) throw new Error("Invalid Fiction inbox");
     return Array.isArray(value) ? (value as IdeaRecord[]).map((record) => ({
       ...record,
       clarificationTurns: Array.isArray(record.clarificationTurns) ? record.clarificationTurns : [],
     })) : [];
-  } catch { return []; }
+  } catch (error) {
+    if (strict && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return [];
+  }
 }
 function writeAll(series: string, records: IdeaRecord[], root?: string): void {
   const path = inboxPath(series, root);
@@ -175,8 +179,8 @@ export function readIdea(series: string, id: string, root = defaultHome()): Idea
   return readAll(series, root).find((record) => record.id === id) ?? null;
 }
 
-export function listIdeas(series: string, root = defaultHome()): IdeaRecord[] {
-  return readAll(series, root).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+export function listIdeas(series: string, root = defaultHome(), strict = false): IdeaRecord[] {
+  return readAll(series, root, strict).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function setIdeaClassification(idea: IdeaRecord, classification: IdeaClassification, targetPath?: string): IdeaRecord {

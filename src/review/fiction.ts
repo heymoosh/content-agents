@@ -178,10 +178,13 @@ function beatsPath(slug: string, root: string): string {
   return `${seriesDirFor(slug, root)}.json`; // same gate as every other slug-to-path join
 }
 
-export function readSceneBeats(slug: string, root: string = BEATS_ROOT): SceneBeats | null {
+export function readSceneBeats(slug: string, root: string = BEATS_ROOT, strict = false): SceneBeats | null {
   try {
     const raw = JSON.parse(readFileSync(beatsPath(slug, root), "utf8")) as Partial<SceneBeats>;
-    if (!raw || typeof raw.beats !== "string" || !raw.beats.trim()) return null;
+    if (!raw || typeof raw.beats !== "string" || !raw.beats.trim()) {
+      if (strict) throw new Error("Invalid Fiction scene anchor");
+      return null;
+    }
     return {
       beats: raw.beats,
       chapter: typeof raw.chapter === "number" ? raw.chapter : null,
@@ -194,7 +197,8 @@ export function readSceneBeats(slug: string, root: string = BEATS_ROOT): SceneBe
       }) : [],
       savedAt: typeof raw.savedAt === "string" ? raw.savedAt : "",
     };
-  } catch {
+  } catch (error) {
+    if (strict && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     return null; // never written, or unreadable — either way there is no anchor to show
   }
 }

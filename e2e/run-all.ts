@@ -22,6 +22,7 @@ type Row = { pass: string; feature: string; pr?: string; status: string; detail:
 
 const PASSES = [
   { name: "A-reads", script: "pass-a-reads.ts", title: "Pass A — every room reads and renders (fixture mode)" },
+  { name: "Studio-judgment", script: "pass-studio-judgment.ts", title: "Studio judgment navigation" },
   { name: "Venture-capture", script: "pass-venture-capture.ts", title: "Venture capture handoff" },
   { name: "B-writes", script: "pass-b-writes.ts", title: "Pass B — the write flows (real server, worktree-isolated)" },
   { name: "C-383", script: "pass-c-383.ts", title: "Pass C — the phase-gated #383 surfaces" },

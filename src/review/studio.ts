@@ -16,14 +16,19 @@ import { readDecisions } from "../venture/decisions.js";
 import { readArtifacts } from "../venture/artifacts.js";
 import { ledgerPath } from "../publish/slots.js";
 
+import { fictionNeedsYou, signalsNeedsYou } from "./studio-judgment.js";
+
 export interface NeedsYouItem {
-  room: "content" | "outreach" | "followups" | "signals" | "charles" | "venture";
+  room: "fiction" | "content" | "outreach" | "followups" | "signals" | "charles" | "venture";
   label: string; // 82px-mono room label in the design ("Outreach", "Content", ...)
   text: string; // the sentence, written to Muxin
   detail: string; // gray tail
   action: string; // the click-through verb ("Review", "Read", "Open")
   // navigation hint for the client: which room to open (and lead dir when applicable)
   dir?: string;
+  series?: string;
+  page?: "inbox" | "review";
+  brand?: import("../identity/brand.js").BrandId;
   urgent: boolean; // renders the amber accent (due today etc.)
 }
 
@@ -231,6 +236,7 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
   }
   needsYou.push(...charlesNeedsYou());
   needsYou.push(...ventureNeedsYou());
+  needsYou.push(...fictionNeedsYou(), ...signalsNeedsYou());
   // Urgent first, then content, then dossiers — the design's "ranked by my day".
   needsYou.sort((a, b) => Number(b.urgent) - Number(a.urgent));
 
@@ -265,7 +271,7 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
 
   return {
     counts: { draftsToReview: pending, dossiersToRead: undecided.length, followupsDue, postsHolding: holding },
-    needsYou: needsYou.slice(0, 8),
+    needsYou,
     team,
   };
 }
