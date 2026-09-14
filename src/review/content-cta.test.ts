@@ -16,6 +16,14 @@ import { generateConfiguredContent, developSpawnPrompt } from './jobs.js';
 import { renderPage } from './page.js';
 import { contentReaderActionHtml, ventureConversionsHtml } from './page-conversions.js';
 
+test('reader action shows one linked destination, with corrections secondary and review retained',()=>{
+  const destination={id:'essay',name:'The full essay',benefit:'The full essay',url:'https://example.org/essay',status:'linked',action:'Read the essay',audience:'Readers',measurement:'Not connected'};
+  const html=contentReaderActionHtml({ventureId:'demo',destinations:[destination],intended:{destinationId:'essay',reason:'Continue reading'}},{mode:'destination',destinationId:'essay',reason:'Continue reading',reviewed:false},[],String);
+  assert.equal(html.replace(/<details>[\s\S]*?<\/details>/g,'').split('The full essay').length-1,1);
+  assert.match(html,/<details[^>]*><summary>Change destination or reasoning/);
+  assert.match(html,/contentReaderReviewed/);
+});
+
 test('a per-piece CTA choice survives configuration without changing Venture ownership', () => {
   const input = { id: 'post', origin: 'human-inference' as const, ventureId: 'demo', descriptor: 'Post', originalInput: 'My writing' };
   const request = buildContentRequest({ ...input, readerAction: { mode: 'none' } } as any);

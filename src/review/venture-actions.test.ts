@@ -31,7 +31,8 @@ test('selected existing sources queue once, preserve exact content and owner gat
     const request=await readContentRequest(folder);
     assert.equal(request.originalInput,'My first post.\n\nMore detail.');
     assert.equal(resolveConfiguredProvenance(folder,request).body.trim(),request.originalInput);
-    assert.deepEqual(request.selections.platforms,['linkedin','bluesky']);
+    assert.deepEqual(request.selections.platforms,['linkedin','bluesky','x','threads','mastodon']);
+    assert.equal(request.control.enabled,true,'a handoff must not opt out of controls for the owner');
     assert.equal(request.ventureSource,null); assert.equal(request.experiment,null);
     const authorized=await authorizeGuiContentRequest(folder,request,request);
     assert.equal(authorized.originalInput,request.originalInput);

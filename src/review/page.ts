@@ -15,6 +15,7 @@ import { INTAKE_QUESTIONS } from "../venture/intake.js";
 import { JOB_COLORS, jobRoom, type JobView } from "./studio-job-ui.js";
 import { CONTENT_CONFIG_OPTIONS } from "./content-request.js";
 import { contentReaderActionHtml, ventureConversionsHtml } from './page-conversions.js';
+import { contentPlanIdeas, contentPlanSummaryHtml } from './content-plan.js';
 import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 import { intakeProgress } from "./intake-progress.js";
 import { ventureProgressHtml, ventureResearchPlanHtml } from "./page-venture-progress.js";
@@ -3161,6 +3162,8 @@ function readsFromCells(t, cuts){
 
 const CW_STEPS = [["1","Input"],["2","Plan this piece"],["3","Approve the drafts"],["4","Publish"]];
 const renderContentReaderAction = ${contentReaderActionHtml.toString()};
+const contentPlanIdeas = ${contentPlanIdeas.toString()};
+const contentPlanSummaryHtml = ${contentPlanSummaryHtml.toString()};
 const renderVentureConversions = ${ventureConversionsHtml.toString()};
 let contentInputText = "";
 try { contentInputText = sessionStorage.getItem("studio.contentInput") || ""; } catch(e) {}
@@ -3406,21 +3409,28 @@ function cwStep2Html(){
   if(CW.treatErr) return cwPickedHtml(s)+crossContext+'<div class="fam-note t-amber" style="margin-top:16px">Could not read recommendations for this piece: '+esc(CW.treatErr)+'</div>';
   if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+crossContext+'<div class="empty">Reading recommendations…</div>';
   const cfg = cwEnsureConfig();
+  const ideas=contentPlanIdeas(CW.conversion,((s.cuts||[]).find(c=>c.lens===CW.approvedLens)||{}).body||s.sourceBody||'');
+  const ideaHtml=ideas.length?'<section><h3>Suggested tests</h3><p>Source-based starting points for your Venture questions, not proven winners or a new AI analysis. Choose a batch; each button replaces the platform, format and angle selections below and includes controls. It does not create drafts.</p>'+ideas.map(idea=>'<div style="margin:16px 0"><b>'+esc(idea.title)+'</b><p>'+esc(idea.why)+'</p><button type="button" data-plan-idea="'+esc(idea.id)+'">Use this test plan</button></div>').join('')+'</section>':'';
   const dist=CW.treat.distribution||{platforms:[],media:[],mediaRationale:""};
   const platformWhy=(dist.platforms||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
   const mediaWhy=(dist.media||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
   const mechanismWhy=(CW.treat.mechanismRecommendations||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div><div class="src">'+esc(x.source)+'</div></div>').join('');
-  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these recommendations?</summary><div style="margin-top:8px;max-width:680px">'+mechanismWhy+platformWhy+(mediaWhy||'<div class="src" style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<div class="src" style="margin-top:10px">Reviewed mechanisms are hypotheses matched to this source, never winner claims. Source fit supplies the cold-start distribution recommendation. Existing measured performance evidence remains stronger when available. Every checkbox remains yours to change.</div></div></details>';
+  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these recommendations?</summary><div style="margin-top:8px">'+mechanismWhy+platformWhy+(mediaWhy||'<div style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<p>These source-fit suggestions are not measured results and may differ from your saved selections. Use the suggested tests above to explore further, or adjust any choice below.</p></div></details>';
   return cwPickedHtml(s)+crossContext+
-    '<p>Choose where this piece will go, how to present it, and what readers can do next.</p>'+
+    '<section id="contentPlanSummary">'+contentPlanSummaryHtml(cfg,CONTENT_CONFIG_OPTIONS,CW.conversion,esc)+'</section>'+ideaHtml+recommendation+
+    renderContentReaderAction(CW.conversion,cfg.readerAction,(s.rounds||[]).flatMap(r=>r.cards),esc)+
+    '<h3 style="margin-top:28px">Adjust the plan</h3>'+
     cwConfigSectionHtml("platform","Platforms",CONTENT_CONFIG_OPTIONS.platform,s)+
     cwConfigSectionHtml("media","Formats · leave empty for text only",CONTENT_CONFIG_OPTIONS.media,s)+
-    cwConfigSectionHtml("treatment","Angle and presentation",CONTENT_CONFIG_OPTIONS.treatment,s)+recommendation+
-    renderContentReaderAction(CW.conversion,cfg.readerAction,(s.rounds||[]).flatMap(r=>r.cards),esc)+
-    '<details style="margin-top:24px"><summary>Explore alternatives with the advisor</summary>'+cwAdvisorHtml(s,true)+'</details>'+
+    cwConfigSectionHtml("treatment","Angle and presentation",CONTENT_CONFIG_OPTIONS.treatment,s)+
+    '<details style="margin-top:24px"><summary>Ask the AI advisor for more tailored ideas</summary>'+cwAdvisorHtml(s,true)+'</details>'+
     '<label style="display:flex;gap:9px;align-items:flex-start;margin-top:22px;padding:14px;background:#faf7f0;border:1px solid #efe7d6;border-radius:8px"><input type="checkbox" id="contentControlEnabled"'+(cfg.control?" checked":"")+'><span><b>Untreated control</b><span class="src" style="display:block">Create one source-preserving control for each selected platform and media combination. You can disable it explicitly.</span></span></label>'+
     '<div class="cw-yesall"><button type="button" class="primary" id="contentConfigSave" data-config-save'+(cfg.saving?" disabled":"")+'>'+(cfg.saving?"Creating drafts…":cfg.saved?"Drafts created":"Use this plan and create drafts")+'</button>'+
-    '<span class="src">This stores the request, creates its untreated control and treated drafts, then sends them to Approve Drafts. It does not approve, schedule, or publish anything.</span></div>';
+    '<span class="src">Saves this plan and creates the selected drafts for review. Nothing is approved, scheduled or published.</span></div>';
+}
+function cwRefreshPlanSummary(){
+  const summary=$('#contentPlanSummary');
+  if(summary)summary.innerHTML=contentPlanSummaryHtml(cwEnsureConfig(),CONTENT_CONFIG_OPTIONS,CW.conversion,esc);
 }
 function cwStep3Html(){
   return '';
@@ -3538,6 +3548,15 @@ $("#contentWizard").addEventListener("click", async (e)=>{
   finally { contentInputSaving=false; renderContentWizard(); }
 });
 $("#contentWizard").addEventListener("click", (e)=>{
+  if(e.target.closest?.('[data-restore-control]')){const cfg=cwEnsureConfig();cfg.control=true;cfg.saved=false;renderContentWizard();return;}
+  const ideaButton=e.target.closest?.('[data-plan-idea]');
+  if(ideaButton){
+    const s=cwSession(), cfg=cwEnsureConfig();
+    const idea=contentPlanIdeas(CW.conversion,((s.cuts||[]).find(c=>c.lens===CW.approvedLens)||{}).body||s.sourceBody||'').find(x=>x.id===ideaButton.dataset.planIdea);
+    if(!idea||cfg.saving)return;
+    cfg.platform=new Set(idea.platforms);cfg.media=new Set(idea.media);cfg.treatment=new Set(idea.treatments);cfg.control=true;cfg.saved=false;
+    renderContentWizard();flash('Test plan selected. Review the choices before creating drafts.');return;
+  }
   const original=e.target.closest?.('[data-use-original]');
   if(original){original.disabled=true;post('/api/develop/use-original',{slug:CW.slug}).then(async r=>{if(!r.ok)throw new Error(r.error);CW.approvedLens=r.lens;await loadContent();const cfg=cwEnsureConfig();cfg.open=true;await cwLoadTreatment();}).catch(e=>{original.disabled=false;flash(e.message);});return;}
   const cta=e.target.closest?.('[data-cta-suggestion]');
@@ -3590,11 +3609,12 @@ $("#contentWizard").addEventListener("change", (e)=>{
     renderContentWizard(); return;
   }
   if(target.id==='contentReaderReviewed'){cfg.readerAction.reviewed=target.checked;return;}
-  if(target.id==="contentControlEnabled"){ cfg.control = !!target.checked; cfg.saved = false; return; }
+  if(target.id==="contentControlEnabled"){ cfg.control = !!target.checked; cfg.saved = false; cwRefreshPlanSummary(); return; }
   const kind = target.dataset && target.dataset.configKind;
   if(!kind) return;
   if(target.checked) cfg[kind].add(target.value); else cfg[kind].delete(target.value);
   cfg.saved = false;
+  cwRefreshPlanSummary();
 });
 
 // "Draft it": her typed direction rides into THIS run's prompt via POST /api/outreach/draft. It

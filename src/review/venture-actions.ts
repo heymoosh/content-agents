@@ -149,7 +149,7 @@ export async function queueExistingSeries(input: {
     if (!existsSync(join(folder, 'content-request.json'))) await writeContentRequest(folder, {
       id: post.contentSlug, origin: 'human-inference', ventureId: input.ventureSlug, descriptor: post.title,
       originalInput: body, sourceProvenance: { kind: 'approved-cut', lens: 'existing-post', sourceLines: refs },
-      treatments: ['platform-framing'], platforms: ['linkedin', 'bluesky'], media: ['none'], includeUntreatedControl: false,
+      treatments: ['platform-framing', 'hook-variants'], platforms: ['linkedin', 'bluesky', 'x', 'threads', 'mastodon'], media: ['none'], includeUntreatedControl: true,
     });
   }
   mkdirSync(join(path, '..'), { recursive: true });

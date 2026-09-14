@@ -5,14 +5,14 @@ export function contentReaderActionHtml(context: any, action: any, cards: any[],
   const selected = action?.mode === 'destination' ? action.destinationId : action?.mode || '';
   const destination = destinations.find((d: any) => d.id === selected);
   const suggestion = cards.find((c: any) => c.kind === 'cta' && c.destinationId === selected && c.status !== 'dismissed');
-  const origin = intended?.destinationId === selected ? 'From your Venture plan' : suggestion ? 'Suggested by the advisor' : 'Your choice';
+  const origin = intended?.destinationId === selected ? (destination?.status==='linked'?'Already linked in this piece':'From your Venture plan') : suggestion ? 'Suggested by the advisor' : 'Your choice';
   return '<section style="margin-top:26px"><h3>Reader’s next step</h3>' +
-    (context?.ventureId ? '<p>Venture: <b>'+esc(context.ventureId)+'</b>'+ (context.goal ? ' · '+esc(context.goal) : '')+'</p>' : '<p>No Venture linked to this piece. Use its source or no CTA.</p>') +
-    (intended ? '<p>From your Venture plan: '+esc(destinations.find((d:any)=>d.id===intended.destinationId)?.name || intended.destinationId)+' · '+esc(intended.reason)+'</p>' : '') +
+    (destination ? '<p>'+esc(destination.action)+' <a href="'+esc(destination.url)+'" target="_blank" rel="noopener noreferrer">'+esc(destination.name)+'</a></p><p>'+esc(action?.reason||destination.benefit)+'</p><p class="src">'+esc(origin)+(destination.status==='linked'?'. Not live-verified.':'')+'</p>' : '<p>'+(selected==='none'?'No CTA for this piece.':'Keep the existing source link, if available.')+'</p>')+
+    '<details><summary>Change destination or reasoning</summary>'+
     '<label>Where should readers go? <select id="contentReaderAction"><option value=""'+(!selected?' selected':'')+'>Keep the existing source-link default</option><option value="none"'+(selected==='none'?' selected':'')+'>No CTA for this piece</option>'+destinations.map((d:any)=>'<option value="'+esc(d.id)+'"'+(selected===d.id?' selected':'')+(!['ready','linked'].includes(d.status)?' disabled':'')+'>'+esc(d.name)+' · '+esc(d.status==='linked'?'Already linked in content':d.status)+'</option>').join('')+'</select></label>'+
     (!destinations.length && context?.ventureId ? '<p>No existing resources found yet. Venture will list linked essays and resources as they appear in your content or are built. No promotional link will be invented.</p>' : '')+
-    (destination ? '<p><b>'+origin+'</b><br>'+esc(destination.benefit)+'<br>For: '+esc(destination.audience)+'<br>Reader action: '+esc(destination.action)+'<br><a href="'+esc(destination.url)+'" target="_blank" rel="noopener noreferrer">'+esc(destination.url)+'</a><br>Measurement: '+esc(destination.measurement)+'</p><label style="display:block">Why this helps readers of this piece<textarea id="contentReaderReason" rows="2" style="width:100%">'+esc(action?.reason||'')+'</textarea></label><label><input type="checkbox" id="contentReaderReviewed"'+(action?.reviewed?' checked':'')+'> I’ve checked that this destination exists and is a strong fit with useful reader value.</label>' : '')+
-    '<p class="src">This choice is saved with the plan and shown with each draft. Nothing is published here.</p></section>';
+    (destination ? '<label style="display:block">Why this helps readers<textarea id="contentReaderReason" rows="2" style="width:100%">'+esc(action?.reason||'')+'</textarea></label><p class="src">Measurement: '+esc(destination.measurement)+'</p>' : '')+'</details>'+
+    (destination?'<label style="display:block;margin-top:12px"><input type="checkbox" id="contentReaderReviewed"'+(action?.reviewed?' checked':'')+'> I’ve checked the link and its value for these readers.</label>':'')+'</section>';
 }
 
 export function ventureConversionsHtml(data: any, esc: (v: any) => string): string {
