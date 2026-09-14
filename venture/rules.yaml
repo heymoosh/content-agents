@@ -103,8 +103,8 @@ artifact_kinds:
     min_evidence: null
     phase: current
 
-# rules.md §5.1 -- the platform-recommendation decision. Single primary platform only; the
-# system MUST NOT recommend a multi-platform launch.
+# rules.md §5.1 -- one reference platform for Venture-native artifacts. This is not
+# exclusivity: bounded platform comparisons use Content Studio and its review gates.
 platform_recommendation:
   filters: [audience_attention, format_sustainability, burnout_risk]
   single_primary_platform: true

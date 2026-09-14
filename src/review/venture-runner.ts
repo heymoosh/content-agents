@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { handleVentureRead } from "./venture-reads.js";
+import { VENTURE_PROGRESS_GUIDANCE } from "../venture/working-context.js";
 import {
   decodeSpawnFailure,
   runAgentSpawn,
@@ -97,6 +98,8 @@ export function ventureStepPrompt(slug: string, phase: number, thread: unknown):
   return [
     "Read .claude/skills/venture/SKILL.md in full before acting.",
     "You are proposing exactly one model-owned Venture draft or analysis step for the current phase.",
+    VENTURE_PROGRESS_GUIDANCE,
+    "If nextAction.command is present in the supplied state, return exactly that command. If nextAction.runnable is false, stop: a human review is pending.",
     "Work read-only: do not edit, delete, or create files and do not run a phase command yourself.",
     "Return ONLY one JSON object with this shape: {command, args, input, summary}.",
     "The server will validate the command and feed input to the existing Venture CLI, which owns every gate.",
@@ -144,6 +147,9 @@ export async function enqueueVentureStep(slug: string, requestedPhase: number, e
   if (requestedPhase !== current.phase) throw new Error(`the venture is in Phase ${current.phase}, not Phase ${requestedPhase}`);
   allowedForPhase(requestedPhase);
 
+  const action = (current.thread as { nextAction?: { runnable: boolean; command: string | null } }).nextAction;
+  if (action && !action.runnable) throw new Error('Review the pending plan or decision before continuing.');
+
   return runQueued("venture-step", `Run Venture Phase ${requestedPhase} step with ${ENGINE_LABELS[engine]}`, async (job) => {
     const proposalResult = await runAgentSpawn(job, engine, enginePrompt(engine, "venture", ventureStepPrompt(slug, requestedPhase, current.thread)), {
       timeoutMs: PROPOSAL_TIMEOUT_MS,
@@ -152,6 +158,11 @@ export async function enqueueVentureStep(slug: string, requestedPhase: number, e
     });
     checkSpawn(proposalResult, job.id, `${ENGINE_LABELS[engine]} Venture proposal`, ENGINE_COMMANDS[engine], PROPOSAL_TIMEOUT_MS);
     const proposal = validateVentureStepProposal(requestedPhase, parseVentureStepProposal(proposalResult.stdout));
+    if (action?.command && proposal.command !== action.command) throw new Error(`Expected ${action.command}; no step was written. Try preparing the next test again.`);
+    const latest = currentThread(slug).thread as { workingContext?: { revision: number }; nextAction?: { runnable: boolean; command: string | null } };
+    if (latest.workingContext?.revision !== (current.thread as typeof latest).workingContext?.revision || latest.nextAction?.runnable === false || latest.nextAction?.command !== action?.command) {
+      throw new Error('Venture context or its next step changed during analysis. No draft was written. Review the saved update and try again.');
+    }
     const script = join(repoRoot, "src", "venture", `phase${requestedPhase}.ts`);
     const cliResult = await runCommandSpawn(job, process.execPath, ["--import", "tsx", script, proposal.command, slug, ...proposal.args], {
       timeoutMs: CLI_TIMEOUT_MS,

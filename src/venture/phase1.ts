@@ -84,8 +84,14 @@ function cmdPlanInit(slug: string) {
 
 // --- plan-review: Muxin's explicit gate ---------------------------------------------------------
 
+export function reviewResearchPlan(slug: string, expectedUpdatedAt?: string) {
+  const plan = readArtifact(slug, 'p1-research-plan');
+  if (!plan || plan.artifact_kind !== 'phase_1_research_plan' || plan.editorial_status === 'discarded') throw new Error('No active research plan to review');
+  if (expectedUpdatedAt !== undefined && plan.updated_at !== expectedUpdatedAt) throw new Error('The plan changed. Reload and review the current version.');
+  return updateArtifactFields(slug, 'p1-research-plan', { reviewed_by_muxin: true, reviewed_at: now() }, now());
+}
 function cmdPlanReview(slug: string) {
-  const updated = updateArtifactFields(slug, "p1-research-plan", { reviewed_by_muxin: true, reviewed_at: now() }, now());
+  const updated = reviewResearchPlan(slug);
   console.log(`p1-research-plan reviewed_by_muxin=${updated.fields?.reviewed_by_muxin}`);
 }
 

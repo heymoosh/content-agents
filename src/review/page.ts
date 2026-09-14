@@ -16,6 +16,7 @@ import { JOB_COLORS, jobRoom, type JobView } from "./studio-job-ui.js";
 import { CONTENT_CONFIG_OPTIONS } from "./content-request.js";
 import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 import { intakeProgress } from "./intake-progress.js";
+import { ventureProgressHtml, ventureResearchPlanHtml } from "./page-venture-progress.js";
 export {
   formatElapsed,
   ANSWERED_FOOTER,
@@ -1239,18 +1240,19 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="sheet-head"><h2>Venture</h2><label><span class="sr-only">Choose a venture</span><select id="ventureSelect" class="venture-switcher" aria-label="Choose a venture"><option>Loading ventures…</option></select></label><button type="button" id="ventureStartBtn"><span aria-hidden="true">＋</span> Start a venture</button><span class="grow"></span>
         <span class="src" id="ventureDay"></span>
       </div>
-      <nav class="venture-stages" aria-label="Venture stages"><button class="venture-stage on" data-set-ven-pane="work">1 · Work</button><span class="cw-sep">→</span><button class="venture-stage" data-set-ven-pane="documents">2 · Documents</button><span class="cw-sep">→</span><button class="venture-stage" data-set-ven-pane="intake">3 · Guardrails</button><span class="cw-sep">→</span><button class="venture-stage" data-set-ven-pane="history">4 · History</button></nav>
+      <nav class="room-pages venture-stages" aria-label="Venture pages"><button class="venture-stage on" data-set-ven-pane="work">Overview and next steps</button><button class="venture-stage" data-set-ven-pane="documents">Documents</button><button class="venture-stage" data-set-ven-pane="intake">Guardrails</button><button class="venture-stage" data-set-ven-pane="history">History</button></nav>
       <div id="ventureWorkPane">
-      <div class="sheet-sub" style="max-width:640px">Every line below comes from the ledger, the decisions, the artifacts, and your intake. The selected engine drafts one step and stops at your next gate.</div>
-      <details class="venture-tools" style="margin-top:12px">
-        <summary class="cw-back">Analysis and next-step controls</summary>
+      <style>.venture-progress,.vp-plan{font-size:16px;line-height:1.6;color:#26231e}.vp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 32px}.vp-grid h3{margin:12px 0 6px}.vp-text{white-space:pre-wrap;margin:0}.vp-meta{font-size:13px;color:#625b50}.vp-field{display:block;margin:16px 0}.vp-field textarea{display:block;width:100%;box-sizing:border-box;padding:12px;font:inherit}.venture-progress details{margin:24px 0}.venture-progress summary{cursor:pointer}.vp-plan section{padding:8px 0;border-bottom:1px solid var(--line)}#roomVenture .vnote{color:#403b33}#roomVenture .vthread{max-width:none}#ventureNextExplanation{max-width:850px}@media(max-width:760px){.vp-grid{grid-template-columns:1fr}#ventureMainSheet{padding:20px!important}}</style>
+      <div id="ventureProgress"></div>
+      <section class="venture-tools" style="margin-top:24px">
+        <h3>Next action</h3><p id="ventureNextExplanation"></p>
         <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;background:#faf7f0;border:1px solid #efe7d6;border-radius:8px">
           <label class="engine-choice"><span>Run with</span><select class="engine-select" id="ventureEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-          <button type="button" id="ventureAnalyzeBtn">Analyze this step</button>
+          <button type="button" id="ventureAnalyzeBtn">Help me decide what’s next</button>
           <button type="button" id="ventureRunStepBtn">Run the next draft step</button>
           <span class="src">Both stop at the next human gate. Neither approves or publishes.</span>
         </div>
-      </details>
+      </section>
       <div id="ventureAnalysisPanel" hidden style="margin-top:16px;padding-top:14px;border-top:1px solid #efe7d6">
         <div class="sheet-head"><h3>Selected engine's read</h3><span class="grow"></span><span class="src" id="ventureAnalysisEngine"></span></div>
         <div class="sheet-sub">Read-only advice about what is ready, what you need to decide, and what must wait. It does not write canon or advance a phase.</div>
@@ -3848,6 +3850,7 @@ async function loadVenture(){
 }
 async function analyzeVenture(){
   if(!ventureSlug || ventureAnalysisPending) return;
+  if(ventureWorkingDraft()){ flash('Save your working update before asking the model to use it.'); return; }
   const engine = $("#ventureEngine").value;
   ventureAnalysisPending = true;
   $("#ventureAnalyzeBtn").disabled = true;
@@ -3872,6 +3875,7 @@ async function analyzeVenture(){
 $("#ventureAnalyzeBtn").addEventListener("click", analyzeVenture);
 async function runVentureStep(){
   if(!ventureSlug || !VENTURE_THREAD || ventureRunStepPending) return;
+  if(ventureWorkingDraft()){ flash('Save your working update before preparing a proposal.'); return; }
   const engine = $("#ventureEngine").value;
   ventureRunStepPending = true;
   $("#ventureRunStepBtn").disabled = true;
@@ -3888,7 +3892,8 @@ async function runVentureStep(){
   } finally {
     ventureRunStepPending = false;
     $("#ventureRunStepBtn").disabled = !ventureSlug;
-    $("#ventureRunStepBtn").textContent = "Run the next draft step";
+    $("#ventureRunStepBtn").textContent = VENTURE_THREAD?.nextAction?.label || "Prepare the next proposal";
+    $("#ventureRunStepBtn").disabled = !ventureSlug || VENTURE_THREAD?.nextAction?.runnable === false;
   }
 }
 $("#ventureRunStepBtn").addEventListener("click", runVentureStep);
@@ -4139,6 +4144,7 @@ function vCard(m){
     + '<div class="vtitle">'+esc(m.title)+'</div>'
     + '<div class="vstate"><i style="background:'+vDot(m.dot)+'"></i><span>'+esc(m.state)+'</span>'+vBadge(m.evidence)+'</div>';
   if(m.evidence) h += vEvidence(m.evidence);
+  if(m.researchPlan) h += renderVentureResearchPlan(m.researchPlan,esc);
   if(m.retraction){
     h += '<div style="margin-top:11px"><div class="vmono">TAKEN DOWN '+esc(String(m.retraction.retractedAt).slice(0,10))+'</div>'
       + '<div class="vmine" style="margin-top:5px">'+esc(m.retraction.attestation)+'</div>'
@@ -4183,7 +4189,7 @@ function vCard(m){
   }
   // The action list comes from the SERVER (venture-thread.ts's cardActions), so the browser never
   // holds a second copy of the state machine and can never draw a control the routes would refuse.
-  if(m.actions && m.actions.length){
+  if(m.actions && m.actions.length && !m.researchPlan){
     h += '<div class="vacts">'
       + m.actions.map((a,i)=>'<button data-vcard="'+esc(m.artifactId)+'" data-vact="'+i+'"'
         + (i===0?' class="primary"':'')+'>'+esc(a.label)+'</button>').join("")
@@ -4424,7 +4430,7 @@ function ventureLearningHtml(){
     const id=String(s.id||"").replace(/^research:/,"");
     if(id) sources.push('<button data-learning-source="research-observation" data-learning-id="'+esc(id)+'">Evaluate '+esc(s.evidenceTier)+' learning · '+esc(s.scope)+'</button>');
   });
-  const sourceHtml=sources.length?'<div class="vblock"><div class="vmono">LEARNING</div><div class="vnote">Review one accepted learning receipt at a time. Evaluation never changes Venture state by itself.</div><div class="vacts">'+sources.join('')+'</div></div>':'';
+  const sourceHtml=sources.length?'<details class="vblock"><summary>Explore individual evidence receipts ('+sources.length+')</summary><div class="vnote">Optional evidence review. These observations are not your business task list and do not establish paid demand.</div><div class="vacts">'+sources.join('')+'</div></details>':'';
   const cards=evaluations.map(e=>{
     const status=String(e.status||"pending");
     const controls=status==="pending"?'<div class="vacts"><button class="primary" data-learning-decision="accept" data-learning-id="'+esc(e.evaluationId||e.id)+'">Accept</button><button data-learning-decision="request-more-evidence" data-learning-id="'+esc(e.evaluationId||e.id)+'">Request more evidence</button><button data-learning-decision="decline" data-learning-id="'+esc(e.evaluationId||e.id)+'">Decline</button></div>':'';
@@ -4449,24 +4455,75 @@ async function openVentureCapture(item){
   target?.scrollIntoView({behavior:"smooth",block:"center"});
   if(target){ target.setAttribute("tabindex","-1"); target.focus({preventScroll:true}); }
 }
+const renderVentureProgress = ${ventureProgressHtml.toString()};
+const renderVentureResearchPlan = ${ventureResearchPlanHtml.toString()};
+const ventureWorkingDrafts = {};
+function ventureWorkingDraft(){
+  if(ventureWorkingDrafts[ventureSlug]) return ventureWorkingDrafts[ventureSlug];
+  try { const saved=JSON.parse(sessionStorage.getItem('venture-working:'+ventureSlug)||'null'); if(saved) ventureWorkingDrafts[ventureSlug]=saved; return saved; } catch { return null; }
+}
+function renderWorkingContext(t){
+  const draft=ventureWorkingDraft();
+  $('#ventureProgress').innerHTML=renderVentureProgress(t,esc);
+  if(draft){
+    document.querySelectorAll('[data-working-field]').forEach(el=>{ if(typeof draft[el.dataset.workingField]==='string') el.value=draft[el.dataset.workingField]; });
+    $('#ventureWorkingEdit').open=true;
+    $('#ventureWorkingStatus').textContent='Unsaved changes restored. Save before requesting a proposal.';
+  }
+  $('#ventureNextExplanation').textContent=t.nextAction?.explanation||'Review the current work below.';
+  $('#ventureRunStepBtn').textContent=t.nextAction?.label||'Prepare the next proposal';
+  $('#ventureRunStepBtn').disabled=ventureRunStepPending||t.nextAction?.runnable===false;
+}
+document.addEventListener('input', e=>{
+  const el=e.target;
+  if(!el?.matches?.('[data-working-field]')||!ventureSlug) return;
+  const draft=ventureWorkingDraft()||{revision:VENTURE_THREAD?.workingContext?.revision||0};
+  document.querySelectorAll('[data-working-field]').forEach(field=>draft[field.dataset.workingField]=field.value);
+  ventureWorkingDrafts[ventureSlug]=draft;
+  try { sessionStorage.setItem('venture-working:'+ventureSlug,JSON.stringify(draft)); } catch {}
+  $('#ventureWorkingStatus').textContent='Unsaved changes. Click Save working update to use them in the next proposal.';
+});
+async function saveVentureWorkingContext(){
+  const slug=ventureSlug, current=ventureWorkingDraft(), draft=current?{...current}:null;
+  if(!draft){ $('#ventureWorkingStatus').textContent='No changes to save.'; return; }
+  $('#ventureWorkingSave').disabled=true;
+  $('#ventureWorkingStatus').textContent='Saving…';
+  try {
+    const result=await post('/api/venture/'+encodeURIComponent(slug)+'/working-context',draft);
+    if(!result.ok) throw new Error(result.error||'Could not save');
+    // Do not discard edits made while the save request was in flight.
+    if(JSON.stringify(ventureWorkingDrafts[slug])===JSON.stringify(draft)){
+      delete ventureWorkingDrafts[slug];
+      try { sessionStorage.removeItem('venture-working:'+slug); } catch {}
+    } else if(ventureWorkingDrafts[slug]) {
+      ventureWorkingDrafts[slug].revision=result.context.revision;
+      try { sessionStorage.setItem('venture-working:'+slug,JSON.stringify(ventureWorkingDrafts[slug])); } catch {}
+    }
+    if(slug===ventureSlug){ await loadVenture(); $('#ventureWorkingStatus').textContent=ventureWorkingDraft()?'Earlier update saved. Your newer edits still need saving.':'Working update saved. The next model request will use it. Your original interview is unchanged.'; }
+  } catch(e){ if(slug===ventureSlug) $('#ventureWorkingStatus').textContent='Not saved. '+(e.message||String(e)); }
+  finally { if(slug===ventureSlug) $('#ventureWorkingSave').disabled=false; }
+}
 function renderVenture(){
   const t = VENTURE_THREAD;
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
+  renderWorkingContext(t);
   $("#ventureDay").textContent = vDayLine(t.elapsedDays);
   const signals = (VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).filter(p=>p.ventureSlug===ventureSlug&&p.status==="adopted");
   const signalsHtml = signals.map(p=>'<div class="vblock" data-signals-input="'+esc(p.id)+'"><div class="vmono">SIGNALS INPUT · '+(p.ventureDecision?'DECIDED IN VENTURE':'ADOPTED IN SIGNALS')+'</div><div class="vtitle" style="font-size:20px">'+esc(p.title)+'</div><div class="vnote" style="margin-top:8px">'+esc(p.proposedInput)+' · measured '+esc(p.evidenceStatus)+' evidence · phase '+esc(p.phase)+(p.ventureDecision?' · Venture decision: '+esc(p.ventureDecision.outcome):'')+'</div>'+signalsHandoffMetaHtml(p, null, null)+'<div class="vnote" style="margin-top:6px"><strong>Venture:</strong> '+esc(p.ventureSlug)+' · <strong>Phase:</strong> '+esc(p.phase)+'</div>'+(p.ventureDecision?'':'<div class="vacts"><button class="primary" data-signals-input-action="accept" data-signals-input-id="'+esc(p.id)+'">Accept in Venture</button><button data-signals-input-action="request-more-evidence" data-signals-input-id="'+esc(p.id)+'">Request more evidence</button><button data-signals-input-action="reject" data-signals-input-id="'+esc(p.id)+'">Reject</button></div>')+'</div>').join('');
-  $("#ventureThread").innerHTML = ventureLearningHtml() + signalsHtml + t.messages.map(m=>{
+  $("#ventureThread").innerHTML = t.messages.map(m=>{
+    if(m.kind==='rail' && (m.text==='INTAKE · REVIEWED CONTEXT'||m.text==='CHECKPOINT · STOP AND WAIT')) return '';
+    if(m.kind==='choice'&&!m.live) return '<details class="vblock"><summary>Recorded decision: '+esc(m.rail)+'</summary>'+vChoice(m)+'</details>';
     if(m.kind==="rail") return '<div class="vmono">'+esc(m.text)+'</div>';
-    if(m.kind==="said") return '<div class="vsaid">'+esc(m.text)+'</div>';
-    if(m.kind==="receipt") return '<div class="vreceipt"><i style="background:'+vDot(m.dot)+'"></i><span>'+esc(m.text)+'</span></div>';
+    if(m.kind==="said") return '<details class="vblock"><summary>Internal workflow status</summary><p>This counts only work registered in Venture, not all your existing content or business activity.</p><div class="vsaid">'+esc(m.text)+'</div></details>';
+    if(m.kind==="receipt") return '';
     if(m.kind==="card") return vCard(m);
     if(m.kind==="choice") return vChoice(m);
     if(m.kind==="gate") return vGate(m);
-    if(m.kind==="quotes") return vQuotes(m);
+    if(m.kind==="quotes") return '<details class="vblock"><summary>Original interview and reviewed context</summary>'+vQuotes(m)+'</details>';
     if(m.kind==="clusters") return vClusters(m);
-    if(m.kind==="checkpoint") return vCheckpoint(m);
+    if(m.kind==="checkpoint") return '<details class="vblock"'+(m.canClear?' open':'')+'><summary>Phase completion requirements'+(m.canClear?' · ready for your confirmation':'')+'</summary><p>These are internal phase gates. Existing or scheduled content is not automatically registered or counted as live.</p>'+vCheckpoint(m)+'</details>';
     return "";
-  }).join("");
+  }).join("") + (signalsHtml?'<details class="vblock"><summary>Signals proposals to review</summary>'+signalsHtml+'</details>':'') + ventureLearningHtml();
   // Bottom-of-home queue (slice 2b): this venture's captured thoughts, plus every open "which
   // venture?" question that has no slug yet (a slugged row is another venture's, whatever its
   // state). Row text comes from the capture event itself (SERVER_CAPTURES); the queue row only
@@ -4496,6 +4553,7 @@ function renderVenture(){
   $("#ventureRail").innerHTML = '<div><div class="vmono">LEDGER / HISTORY</div>'
     + '<div class="vnote" style="font-size:12px;margin-top:2px">Earlier artifacts and live records appear here when the server exposes them. Nothing is inferred.</div></div>'
     + historyHtml
+    + t.messages.filter(m=>m.kind==='receipt').map(m=>'<p class="vreceipt"><span>'+esc(m.at)+' · '+esc(m.text)+'</span></p>').join('')
     + t.rail.map(g=>'<div style="display:flex;flex-direction:column;gap:9px">'
       + '<div class="vrail-grp">'+esc(g.name)+'</div>'
       + g.items.map(it=>'<div class="vrail-item"><i></i><span style="min-width:0;display:flex;flex-direction:column;gap:2px">'
@@ -4581,6 +4639,14 @@ document.addEventListener("click", e=>{
   const t = e.target;
   if(!t || !t.closest || !t.closest("#roomVenture")) return;
   const val = ()=> { const el = $("#vFormVal"); return el ? el.value : ""; };
+
+  if(t.closest('#ventureWorkingSave')){ saveVentureWorkingContext(); return; }
+  const planReview=t.closest('[data-review-research-plan]');
+  if(planReview){
+    planReview.disabled=true;
+    ventureWrite('/research-plan/review',{confirm:true,updatedAt:planReview.dataset.reviewResearchPlan},'Research plan reviewed. Ready for the next proposal.','research-plan').finally(()=>{planReview.disabled=false;});
+    return;
+  }
 
   const learningSource = t.closest("[data-learning-source]");
   if(learningSource){

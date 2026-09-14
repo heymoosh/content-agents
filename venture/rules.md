@@ -297,11 +297,24 @@ Required output:
 - known risks or uncertainty;
 - a user action to accept or choose another platform.
 
-The system MUST recommend one primary platform. It MUST NOT recommend a multi-platform launch during this phase.
+The system recommends one primary reference platform for the Venture-native workflow. This is not
+an exclusivity rule. Owner amendment, 2026-09-14: when audience location is unknown, propose a
+bounded comparison across suitable platforms through Content Studio, with platform-native versions,
+separate attribution and the normal editorial and publication approvals. Do not assume the existing
+platform is the best fit, distribute everywhere indiscriminately, or exceed the founder's time budget.
 
 If Muxin overrides the recommendation, store the selected platform and her reason. Later steps use her selection.
 
 ### 5.1A Research framing — Phase 1 is discovery, not selling
+
+For an existing business, reconcile prior work before recommending new work. Read the latest
+`working-context.jsonl` entry alongside the original intake and the artifact/decision ledgers.
+The update is owner-reported operating context, not verified delivery or an approval of a phase gate.
+Credit existing content, scheduled work, tools, funnels and surveys; identify what remains unknown
+and what was intentionally deferred. Reuse suitable work in test proposals instead of automatically
+starting a fresh posting exercise. Scheduled content is not live content. Historical work remains
+historical evidence unless explicitly linked and qualified for a current test. Never manufacture
+artifact completion or reset a selected decision to make the screen look further along.
 
 Added 2026-08-07; formalized into a structured plan in the same-day corrective pass. Phase 1 posts
 are public qualitative discovery instruments before they are anything else. Their job is to test what

@@ -43,6 +43,8 @@ import { ventureDir } from "../venture/paths.js";
 import { clearIntakeDrafts } from "./intake-draft.js";
 import { commitIntake } from "./intake-commit.js";
 import { existsSync } from "node:fs";
+import { saveWorkingContext } from "../venture/working-context.js";
+import { reviewResearchPlan } from "../venture/phase1.js";
 import { readSignalsVentureProposals } from "./signals-venture-handoff-store.js";
 import { acceptSignalsInput, type SignalsInputHandoff } from "../venture/signals-input.js";
 import { createVentureInputPointer } from "../grow/venture-input.js";
@@ -90,6 +92,19 @@ function str(body: Record<string, unknown>, key: string): string | undefined {
 }
 
 const ROUTES: Route[] = [
+  {
+    method: 'POST',
+    pattern: /^\/api\/venture\/([^/]+)\/research-plan\/review$/,
+    handler: (slug, _params, body) => {
+      if (body.confirm !== true || typeof body.updatedAt !== 'string') throw new Error('Confirm the displayed plan before continuing');
+      return { artifact: reviewResearchPlan(slug, body.updatedAt) };
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/api\/venture\/([^/]+)\/working-context$/,
+    handler: (slug, _params, body) => ({ context: saveWorkingContext(slug, body) }),
+  },
   // --- decisions -------------------------------------------------------------------------------
   //
   // One URL for every decision kind; decisions.ts reads the kind off the record and applies that

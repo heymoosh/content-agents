@@ -40,6 +40,7 @@ import type { ResponseGateState } from "../venture/responses.js";
 import type { ClusterAnalysis } from "../venture/phase3.js";
 import type { VentureState, CheckpointState } from "../venture/state.js";
 import type { IntakeAnswers } from "../venture/intake.js";
+import type { WorkingContext } from "../venture/working-context.js";
 
 // ── the view model ───────────────────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ export type DotTone = "green" | "amber" | "red" | "grey" | "blue";
  * of venture-schema-contract.md §2.2, kept distinct.
  */
 export interface CardMsg {
+  researchPlan?: { reviewed: boolean; updatedAt: string; knowns: { claim: string; refs: string[] }[]; unknowns: { id: string; description: string }[]; probes: { unknown: string; hypothesis: string; question: string; evidence: string }[] };
   kind: "card";
   artifactId: string;
   rail: string;
@@ -271,6 +273,8 @@ export type ThreadMsg =
   | ClustersMsg;
 
 export interface VentureThread {
+  workingContext?: WorkingContext;
+  nextAction: { label: string; explanation: string; command: 'plan-init' | null; runnable: boolean };
   slug: string;
   phase: 1 | 2 | 3 | 4;
   phaseStatus: string;
@@ -309,6 +313,7 @@ export interface RailItem {
 }
 
 export interface ThreadInput {
+  workingContext?: WorkingContext;
   slug: string;
   state: VentureState;
   statusText: string;
@@ -804,6 +809,8 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
 
   return {
     slug: input.slug,
+    workingContext: input.workingContext,
+    nextAction: nextVentureAction(state.current_phase, artifacts, decisions),
     phase: state.current_phase,
     phaseStatus: state.phase_status,
     statusText: input.statusText,
@@ -817,6 +824,25 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
       { name: "venture/<slug>/canon.md", stamp: "the ledger every receipt above came from" },
     ],
   };
+}
+
+export function nextVentureAction(phase: number, artifacts: VentureArtifact[], decisions: DecisionRecord[]): VentureThread['nextAction'] {
+  const plan = artifacts.find(a => a.artifact_kind === 'phase_1_research_plan');
+  if (phase === 1 && plan?.editorial_status === 'discarded') return {label:'Restore the research plan below',command:null,runnable:false,explanation:'The plan was put aside. Restore it before reviewing or continuing.'};
+  if (phase === 1 && !plan) return {
+    label: 'Prepare my next test', command: 'plan-init', runnable: true,
+    explanation: 'Use the saved context and existing work to propose what to test, which content can support it, and what evidence is still missing. You review the plan before anything is drafted or published.',
+  };
+  if (phase === 1 && plan && plan.fields?.reviewed_by_muxin !== true) return {
+    label: 'Review the research plan below', command: null, runnable: false,
+    explanation: 'The proposed plan is ready for your review. It is not an instruction to recreate your existing content.',
+  };
+  if (decisions.some(d => d.status === 'awaiting_user')) return {
+    label: 'Review the decision below', command: null, runnable: false,
+    explanation: 'Choose from the pending proposal before asking the model to continue. Existing work and saved updates remain available.',
+  };
+  return { label: 'Prepare the next proposal', command: null, runnable: true,
+    explanation: 'The model reads your saved progress and the current workflow, prepares one eligible step, and stops for your review.' };
 }
 
 export function day14Choice(candidates: string[], rulesVersion: string): ChoiceMsg {
@@ -851,6 +877,10 @@ export function day14Choice(candidates: string[], rulesVersion: string): ChoiceM
 
 function cardFor(a: VentureArtifact, minEvidence: ThreadInput["minEvidence"]): CardMsg {
   const st = cardState(a);
+  if(a.artifact_kind === 'phase_1_research_plan' && a.editorial_status !== 'discarded') {
+    st.text = a.fields?.reviewed_by_muxin === true ? 'Research plan reviewed. Ready to guide the next proposal.' : 'Proposed research plan. Review its questions and tests below.';
+    st.dot = a.fields?.reviewed_by_muxin === true ? 'green' : 'amber';
+  }
   const ev = evidenceView(a.evidence);
   return {
     kind: "card",
@@ -873,6 +903,13 @@ function cardFor(a: VentureArtifact, minEvidence: ThreadInput["minEvidence"]): C
     failure: a.failure ? { message: a.failure.message, retryable: a.failure.retryable, at: a.failure.at } : null,
     claimRefs: a.claim_refs ?? [],
     actions: cardActions(a, minEvidence),
+    ...(a.artifact_kind === 'phase_1_research_plan' && a.editorial_status !== 'discarded' ? { researchPlan: {
+      reviewed: a.fields?.reviewed_by_muxin === true,
+      updatedAt: a.updated_at,
+      knowns: ((a.fields?.confirmed_knowns ?? []) as {claim: string; evidence_refs: string[]}[]).map(k => ({claim:k.claim,refs:k.evidence_refs})),
+      unknowns: ((a.fields?.open_unknowns ?? []) as {unknown_id:string;description:string}[]).map(u=>({id:u.unknown_id,description:u.description})),
+      probes: ((a.fields?.probes ?? []) as {unknown_id:string;hypothesis:string;conversation_question:string;expected_evidence:string}[]).map(p=>({unknown:p.unknown_id,hypothesis:p.hypothesis,question:p.conversation_question,evidence:p.expected_evidence})),
+    } } : {}),
     findings: emergentFindings(a),
     contentHandoffEligible: Boolean(a.body_path)
       && (a.artifact_kind === "substack-post" || a.artifact_kind === "text-post-note")

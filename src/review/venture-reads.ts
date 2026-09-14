@@ -39,6 +39,7 @@ import { loadRules } from "../venture/rules.js";
 import { computeState } from "../venture/state.js";
 import { formatStatusReadOnly } from "../venture/status.js";
 import { buildVentureThread } from "./venture-thread.js";
+import { readWorkingContext } from "../venture/working-context.js";
 import { listVentureDocuments, readVentureDocument } from "./venture-documents.js";
 
 export interface VentureReadResult {
@@ -189,6 +190,7 @@ const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> =
       gate: getResponseGateState(slug),
       clusters: readClusterAnalysis(slug),
       answers: readIntakeAnswers(slug) ?? null,
+      workingContext: readWorkingContext(slug),
       rulesVersion: rules.rules_version,
       minEvidence: Object.fromEntries(Object.entries(rules.artifact_kinds).map(([k, v]) => [k, v.min_evidence])),
       selectCounts: {

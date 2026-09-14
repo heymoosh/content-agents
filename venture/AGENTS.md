@@ -160,6 +160,9 @@ predicates.
   stamped rules version and both source hashes written at kickoff. `state.md` is a cache, rebuilt
   from the ledger on disagreement, never trusted.
 - `venture/<slug>/decisions.jsonl` — one line per judgment step; immutable once `selected`.
+- `venture/<slug>/working-context.jsonl` — append-only owner-reported operating updates after intake.
+  Latest revision informs proposals and the overview; it is not delivery evidence or a gate decision.
+  The original intake and selected decisions remain unchanged.
 - `venture/<slug>/artifacts.jsonl` — one line per drafted/delivered artifact; both state machines
   live here (editorial: Muxin-only; delivery: script/agent-written).
 - `venture/<slug>/phase-1-attention/` — Phase 1's working drafts. `venture/<slug>/phase-2-audience/`

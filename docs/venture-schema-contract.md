@@ -1,5 +1,15 @@
 # Venture Build — the data contract to design against
 
+## Post-intake working context (implemented 2026-09-14)
+
+`venture/<slug>/working-context.jsonl` keeps append-only revisions of owner-reported operating
+context. Each JSON line contains `revision` (positive integer), `savedAt` (ISO timestamp), and
+five text fields: `underway`, `testing`, `next`, `gaps`, `constraints`. The overview reads the latest
+revision; saves require the caller's current revision and reject stale writes. Empty text is allowed.
+The original intake, scorecard, selected decisions and delivery records are not rewritten. Context
+updates inform model proposals, but cannot confirm delivery, approve an artifact, or clear a phase.
+The server rejects a draft proposal if the working-context revision changed during its model call.
+
 **Status:** a contract, not code. Nothing here is built. It exists so the Venture Build front end
 can be designed against real state instead of invented state, and so the build that follows has an
 unambiguous target. Companion to `docs/venture-build-plan.md`, which specifies the behavior, and to

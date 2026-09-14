@@ -35,6 +35,7 @@ import { listLeadDetails, readLeadDetail, type LeadDetail } from "../outreach/st
 import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { handleVentureRead } from "./venture-reads.js";
+import { VENTURE_PROGRESS_GUIDANCE } from "../venture/working-context.js";
 import { handleVentureWrite } from "./venture-writes.js";
 import { deliverVenture } from "../venture/deliver.js";
 import { buildFollowups, markResponded, markContacted, markSent, moveOn, isBucket, type TrackerEvent } from "../outreach/tracker.js";
@@ -663,6 +664,7 @@ export function ventureAnalysisPrompt(slug: string, thread: unknown): string {
     `Follow its rules and phase gates as the governing policy for this advice.`,
     `Do not run /venture, do not execute a phase command, and do not write, edit, delete, or advance any file or ledger.`,
     `You are giving Muxin a read-only judgment about the current venture state.`,
+    VENTURE_PROGRESS_GUIDANCE,
     `Identify what is ready now, the next decision or action that belongs to Muxin, the strongest risks or evidence gaps,`,
     `and what must not happen yet. Keep recommendations grounded only in the supplied server-derived state.`,
     `Treat accepted learning evaluations as evidence-bounded proposals. Pending, declined, or more-evidence evaluations do not authorize a change, and no evaluation auto-mutates Venture.`,
