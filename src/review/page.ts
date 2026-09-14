@@ -1247,6 +1247,8 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <style>.venture-progress,.vp-plan{font-size:16px;line-height:1.6;color:#26231e}.venture-progress{max-width:82ch;margin-top:32px}.vp-sections section{margin:24px 0}.vp-sections h3{margin:0 0 8px}.vp-sections ul{margin:0;padding-left:24px}.vp-sections li{margin:0 0 8px}.vp-text{white-space:pre-wrap;margin:0}.vp-meta{font-size:13px;color:#625b50}.vp-field{display:block;margin:16px 0}.vp-field textarea{display:block;width:100%;box-sizing:border-box;padding:12px;font:inherit}.venture-progress details{margin:24px 0}.venture-progress summary{cursor:pointer}.vp-plan section{padding:8px 0;border-bottom:1px solid var(--line)}#roomVenture .vnote{color:#403b33}#roomVenture .vthread{max-width:none}#ventureNextExplanation{max-width:850px}@media(max-width:760px){#ventureMainSheet{padding:20px!important}}</style>
       <style>.venture-phase-track{display:flex;gap:8px;list-style:none;padding:0;flex-wrap:wrap}.venture-phase-track li{flex:1;min-width:135px;border-top:5px solid var(--line);padding:10px 8px}.venture-phase-track li[aria-current]{border-color:#25221d;background:#f1ece1}.venture-phase-track span,.venture-phase-track small{display:block}.venture-guide{margin:24px 0;font-size:15px;line-height:1.5}.venture-table-wrap{overflow-x:auto}.venture-action-table{width:100%;border-collapse:collapse;text-align:left;font-size:15px;line-height:1.5}.venture-action-table th,.venture-action-table td{padding:14px 12px;border-bottom:1px solid var(--line);vertical-align:top}.venture-action-table th{font-weight:600}.venture-action-table button{text-align:left;white-space:normal}.venture-document-fields{margin:0}.venture-document-fields>div{margin:16px 0}.venture-document-fields dt{font-weight:600}.venture-document-fields dd{margin:6px 0 0}.venture-document-fields ul{padding-left:22px}#ventureActions .venture-progress{max-width:none}</style>
       <div id="ventureGuide"></div>
+      <style>.venture-phase-track li{padding:0}.venture-phase-track button{display:block;width:100%;height:100%;padding:10px 8px;border:0;border-radius:0;background:transparent;text-align:left;font:inherit;color:inherit}.venture-phase-track button[aria-pressed="true"]{box-shadow:inset 0 -3px #25221d}.venture-phase-track button:focus-visible{outline:2px solid #345e90;outline-offset:2px}</style>
+      <div id="venturePhaseWork">
       <div id="ventureActions"></div>
       <section class="venture-tools" id="ventureTools" style="margin-top:24px">
         <h3>Next action</h3><p id="ventureNextExplanation"></p>
@@ -1265,6 +1267,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div id="ventureProgress"></div>
       <div class="vroom" id="ventureRead" style="margin:18px -40px 0;border-top:1px solid #efe7d6">
         <div class="vthread" id="ventureThread"><div class="empty">Loading…</div></div>
+      </div>
       </div>
       </div>
       <div id="ventureDocumentsPane" hidden><div id="ventureDocuments"></div><div id="ventureDocumentReader" hidden></div></div>
@@ -3655,6 +3658,15 @@ let ficPrError = "";
 // the venture thread) or "intake" (the voice/scorecard guardrails). Exactly one shows at a time.
 // The Start-a-venture interview is a separate overlay on the thread pane, same as before.
 let VEN = { pane: "work" };
+let venturePreviewPhase = null;
+function renderVenturePhasePreview(){
+  if(!VENTURE_THREAD) return;
+  const selected=venturePreviewPhase ?? VENTURE_THREAD.phase;
+  $('#ventureGuide').innerHTML=renderVentureGuide(VENTURE_THREAD,esc,selected);
+  // Keep current work mounted so previewing cannot discard an unsaved edit.
+  $('#venturePhaseWork').hidden=selected!==VENTURE_THREAD.phase;
+  $('#venturePhaseWork').inert=selected!==VENTURE_THREAD.phase;
+}
 function renderVentureSheets(){
   $("#ventureMainSheet").hidden = false;
   $("#ventureWorkPane").hidden = VEN.pane !== "work";
@@ -4531,6 +4543,15 @@ async function saveVentureWorkingContext(){
   finally { if(slug===ventureSlug) $('#ventureWorkingSave').disabled=false; }
 }
 document.addEventListener('click',async e=>{
+  const phaseButton=e.target.closest?.('[data-venture-phase]');
+  if(phaseButton && VENTURE_THREAD){
+    const phase=Number(phaseButton.dataset.venturePhase);
+    if(!Number.isInteger(phase)||phase<1||phase>4) return;
+    venturePreviewPhase=phase===VENTURE_THREAD.phase?null:phase;
+    renderVenturePhasePreview();
+    $('#ventureGuide [data-venture-phase="'+phase+'"]').focus({preventScroll:true});
+    return;
+  }
   const refresh=e.target.closest?.('[data-website-refresh]');
   if(refresh){
     document.querySelectorAll('[data-website-refresh]').forEach(b=>{b.disabled=true;b.textContent='Reading website totals…';});
@@ -4554,12 +4575,12 @@ function renderVenture(){
   const t = VENTURE_THREAD;
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
   renderWorkingContext(t);
-  $('#ventureGuide').innerHTML=renderVentureGuide(t,esc);
+  renderVenturePhasePreview();
   $('#ventureSavedConstraints').innerHTML='<h3>Saved operating constraints</h3>'+(t.workingContext?.constraints?'<p style="white-space:pre-wrap">'+esc(t.workingContext.constraints)+'</p>':'<p>No separate operating update recorded. Your original interview is preserved in Documents.</p>');
   const execution = t.phase===1 && (t.executionSeries||[]).length>0 && t.nextAction?.label==='Work through the actions below';
   $('#ventureActions').innerHTML=execution?renderVentureActions(t.executionSeries,t.websiteMeasurement,esc):'';
   // Keep the operating page short. Original context and every workflow gate remain in History.
-  const detailsParent=execution?$('#ventureHistoryPane'):$('#ventureWorkPane');
+  const detailsParent=execution?$('#ventureHistoryPane'):$('#venturePhaseWork');
   detailsParent.append($('#ventureTools'),$('#ventureAnalysisPanel'),$('#ventureProgress'),$('#ventureRead'));
   $("#ventureDay").textContent = vDayLine(t.elapsedDays);
   const signals = (VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).filter(p=>p.ventureSlug===ventureSlug&&p.status==="adopted");
@@ -4665,6 +4686,10 @@ function switchVenture(slug){
   for(const timer of intakeTimers.values()) clearTimeout(timer);
   intakeTimers.clear();
   ventureSlug=slug;
+  venturePreviewPhase=null;
+  $('#venturePhaseWork').hidden=false;
+  $('#venturePhaseWork').inert=false;
+  $('#ventureGuide').innerHTML='';
   VENTURE_THREAD=null;
   VENTURE_LEARNING_EVALUATIONS=[];
   VENTURE_LEARNING_SOURCES=[];

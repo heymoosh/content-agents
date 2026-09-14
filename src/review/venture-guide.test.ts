@@ -10,6 +10,16 @@ test('phase view uses recorded phase, preserves blockers, escapes structured val
   const before=JSON.stringify(thread);
   const html=ventureGuideHtml(thread,escape);
   assert.match(html,/Phase 1 of 4/); assert.match(html,/Day 21/); assert.match(html,/Not live/);
+  for(const phase of [2,3,4]){
+    const preview=ventureGuideHtml(thread,escape,phase);
+    assert.match(preview,new RegExp('Preview: Phase '+phase+' of 4'));
+    assert.match(preview,/Not unlocked yet/);
+    assert.match(preview,/What is needed to start/);
+    assert.match(preview,/What this phase needs to finish/);
+    assert.match(preview,/data-venture-phase="1">Back to current phase and actions/);
+    assert.doesNotMatch(preview,/data-venture-history/);
+  }
+  assert.match(ventureGuideHtml(thread,escape,9),/Phase 1 of 4/);
   assert.equal(JSON.stringify(thread),before);
   const doc=ventureStructuredHtml({reviewed_by_muxin:false,claim:'<script>not markup</script>'},escape);
   assert.match(doc,/Reviewed by muxin/); assert.doesNotMatch(doc,/<script>/); assert.match(doc,/No/);
