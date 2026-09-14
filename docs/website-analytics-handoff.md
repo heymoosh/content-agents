@@ -123,3 +123,18 @@ deployment, run isolated new/duplicate/import/reactivation and first/repeat-surv
 disposable or approved database, then connect Content Studio's server-side reader to the protected
 report. Until that happens, the implementation is complete in source control but collection and
 historical import classification remain unverified.
+
+The follow-up report enhancement is committed in landing-page commit `120e378`
+(`feat: expose saved survey totals in analytics report`). Content Studio's server-side adapter is
+committed in `3605da9` (`feat: connect Content Studio to website analytics report`). When
+`WEBSITE_ANALYTICS_REPORT_URL` and `WEBSITE_ANALYTICS_REPORT_TOKEN` are present in the Content Studio
+server environment, its existing read-only website refresh route fetches the protected report,
+validates and stores an aggregate-only snapshot, and updates the existing private summary. With
+those variables absent, the prior read-only database totals path remains available.
+
+Adapter validation: four focused analytics tests passed; the landing-page suite passed 15 tests,
+TypeScript passed, and the Astro build passed. The Content Studio repository-wide test run reported
+at least 2,729 passing subtests but did not emit its final summary or exit, so it was stopped after
+the hang. Content Studio typecheck still reports three unrelated pre-existing test typing errors in
+`src/review/publishing-status.test.ts` and `src/review/venture-guide.test.ts`. No live endpoint,
+deployment token, production database, import classification, or Content Studio refresh was run.
