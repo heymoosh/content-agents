@@ -2614,14 +2614,13 @@ function directionHtml(l){
   if(phase === "drafting"){
     return saidBlock + '<div class="thinking" style="margin-top:14px;">Drafting the pitch… (your subscription. The Studio room has the progress and the log.)</div>';
   }
-  if(phase === "drafted") return saidBlock;
-  const typed = outDirection.get(l.dir) || "";
+  const typed = outDirection.get(l.dir) ?? l.direction?.text ?? "";
   const err = outError.get(l.dir);
   return '<div class="dir-open"><span class="cap">Suggested angle</span>'+
       '<span class="line">'+esc(outreachOpeningLine(l))+'</span></div>'+
     '<div class="dir-box">'+
       '<textarea class="dir-input" rows="2" data-dir="'+esc(l.dir)+'" placeholder="Say which way to take it, in a line or two.">'+esc(typed)+'</textarea>'+
-      '<div class="dir-go"><button class="dir-send" data-dir="'+esc(l.dir)+'"'+(typed.trim()?"":" disabled")+'>Draft it</button>'+
+      '<div class="dir-go"><button class="dir-save" data-dir="'+esc(l.dir)+'">Save angle</button><span class="note">Save edits to keep your angle for this lead. Drafting and revision also save it.</span>'+(phase === "drafted" || !["pursue","qualified"].includes(l.status) ? "" : '<button class="dir-send" data-dir="'+esc(l.dir)+'"'+(typed.trim()?"":" disabled")+'>Draft it</button>')+
         '<span class="note">Nothing here goes anywhere. It becomes a draft, and only you send it. I write it in your voice and I never invent interest you do not have.</span></div>'+
       (err ? '<div class="aierr" style="margin-top:10px;">⚠ '+esc(err)+' (see the Studio room for the job log)</div>' : "")+
     '</div>';
@@ -2694,8 +2693,7 @@ function threadHtml(l){
   const legacy = mmr.legacy ? ' <span class="legacy-chip">legacy read, the pitch angle standing in until this lead is re-qualified</span>' : "";
   // The direction composer replaces the old one-click "Draft the message": drafting now starts from
   // what she typed, so the thread only offers it once the lead is one she said to pursue.
-  const canDraft = !l.latestMessage && l.kind!=="content-example" && (l.status==="pursue"||l.status==="qualified");
-  const direction = (canDraft || pending || l.latestMessage) && l.kind!=="content-example" ? directionHtml(l) : "";
+  const direction = l.kind!=="content-example" ? directionHtml(l) : "";
   const outreachEngine = l.kind!=="content-example" ? outreachEngineSelectHtml() : "";
   const decideBtns = l.kind==="content-example" ? "" :
     '<div class="wb-handoff" style="margin-top:18px">'+
@@ -2736,6 +2734,10 @@ function renderOutreachBox(){
   refreshEngineControls(box);
   box.querySelectorAll("button.tri-row").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = b.dataset.dir; renderOutreachBox(); }));
   box.querySelectorAll("button.out-back").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = null; renderOutreachBox(); }));
+  box.querySelectorAll("button.dir-save").forEach(b=>b.addEventListener("click", async ()=>{
+    try { await saveOutreachAngle(b.dataset.dir); flash("Angle saved for this lead."); }
+    catch(e){ flash(e instanceof Error ? e.message : String(e)); }
+  }));
   box.querySelectorAll("button.dir-send").forEach(b=>b.addEventListener("click", ()=>{
     const select = b.closest(".dossier-grid")?.querySelector(".engine-select");
     outreachDraft(b.dataset.dir, b, select ? select.value : "codex");
@@ -2874,6 +2876,7 @@ async function outreachMsgRevise(b, engine){
   msgError.delete(dir);
   msgPending.add(dir); renderOutreachBox();
   try {
+    await saveOutreachAngle(dir);
     const r = await post("/api/outreach/message/revise", outreachMessageReviseRequest(dir, file, instruction, engine));
     if(r.ok){ flash("Message revised"); await loadOutreach(); }
     else { msgError.set(dir, r.error || "Failed to revise"); }
@@ -2936,6 +2939,7 @@ async function loadOutreach(){
       } catch (e) { /* no ledger yet: every row reads "never pitched", which is the truth */ }
       }
     renderOutreachBox();
+    renderCaptureHandoff();
     hideRoomLoading("outreachList");
     connectionRecovered();
   } catch(e) {
@@ -3460,11 +3464,19 @@ $("#contentWizard").addEventListener("change", (e)=>{
 // "Draft it": her typed direction rides into THIS run's prompt via POST /api/outreach/draft. It
 // wins over the stored pitch angle where they disagree. Iterating on the result is a different
 // button ("Update it"), and it reuses the revise path that already existed.
+async function saveOutreachAngle(dir){
+  const lead=(OUTREACH_LEADS||[]).find(l=>l.dir===dir);
+  const text=outDirection.get(dir) ?? lead?.direction?.text ?? "";
+  const r=await post("/api/outreach/direction",{dir,text});
+  if(!r.ok) throw new Error(r.error||"Could not save your angle");
+  if(lead) lead.direction=r.direction;
+  return r.direction;
+}
 async function outreachDraft(dir, btn, engine){
   if(outPending.has(dir)) return; // already in flight — don't fire a second real claude -p spawn
   const wrap = btn ? btn.closest(".dir-box") : null;
   const input = wrap ? wrap.querySelector(".dir-input") : null;
-  const direction = input ? input.value.trim() : (outDirection.get(dir) || "").trim();
+  const direction = input ? input.value.trim() : (outDirection.get(dir) ?? (OUTREACH_LEADS||[]).find(l=>l.dir===dir)?.direction?.text ?? "").trim();
   if(!direction){ flash("Say which way to take it first"); return; }
   outDirection.set(dir, direction);
   outSaid.set(dir, direction);
@@ -3479,6 +3491,7 @@ async function outreachDraft(dir, btn, engine){
     // person its follow-up clock will belong to.
     const lead = (OUTREACH_LEADS||[]).find(l=>l.dir===dir);
     const recipient = lead && lead.contacts && lead.contacts.length ? lead.contacts[0].name : undefined;
+    await saveOutreachAngle(dir);
     const r = await post("/api/outreach/draft", outreachDraftRequest(dir, direction, recipient, engine));
     if(r.ok){ drafted = true; outDirection.delete(dir); flash("Drafted. Shape it here before you ever send it."); }
     else outError.set(dir, r.error || "Failed to draft");
@@ -7021,7 +7034,10 @@ async function advanceCaptureSafely(room, text){
   }
   if(room==="Outreach"){
     setOutreachSub("leads");
-    $("#outreachList button, #outreachList [tabindex]")?.focus();
+    await loadOutreach();
+    await loadCaptures();
+    renderCaptureHandoff();
+    $("#outreachCaptureHandoff select")?.focus();
     return "Choose the lead this belongs to before drafting.";
   }
   if(room==="Charles"){
@@ -7059,6 +7075,13 @@ async function loadCaptures(){
   try { const r=await fetch("/api/captures"); const d=await r.json(); if(d.ok) SERVER_CAPTURES=d.captures||[]; }
   catch(e) { /* keep the last repository read visible */ }
 }
+function outreachCaptureControls(capture){
+  const leads=(OUTREACH_LEADS||[]).filter(l=>l.kind!=="content-example" && outreachGoodFit(l));
+  const attached=leads.filter(l=>l.dir===capture.promotion?.itemId || l.direction?.captureIds?.includes(capture.id));
+  return attached.length
+    ? attached.map(l=>'<button class="cap-open-lead" data-dir="'+esc(l.dir)+'">Open '+esc(l.name||l.dir)+'</button>').join("")
+    : '<select class="cap-lead" aria-label="Lead for this outreach angle"><option value="">Choose the person’s lead</option>'+leads.map(l=>'<option value="'+esc(l.dir)+'">'+esc(l.name||l.dir)+'</option>').join("")+'</select><button class="cap-attach">Attach angle</button>';
+}
 function renderCaptureHandoff(){
   const targets = [
     ["content", "contentCaptureHandoff", "Content"],
@@ -7071,15 +7094,36 @@ function renderCaptureHandoff(){
   for(const [room, id, label] of targets){
     const box = $("#"+id);
     if(!box) continue;
-    const captures = SERVER_CAPTURES.filter(c=>c.room===label&&captureHandoffSummary(c));
+    const captures = SERVER_CAPTURES.filter(c=>c.room===label&&(captureHandoffSummary(c)||(label==="Outreach"&&c.promotion)));
     if(!captures.length || currentTab !== room){ box.hidden = true; box.innerHTML = ""; continue; }
     box.hidden = false;
     box.innerHTML = captures.map(capture=>'<div class="capture-handoff" data-capture-id="'+esc(capture.id)+'" style="border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:13px 15px;margin-top:14px">'+
-      '<div class="wb-label">CAPTURE WAITING HERE</div>'+
+      '<div class="wb-label">'+(capture.promotion?'SAVED OUTREACH THOUGHT':'CAPTURE WAITING HERE')+'</div>'+
       '<div style="font:400 16px/1.6 Georgia,serif;white-space:pre-wrap;margin-top:6px">'+esc(capture.text)+'</div>'+
-      '<div class="actions" style="margin-top:10px">'+(label==="Venture"?'<button class="primary cap-start">Open in Venture</button>':label==="Charles"?'<button class="primary cap-start">Resume idea</button>':label==="Content"&&!capture.jobId?'<button class="primary cap-start">Start on it</button>':'')+'<button class="cap-return">Back to Studio capture</button><span class="src">'+(capture.jobId?'Advisor started. Approval and publishing remain separate.':'Saved in the repository. Nothing has been approved or published.')+'</span></div>'+
+      '<div class="actions" style="margin-top:10px">'+(label==="Outreach"?outreachCaptureControls(capture):label==="Venture"?'<button class="primary cap-start">Open in Venture</button>':label==="Charles"?'<button class="primary cap-start">Resume idea</button>':label==="Content"&&!capture.jobId?'<button class="primary cap-start">Start on it</button>':'')+'<button class="cap-return">Back to Studio capture</button><span class="src">'+(capture.jobId?'Advisor started. Approval and publishing remain separate.':'Saved in the repository. Nothing has been approved or published.')+'</span></div>'+
       '</div>').join("");
     box.querySelectorAll(".capture-handoff").forEach(card=>{
+      card.querySelectorAll(".cap-open-lead").forEach(b=>b.addEventListener("click",()=>{
+        activeLeadDir=b.dataset.dir; renderOutreachBox(); $("#outreachList")?.scrollIntoView({block:"start"});
+      }));
+      card.querySelector(".cap-attach")?.addEventListener("click",async (event)=>{
+        const dir=card.querySelector(".cap-lead").value;
+        if(!dir){ flash("Choose the lead this angle belongs to."); return; }
+        const lead=(OUTREACH_LEADS||[]).find(l=>l.dir===dir);
+        if(outDirection.has(dir) && outDirection.get(dir)!==(lead?.direction?.text||"")){
+          flash("Save the angle already in this lead’s editor before attaching another thought."); return;
+        }
+        event.target.disabled=true;
+        try {
+          const r=await post("/api/outreach/direction",{dir,captureId:card.dataset.captureId});
+          if(!r.ok) throw new Error(r.error||"Could not attach the angle");
+          outDirection.set(dir,r.direction.text); activeLeadDir=dir;
+          await loadCaptures();
+          await loadOutreach();
+          flash("Angle attached to this lead. Review it before drafting.");
+          $("#outreachList")?.scrollIntoView({block:"start"});
+        } catch(e){ event.target.disabled=false; flash(e instanceof Error?e.message:String(e)); }
+      });
       card.querySelector(".cap-start")?.addEventListener("click", async (event)=>{
         event.target.disabled=true;
         const capture=SERVER_CAPTURES.find(c=>c.id===card.dataset.captureId);

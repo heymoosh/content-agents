@@ -1,3 +1,4 @@
+import { readLeadDirection, type LeadDirection } from "./direction.js";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,6 +103,7 @@ export interface LeadDetail extends LeadSummary {
   pitch: string; // ## Pitch -- the pitch angle (client/platform) or tentative content angle (content-example)
   jsaStats: JsaStat[]; // stat-shaped lines parsed out of ## Profile (JSA-snapshot leads) -- table-ready
   profileRest: string; // ## Profile minus the jsaStats lines -- the prose worth reading, collapsed in the GUI
+  direction?: LeadDirection;
   muxinNotes: string; // ## Muxin notes -- Muxin's own free-text observations, appended via the GUI
   latestMessage: LeadMessage | null; // newest messages/message-NN.md, if this lead was ever drafted
   // The matchmaker read (design 3d): written to Muxin, not pitch-strategy prose. Emitted by the
@@ -208,6 +210,7 @@ export function readLeadDetail(dir: string): LeadDetail {
     pitch: extractSection(body, "## Pitch").trim(),
     jsaStats: stats,
     profileRest: rest,
+    direction: readLeadDirection(absDir),
     muxinNotes: extractSection(body, "## Muxin notes").trim(),
     latestMessage: readLatestMessage(absDir),
     whyThem: String(fm.why_them ?? "").trim(),

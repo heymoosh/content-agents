@@ -4249,3 +4249,26 @@ test("Charles saved idea resume restores exact text and selection without drafti
   assert.equal(input.value,text);
   assert.equal(boxes[0]!.checked,true);
 });
+
+
+test("Outreach angle editor recovers persisted text and remains editable after drafting", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function directionHtml(l)");
+  const end = script.indexOf("function outreachMessageBox", start);
+  const pending = new Set();
+  const local = new Map();
+  const render = new Function("outreachThreadPhase", "outPending", "outSaid", "outDirection", "outError", "esc", "outreachOpeningLine", script.slice(start,end)+"; return directionHtml;")(
+    (msg: unknown) => msg ? "drafted" : "asking", pending, new Map(), local, new Map(), (s: string) => s, () => "Suggested research angle",
+  );
+  const lead = { dir: "outreach/leads/peer-sam", status: "pursue", direction: { text: "Ask about the community project." } };
+  assert.match(render(lead), /Ask about the community project/);
+  assert.match(render(lead), /Draft it/);
+  const drafted = render({...lead, latestMessage: { body: "Draft" }});
+  assert.match(drafted, /Ask about the community project/);
+  assert.match(drafted, /Save angle/);
+  assert.doesNotMatch(drafted, /Draft it/);
+  local.set(lead.dir, "Unsaved edit");
+  assert.match(render(lead), /Unsaved edit/);
+  local.set(lead.dir, "");
+  assert.doesNotMatch(render(lead), /Ask about the community project/);
+});

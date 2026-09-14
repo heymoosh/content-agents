@@ -2915,3 +2915,11 @@ test("SLICE-6Q: an agent child loses every .env-injected key while a plain runCo
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("outreachMessageRevisePrompt retains the saved owner angle without relaxing evidence rules", () => {
+  const prompt = outreachMessageRevisePrompt("outreach/leads/peer-sam/messages/message-01.md", "email", "Make it shorter", "Ask about the community project.");
+  assert.match(prompt, /Ask about the community project/);
+  assert.match(prompt, /unless her revision request explicitly changes it/);
+  assert.match(prompt, /NEVER invent a fact/);
+  assert.match(prompt, /Edit ONLY that one file/);
+});

@@ -1,4 +1,5 @@
 import "../util/env.js";
+import { readLeadDirection } from "./direction.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -319,13 +320,14 @@ export async function runDraft(
   const selected = selectEvidenceForDraft(evidence, classification);
 
   const promptRecipient = (opts.recipient ?? "").trim() || undefined;
-  const prompt = buildDraftPrompt({ leadName, channel, classification, classificationLabel, pitchAngle, evidence: selected, recipient: promptRecipient, direction: opts.direction });
+  const direction = opts.direction ?? readLeadDirection(absDir).text;
+  const prompt = buildDraftPrompt({ leadName, channel, classification, classificationLabel, pitchAngle, evidence: selected, recipient: promptRecipient, direction });
   // GUI callers (src/review/jobs.ts, card d39258ab) inject a callClaude backed by the shared logged
   // spawn (runClaudeSpawn) instead of this file's own execFile call, for a real job log + heartbeat
   // -- same model/tools/prompt/timeout either way, only the transport differs. The CLI path below
   // (main()) and every test always use the default execFile-based callClaudeDraft.
   const messageBody = await (opts.callClaude ?? callClaudeDraft)(prompt);
-  const unauthorized = findUnauthorizedOutreachClaims(messageBody, selected, opts.direction);
+  const unauthorized = findUnauthorizedOutreachClaims(messageBody, selected, direction);
   if (unauthorized.length) {
     throw new Error(`refusing to write draft: unauthorized outreach claim(s): ${unauthorized.map((finding) => `"${finding.span}"`).join(", ")}`);
   }

@@ -534,6 +534,28 @@ describe("runDraft guard clauses (no subprocess reached)", () => {
     }
   });
 
+  test("runDraft recovers a saved lead angle for the generated message", async () => {
+    const dir = makeLeadDir(leadFixture());
+    writeFileSync(
+      join(dir, "review-queue.md"),
+      `| id | platform | format | asset | native | brand | cta | status | notes |\n|---|---|---|---|---|---|---|---|---|\n`,
+    );
+    writeFileSync(join(dir, "direction.json"), JSON.stringify({text: "keep it to three lines and ask for twenty minutes", captureIds: ["capture-1"]}));
+    let promptSeen = "";
+    try {
+      await runDraft(dir, {
+        callClaude: async (prompt) => {
+          promptSeen = prompt;
+          return "the injected draft body";
+        },
+      });
+      assert.ok(promptSeen.includes("keep it to three lines and ask for twenty minutes"));
+      assert.ok(/HER DIRECTION WINS/.test(promptSeen));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("runDraft without a direction sends a prompt carrying no direction block", async () => {
     const dir = makeLeadDir(leadFixture());
     writeFileSync(

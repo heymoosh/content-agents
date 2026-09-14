@@ -29,6 +29,8 @@ import { appendBetRetraction, readQueue, writeCell, type QueueRow } from "../pub
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { fetchNotesList, humanInferenceSubstackMeasurementBinding, scaffoldPicked } from "../atomize/new-notes.js";
 import { scaffoldContentFolder } from "../atomize/new-content.js";
+import { attachOutreachCapture } from "./outreach-capture.js";
+import { saveLeadDirection } from "../outreach/direction.js";
 import { listLeadDetails, readLeadDetail, type LeadDetail } from "../outreach/status.js";
 import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
@@ -2278,6 +2280,19 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
     // Iterating on the result is NOT here. It reuses POST /api/outreach/message/revise above, so
     // there stays exactly one revise path. Nothing here sends anything: the draft lands `pending`
     // in the lead's review-queue.md, Muxin locks it and sends it by hand (CLAUDE.md rule 2 analog).
+    if (req.method === "POST" && url.pathname === "/api/outreach/direction") {
+      const b = await readBody(req);
+      try {
+        const dir = String(b.dir ?? "");
+        const direction = b.captureId
+          ? attachOutreachCapture(repoRoot, dir, String(b.captureId))
+          : saveLeadDirection(repoRoot, dir, String(b.text ?? ""));
+        json(res, 200, { ok: true, direction });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/outreach/draft") {
       const b = await readBody(req);
       const guard = outreachDraftGuard(b);
