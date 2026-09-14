@@ -5105,7 +5105,7 @@ async function ivNotesAction(action){
       if(!result.ok) throw new Error(result.error||"Could not create this venture.");
       if(ivSlug!==slug) return;
       ivRemember(null); ivExit(); ventureSlug=slug; await loadVentureList(); flash("Venture created from your reviewed context.");
-    } else ivNotesMessage="Conversation and draft saved. You can return whenever you like.";
+    } else ivNotesMessage="Saved: your notes, conversation, manual corrections, and reply draft. Saving does not send a reply to the AI or start the venture.";
     succeeded=true;
   } catch(e){ if(ivSlug===slug) ivNotesMessage=e instanceof Error?e.message:String(e); }
   finally { if(ivSlug===slug){ ivNotesBusy=false; renderIntake(); } }
@@ -5122,11 +5122,14 @@ function ivNotesHtml(){
   const migration=a&&!messages.length?'<div class="iv-chat-message"><strong>Working understanding from your earlier notes</strong>'+esc(a.summary)+'<p>We can continue the interview here. You do not need to fill in the fields. Tell me what you want help thinking through, or ask me to suggest a next step.</p></div>':'';
   const conversation=messages.map(m=>'<div class="iv-chat-message '+(m.role==='user'?'user':'assistant')+'"><strong>'+ (m.role==='user'?'You':'Interviewer')+'</strong>'+(m.role==='user'&&m.text.length>1200?'<details><summary>'+esc(m.text.slice(0,180))+'…</summary>'+esc(m.text)+'</details>':esc(m.text))+'</div>').join('');
   const ready=!!a&&progress.ready&&s.notes===ivNotesAnalyzedText&&!s.draft?.trim()&&!ivNotesConflict;
-  const nextQuestion=a?.questions?.find(q=>q.fields?.some(key=>missing.some(f=>f.key===key)))?.question||missing[0]?.label;
+  const invalidCount=missing.some(f=>f.key==='scorecard.required_live_posts');
+  const nextQuestion=invalidCount?'Enter a whole number greater than zero for Number of initial posts in the context below. Your saved explanation is still shown there. Extra context belongs in Your reply.':a?.questions?.find(q=>q.fields?.some(key=>missing.some(f=>f.key===key)))?.question||missing[0]?.label;
   const closeout=ready?'<section class="iv-closeout" aria-label="Interview closeout"><h2>Ready to start your venture</h2><p>'+esc(a.summary)+'</p><p>Your context is covered. Review the answers below, including hypotheses and explicit unknowns. Start venture saves this context and your full conversation, records kickoff, and opens the Venture workspace. Research, content, and phase decisions still need your approval.</p><button class="primary" id="ivNotesConfirm"'+disabled+'>Start venture</button></section>':'';
-  const context=a?'<details'+(ready?' open':'')+'><summary>'+(ready?'Review your venture context':'Working context · updated as we talk')+'</summary><p>'+esc(a.summary)+'</p>'+ivNotesFields.filter(f=>value(f.key).trim()).map(f=>{
+  const context=a?'<details id="ivContextReview"'+(ready||invalidCount?' open':'')+'><summary>'+(ready?'Review your venture context':'Working context · updated as we talk')+'</summary><p>'+esc(a.summary)+'</p><p>Manual corrections replace the mapped answer. Click Save changes to save them, or Start venture to save and create the workspace.</p>'+ivNotesFields.filter(f=>value(f.key).trim()||f.key==='scorecard.required_live_posts').map(f=>{
     const field=a.fields.find(x=>x.key===f.key);
-    return '<div class="iv-context-item"><strong>'+esc(f.label)+'</strong><p>'+esc(value(f.key))+'</p><span class="iv-hint">'+esc(Object.prototype.hasOwnProperty.call(s.corrections,f.key)?'Your correction':field?.basis==='inferred'?'Inferred from your answers':'From your answers')+'</span><details><summary>Evidence and manual correction</summary><p class="iv-hint">'+esc(field?.evidence?.join(' / ')||'Your supplied correction')+'</p><textarea aria-label="'+esc(f.label)+'" class="iv-in" rows="2" data-notes-field="'+esc(f.key)+'"'+disabled+'>'+esc(value(f.key))+'</textarea></details></div>';
+    const numeric=f.key==='scorecard.required_live_posts';
+    const editor=numeric?'<p id="ivPostCountHelp">Enter a whole number greater than zero, such as 6. Extra context belongs in Your reply, not this number.</p><input type="number" min="1" step="1" aria-describedby="ivPostCountHelp" aria-label="'+esc(f.label)+'" class="iv-in" data-notes-field="'+esc(f.key)+'" value="'+esc(invalidCount?'':value(f.key))+'"'+disabled+'>':'<textarea aria-label="'+esc(f.label)+'" class="iv-in" rows="2" data-notes-field="'+esc(f.key)+'"'+disabled+'>'+esc(value(f.key))+'</textarea>';
+    return '<div class="iv-context-item"><strong>'+esc(f.label)+'</strong><p>'+esc(value(f.key))+'</p><span class="iv-hint">'+esc(Object.prototype.hasOwnProperty.call(s.corrections,f.key)?'Your correction':field?.basis==='inferred'?'Inferred from your answers':'From your answers')+'</span><details id="ivCorrection-'+esc(f.key)+'"'+(numeric&&invalidCount?' open':'')+'><summary>Evidence and manual correction</summary><p class="iv-hint">'+esc(field?.evidence?.join(' / ')||'Your supplied correction')+'</p>'+editor+'</details></div>';
   }).join('')+(missing.length?'<p>We are still exploring some details together. There are no blank fields for you to fill out here.</p>':'')+'</details>':'';
   return '<div class="iv-chat">'+closeout+(ready?context:'')+'<h2>'+(ready?'Interview saved':'Let’s shape your venture')+'</h2><p>'+(ready?'You can still send a correction or ask a question before starting.':'Share what you know, ask for ideas, or say you’re unsure. We’ll work through it together, one step at a time.')+'</p>'+
     (a?'<p role="status">'+progress.completed+' of '+progress.total+' context details captured'+(ready?' · Ready for your review':missing.length?' · '+missing.length+' still need clarification':' · Submit your latest changes before closeout')+'. These are mapped from your conversation, not separate questions to fill out.</p>':'')+
@@ -5135,8 +5138,8 @@ function ivNotesHtml(){
     (a&&missing.length?'<section aria-label="Next interview question"><h3>Let’s resolve this next</h3><p>'+esc(nextQuestion)+'</p><p>Answer naturally below, point me to an earlier answer, or ask for a recommendation. If you do not know yet, say so and we can record that honestly.</p></section>':'')+
     (started&&!a&&messages[messages.length-1]?.role==='user'&&!ivNotesBusy?'<p>Your message is saved. Choose “Continue interview” to get a reply.</p>':'')+
     '<label for="ivChatDraft">'+(started?'Your reply':'What are you thinking about building?')+'</label><textarea class="iv-in" id="ivChatDraft" rows="4" placeholder="'+(started?'Answer naturally, ask a question, or tell me what you’re unsure about.':'Paste your existing notes or describe your idea. We can start wherever you are.')+'"'+disabled+'>'+esc(s.draft||'')+'</textarea>'+
-    '<div class="iv-nav"><label>Talk with <select id="ivNotesEngine"'+disabled+'><option value="claude"'+(ivNotesEngine==='claude'?' selected':'')+'>Claude</option><option value="codex"'+(ivNotesEngine==='codex'?' selected':'')+'>GPT (Codex)</option></select></label><button class="primary" id="ivNotesAnalyze"'+disabled+'>'+(ivNotesBusy?'Thinking…':started?'Continue interview':'Start conversation')+'</button>'+(started?'<button id="ivNotesIdeas"'+disabled+'>Help me think this through</button>':'')+'<button id="ivNotesSave"'+disabled+'>Save for later</button><button id="ivLeave"'+disabled+'>Leave for now</button></div>'+
-    '<div role="status" style="margin:14px 0">'+esc(ivNotesMessage)+'</div>'+
+    '<div class="iv-nav"><label>Talk with <select id="ivNotesEngine"'+disabled+'><option value="claude"'+(ivNotesEngine==='claude'?' selected':'')+'>Claude</option><option value="codex"'+(ivNotesEngine==='codex'?' selected':'')+'>GPT (Codex)</option></select></label><button class="primary" id="ivNotesAnalyze"'+disabled+'>'+(ivNotesBusy?'Thinking…':started?'Continue interview':'Start conversation')+'</button>'+(started?'<button id="ivNotesIdeas"'+disabled+'>Help me think this through</button>':'')+'<button id="ivNotesSave"'+disabled+'>Save changes</button><button id="ivLeave"'+disabled+'>Save and leave</button></div>'+
+    '<div id="ivNotesSaveStatus" role="status" style="margin:14px 0">'+esc(ivNotesMessage)+'</div>'+
     (ivNotesConflict?'<button id="ivNotesUseSaved">Discard this tab’s edits and load saved version</button>':'')+
     (ready?'':context)+'</div>';
 }
@@ -5145,8 +5148,10 @@ function renderIntake(){
   if(!box) return;
   if(!ivSlug){ box.innerHTML = ivStartHtml(); const s = $("#ivSlugIn"); if(s) s.focus(); return; }
   const hadCloseout=!!box.querySelector('.iv-closeout');
+  const openReviews=Array.from(box.querySelectorAll('details[id][open]')).map(d=>d.id);
   const body = ivNotesHtml();
   box.innerHTML = '<div class="iv"><div class="vmono">INTAKE: '+esc(ivSlug)+'</div>'+body+'</div>';
+  for(const id of openReviews){ const detail=document.getElementById(id); if(detail) detail.open=true; }
   const log=box.querySelector('.iv-chat-log'); if(log) log.scrollTop=log.scrollHeight;
   const closeout=box.querySelector('.iv-closeout'); if(closeout&&!hadCloseout) closeout.scrollIntoView({block:'start'});
 }
@@ -5156,6 +5161,10 @@ function renderIntake(){
 document.addEventListener("input", e=>{
   const t = e.target;
   if(!t || !t.closest || !t.closest("#ventureIntake")) return;
+  if(t.id==='ivChatDraft'||t.id==='ivNotes'||t.dataset.notesField){
+    ivNotesMessage='Unsaved changes. Click Save changes to keep them. Continue interview saves and sends your reply to the AI.';
+    const status=$("#ivNotesSaveStatus"); if(status) status.textContent=ivNotesMessage;
+  }
   if(t.id==="ivChatDraft"){
     ivNotesState.draft=t.value; ivBackupNotes(); const confirm=$("#ivNotesConfirm"),s=ivNotesState;
     if(confirm) confirm.disabled=ivNotesBusy||ivNotesConflict||!!s.draft.trim()||s.notes!==ivNotesAnalyzedText||!ivContextProgress(ivNotesFields,Object.fromEntries(ivNotesFields.map(f=>[f.key,Object.prototype.hasOwnProperty.call(s.corrections,f.key)?s.corrections[f.key]:s.analysis?.fields.find(x=>x.key===f.key)?.text||""]))).ready;
@@ -5164,8 +5173,13 @@ document.addEventListener("input", e=>{
   if(t.id==="ivNotes"){ ivNotesState.notes=t.value; ivBackupNotes(); const confirm=$("#ivNotesConfirm"); if(confirm) confirm.disabled=true; return; }
   if(t.dataset.notesField){
     ivNotesState.corrections[t.dataset.notesField]=t.value; ivBackupNotes();
+    if(t.dataset.notesField==='scorecard.required_live_posts'){
+      const valid=Number.isSafeInteger(Number(t.value))&&Number(t.value)>0;
+      t.setAttribute('aria-invalid',String(!valid));
+      if(!valid){ ivNotesMessage='Enter a whole number greater than zero. Put any explanation in Your reply. Your changes are not saved yet.'; const status=$("#ivNotesSaveStatus"); if(status) status.textContent=ivNotesMessage; }
+    }
     const confirm=$("#ivNotesConfirm"), s=ivNotesState;
-    if(confirm) confirm.disabled=ivNotesBusy||!!s.draft?.trim()||s.notes!==ivNotesAnalyzedText||!ivContextProgress(ivNotesFields,Object.fromEntries(ivNotesFields.map(f=>[f.key,Object.prototype.hasOwnProperty.call(s.corrections,f.key)?s.corrections[f.key]:s.analysis?.fields.find(x=>x.key===f.key)?.text||""]))).ready;
+    if(confirm) confirm.disabled=ivNotesBusy||ivNotesConflict||!!s.draft?.trim()||s.notes!==ivNotesAnalyzedText||!ivContextProgress(ivNotesFields,Object.fromEntries(ivNotesFields.map(f=>[f.key,Object.prototype.hasOwnProperty.call(s.corrections,f.key)?s.corrections[f.key]:s.analysis?.fields.find(x=>x.key===f.key)?.text||""]))).ready;
     return;
   }
   if(t.id === "ivIn") return ivQueue(Number(t.dataset.ivq), t.value);

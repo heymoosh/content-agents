@@ -25,7 +25,7 @@ test('complete context automatically opens closeout, while a draft or invalid co
   const s=state();
   const result=html(s);
   assert.match(result,/Ready to start your venture/);
-  assert.match(result,/<details open><summary>Review your venture context/);
+  assert.match(result,/<details id="ivContextReview" open><summary>Review your venture context/);
   assert.match(result,/id="ivNotesConfirm">Start venture/);
   s.draft='Wait, change this'; assert.doesNotMatch(html(s),/id="ivNotesConfirm"/);
   s.draft=''; s.analysis.fields.find(f=>f.key==='scorecard.required_live_posts')!.text='three';
@@ -39,4 +39,26 @@ test('confirmed closeout saves first, creates once, and opens the resulting vent
   const run=new Function('post',`let ivNotesBusy=false,ivNotesState={revision:1,notes:'Founder notes',corrections:{},draft:''},ivSlug='fixture',ivNotesMessage='',ventureSlug;const sessionStorage={removeItem(){}},ivNotesBackupKey=()=>'',renderIntake=()=>{},ivRemember=()=>{},ivExit=()=>{ivSlug=null;},flash=()=>{};let loaded;async function loadVentureList(){loaded=ventureSlug;}${code};return async()=>({ok:await ivNotesAction('confirm'),loaded});`)(post);
   assert.deepEqual(await run(),{ok:true,loaded:'fixture'});
   assert.deepEqual(calls,['/api/venture/fixture/intake/context','/api/venture/fixture/intake/context/confirm']);
+});
+test('manual corrections have explicit save feedback and numeric guidance without hiding context', () => {
+  const s=state();
+  const result=html(s);
+  assert.match(result,/id="ivNotesSave"[^>]*>Save changes/);
+  assert.match(result,/type="number" min="1" step="1"/);
+  assert.match(result,/Extra context belongs in Your reply/);
+  Object.assign(s.corrections,{'scorecard.required_live_posts':'6 - plus existing posts'});
+  const invalid=html(s);
+  assert.match(invalid,/Enter a whole number greater than zero/);
+  assert.match(invalid,/6 - plus existing posts/);
+  assert.match(invalid,/<details id="ivContextReview" open>/);
+  assert.doesNotMatch(invalid,/id="ivNotesConfirm"/);
+});
+test('saving and rerendering retains the open context and correction panels', () => {
+  const start=script.indexOf('function renderIntake(){');
+  const code=script.slice(start,script.indexOf('// One delegated listener',start));
+  const panels=[{id:'ivContextReview',open:false},{id:'ivCorrection-q1',open:false}];
+  const box={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>panels};
+  const doc={getElementById:(id:string)=>panels.find(p=>p.id===id)};
+  new Function('$','document',`const ivSlug='fixture',esc=v=>v,ivNotesHtml=()=>'<details>Fixture</details>';${code};renderIntake();`)(()=>box,doc);
+  assert.ok(panels.every(p=>p.open));
 });

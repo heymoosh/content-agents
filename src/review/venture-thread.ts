@@ -553,7 +553,7 @@ function liveDot(ev: EvidenceView | null): DotTone {
 // there is no default sentence: an unrecognised event renders its own type and id rather than an
 // invented story.
 const RECEIPT_COPY: Record<string, { text: string; dot: DotTone }> = {
-  kickoff: { text: "Venture created. Everything from here writes into it.", dot: "grey" },
+  kickoff: { text: "Venture started: reviewed context and kickoff saved. Starting the venture does not launch AI work. Use Run the next draft step when you want to begin; queued or running work appears in the job status. Nothing publishes automatically.", dot: "green" },
   "pace-recorded": { text: "Posting pace recorded. Checkpoint 1 reads it from here.", dot: "grey" },
   "response-gate-opened": { text: "Enough answers to start choosing. The count is all I ever show you.", dot: "green" },
   "checkpoint-cleared": { text: "Checkpoint cleared. Written to canon first, then the next phase opened.", dot: "green" },
@@ -703,8 +703,11 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
   const byId = new Map(artifacts.map((a) => [a.artifact_id, a]));
   const messages: ThreadMsg[] = [];
 
-  // 1. Her own words. The transcript opens the thread because it is what everything downstream
-  //    cites, and it is the only place in this room rendered entirely in her register.
+  // Creation needs a visible receipt before the long reviewed context.
+  const kickoff = canon.find(e => e.type === 'kickoff');
+  if (kickoff) messages.push(receiptFor(kickoff));
+
+  // 1. Her own words, which everything downstream cites.
   if (answers && Object.keys(answers).length) {
     messages.push({ kind: "rail", text: "INTAKE · REVIEWED CONTEXT" });
     messages.push({
@@ -720,7 +723,7 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
   // 2. The ledger, oldest first. Receipts are facts that already happened, in the order canon.md
   //    recorded them — this is the "derived, not stored" claim at its most literal.
   const sorted = [...canon].sort((a, b) => a.at.localeCompare(b.at));
-  for (const e of sorted) messages.push(receiptFor(e));
+  for (const e of sorted) if (e !== kickoff) messages.push(receiptFor(e));
 
   // 3. Where the venture is now.
   messages.push({ kind: "rail", text: PHASE_RAIL[state.current_phase] ?? `PHASE ${state.current_phase}` });

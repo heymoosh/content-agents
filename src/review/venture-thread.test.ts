@@ -33,6 +33,13 @@ import { OVERRIDE_SELECT_KINDS, type DecisionRecord } from "../venture/decisions
 import type { CheckpointState, VentureState } from "../venture/state.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+test('kickoff receipt distinguishes saved setup from launching work', () => {
+  const receipt=receiptFor({at:'2026-09-14T12:00:00Z',type:'kickoff',id:'fixture/kickoff',fields:{}});
+  assert.match(receipt.text,/reviewed context and kickoff saved/);
+  assert.match(receipt.text,/does not launch AI work/);
+  assert.match(receipt.text,/Run the next draft step/);
+});
 const AT = "2026-08-18T09:00:00.000Z";
 const NOW = "2026-08-21T09:00:00.000Z";
 
