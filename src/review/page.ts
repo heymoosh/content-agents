@@ -1242,8 +1242,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       </div>
       <nav class="room-pages venture-stages" aria-label="Venture pages"><button class="venture-stage on" data-set-ven-pane="work">Overview and next steps</button><button class="venture-stage" data-set-ven-pane="documents">Documents</button><button class="venture-stage" data-set-ven-pane="intake">Guardrails</button><button class="venture-stage" data-set-ven-pane="history">History</button></nav>
       <div id="ventureWorkPane">
-      <style>.venture-progress,.vp-plan{font-size:16px;line-height:1.6;color:#26231e}.vp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 32px}.vp-grid h3{margin:12px 0 6px}.vp-text{white-space:pre-wrap;margin:0}.vp-meta{font-size:13px;color:#625b50}.vp-field{display:block;margin:16px 0}.vp-field textarea{display:block;width:100%;box-sizing:border-box;padding:12px;font:inherit}.venture-progress details{margin:24px 0}.venture-progress summary{cursor:pointer}.vp-plan section{padding:8px 0;border-bottom:1px solid var(--line)}#roomVenture .vnote{color:#403b33}#roomVenture .vthread{max-width:none}#ventureNextExplanation{max-width:850px}@media(max-width:760px){.vp-grid{grid-template-columns:1fr}#ventureMainSheet{padding:20px!important}}</style>
-      <div id="ventureProgress"></div>
+      <style>.venture-progress,.vp-plan{font-size:16px;line-height:1.6;color:#26231e}.venture-progress{max-width:82ch;margin-top:32px}.vp-sections section{margin:24px 0}.vp-sections h3{margin:0 0 8px}.vp-sections ul{margin:0;padding-left:24px}.vp-sections li{margin:0 0 8px}.vp-text{white-space:pre-wrap;margin:0}.vp-meta{font-size:13px;color:#625b50}.vp-field{display:block;margin:16px 0}.vp-field textarea{display:block;width:100%;box-sizing:border-box;padding:12px;font:inherit}.venture-progress details{margin:24px 0}.venture-progress summary{cursor:pointer}.vp-plan section{padding:8px 0;border-bottom:1px solid var(--line)}#roomVenture .vnote{color:#403b33}#roomVenture .vthread{max-width:none}#ventureNextExplanation{max-width:850px}@media(max-width:760px){#ventureMainSheet{padding:20px!important}}</style>
       <section class="venture-tools" style="margin-top:24px">
         <h3>Next action</h3><p id="ventureNextExplanation"></p>
         <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;background:#faf7f0;border:1px solid #efe7d6;border-radius:8px">
@@ -1258,6 +1257,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <div class="sheet-sub">Read-only advice about what is ready, what you need to decide, and what must wait. It does not write canon or advance a phase.</div>
         <div class="md" id="ventureAnalysisOut" style="margin-top:12px"></div>
       </div>
+      <div id="ventureProgress"></div>
       <div class="vroom" id="ventureRead" style="margin:18px -40px 0;border-top:1px solid #efe7d6">
         <div class="vthread" id="ventureThread"><div class="empty">Loading…</div></div>
       </div>

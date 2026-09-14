@@ -54,12 +54,16 @@ test('new business and existing business both begin with research, then stop for
   assert.equal(nextVentureAction(1,[plan],[]).runnable,true);
 });
 test('overview labels owner reports, escapes input, shows existing work and keeps original context secondary', () => {
-  const t={workingContext:{revision:1,savedAt:'2026-09-14',underway:'Six Notes scheduled <script>',testing:'Which platforms?',next:'Map existing posts',gaps:'No offer yet',constraints:'30 hour ceiling'},messages:[]} as unknown as VentureThread;
+  const t={workingContext:{revision:1,savedAt:'2026-09-14',underway:'Six Notes scheduled <script>\n\nExisting backlog',testing:'Which platforms?',next:'Map existing posts',gaps:'No offer yet',constraints:'30 hour ceiling'},messages:[]} as unknown as VentureThread;
   const html=ventureProgressHtml(t);
   assert.match(html,/Six Notes scheduled &lt;script&gt;/);
   assert.match(html,/Reported context, not verified publication/);
   assert.match(html,/<details id="ventureWorkingEdit">/);
   assert.match(html,/Which platforms\?/);
+  assert.match(html,/<ul><li>Six Notes scheduled &lt;script&gt;<\/li><li>Existing backlog<\/li><\/ul>/);
+  assert.doesNotMatch(html,/vp-grid/);
+  const page=renderPage({repoRoot:'/fixture',isDevWorktree:true});
+  assert.ok(page.indexOf('id="ventureRunStepBtn"') < page.indexOf('id="ventureProgress"'));
   assert.doesNotMatch(html,/25 questions|0 of 0/);
   assert.match(VENTURE_PROGRESS_GUIDANCE,/supersedes conflicting intake/);
   assert.match(VENTURE_PROGRESS_GUIDANCE,/Scheduled is not live/);

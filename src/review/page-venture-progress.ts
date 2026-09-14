@@ -11,10 +11,10 @@ export function ventureProgressHtml(t: VentureThread, esc: (s: unknown) => strin
   return '<section class="venture-progress"><h2>Where your venture stands</h2>'
     + (t.messages.some(m=>m.kind==='receipt')?'<p>Interview saved. Your original context and activity remain in History and the details below.</p>':'')
     + (hasContext ? '<p class="vp-meta">Saved working update · '+esc(c.savedAt?.slice(0,10))+' · Reported context, not verified publication or performance.</p>' : '<p>Start from the context you already supplied. Add any developments since the interview below.</p>')
-    + '<div class="vp-grid">'+Object.entries(titles).filter(([key])=>key!=='constraints').map(([key,title])=>{
+    + '<div class="vp-sections">'+Object.entries(titles).filter(([key])=>key!=='constraints').map(([key,title])=>{
       const value=c?.[key as keyof typeof titles] || (key==='underway'?fallback:'');
       if(!value) return '';
-      return '<section><h3>'+title+'</h3><p class="vp-text">'+esc(value)+'</p></section>';
+      return '<section><h3>'+title+'</h3><ul>'+value.split(/\n+/).map(line=>line.trim()).filter(Boolean).map(line=>'<li>'+esc(line)+'</li>').join('')+'</ul></section>';
     }).join('')+'</div>'
     + (c?.constraints?'<details><summary>Business operating boundaries</summary><p class="vp-text">'+esc(c.constraints)+'</p></details>':'')
     + '<details id="ventureWorkingEdit"><summary>Update this context</summary><p>Tell the model what has changed. These notes inform its next proposal; they do not approve a draft or mark anything live.</p>'
