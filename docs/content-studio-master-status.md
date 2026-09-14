@@ -6,17 +6,16 @@
 - Rules: `AGENTS.md` -> `## Slice protocol` plus `docs/operations/slice-protocol-environment.md`.
 - Current work: real-content channel coverage through the actual Studio Publishing workflow.
 - Confirmed public: X, LinkedIn, Bluesky, Mastodon, Threads, Facebook, and Instagram.
-- Retry-ready after account repair: TikTok's sandbox Direct Post fix is applied; YouTube's rejected
-  refresh grant likely reflects Google's seven-day Testing-app lifetime.
-- Substack is **not** a pass: its browser attempt recorded a false local success, while the exact
-  approved Note never appeared publicly. That state was corrected and the verifier now fails closed.
-- Next: reconnect TikTok; verify Google OAuth status and reconnect YouTube; then run both ASAP
-  canaries. Decide whether optional Gmail stays manual; Substack needs a fresh attended retry budget.
-- Temporary public-media delivery worked, but production still needs a durable HTTPS media origin.
-- Last accepted: **8F, 8G, 8H, and the live-canary repair**; Grok accepted it, clean E2E passed, and the final gate passed 4,593/4,593.
-- Last decision: retain the read-only token only in attended shell scope; no plaintext runtime
-  secrets remain in Compose or its `.env`, and the authorized obsolete secret-bearing backup is gone.
-- Master: `/Users/Muxin/Documents/GitHub/content-agents/docs/content-studio-master-status.md`.
+- TikTok Direct Post sandbox fix is applied; OAuth reconnection and the approved retry remain.
+- YouTube's actual Postiz OAuth client is in `voter-choice-493119`, confirmed External / Testing.
+- Next: owner resolves Postiz's Chrome certificate warning and authorizes the shared Google app's
+  Production transition; then reconnect TikTok/YouTube and run their bounded Studio browser retries.
+- Substack is not live; a fresh attended retry budget is required. Gmail remains optional/manual.
+- Durable HTTPS media hosting and attended Bitwarden injection for Studio's API key remain open.
+- Last accepted runtime: `ea05080`, including 8F/8G/8H and publishing recovery; Grok accepted,
+  clean E2E passed, and the final gate passed 4,593/4,593. No new live retry ran in this continuation.
+- Latest investigation: Progress log -> 2026-09-13 (OAuth project verified; attended recovery blocked).
+- Keep the read-only Bitwarden token in attended shell scope only.
 
 ## Standing constraints
 
@@ -172,9 +171,15 @@ rendered, approved, and scheduled. **Process note:** the stale wording
    `video.publish` for that path. Re-authenticating without first adding and approving that scope
    would repeat the failure. YouTube's access token expired normally one hour after its 2026-09-01
    connection, but its refresh token now returns `invalid_grant`. Its twelve-day age and the Google
-   rule that external Testing apps requesting non-basic scopes receive seven-day refresh tokens make
-   Testing status the leading explanation; verify the OAuth consent-screen publishing status before
-   reconnecting. The installed override now requests `video.publish`; the single app container was
+   rule that external Testing apps requesting non-basic scopes receive seven-day refresh tokens made
+   Testing status the leading explanation. An authenticated browser check now confirms that the
+   exact runtime client, `Content Agents Postiz YouTube`, belongs to `voter-choice-493119`
+   (Voter Choice), whose Audience page says External / Testing. The separate
+   `content-agents-499618` project is In production but has a different client and is not the
+   Postiz connection. This confirms the current expiry policy, not the historical cause of this
+   individual `invalid_grant`. Production transition for the shared Voter Choice OAuth app needs
+   owner authorization before reconnection; see the latest Progress log entry.
+   The installed override now requests `video.publish`; the single app container was
    restarted healthy and both backend and orchestrator load the corrected bind mount. TikTok's
    existing `Local Postiz Test` sandbox has Login Kit, Content Posting API, target user
    `humaninference`, and `video.upload`, but inspection on 2026-09-13 found Direct Post switched off.
@@ -190,9 +195,10 @@ rendered, approved, and scheduled. **Process note:** the stale wording
    text is absent from the public feed. The false success, Placed row, and queue state were corrected.
    Gmail remains unconfigured and uncanaried. Destination coverage is therefore not complete.
    Format/provider-specific gaps such as Facebook text-only, the real carousel run, and unverified
-   fallback routes remain separately explicit in the capability matrix below. Next: reconnect
-   TikTok, verify the Google OAuth app is not subject to the seven-day Testing limit,
-   then reconnect TikTok/YouTube inside Postiz and run one ASAP retry each; grant a fresh attended Substack retry after the exhausted attempt/retry budget,
+   fallback routes remain separately explicit in the capability matrix below. Next: resolve Chrome's
+   `ERR_CERT_AUTHORITY_INVALID` at the Postiz HTTPS origin through an
+   owner-attended browser action, authorize the shared Voter Choice OAuth app's Production
+   transition, then reconnect TikTok/YouTube inside Postiz and run one ASAP retry each; grant a fresh attended Substack retry after the exhausted attempt/retry budget,
    then configure and explicitly approve the exact Gmail canary envelope. The shared retry video is
    now a real tracked candidate at its canonical `configured-media` path; the earlier untracked
    symlink to an ignored render was removed so another checkout will not inherit a broken row.
@@ -248,8 +254,9 @@ rendered, approved, and scheduled. **Process note:** the stale wording
     the false Scheduled rendering and obsolete provider copy described in item 10; it did not click
     a retry through to delivery, so the full journey remains a verification gap.
 
-12. ~~**Keep Studio HTTP tests out of the live Content workspace.**~~ **FIXED IN THE CURRENT
-    CANDIDATE 2026-09-13.** Six route tests created temporary queue folders under the repository's
+12. ~~**Keep Studio HTTP tests out of the live Content workspace.**~~ **DONE 2026-09-13,
+    accepted and committed in `ea05080`.** Six route tests created temporary queue folders under
+    the repository's
     real `content/` directory. Their `finally` blocks eventually removed them on a normal pass, but
     the running Studio discovered and displayed the synthetic posts while the suite was executing;
     an interrupted run could leave them behind. The routes now receive isolated temporary Content
@@ -271,6 +278,45 @@ read-by-id route, and Postiz soft-deletes, so absence can never distinguish live
 deleted from never-created. Both are provider facts, not bugs to fix here.
 
 ## Progress log
+
+### 2026-09-13 (OAuth project verified; attended recovery blocked)
+
+Continued the current Publishing handoff with read-only authenticated account investigation.
+The running `postiz` container's public `YOUTUBE_CLIENT_ID` exactly matches the Google Cloud
+client **Content Agents Postiz YouTube** in **Voter Choice** (`voter-choice-493119`), created
+August 31. Its [Audience page](https://console.cloud.google.com/auth/audience?project=voter-choice-493119)
+shows **External / Testing**, with one test user. The similarly named Content-Agents project
+(`content-agents-499618`) is In production, but its YouTube client does not match Postiz.
+Do not use that other project's production status as evidence for this connection.
+
+[Google's refresh-token policy](https://developers.google.com/identity/protocols/oauth2#expiration)
+confirms seven-day refresh tokens for External / Testing apps requesting non-basic scopes.
+This establishes the current policy affecting Postiz; it does not prove when the failed token
+was revoked or whether another invalidation cause also occurred. The Voter Choice client list
+also contains Content Agents Gmail and Content Agents YouTube Desktop. A Production transition
+therefore changes the shared OAuth app audience, not just one YouTube connection.
+
+Opening Postiz at `https://postiz-threads.meta:4443` failed with
+`ERR_CERT_AUTHORITY_INVALID`. The owner was asked to resolve or proceed through the browser
+warning because computer-use policy requires human handling of security interstitials.
+Automatic approval review separately rejected the Google `Publish app` action because it could
+change security/account state without specific authorization. No production transition was made;
+owner authorization was requested with the shared-project impact explained. No credentials,
+OAuth grants, schedules, or public posts were changed, and no canary retry budget was consumed.
+The single next action is the attended account-recovery checkpoint: resolve the Postiz browser
+warning and authorize the shared Google OAuth transition, then reconnect and run the already
+bounded TikTok/YouTube browser retries.
+
+This continuation changes documentation only. Session review reconciles the account identity,
+current status, and explicit remaining gaps; session review and `git diff --check` both PASS.
+Runtime acceptance remains `ea05080`; item 12's stale "current candidate" wording is corrected
+in place. The pre-existing `data/notes-spread-ledger.jsonl` modification belongs to another
+session and is left in place. Repository edits are isolated from that checkout.
+Required `bash scripts/repo-hygiene.sh --rescue --base main` ran and its output was reviewed:
+that ledger was rescued without changing its working copy; existing merged branches
+`slice-6m-worker` and `slice-6s-worker` were left in place. Only this master document is changed
+by this continuation; no untracked repository artifact was created. Documentation closeout: PASS.
+Live recovery: blocked at the attended checkpoint above.
 
 ### 2026-09-13 (publishing repair accepted; closeout PASS) — Grok ACCEPT, local gates green
 
