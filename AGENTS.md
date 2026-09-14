@@ -19,12 +19,12 @@ only for the build being touched: `stories/AGENTS.md`, `venture/AGENTS.md`, or `
 **Owner decision, 2026-09-13:** the agent decides whether testing is necessary and which checks
 are worth running. There are no automatic testing gates based on file type, UI visibility, commit,
 merge, or session completion. This replaces earlier mandatory full-suite, browser-suite and
-post-merge-rerun requirements. Independent review is limited to the high-risk boundaries below.
+post-merge-rerun requirements. Independent review is optional, at the agent’s discretion.
 
 Use judgment, not a checklist. A wording fix may need only reading the diff and looking at the
 result. A behavioral change may benefit from a focused regression test. Changes involving data loss,
 credentials, duplicate publication, model permissions or authorship deserve more scrutiny; choose
-the checks that address the actual risk, with independent review for the boundaries below. Do not run unrelated tests merely
+the checks that address the actual risk. Do not run unrelated tests merely
 because they exist. Do not claim verification that was not performed.
 
 Useful practices, not mandatory gates:
@@ -77,11 +77,10 @@ push or add hosted CI merely to obtain a check result.
 ## Escalation and optional review
 
 If a difficult technical problem resists reasonable investigation, ask `sol_advisor` for guidance
-only; do not keep guessing. Handle routine debugging directly. One bounded cross-family review is
-required for changes to credential protection, model/tool permissions, publishing/send authorization,
-duplicate-delivery safeguards, persistent-data integrity or authorship/canon boundaries. Other reviews
-are discretionary unless requested. If required review is unavailable, retain the candidate without
-integrating it. Reviews distinguish defects, missing evidence and optional improvements,
+only; do not keep guessing. Handle routine debugging directly. Independent review is discretionary, including for sensitive changes; it is not an integration gate.
+Before claiming completion, review the result against the user’s requirements: identify what was
+implemented, what evidence supports each outcome, and any incomplete or unverified part. Report
+each requirement honestly as complete or incomplete; a passed test alone is not completion. Reviews distinguish defects, missing evidence and optional improvements,
 and resolve material findings without an endless review loop. Do not call same-family guidance an
 independent cross-family audit.
 
@@ -101,7 +100,7 @@ completed reviews. Pass these restrictions to any agent that may launch Grok.
 ## Slice protocol
 
 Compatibility heading only. Normal tasks need no packet, formal result block, blanket audit,
-full test gate, or closeout ceremony. High-risk review remains as specified above. Use the discretionary verification policy above.
+full test gate, or closeout ceremony. Requirements-based completion review remains as specified above. Use the discretionary verification policy above.
 
 After changing repository files, use `git status` and, when useful for concurrent-work recovery,
 `bash scripts/repo-hygiene.sh --rescue --base main`. Run hygiene at most once at final closeout unless

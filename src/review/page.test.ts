@@ -2532,7 +2532,7 @@ test("Studio capture: the rendered durable-handoff verdict makes no stale routin
   for (const line of [
     "I read this as Fiction. Start on it puts these beats in Write next for you to review before drafting.",
     "I read this as Outreach. Start on it opens the lead chooser; you still choose the person before any draft.",
-    "I read this as Venture. Start on it opens the current human-gated venture step. It does not run or approve it.",
+    "I read this as Venture. Start on it saves this thought to its venture queue and asks which venture if unclear. It does not draft or approve anything.",
     "I read this as Charles. Start on it places the exact idea in Charles Input for you to review before drafting.",
   ]) assert.ok(script.includes(JSON.stringify(line)), line);
   for (const stale of [
@@ -2664,7 +2664,7 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(section.includes("await loadCharles()"), "Charles waits for its room read before copying into Input");
   assert.ok(section.includes('input.value=text'), "Charles copies the exact capture without drafting it");
   assert.ok(section.includes("Charles Input already has an unsaved idea"), "Charles refuses to overwrite a different unsaved idea");
-  assert.ok(section.includes('$("#ventureRunStepBtn")?.focus()'), "Venture opens its current human-gated step");
+  assert.ok(section.includes('await openVentureCapture(r.queueItem)'), "Venture opens its persisted thought or venture chooser");
   assert.ok(section.includes('throw new Error("Unsupported capture room: "+room)'), "unknown rooms fail closed instead of falling through to Venture");
   assert.ok(!section.includes('$("#charlesDraftBtn").click()'));
   assert.ok(!section.includes('$("#ficDraftBtn").click()'));
@@ -2690,7 +2690,7 @@ test("Studio capture copy: no em dashes and every classified build names its saf
   assert.match(captureHandoffVerdict("Content").line, /advisor round/);
   assert.match(captureHandoffVerdict("Fiction").line, /review before drafting/);
   assert.match(captureHandoffVerdict("Outreach").line, /choose the person/);
-  assert.match(captureHandoffVerdict("Venture").line, /does not run or approve/);
+  assert.match(captureHandoffVerdict("Venture").line, /does not draft or approve/);
   assert.match(captureHandoffVerdict("Charles").line, /review before drafting/);
 });
 

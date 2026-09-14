@@ -21,7 +21,7 @@ export function captureVerdict(room: CaptureRoom): CaptureVerdictView {
   if (room === "Content") return { room, line: "I read this as Content. Start on it opens an advisor round. Approval and publishing stay separate.", actionLabel: "Start on it" };
   if (room === "Fiction") return { room, line: "I read this as Fiction. Start on it puts these beats in Write next for you to review before drafting.", actionLabel: "Start on it" };
   if (room === "Outreach") return { room, line: "I read this as Outreach. Start on it opens the lead chooser; you still choose the person before any draft.", actionLabel: "Start on it" };
-  if (room === "Venture") return { room, line: "I read this as Venture. Start on it opens the current human-gated venture step. It does not run or approve it.", actionLabel: "Start on it" };
+  if (room === "Venture") return { room, line: "I read this as Venture. Start on it saves this thought to its venture queue and asks which venture if unclear. It does not draft or approve anything.", actionLabel: "Start on it" };
   if (room === "Charles") return { room, line: "I read this as Charles. Start on it places the exact idea in Charles Input for you to review before drafting.", actionLabel: "Start on it" };
   throw new Error(`Unsupported capture room: ${String(room)}`);
 }

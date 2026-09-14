@@ -113,7 +113,7 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    reviewed-file workflow, not a callable repository API. New builds inherit this.
 7. **Integration: use engineering judgment.** AGENTS.md owns the discretionary verification policy.
    Choose testing appropriate to the actual risk; no full suite or live canary is automatically
-   required. Independent review is reserved for the high-risk boundaries specified in AGENTS.md. Preserve the content, identity and authorization boundaries
+   required. Independent review is optional; review completion against the requirements as specified in AGENTS.md. Preserve the content, identity and authorization boundaries
    above. Committing content is not publishing; Muxin's approval still governs publication.
 
 ## Pipeline map

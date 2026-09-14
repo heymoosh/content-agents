@@ -4326,6 +4326,21 @@ function ventureLearningHtml(){
   }).join('');
   return sourceHtml+(cards?'<div class="vblock"><div class="vmono">RECORDED LEARNING</div>'+cards+'</div>':'');
 }
+// Open the durable capture, including after reload or an answer in another venture.
+async function openVentureCapture(item){
+  if(!item || item.payload.kind!=="venture") throw new Error("The Venture queue item is unavailable. Try the saved capture again.");
+  await loadCaptures();
+  await loadVentureList();
+  const slug=item.payload.slug;
+  if(slug && !VENTURE_SLUGS.includes(slug)) throw new Error("This thought is saved, but its venture is unavailable on this desk.");
+  if(slug && slug!==ventureSlug) await switchVenture(slug);
+  VEN.pane="work"; renderVentureSheets();
+  ventureQueueAsk=item.state==="awaiting-answer" ? item.captureId : null;
+  renderVenture(); renderCaptureHandoff();
+  const target=ventureQueueAsk ? $("#ventureQueueAsk") : Array.from(document.querySelectorAll("#ventureCaptureHandoff [data-capture-id]")).find(card=>card.dataset.captureId===item.captureId);
+  target?.scrollIntoView({behavior:"smooth",block:"center"});
+  if(target){ target.setAttribute("tabindex","-1"); target.focus({preventScroll:true}); }
+}
 function renderVenture(){
   const t = VENTURE_THREAD;
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
@@ -4356,7 +4371,7 @@ function renderVenture(){
       title:((capture&&capture.text)||"").replace(/\\s+/g," ").trim().slice(0,90)||"(captured thought)",
       meta:asking?"which venture? · "+((it.payload.candidates||[]).length)+" to choose from":it.state+" · "+(it.payload.slug||""),
       tag:asking?"ASK":"THOUGHT", tagCls:"yours",
-      action:asking?"Answer":"Resume"
+      action:asking?"Answer":"Open thought"
     };
   });
   const asking=ventureQueueAsk?(VENTURE_QUEUE||[]).find(it=>it.captureId===ventureQueueAsk&&it.state==="awaiting-answer"):null;
@@ -4387,31 +4402,26 @@ function renderVenture(){
     + t.refs.map(r=>'<div style="margin-top:6px"><div style="font-size:12px;line-height:1.4;color:#5a5346">'+esc(r.name)+'</div>'
       + '<div class="from" style="font:10px/1.5 ui-monospace,monospace;color:#b8ad94">'+esc(r.stamp)+'</div></div>').join("")
     + '</div>';
-  // A queue row resumes this venture's own flow: an open "which venture?" question surfaces its
-  // answer prompt; anything else is already this venture's, so it scrolls back to the thread and
-  // hands focus to the next draft step (the room's native next action).
-  document.querySelectorAll("#ventureThread .rq-row").forEach(button=>button.addEventListener("click",()=>{
-    const id=button.dataset.rqId;
-    const item=(VENTURE_QUEUE||[]).find(it=>it.captureId===id);
-    if(item&&item.state==="awaiting-answer"){
-      ventureQueueAsk=id; renderVenture();
-      $("#ventureQueueAsk")?.scrollIntoView({behavior:"smooth",block:"center"});
-      return;
-    }
-    $("#ventureThread").scrollIntoView({behavior:"smooth",block:"start"});
-    $("#ventureRunStepBtn")?.focus();
+  // Reopen the complete saved thought or its durable venture question.
+  document.querySelectorAll("#ventureThread .rq-row").forEach(button=>button.addEventListener("click",async ()=>{
+    const item=(VENTURE_QUEUE||[]).find(it=>it.captureId===button.dataset.rqId);
+    try { await openVentureCapture(item); }
+    catch(e){ flash(e instanceof Error?e.message:String(e)); }
   }));
   document.querySelectorAll("#ventureThread [data-venture-answer]").forEach(button=>button.addEventListener("click",async ()=>{
     const captureId=button.dataset.ventureAnswerCapture, slug=button.dataset.ventureAnswer;
     const item=(VENTURE_QUEUE||[]).find(it=>it.captureId===captureId);
     button.disabled=true;
-    const r=await post("/api/room-queue/venture-answer",{captureId,slug,expectedVersion:(item&&item.payload&&item.payload.answerVersion)||0});
-    // Any outcome clears the prompt and reloads: a 409 (answered elsewhere) must not leave a stale
-    // question on the desk, and a reload reads the queue's durable state either way.
-    ventureQueueAsk=null;
-    if(r.ok) flash(slug===ventureSlug?"Filed under this venture":"Filed under "+slug);
-    else flash(r.error||"Could not record the answer");
-    loadVenture();
+    try {
+      const r=await post("/api/room-queue/venture-answer",{captureId,slug,expectedVersion:(item&&item.payload&&item.payload.answerVersion)||0});
+      if(r.ok){ await openVentureCapture(r.item); flash("Thought saved under "+slug); }
+      else {
+        // A conflict carries the current durable item. Show it instead of the stale question.
+        if(r.item) await openVentureCapture(r.item);
+        flash(r.error||"Could not record the answer");
+      }
+    } catch(e){ flash(e instanceof Error?e.message:String(e)); }
+    finally { button.disabled=false; }
   }));
   $("#ventureThread [data-venture-answer-dismiss]")?.addEventListener("click",()=>{ ventureQueueAsk=null; renderVenture(); });
 }
@@ -4447,7 +4457,7 @@ function switchVenture(slug){
   renderVentureSwitcher();
   renderVentureDocuments();
   if(slug==="__example__"){ renderVentureExample(); return; }
-  loadVenture();
+  return loadVenture();
 }
 // Pane switch for the in-sheet venture views. Lives on the room, not
 // inside the rebuilt thread, so a plain listener on #roomVenture is enough.
@@ -6989,9 +6999,10 @@ async function advanceCaptureSafely(room, text){
     return "Your exact idea is in Charles Input. Review it before drafting.";
   }
   if(room==="Venture"){
-    await loadVenture();
-    $("#ventureRunStepBtn")?.focus();
-    return "The current venture step is open. Review its human gate before running it.";
+    const r=await post("/api/captures/start",{room:"Venture",text:text});
+    if(!r.ok) throw new Error(r.error||"Could not add this thought to Venture. It is still saved in Studio.");
+    await openVentureCapture(r.queueItem);
+    return r.needsVenture ? "Choose which venture this thought belongs to." : "Your thought is saved in its venture queue. Nothing has been drafted or approved.";
   }
   throw new Error("Unsupported capture room: "+room);
 }
@@ -7034,12 +7045,18 @@ function renderCaptureHandoff(){
     box.innerHTML = captures.map(capture=>'<div class="capture-handoff" data-capture-id="'+esc(capture.id)+'" style="border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:13px 15px;margin-top:14px">'+
       '<div class="wb-label">CAPTURE WAITING HERE</div>'+
       '<div style="font:400 16px/1.6 Georgia,serif;white-space:pre-wrap;margin-top:6px">'+esc(capture.text)+'</div>'+
-      '<div class="actions" style="margin-top:10px">'+(label==="Content"&&!capture.jobId?'<button class="primary cap-start">Start on it</button>':'')+'<button class="cap-return">Back to Studio capture</button><span class="src">'+(capture.jobId?'Advisor started. Approval and publishing remain separate.':'Saved in the repository. Nothing has been approved or published.')+'</span></div>'+
+      '<div class="actions" style="margin-top:10px">'+(label==="Venture"?'<button class="primary cap-start">Open in Venture</button>':label==="Content"&&!capture.jobId?'<button class="primary cap-start">Start on it</button>':'')+'<button class="cap-return">Back to Studio capture</button><span class="src">'+(capture.jobId?'Advisor started. Approval and publishing remain separate.':'Saved in the repository. Nothing has been approved or published.')+'</span></div>'+
       '</div>').join("");
     box.querySelectorAll(".capture-handoff").forEach(card=>{
       card.querySelector(".cap-start")?.addEventListener("click", async (event)=>{
         event.target.disabled=true;
         const capture=SERVER_CAPTURES.find(c=>c.id===card.dataset.captureId);
+        if(label==="Venture"){
+          try { flash(await advanceCaptureSafely("Venture",capture.text)); }
+          catch(e){ flash(e instanceof Error?e.message:String(e)); }
+          finally { event.target.disabled=false; }
+          return;
+        }
         const r=await post("/api/captures/start",{text:capture&&capture.text,engine:$("#studioEngine").value,brand:signalsBrand()});
         if(r.ok){ flash("Advisor started. It cannot approve or publish."); await loadCaptures(); renderCaptureHandoff(); loadJobs(); }
         else { event.target.disabled=false; flash(r.error||"Could not start the advisor"); }
