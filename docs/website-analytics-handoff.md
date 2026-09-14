@@ -22,14 +22,16 @@ match to learn from historical content, or confuse historical engagement with pr
   repeated submissions and reactivations must not count as new acquisition. Survey answers can
   change, so latest answers and first completion need distinct treatment.
 - Content Studio can refresh aggregate subscriber/survey counts from the database read-only, and
-  its configured analytics path can now display the saved website funnel report. No live refresh
-  has been run, so the report still has no collected website rows in this session.
+  its configured analytics path can now display the saved website funnel report and diagnostic
+  form-flow counters. No live refresh has been run, so the report still has no collected website
+  rows in this session.
 - Historical website traffic cannot be reconstructed unless an existing analytics source captured
   it. Inspect what is already installed before adding anything. Missing data stays unknown, not zero.
 - The landing-page implementation now has a first-party collector for page views, 30-minute
   browser sessions, referrer host, and UTM/source-post attribution. It also records server-backed
-  new-signup and first-survey outcomes with idempotent event IDs. Content Studio now has a
-  server-side reader and aggregate dashboard renderer, pending deployment and live refresh.
+  new-signup and first-survey outcomes with idempotent event IDs, plus typed newsletter/survey
+  attempt signals. Content Studio now has a server-side reader and aggregate dashboard renderer,
+  pending deployment and live refresh.
 
 ## Running list
 
@@ -41,7 +43,7 @@ match to learn from historical content, or confuse historical engagement with pr
 | First | What is the signup conversion rate? | Sessions with a successful new signup / measured eligible sessions, using the same time range and attribution scope. Show numerator and denominator. | The private report returns measured sessions, new-signup sessions, numerator/denominator-based rate, and session coverage gaps; the Studio dashboard now renders these rows. Deployment and live collection remain. |
 | First | Do people complete the survey? | First successful completion / eligible new-signup cohort, with a stated follow-up window. Separately report imported subscribers who later answer. | Implemented locally with `survey_first_completed_at`, one idempotent first-completion event, a 14-day website cohort, and separate imported/unknown counts. Legacy first-completion history is not invented. |
 | First | What do readers want? | Counts and shares of each saved survey choice, segmented by acquisition cohort/source where useful; show response count and unanswered fields. | The private report returns aggregate categories, response/unanswered counts and shares; free-text Other values are bucketed. Studio now renders the normalized categories without raw answers. |
-| Next | Where is the flow failing? | Signup attempts versus successful saves; survey starts versus completions; aggregate validation/server errors. | Add minimal events only if needed to diagnose loss. A button click is not a saved subscription. Never log form bodies or identifiers. |
+| Next | Where is the flow failing? | Signup attempts versus successful saves; survey starts versus completions; aggregate validation/server errors. | Implemented locally: typed newsletter form starts/submits and survey starts are included as diagnostic client signals, while saved signup/survey outcomes remain authoritative. Deployment and live collection remain. Never log form bodies or identifiers. |
 | Next | Does interest persist? | New subscribers, reactivations and unsubscribes per period; net audience change shown separately from imports. | Current active count exists; historical changes need dated events, not guesses from today's snapshot. |
 | Later | Which content sends people toward tools/products? | Explicit CTA clicks to existing destinations. Later add verified activation, qualified requests and purchases only when those flows exist. | Not a prerequisite for this test. No offer means sales conversion is not applicable, not a failed funnel. |
 
@@ -93,7 +95,8 @@ tracking must remain visible alongside server totals. No session replay or heatm
 ## First useful Studio report
 
 One table: **source/platform → landing content → measured sessions → new signup sessions →
-signup rate → survey completions**. Add a separate panel for audience needs and a coverage note.
+signup rate → survey completions**. Add a separate panel for audience needs and a coverage note
+with newsletter form starts/submits and survey starts clearly labeled as diagnostic client signals.
 Show total existing audience separately. Offer requests, sales and revenue can wait until an offer exists.
 
 Next action in the landing-page session: deploy after the owner reviews the measurement wording and
@@ -108,8 +111,9 @@ Implemented in `/Users/Muxin/Documents/GitHub/landing-page`:
 
 - `site/src/scripts/lead-events.js` and `site/src/scripts/analytics-context.js` collect privacy-minimal page/session/referrer/UTM context. Query strings are stripped from stored paths and only the referrer hostname is retained.
 - `site/api/_analytics.ts` and `site/api/lead-events.ts` add bounded fields, stable event IDs, a unique event index, and client-event allowlisting.
+- `site/api/_analytics.ts`, `site/api/lead-events.ts`, and `site/src/scripts/lead-events.js` preserve an allowlisted form type so newsletter attempt and survey-start signals can be counted separately.
 - `site/api/essays-subscribe.ts` records new website signups and first survey completions transactionally. Duplicate submissions, existing subscribers, reactivations and imports do not create new signup events.
-- `site/api/website-analytics.ts` exposes the token-protected aggregate report with date/timezone filters, page-view breakdowns, conversion rows, needs categories, audience origin totals and coverage gaps. It does not expose email addresses or raw survey answers.
+- `site/api/website-analytics.ts` exposes the token-protected aggregate report with date/timezone filters, page-view breakdowns, conversion rows, needs categories, audience origin totals, coverage gaps, and diagnostic newsletter/survey attempt counts. It does not expose email addresses or raw survey answers.
 - `site/src/pages/terms-privacy.astro` discloses the first-party website measurement.
 - `docs/website-analytics.md` documents the URL-tagging contract and owner setup.
 
@@ -119,13 +123,13 @@ email send, or live Content Studio refresh was exercised. The owner still needs 
 privacy behavior, configure the report token, deploy, classify verified imports, configure Studio,
 and run the isolated refresh.
 
-The landing-page implementation is now committed locally in commit `b16618b`
-(`feat: add first-party website analytics funnel`). The next verification pass is still owner-gated:
-review the measurement wording and consent requirement, set `WEBSITE_ANALYTICS_REPORT_TOKEN` in the
-deployment, run isolated new/duplicate/import/reactivation and first/repeat-survey checks against a
-disposable or approved database, then connect Content Studio's server-side reader to the protected
-report. Until that happens, the implementation is complete in source control but collection and
-historical import classification remain unverified.
+The landing-page implementation is committed locally in `b16618b`
+(`feat: add first-party website analytics funnel`), with the diagnostic attempt-signal follow-up in
+`2bc54de` (`feat: report website funnel attempt signals`). The next verification pass is still
+owner-gated: review the measurement wording and consent requirement, set
+`WEBSITE_ANALYTICS_REPORT_TOKEN` in the deployment, and run isolated
+new/duplicate/import/reactivation and first/repeat-survey checks against a disposable or approved
+database. Until that happens, collection and historical import classification remain unverified.
 
 The follow-up report enhancement is committed in landing-page commit `120e378`
 (`feat: expose saved survey totals in analytics report`). Content Studio's server-side adapter is
@@ -135,15 +139,17 @@ server environment, its existing read-only website refresh route fetches the pro
 validates and stores an aggregate-only snapshot, and updates the existing private summary. With
 those variables absent, the prior read-only database totals path remains available.
 
-The Studio presentation pass is committed in `3131c93` (`feat: show website analytics in Studio`).
+The Studio presentation pass is committed in `3131c93` (`feat: show website analytics in Studio`),
+with diagnostic funnel counters in `d7e70d2` (`feat: show website funnel diagnostics in Studio`).
 Studio reads and validates the saved aggregate snapshot on each private Signals/Venture read, then
 renders the top 25 source/platform-to-landing rows with measured sessions, new signups, signup rate,
-and survey completions, plus normalized saved-needs categories. It also renders the report when no
-Venture series exists. The full snapshot remains capped at 500 rows and contains no subscriber
-identifiers or raw survey answers; a malformed derived snapshot is ignored while the separate
-summary remains readable.
+and survey completions, plus normalized saved-needs categories and clearly labeled newsletter/survey
+diagnostic signals. It also renders the report when no Venture series exists. The full snapshot
+remains capped at 500 rows and contains no subscriber identifiers or raw survey answers; a malformed
+derived snapshot is ignored while the separate summary remains readable. Older saved snapshots
+without the new counters normalize those fields to zero until the next refresh.
 
-Adapter validation: five focused analytics tests passed after the presentation pass; the landing-page suite,
+Adapter validation: five focused analytics tests passed after the diagnostics pass; the landing-page suite,
 TypeScript check, and Astro build passed. The Content Studio repository-wide test run reported
 at least 2,729 passing subtests but did not emit its final summary or exit, so it was stopped after
 the hang. Content Studio typecheck still reports three unrelated pre-existing test typing errors in
