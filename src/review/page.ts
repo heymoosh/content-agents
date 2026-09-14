@@ -847,7 +847,18 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
      screen may wear that pair (docs/prototype-port-rules.md Rule 3). The question above it is the
      app asking, so it is sans. Nothing here is purple: no AI writes a single character of an
      intake answer. */
-  .iv { max-width:660px; display:flex; flex-direction:column; gap:0; }
+  .iv { width:100%; min-width:0; display:flex; flex-direction:column; gap:0; }
+  .iv-chat { color:var(--ink); font-size:16px; line-height:1.65; }
+  .iv-chat-message { margin:20px 0; padding:18px 22px; border:1px solid #e7e1d6; border-radius:10px; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .iv-chat-message.user { background:#f0ece3; }
+  .iv-chat-message strong { display:block; margin-bottom:8px; font-size:13px; }
+  .iv-chat .iv-in { font:inherit; color:var(--ink); min-height:120px; }
+  .iv-chat details { margin:22px 0; }
+  .iv-chat summary { cursor:pointer; }
+  .iv-chat-log { max-height:55vh; overflow-y:auto; padding-right:8px; }
+  .iv-chat .iv-hint { max-width:none; color:#625b50; }
+  .iv-context-item { padding:14px 0; border-bottom:1px solid #e7e1d6; }
+  .iv-context-item p { white-space:pre-wrap; margin:6px 0; color:var(--ink); }
   .iv-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
   .iv-block { font-size:13px; line-height:1.5; color:#8a7f6d; margin-top:10px; }
   .iv-bar { height:3px; background:#eae2ce; border-radius:2px; margin-top:10px; max-width:420px; overflow:hidden; }
@@ -5000,7 +5011,7 @@ let ivNotesState=null, ivNotesFields=[], ivNotesBusy=false, ivNotesMessage="", i
 function ivNotesBackupKey(slug){ return "venture.notes."+slug; }
 function ivBackupNotes(){
   if(!ivSlug||!ivNotesState) return;
-  try { sessionStorage.setItem(ivNotesBackupKey(ivSlug),JSON.stringify({revision:ivNotesState.revision,notes:ivNotesState.notes,corrections:ivNotesState.corrections})); } catch(e) {}
+  try { sessionStorage.setItem(ivNotesBackupKey(ivSlug),JSON.stringify({revision:ivNotesState.revision,notes:ivNotesState.notes,corrections:ivNotesState.corrections,draft:ivNotesState.draft||""})); } catch(e) {}
 }
 async function ivLoadContext(slug){
   ivNotesConflict=false;
@@ -5013,8 +5024,8 @@ async function ivLoadContext(slug){
     ivNotesAnalyzedText=j.state.analysis?j.state.notes:"";
     try {
       const local=JSON.parse(sessionStorage.getItem(ivNotesBackupKey(slug))||"null");
-      if(local&&local.revision===j.state.revision){ ivNotesState.notes=local.notes; ivNotesState.corrections=local.corrections; }
-      else if(local&&(local.notes!==j.state.notes||JSON.stringify(local.corrections)!==JSON.stringify(j.state.corrections))){
+      if(local&&local.revision===j.state.revision){ ivNotesState.notes=local.notes; ivNotesState.corrections=local.corrections; ivNotesState.draft=local.draft||""; }
+      else if(local&&(local.notes!==j.state.notes||JSON.stringify(local.corrections)!==JSON.stringify(j.state.corrections)||(local.draft||"")!==(j.state.draft||""))){
         ivNotesState={...j.state,...local};
         ivNotesConflict=true;
         ivNotesMessage="This tab has unsaved notes or corrections from an earlier version. Copy anything you want to keep before loading the saved version; saving will refuse to overwrite newer work.";
@@ -5028,24 +5039,24 @@ async function ivNotesAction(action){
   if(ivNotesBusy||!ivNotesState) return;
   const slug=ivSlug, base="/api/venture/"+encodeURIComponent(slug)+"/intake/context";
   let succeeded=false;
-  ivNotesBusy=true; ivNotesMessage=action==="analyze"?"Reading your notes and connecting the details…":"Saving…"; renderIntake();
+  ivNotesBusy=true; ivNotesMessage=action==="analyze"?"Thinking through your reply…":"Saving…"; renderIntake();
   try {
-    const saved=await post(base,{revision:ivNotesState.revision,notes:ivNotesState.notes,corrections:ivNotesState.corrections});
+    const saved=await post(base,{revision:ivNotesState.revision,notes:ivNotesState.notes,corrections:ivNotesState.corrections,draft:ivNotesState.draft||""});
     if(!saved.ok) throw new Error(saved.error||"Could not save your notes.");
     try { sessionStorage.removeItem(ivNotesBackupKey(slug)); } catch(e) {}
     if(ivSlug!==slug) return;
     ivNotesState=saved.state;
     if(action==="analyze"){
       const result=await post("/api/venture/"+encodeURIComponent(slug)+"/intake/context/analyze",{revision:ivNotesState.revision,engine:ivNotesEngine});
-      if(!result.ok) throw new Error(result.error||"The model could not read these notes. They are saved; try again.");
+      if(!result.ok){ await ivLoadContext(slug); throw new Error(result.error||"Your message is saved, but the model could not reply. Try again."); }
       if(ivSlug!==slug) return;
-      ivNotesState=result.state; ivNotesAnalyzedText=result.state.notes; ivNotesMessage="Read complete. Review the understanding below.";
+      ivNotesState=result.state; ivNotesAnalyzedText=result.state.notes; ivNotesMessage="";
     } else if(action==="confirm"){
       const result=await post("/api/venture/"+encodeURIComponent(slug)+"/intake/context/confirm",{revision:ivNotesState.revision,confirm:true});
       if(!result.ok) throw new Error(result.error||"Could not create this venture.");
       if(ivSlug!==slug) return;
       ivRemember(null); ivExit(); ventureSlug=slug; await loadVentureList(); flash("Venture created from your reviewed context.");
-    } else ivNotesMessage="Notes saved. You can leave and resume later.";
+    } else ivNotesMessage="Conversation and draft saved. You can return whenever you like.";
     succeeded=true;
   } catch(e){ if(ivSlug===slug) ivNotesMessage=e instanceof Error?e.message:String(e); }
   finally { if(ivSlug===slug){ ivNotesBusy=false; renderIntake(); } }
@@ -5056,20 +5067,23 @@ function ivNotesHtml(){
   const s=ivNotesState, a=s.analysis, disabled=ivNotesBusy?' disabled':'';
   const value=key=>Object.prototype.hasOwnProperty.call(s.corrections,key)?s.corrections[key]:(a?.fields.find(f=>f.key===key)?.text||"");
   const missing=ivNotesFields.filter(f=>!value(f.key).trim());
-  const questions=(a?.questions||[]).filter(q=>q.fields.some(key=>!value(key).trim()));
-  const review=a?'<h3>What I understand</h3><div class="vnote" style="white-space:pre-wrap">'+esc(a.summary)+'</div>'+
-    (questions.length?'<h3>What still needs clarity</h3><ul>'+questions.map(q=>'<li>'+esc(q.question)+'</li>').join('')+'</ul><p>Add your answers to the notes below in whatever form is easiest.</p>':missing.length?'<p>A few details are still missing. Add more context or correct them in the details below, then read the notes again.</p>':'<p>The context is ready for your review.</p>')+
-    '<details style="margin:20px 0"><summary>Review or correct the full business context</summary>'+ivNotesFields.map(f=>{
-      const field=a.fields.find(x=>x.key===f.key), edited=Object.prototype.hasOwnProperty.call(s.corrections,f.key);
-      return '<label style="display:block;margin:16px 0"><strong>'+esc(f.label)+'</strong><div class="src">'+esc(edited?'Your correction':field?.basis==='inferred'?'Inferred from your notes':field?.basis==='stated'?'From supplied context':'Needs clarity')+'</div><textarea rows="2" style="width:100%;box-sizing:border-box" data-notes-field="'+esc(f.key)+'"'+disabled+'>'+esc(value(f.key))+'</textarea>'+(field?.evidence?.length?'<span class="src" style="display:block">Supporting text: '+esc(field.evidence.join(' / '))+'</span>':'')+'</label>';
-    }).join('')+'</details>':'';
-  return '<div class="iv-q">'+(a?'Your venture context':'Tell me what you are thinking about building.')+'</div>'+review+
-    '<label for="ivNotes">'+(a?'Your notes and clarifications':'Your notes')+'</label><textarea class="iv-in" id="ivNotes" rows="9" placeholder="Paste your plans, ideas, audience notes, existing work, and constraints. A rough description is enough to begin."'+disabled+'>'+esc(s.notes)+'</textarea>'+
-    '<p class="iv-hint">Your model maps the details you have already provided and asks only about gaps or ambiguity. You can correct its interpretation before creating the venture. Earlier interview answers are included automatically.</p>'+
-    '<div class="iv-nav"><label>Read with <select id="ivNotesEngine"'+disabled+'><option value="claude"'+(ivNotesEngine==='claude'?' selected':'')+'>Claude</option><option value="codex"'+(ivNotesEngine==='codex'?' selected':'')+'>GPT (Codex)</option></select></label><button class="primary" id="ivNotesAnalyze"'+disabled+'>'+(ivNotesBusy?'Working…':a?'Update my understanding':'Read my notes')+'</button><button id="ivNotesSave"'+disabled+'>Save notes</button><button id="ivLeave"'+disabled+'>Leave for now</button></div>'+
+  const messages=s.messages||[], started=!!(s.notes||a||messages.length);
+  const migration=a&&!messages.length?'<div class="iv-chat-message"><strong>Working understanding from your earlier notes</strong>'+esc(a.summary)+'<p>We can continue the interview here. You do not need to fill in the fields. Tell me what you want help thinking through, or ask me to suggest a next step.</p></div>':'';
+  const conversation=messages.map(m=>'<div class="iv-chat-message '+(m.role==='user'?'user':'assistant')+'"><strong>'+ (m.role==='user'?'You':'Interviewer')+'</strong>'+(m.role==='user'&&m.text.length>1200?'<details><summary>'+esc(m.text.slice(0,180))+'…</summary>'+esc(m.text)+'</details>':esc(m.text))+'</div>').join('');
+  const ready=!!a&&!missing.length&&s.notes===ivNotesAnalyzedText;
+  const context=a?'<details><summary>'+(ready?'Review the context before creating your venture':'Working context · updated as we talk')+'</summary><p>'+esc(a.summary)+'</p>'+ivNotesFields.filter(f=>value(f.key).trim()).map(f=>{
+    const field=a.fields.find(x=>x.key===f.key);
+    return '<div class="iv-context-item"><strong>'+esc(f.label)+'</strong><p>'+esc(value(f.key))+'</p><span class="iv-hint">'+esc(Object.prototype.hasOwnProperty.call(s.corrections,f.key)?'Your correction':field?.basis==='inferred'?'Inferred from your answers':'From your answers')+'</span><details><summary>Evidence and manual correction</summary><p class="iv-hint">'+esc(field?.evidence?.join(' / ')||'Your supplied correction')+'</p><textarea aria-label="'+esc(f.label)+'" class="iv-in" rows="2" data-notes-field="'+esc(f.key)+'"'+disabled+'>'+esc(value(f.key))+'</textarea></details></div>';
+  }).join('')+(missing.length?'<p>We are still exploring some details together. There are no blank fields for you to fill out here.</p>':'')+'</details>':'';
+  return '<div class="iv-chat"><h2>Let’s shape your venture</h2><p>Share what you know, ask for ideas, or say you’re unsure. We’ll work through it together, one step at a time.</p>'+
+    (s.notes?'<details><summary>Your original notes</summary><div class="iv-chat-message user">'+esc(s.notes)+'</div></details>':'')+
+    migration+'<div class="iv-chat-log" aria-label="Interview conversation">'+conversation+'</div>'+
+    (started&&!a&&messages[messages.length-1]?.role==='user'&&!ivNotesBusy?'<p>Your message is saved. Choose “Continue interview” to get a reply.</p>':'')+
+    '<label for="ivChatDraft">'+(started?'Your reply':'What are you thinking about building?')+'</label><textarea class="iv-in" id="ivChatDraft" rows="4" placeholder="'+(started?'Answer naturally, ask a question, or tell me what you’re unsure about.':'Paste your existing notes or describe your idea. We can start wherever you are.')+'"'+disabled+'>'+esc(s.draft||'')+'</textarea>'+
+    '<div class="iv-nav"><label>Talk with <select id="ivNotesEngine"'+disabled+'><option value="claude"'+(ivNotesEngine==='claude'?' selected':'')+'>Claude</option><option value="codex"'+(ivNotesEngine==='codex'?' selected':'')+'>GPT (Codex)</option></select></label><button class="primary" id="ivNotesAnalyze"'+disabled+'>'+(ivNotesBusy?'Thinking…':started?'Continue interview':'Start conversation')+'</button>'+(started?'<button id="ivNotesIdeas"'+disabled+'>Help me think this through</button>':'')+'<button id="ivNotesSave"'+disabled+'>Save for later</button><button id="ivLeave"'+disabled+'>Leave for now</button></div>'+
     '<div role="status" style="margin:14px 0">'+esc(ivNotesMessage)+'</div>'+
     (ivNotesConflict?'<button id="ivNotesUseSaved">Discard this tab’s edits and load saved version</button>':'')+
-    (a?'<button class="primary" id="ivNotesConfirm"'+(ivNotesBusy||missing.length||s.notes!==ivNotesAnalyzedText?' disabled':'')+'>Confirm understanding and create venture</button><p class="iv-hint">Creates the venture from the context you reviewed. Original notes and the model’s interpretation stay separately recorded. No content is published.</p>':'');
+    context+(ready?'<button class="primary" id="ivNotesConfirm"'+(ivNotesBusy||s.draft?.trim()?' disabled':'')+'>Confirm understanding and create venture</button><p class="iv-hint">Review the context above first. Creating the venture requires your confirmation. Nothing publishes.</p>':'<p class="iv-hint">This is a work in progress, not your final intake. The context will be ready for review once we have worked through the remaining details.</p>')+'</div>';
 }
 function renderIntake(){
   const box = $("#intakeBox");
@@ -5077,6 +5091,7 @@ function renderIntake(){
   if(!ivSlug){ box.innerHTML = ivStartHtml(); const s = $("#ivSlugIn"); if(s) s.focus(); return; }
   const body = ivNotesHtml();
   box.innerHTML = '<div class="iv"><div class="vmono">INTAKE: '+esc(ivSlug)+'</div>'+body+'</div>';
+  const log=box.querySelector('.iv-chat-log'); if(log) log.scrollTop=log.scrollHeight;
 }
 
 // One delegated listener each, like the Venture thread above: renderIntake() replaces the whole
@@ -5084,6 +5099,7 @@ function renderIntake(){
 document.addEventListener("input", e=>{
   const t = e.target;
   if(!t || !t.closest || !t.closest("#ventureIntake")) return;
+  if(t.id==="ivChatDraft"){ ivNotesState.draft=t.value; ivBackupNotes(); const confirm=$("#ivNotesConfirm"); if(confirm) confirm.disabled=!!t.value.trim(); return; }
   if(t.id==="ivNotes"){ ivNotesState.notes=t.value; ivBackupNotes(); const confirm=$("#ivNotesConfirm"); if(confirm) confirm.disabled=true; return; }
   if(t.dataset.notesField){
     ivNotesState.corrections[t.dataset.notesField]=t.value; ivBackupNotes();
@@ -5111,6 +5127,11 @@ document.addEventListener("click", e=>{
   }
   if(!t.closest("#ventureIntake")) return;
   if(t.id==="ivNotesAnalyze") return ivNotesAction("analyze");
+  if(t.id==="ivNotesIdeas"){
+    if(ivNotesBusy) return;
+    ivNotesState.draft=(ivNotesState.draft?ivNotesState.draft+"\\n\\n":"")+"I’m unsure how to answer. What would you suggest, and why? Help me think through a few possibilities before I choose.";
+    ivBackupNotes(); renderIntake(); $("#ivChatDraft")?.focus(); return;
+  }
   if(t.id==="ivNotesSave") return ivNotesAction("save");
   if(t.id==="ivNotesConfirm") return ivNotesAction("confirm");
   if(t.id==="ivNotesReload") return ivLoadContext(ivSlug);

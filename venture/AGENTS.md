@@ -134,9 +134,12 @@ must abstain rather than guess (§5.4c), a measured zero is a real reading and a
 
 A generated recommendation must remain visibly distinct from Muxin's own words, and her edit
 becomes her version. Intake is notes-first: an LLM maps supplied notes into the 25 context fields
-and asks only for missing or ambiguous details. Original notes and manual answers stay verbatim;
+and continues in a conversational interview, asking one useful question at a time and offering
+clearly labeled ideas when the founder is unsure. Suggestions do not become founder evidence
+without acceptance. Natural replies fill the context in the background; the form is not the interview.
+Original notes, conversation turns, and manual answers stay verbatim;
 inferred answers are labeled, correctable, and finalized only by Muxin's explicit confirmation.
-`intake-context.json` preserves the notes, model mapping, supporting quotes, and corrections.
+`intake-context.json` preserves the notes, conversation, model mapping, supporting quotes, and corrections.
 Nothing silently rewrites her answer, her voice evidence, or her selection. Where Venture handles third-party
 replies (a later phase), `respondent_hash` is a keyed HMAC and neither the raw identifier nor the
 key ever appears in a log, export, error record, or PR body.

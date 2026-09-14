@@ -92,7 +92,7 @@ import { buildStudioHome } from "./studio.js";
 import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, type Engine } from "./engines.js";
 import { readTreatment } from "./treatment.js";
 import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts, saveIntakeSectionDraft, readIntakeSections, clearIntakeDrafts } from "./intake-draft.js";
-import { readNotes, saveNotes, analyzeNotes, confirmNotes, notesRunning, INTAKE_NOTE_FIELDS } from "./intake-notes.js";
+import { readNotes, saveNotes, submitInterviewReply, analyzeNotes, confirmNotes, notesRunning, INTAKE_NOTE_FIELDS } from "./intake-notes.js";
 import { enqueueVentureStep } from "./venture-runner.js";
 import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
 import { providerForKind, PUBLISHING_STATUS_PATH, publishingKey, readPublishingStatuses, resolvePublishingAttempt, scheduleApprovedOnce, type PublishingResolution } from "./publishing-status.js";
@@ -2405,7 +2405,8 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           if (engine !== 'claude' && engine !== 'codex') throw new Error('Choose Claude or GPT (Codex) for this analysis.');
           const state = await runQueued('venture-analysis', `Read notes for ${slug}`, async job => {
             job.slugs = [slug];
-            return analyzeNotes(slug, revision, engine);
+            const submitted = submitInterviewReply(slug, revision);
+            return analyzeNotes(slug, submitted.revision, engine);
           }, engine);
           json(res, 200, { ok: true, state }); return;
         }
@@ -2413,7 +2414,7 @@ export async function reviewRequestHandler(req: IncomingMessage, res: ServerResp
           if (b.confirm !== true) throw new Error('Review the context and explicitly confirm it first.');
           json(res, 200, { ok: true, result: confirmNotes(slug, revision) }); return;
         }
-        json(res, 200, { ok: true, state: saveNotes(slug, revision, b.notes, b.corrections) }); return;
+        json(res, 200, { ok: true, state: saveNotes(slug, revision, b.notes, b.corrections, undefined, b.draft) }); return;
       } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); return; }
     }
     // Legacy manual answer drafts remain available for compatibility and are reused by notes analysis.

@@ -198,8 +198,8 @@ Intake happens before the 14-day clock. Nothing drafts until intake and the Day 
 
 1. Start with the founder's existing notes, plans, and descriptions. The 25 questions below define the context to gather, not a mandatory questionnaire (owner decision, September 14, 2026).
 2. Use an LLM to map all supplied details into that context, including reasonable, visibly labeled inferences. Reuse existing answers. Never invent proof, results, audience quotes, commitments, or demand.
-3. Ask only about missing or ambiguous information. Combine related gaps into a short clarification conversation; do not ask for details already supplied.
-4. Preserve the original notes and prior answers. Let the founder inspect and correct the model's understanding, pause, and resume.
+3. Interview through an ongoing chat, one manageable question at a time. Ask only about missing or ambiguous information, not details already supplied. When the founder is unsure, offer concrete possibilities and reasoning, then ask what fits. Suggestions are proposals, never founder facts or commitments until accepted.
+4. Preserve the original notes, conversation, and prior answers. Fill the context from natural replies in the background. Keep the working context secondary and omit empty form fields; the founder can inspect, correct, pause, and resume without completing a questionnaire.
 5. A user question does not count as a business fact. Conflicts require clarification; absence is not evidence.
 6. Only the founder's explicit confirmation finalizes the context. Store original notes, supporting quotes, inferences, and corrections separately from the reviewed answers. Voice evidence and success criteria can also be extracted from supplied notes; their existing completeness and truthfulness requirements remain.
 

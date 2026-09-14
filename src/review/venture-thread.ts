@@ -706,11 +706,11 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
   // 1. Her own words. The transcript opens the thread because it is what everything downstream
   //    cites, and it is the only place in this room rendered entirely in her register.
   if (answers && Object.keys(answers).length) {
-    messages.push({ kind: "rail", text: "INTAKE · IN YOUR OWN WORDS" });
+    messages.push({ kind: "rail", text: "INTAKE · REVIEWED CONTEXT" });
     messages.push({
       kind: "quotes",
-      rail: "THE 25 ANSWERS",
-      sub: "Stored exactly as you gave them. Nothing below paraphrases these.",
+      rail: "BUSINESS CONTEXT",
+      sub: "The context you confirmed at kickoff. Notes-based intake preserves your original words and the model’s interpretations separately in intake-context.json.",
       lines: Object.keys(QUESTION_DISPLAY)
         .filter((id) => answers[id])
         .map((id) => ({ anchor: `q-${id}`, question: QUESTION_DISPLAY[id].question, answer: answers[id] })),
