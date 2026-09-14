@@ -823,8 +823,8 @@ test("client <script>: Charles reads its queue with a guarded parse, appends it 
   // inverted condition; this does not.
   assert.ok(rowClick.includes("if(drafted){"), "the drafted branch is guarded by the literal `if(drafted)`");
   assert.ok(!/if\s*\(\s*!\s*drafted\s*\)/.test(rowClick), "the guard is not its inverse");
-  assert.ok(/if\(drafted\)\{[^]*?charlesId\s*=\s*drafted\.postId[^]*?return;[^]*?\}[^]*?\$\("#charlesInput"\)\?\.focus\(\)/.test(rowClick), "the drafted branch sets charlesId and returns before the composer fall-through focuses the input");
-  assert.ok(!/\$\("#charlesInput"\)\?\.focus\(\)[^]*?charlesId\s*=\s*drafted\.postId/.test(rowClick), "the composer fall-through never precedes the drafted branch");
+  assert.ok(/if\(drafted\)\{[^]*?charlesId\s*=\s*drafted\.postId[^]*?return;[^]*?\}[^]*?resumeCharlesCapture\(button\.dataset\.rqId\)/.test(rowClick), "the drafted branch sets charlesId and returns before the composer fall-through focuses the input");
+  assert.ok(!/resumeCharlesCapture\(button\.dataset\.rqId\)[^]*?charlesId\s*=\s*drafted\.postId/.test(rowClick), "the composer fall-through never precedes the drafted branch");
 
   const draft = script.slice(script.indexOf("async function draftCharles("), script.indexOf("function renderCharlesReplySource("));
   const guard = draft.search(/if\s*\(\s*!modes\.length\s*\)\s*\{\s*flash\("Choose at least one format"\)\s*;\s*return;\s*\}/);
@@ -2659,11 +2659,9 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(!advanceBody.includes('idea.value=text'), "Fiction no longer prefills the raw idea textarea; the idea is a durable record");
   assert.ok(section.includes('ficPage="inbox"'), "Fiction opens its safe front door");
   assert.ok(section.includes('setOutreachSub("leads")'), "Outreach opens the required lead chooser");
-  assert.ok(section.includes('charlesPage="input"'), "Charles opens its safe Input page");
-  assert.ok(section.includes("renderCharlesPages()"), "Charles renders the existing Input page helper");
+  assert.ok(section.includes('resumeCharlesCapture(capture?.id)'), "Charles restores the selected saved capture through the shared resume helper");
   assert.ok(section.includes("await loadCharles()"), "Charles waits for its room read before copying into Input");
-  assert.ok(section.includes('input.value=text'), "Charles copies the exact capture without drafting it");
-  assert.ok(section.includes("Charles Input already has an unsaved idea"), "Charles refuses to overwrite a different unsaved idea");
+
   assert.ok(section.includes('await openVentureCapture(r.queueItem)'), "Venture opens its persisted thought or venture chooser");
   assert.ok(section.includes('throw new Error("Unsupported capture room: "+room)'), "unknown rooms fail closed instead of falling through to Venture");
   assert.ok(!section.includes('$("#charlesDraftBtn").click()'));
@@ -4217,4 +4215,37 @@ test("Publishing labels distinguish schedules, handoffs and provider-confirmed l
   assert.equal(state({status:"scheduled",publishingStatus:{state:"uncertain"}}), "Needs reconciliation");
   assert.match(message("Scheduled"), /live publication is not yet confirmed/);
   assert.match(message("Ready to paste"), /Nothing has been posted/);
+});
+
+
+test("Charles saved idea resume restores exact text and selection without drafting or overwriting", () => {
+  const script=emittedScripts().join("\n");
+  const start=script.indexOf("function resumeCharlesCapture(");
+  const end=script.indexOf("async function draftCharles(", start);
+  assert.ok(start>=0&&end>start);
+  const text="Charles considers a new plan.\n\n"+"Keep the entire thought. ".repeat(30);
+  const capture={id:"saved",room:"Charles",text};
+  const input={value:"",focus(){},scrollIntoView(){}};
+  const boxes=[{value:"oneliner",checked:true},{value:"essay",checked:false},{value:"reply",checked:false}];
+  let pageRenders=0;
+  const makeResume=(captures: unknown[], queue: unknown[])=>new Function(
+    "SERVER_CAPTURES","CHARLES_QUEUE","$","document","renderCharlesPages","renderCharlesReplySource",
+    'let charlesPage="all";'+script.slice(start,end)+';return resumeCharlesCapture;'
+  )(captures,queue,()=>input,{querySelectorAll:()=>boxes},()=>{pageRenders++;},()=>{}) as (id:string)=>string;
+  // Reconstructed server data after reload, including an existing all-undrafted selection.
+  const resume=makeResume(JSON.parse(JSON.stringify([capture])),[{captureId:"saved",payload:{outputs:[{type:"essay",status:"pending"}]}}]);
+  resume("saved");
+  assert.equal(input.value,text);
+  assert.deepEqual(boxes.map(b=>b.checked),[false,true,false]);
+  assert.equal(pageRenders,1);
+  resume("saved"); // harmless repeat, no model or POST binding is provided
+  input.value="A different unsaved idea";
+  assert.throws(()=>resume("saved"),/Another idea/);
+  assert.equal(input.value,"A different unsaved idea");
+  assert.throws(()=>resume("missing"),/unavailable/);
+  input.value="";
+  boxes[0]!.checked=true;
+  makeResume([capture],[])("saved"); // captures saved before a group exists also resume
+  assert.equal(input.value,text);
+  assert.equal(boxes[0]!.checked,true);
 });

@@ -5469,6 +5469,29 @@ function renderFiction(){
   });
 }
 
+// Resume from the repository capture, never from the shortened queue title.
+function resumeCharlesCapture(captureId){
+  const capture=SERVER_CAPTURES.find(c=>c.id===captureId&&c.room==="Charles");
+  if(!capture) throw new Error("This saved idea is unavailable. Reload Charles and try again.");
+  const input=$("#charlesInput");
+  if(!input) throw new Error("Charles Input is unavailable");
+  charlesPage="input"; renderCharlesPages();
+  if(input.value.trim()&&input.value.trim()!==capture.text.trim()){
+    input.focus();
+    throw new Error("Another idea is already in the editor. Finish or clear it before resuming this one; your saved thought is still here.");
+  }
+  input.value=capture.text;
+  const item=CHARLES_QUEUE.find(it=>it.captureId===captureId);
+  const outputs=item?.payload?.outputs||[];
+  if(outputs.length){
+    document.querySelectorAll(".charles-format").forEach(box=>{ box.checked=outputs.some(o=>o.type===box.value); });
+    renderCharlesReplySource();
+  }
+  input.scrollIntoView({behavior:"smooth",block:"center"});
+  input.focus();
+  return "Saved idea restored. Choose formats and click Draft when ready.";
+}
+
 async function draftCharles(){
   const input = $("#charlesInput").value.trim();
   const replySource = $("#charlesReplyInput").value.trim();
@@ -5766,7 +5789,7 @@ function renderCharlesQueue(){
       title:((capture&&capture.text)||"").replace(/\\s+/g," ").trim().slice(0,90)||"(captured thought)",
       meta:it.state+" · "+done+" of "+outputs.length+" drafted"+(outputs.length?" · "+outputs.map(o=>typeLabel(o.type)+" "+o.status).join(", "):""),
       tag:"GROUP", tagCls:"yours",
-      action:done?"Open":"Compose"
+      action:done?"Open":"Resume idea"
     };
   });
   $("#charlesMain").insertAdjacentHTML("beforeend", roomQueueHtml("Charles queue", rows));
@@ -5781,8 +5804,8 @@ function renderCharlesQueue(){
       ($("#charlesMain .charles-output.on")||$("#charlesMain")).scrollIntoView({behavior:"smooth",block:"start"});
       return;
     }
-    charlesPage="input"; renderCharlesPages();
-    $("#charlesInput")?.focus();
+    try { flash(resumeCharlesCapture(button.dataset.rqId)); }
+    catch(e){ flash(e instanceof Error?e.message:String(e)); }
   }));
 }
 async function onCharlesAction(act, item, el){
@@ -7003,16 +7026,9 @@ async function advanceCaptureSafely(room, text){
   }
   if(room==="Charles"){
     await loadCharles();
-    charlesPage="input"; renderCharlesPages();
-    const input=$("#charlesInput");
-    if(!input) throw new Error("Charles Input is unavailable");
-    if(input.value.trim()&&input.value!==text){
-      input.focus();
-      throw new Error("Charles Input already has an unsaved idea. Clear it, then start this saved capture again.");
-    }
-    input.value=text;
-    input?.focus();
-    return "Your exact idea is in Charles Input. Review it before drafting.";
+    await loadCaptures();
+    const capture=SERVER_CAPTURES.find(c=>c.room==="Charles"&&c.text.trim()===text.trim());
+    return resumeCharlesCapture(capture?.id);
   }
   if(room==="Venture"){
     const r=await post("/api/captures/start",{room:"Venture",text:text});
@@ -7061,14 +7077,14 @@ function renderCaptureHandoff(){
     box.innerHTML = captures.map(capture=>'<div class="capture-handoff" data-capture-id="'+esc(capture.id)+'" style="border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:13px 15px;margin-top:14px">'+
       '<div class="wb-label">CAPTURE WAITING HERE</div>'+
       '<div style="font:400 16px/1.6 Georgia,serif;white-space:pre-wrap;margin-top:6px">'+esc(capture.text)+'</div>'+
-      '<div class="actions" style="margin-top:10px">'+(label==="Venture"?'<button class="primary cap-start">Open in Venture</button>':label==="Content"&&!capture.jobId?'<button class="primary cap-start">Start on it</button>':'')+'<button class="cap-return">Back to Studio capture</button><span class="src">'+(capture.jobId?'Advisor started. Approval and publishing remain separate.':'Saved in the repository. Nothing has been approved or published.')+'</span></div>'+
+      '<div class="actions" style="margin-top:10px">'+(label==="Venture"?'<button class="primary cap-start">Open in Venture</button>':label==="Charles"?'<button class="primary cap-start">Resume idea</button>':label==="Content"&&!capture.jobId?'<button class="primary cap-start">Start on it</button>':'')+'<button class="cap-return">Back to Studio capture</button><span class="src">'+(capture.jobId?'Advisor started. Approval and publishing remain separate.':'Saved in the repository. Nothing has been approved or published.')+'</span></div>'+
       '</div>').join("");
     box.querySelectorAll(".capture-handoff").forEach(card=>{
       card.querySelector(".cap-start")?.addEventListener("click", async (event)=>{
         event.target.disabled=true;
         const capture=SERVER_CAPTURES.find(c=>c.id===card.dataset.captureId);
-        if(label==="Venture"){
-          try { flash(await advanceCaptureSafely("Venture",capture.text)); }
+        if(label==="Venture"||label==="Charles"){
+          try { flash(await advanceCaptureSafely(label,capture.text)); }
           catch(e){ flash(e instanceof Error?e.message:String(e)); }
           finally { event.target.disabled=false; }
           return;
