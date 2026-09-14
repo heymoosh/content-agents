@@ -27,7 +27,7 @@
 //      "nothing has happened yet" from "the answer is zero", so no route collapses them.
 
 import { existsSync } from "node:fs";
-import { readArtifacts } from "../venture/artifacts.js";
+import { readArtifact, readArtifacts } from "../venture/artifacts.js";
 import { readArtifactBody } from "../venture/artifact-lifecycle.js";
 import { readCanonEvents } from "../venture/canon.js";
 import { readDecisions } from "../venture/decisions.js";
@@ -40,6 +40,7 @@ import { computeState } from "../venture/state.js";
 import { formatStatusReadOnly } from "../venture/status.js";
 import { buildVentureThread } from "./venture-thread.js";
 import { readWorkingContext } from "../venture/working-context.js";
+import { readSeriesProgress, readWebsiteMeasurement } from './venture-actions.js';
 import { listVentureDocuments, readVentureDocument } from "./venture-documents.js";
 
 export interface VentureReadResult {
@@ -191,6 +192,8 @@ const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> =
       clusters: readClusterAnalysis(slug),
       answers: readIntakeAnswers(slug) ?? null,
       workingContext: readWorkingContext(slug),
+      executionSeries: readSeriesProgress('human-inference').filter(s => s.ventureSlug === slug && readArtifact(slug,'p1-research-plan')?.updated_at === s.planUpdatedAt),
+      websiteMeasurement: readWebsiteMeasurement(),
       rulesVersion: rules.rules_version,
       minEvidence: Object.fromEntries(Object.entries(rules.artifact_kinds).map(([k, v]) => [k, v.min_evidence])),
       selectCounts: {

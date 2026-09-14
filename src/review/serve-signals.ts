@@ -20,6 +20,7 @@ import { readSignalsVentureProposals, recordSignalsVentureDecision, recordSignal
 import { readCanonEvents } from "../venture/canon.js";
 import { computeState } from "../venture/state.js";
 import { migrateLegacyDataFile } from "../runtime/data-root.js";
+import { readSeriesProgress, readWebsiteMeasurement } from './venture-actions.js';
 
 type SignalsRouteContext = {
   req: IncomingMessage;
@@ -129,6 +130,8 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
       })),
       changeProposals: readSignalsProposals(proposalsPath).filter((proposal) => proposal.brandId === brand),
       experimentPlans: brandPlans,
+      ventureSeries: readSeriesProgress(brand),
+      websiteMeasurement: brand === 'human-inference' ? readWebsiteMeasurement() : null,
       experimentPerformance: (() => { const value = (readExperimentPerformance?.() ?? readLiveExperimentPerformance(experimentPlansPath)) as { experiments?: readonly { brandId?: BrandId | null }[]; [key: string]: unknown }; return { ...value, experiments: (value.experiments ?? []).filter((item) => item.brandId === brand) }; })(),
       experimentInterpretations: readExperimentInterpretations(experimentResultsPath).filter((item) => item.brandId === brand),
       // A missing/unavailable optional handoff ledger is an honest empty read, like the other

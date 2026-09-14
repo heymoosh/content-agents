@@ -41,6 +41,7 @@ import type { ClusterAnalysis } from "../venture/phase3.js";
 import type { VentureState, CheckpointState } from "../venture/state.js";
 import type { IntakeAnswers } from "../venture/intake.js";
 import type { WorkingContext } from "../venture/working-context.js";
+import type { VentureSeries, WebsiteMeasurement } from './venture-actions.js';
 
 // ── the view model ───────────────────────────────────────────────────────────────────────────────
 
@@ -273,6 +274,8 @@ export type ThreadMsg =
   | ClustersMsg;
 
 export interface VentureThread {
+  executionSeries?: VentureSeries[];
+  websiteMeasurement?: WebsiteMeasurement | null;
   workingContext?: WorkingContext;
   nextAction: { label: string; explanation: string; command: 'plan-init' | null; runnable: boolean };
   slug: string;
@@ -313,6 +316,8 @@ export interface RailItem {
 }
 
 export interface ThreadInput {
+  executionSeries?: VentureSeries[];
+  websiteMeasurement?: WebsiteMeasurement | null;
   workingContext?: WorkingContext;
   slug: string;
   state: VentureState;
@@ -810,7 +815,9 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
   return {
     slug: input.slug,
     workingContext: input.workingContext,
-    nextAction: nextVentureAction(state.current_phase, artifacts, decisions),
+    executionSeries: input.executionSeries,
+    websiteMeasurement: input.websiteMeasurement,
+    nextAction: nextVentureAction(state.current_phase, artifacts, decisions, input.executionSeries),
     phase: state.current_phase,
     phaseStatus: state.phase_status,
     statusText: input.statusText,
@@ -826,7 +833,7 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
   };
 }
 
-export function nextVentureAction(phase: number, artifacts: VentureArtifact[], decisions: DecisionRecord[]): VentureThread['nextAction'] {
+export function nextVentureAction(phase: number, artifacts: VentureArtifact[], decisions: DecisionRecord[], series: VentureSeries[] = []): VentureThread['nextAction'] {
   const plan = artifacts.find(a => a.artifact_kind === 'phase_1_research_plan');
   if (phase === 1 && plan?.editorial_status === 'discarded') return {label:'Restore the research plan below',command:null,runnable:false,explanation:'The plan was put aside. Restore it before reviewing or continuing.'};
   if (phase === 1 && !plan) return {
@@ -841,6 +848,8 @@ export function nextVentureAction(phase: number, artifacts: VentureArtifact[], d
     label: 'Review the decision below', command: null, runnable: false,
     explanation: 'Choose from the pending proposal before asking the model to continue. Existing work and saved updates remain available.',
   };
+  if (phase === 1 && series.length) return {label:'Work through the actions below',command:null,runnable:false,
+    explanation:'The approved plan has linked work. Prepare the queued content, connect measurements and wait for results before requesting more proposals.'};
   return { label: 'Prepare the next proposal', command: null, runnable: true,
     explanation: 'The model reads your saved progress and the current workflow, prepares one eligible step, and stops for your review.' };
 }

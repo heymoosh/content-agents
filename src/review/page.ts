@@ -17,6 +17,7 @@ import { CONTENT_CONFIG_OPTIONS } from "./content-request.js";
 import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 import { intakeProgress } from "./intake-progress.js";
 import { ventureProgressHtml, ventureResearchPlanHtml } from "./page-venture-progress.js";
+import { ventureActionsHtml, ventureSeriesSignalsHtml } from './page-venture-actions.js';
 export {
   formatElapsed,
   ANSWERED_FOOTER,
@@ -1243,11 +1244,12 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <nav class="room-pages venture-stages" aria-label="Venture pages"><button class="venture-stage on" data-set-ven-pane="work">Overview and next steps</button><button class="venture-stage" data-set-ven-pane="documents">Documents</button><button class="venture-stage" data-set-ven-pane="intake">Guardrails</button><button class="venture-stage" data-set-ven-pane="history">History</button></nav>
       <div id="ventureWorkPane">
       <style>.venture-progress,.vp-plan{font-size:16px;line-height:1.6;color:#26231e}.venture-progress{max-width:82ch;margin-top:32px}.vp-sections section{margin:24px 0}.vp-sections h3{margin:0 0 8px}.vp-sections ul{margin:0;padding-left:24px}.vp-sections li{margin:0 0 8px}.vp-text{white-space:pre-wrap;margin:0}.vp-meta{font-size:13px;color:#625b50}.vp-field{display:block;margin:16px 0}.vp-field textarea{display:block;width:100%;box-sizing:border-box;padding:12px;font:inherit}.venture-progress details{margin:24px 0}.venture-progress summary{cursor:pointer}.vp-plan section{padding:8px 0;border-bottom:1px solid var(--line)}#roomVenture .vnote{color:#403b33}#roomVenture .vthread{max-width:none}#ventureNextExplanation{max-width:850px}@media(max-width:760px){#ventureMainSheet{padding:20px!important}}</style>
-      <section class="venture-tools" style="margin-top:24px">
+      <div id="ventureActions"></div>
+      <section class="venture-tools" id="ventureTools" style="margin-top:24px">
         <h3>Next action</h3><p id="ventureNextExplanation"></p>
         <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;background:#faf7f0;border:1px solid #efe7d6;border-radius:8px">
           <label class="engine-choice"><span>Run with</span><select class="engine-select" id="ventureEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-          <button type="button" id="ventureAnalyzeBtn">Help me decide what’s next</button>
+          <button type="button" id="ventureAnalyzeBtn">Ask for advice</button>
           <button type="button" id="ventureRunStepBtn">Run the next draft step</button>
           <span class="src">Both stop at the next human gate. Neither approves or publishes.</span>
         </div>
@@ -4456,6 +4458,8 @@ async function openVentureCapture(item){
   if(target){ target.setAttribute("tabindex","-1"); target.focus({preventScroll:true}); }
 }
 const renderVentureProgress = ${ventureProgressHtml.toString()};
+const renderVentureActions = ${ventureActionsHtml.toString()};
+const renderVentureSeriesSignals = ${ventureSeriesSignalsHtml.toString()};
 const renderVentureResearchPlan = ${ventureResearchPlanHtml.toString()};
 const ventureWorkingDrafts = {};
 function ventureWorkingDraft(){
@@ -4505,10 +4509,27 @@ async function saveVentureWorkingContext(){
   } catch(e){ if(slug===ventureSlug) $('#ventureWorkingStatus').textContent='Not saved. '+(e.message||String(e)); }
   finally { if(slug===ventureSlug) $('#ventureWorkingSave').disabled=false; }
 }
+document.addEventListener('click',async e=>{
+  const button=e.target.closest?.('[data-venture-content],[data-venture-signals],[data-venture-documents],[data-venture-history]');
+  if(!button) return;
+  if(button.hasAttribute('data-venture-content')){
+    await setRoom('content'); CW.pane='wizard'; CW.slug=button.dataset.ventureContent; CW.approvedLens='existing-post'; CW.step=2;
+    await cwLoadTreatment(); renderContentWizard();
+  } else if(button.hasAttribute('data-venture-signals')){
+    $('#signalsBrand').value='human-inference'; setSignalsTab('experiments'); await setRoom('signals');
+  } else {
+    VEN.pane=button.hasAttribute('data-venture-documents')?'documents':'history';renderVentureSheets();
+  }
+});
 function renderVenture(){
   const t = VENTURE_THREAD;
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
   renderWorkingContext(t);
+  const execution = t.phase===1 && (t.executionSeries||[]).length>0 && t.nextAction?.label==='Work through the actions below';
+  $('#ventureActions').innerHTML=execution?renderVentureActions(t.executionSeries,t.websiteMeasurement,esc):'';
+  // Keep the operating page short. Original context and every workflow gate remain in History.
+  const detailsParent=execution?$('#ventureHistoryPane'):$('#ventureWorkPane');
+  detailsParent.append($('#ventureTools'),$('#ventureAnalysisPanel'),$('#ventureProgress'),$('#ventureRead'));
   $("#ventureDay").textContent = vDayLine(t.elapsedDays);
   const signals = (VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).filter(p=>p.ventureSlug===ventureSlug&&p.status==="adopted");
   const signalsHtml = signals.map(p=>'<div class="vblock" data-signals-input="'+esc(p.id)+'"><div class="vmono">SIGNALS INPUT · '+(p.ventureDecision?'DECIDED IN VENTURE':'ADOPTED IN SIGNALS')+'</div><div class="vtitle" style="font-size:20px">'+esc(p.title)+'</div><div class="vnote" style="margin-top:8px">'+esc(p.proposedInput)+' · measured '+esc(p.evidenceStatus)+' evidence · phase '+esc(p.phase)+(p.ventureDecision?' · Venture decision: '+esc(p.ventureDecision.outcome):'')+'</div>'+signalsHandoffMetaHtml(p, null, null)+'<div class="vnote" style="margin-top:6px"><strong>Venture:</strong> '+esc(p.ventureSlug)+' · <strong>Phase:</strong> '+esc(p.phase)+'</div>'+(p.ventureDecision?'':'<div class="vacts"><button class="primary" data-signals-input-action="accept" data-signals-input-id="'+esc(p.id)+'">Accept in Venture</button><button data-signals-input-action="request-more-evidence" data-signals-input-id="'+esc(p.id)+'">Request more evidence</button><button data-signals-input-action="reject" data-signals-input-id="'+esc(p.id)+'">Reject</button></div>')+'</div>').join('');
@@ -4646,7 +4667,7 @@ document.addEventListener("click", e=>{
   const planReview=t.closest('[data-review-research-plan]');
   if(planReview){
     planReview.disabled=true;
-    ventureWrite('/research-plan/review',{confirm:true,updatedAt:planReview.dataset.reviewResearchPlan},'Research plan reviewed. Ready for the next proposal.','research-plan').finally(()=>{planReview.disabled=false;});
+    ventureWrite('/research-plan/review',{confirm:true,updatedAt:planReview.dataset.reviewResearchPlan},'Research plan reviewed. Continue with its actions.','research-plan').finally(()=>{planReview.disabled=false;});
     return;
   }
 
@@ -6220,11 +6241,12 @@ function experimentCanProposeVenture(perf, interpretation){
 }
 function signalsExperimentsHtml(){
   const plans=(SIGNALS&&SIGNALS.experimentPlans)||[];
+  const series=renderVentureSeriesSignals((SIGNALS&&SIGNALS.ventureSeries)||[],SIGNALS&&SIGNALS.websiteMeasurement,esc);
   const propose='<div class="actions"><button class="sig-experiment-propose">Plan a test</button><span class="src">Requires an existing Content request and reviewed evidence. The analysis may recommend not testing yet.</span></div>';
-  if(!plans.length) return '<section><p>No experiments recorded for this brand yet.</p><p>Start with a question about an existing Content item. An approved test goes through Content review before publication.</p>'+propose+'</section>';
+  if(!plans.length) return series+(series?'<p>No controlled comparisons recorded. The exploratory Venture series above does not require inventing one.</p>':'<section><p>No experiments recorded for this brand yet.</p><p>Start with a question about an existing Content item. An approved test goes through Content review before publication.</p>'+propose+'</section>');
   const performanceById=new Map((((SIGNALS&&SIGNALS.experimentPerformance)||{}).experiments||[]).map(row=>[row.experimentId,row]));
   const interpretationById=new Map(((SIGNALS&&SIGNALS.experimentInterpretations)||[]).map(row=>[row.experimentId,row]));
-  return '<section>'+propose+'<p class="sig-meta">Plan approval, copy review and publication remain separate. Expanding a test shows its evidence and design.</p>'+plans.map(p=>{
+  return series+'<section>'+propose+'<p class="sig-meta">Plan approval, copy review and publication remain separate. Expanding a test shows its evidence and design.</p>'+plans.map(p=>{
     const status=String(p.status||"proposed");
     const confidence=String(p.confidence||"unknown");
     const controls=status==="proposed"
@@ -6301,6 +6323,7 @@ function renderSignals(){
   }
   experimentBox.innerHTML=signalsExperimentsHtml();
   bindSignalsExperimentActions(experimentBox);
+  experimentBox.querySelectorAll('.sig-venture-open').forEach(b=>b.addEventListener('click',()=>{ VEN.pane='work';setRoom('venture');switchVenture(b.dataset.slug); }));
   experimentBox.querySelectorAll(".sig-venture-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsVenture(b)));
   const plans=SIGNALS.experimentPlans||[];
   const interpretations=SIGNALS.experimentInterpretations||[];
