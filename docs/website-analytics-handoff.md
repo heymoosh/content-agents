@@ -105,6 +105,10 @@ posts; a Studio link builder is specified in `docs/website-link-builder-handoff.
 
 ## Shipped — 2026-09-15
 
+- Studio link builder v1 shipped: a pure tagging function plus a panel in the Signals room, unit
+  tested. **Not fully done** — two gaps remain open and unresolved (lineage prefill-and-lock is
+  blocked on missing plumbing; the live round-trip check was never run). Full status, why it's
+  blocked, and an owner decision needed before continuing: `docs/website-link-builder-handoff.md`.
 - Owner approved the Terms & Privacy "Website Measurement" wording. No cookie banner: the collector
   uses `sessionStorage` only, readers are mostly US-based, and no third-party tracker is involved.
 - Landing-page PR #94 merged and released as `v2026.09.15` (tag-triggered Vercel deploy). Live
