@@ -22,6 +22,8 @@ import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 import { intakeProgress } from "./intake-progress.js";
 import { ventureProgressHtml, ventureResearchPlanHtml } from "./page-venture-progress.js";
 import { ventureActionsHtml, ventureSeriesSignalsHtml, websiteAnalyticsReportHtml } from './page-venture-actions.js';
+import { linkBuilderPanelHtml } from './page-link-builder.js';
+import { buildWebsiteLink } from './website-link-builder.js';
 import { ventureGuideHtml, ventureStructuredHtml } from './page-venture-guide.js';
 export {
   formatElapsed,
@@ -1307,6 +1309,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div id="signalsOverviewPanel">
     <div id="signalsPerformance"><p>Loading performance…</p></div>
     <div id="signalsFamilies"><p>Loading outcomes…</p></div>
+    ${linkBuilderPanelHtml()}
     <details class="sig-detail"><summary>Audience comments and research</summary><div id="signalsResearch"></div></details>
     <h3>Explore the results</h3>
     <div class="strategy" style="max-width:none;margin-top:14px">
@@ -4591,6 +4594,52 @@ const renderVentureGuide = ${ventureGuideHtml.toString()};
 const renderVentureStructured = ${ventureStructuredHtml.toString()};
 const renderVentureSeriesSignals = ${ventureSeriesSignalsHtml.toString()};
 const renderVentureResearchPlan = ${ventureResearchPlanHtml.toString()};
+const buildWebsiteLink = ${buildWebsiteLink.toString()};
+document.querySelectorAll('#wlbPlatform,#wlbMedium').forEach(select=>{
+  select.addEventListener('change',()=>{
+    const other=$('#'+select.id+'Other');
+    other.hidden=select.value!=='__other';
+    if(!other.hidden) other.focus();
+  });
+});
+$('.website-link-builder')?.addEventListener('click', e=>{
+  if(e.target.closest?.('[data-link-builder-build]')){
+    const fieldValue=(selectId)=>{ const select=$('#'+selectId); return select.value==='__other' ? $('#'+selectId+'Other').value : select.value; };
+    const result=buildWebsiteLink({
+      destination: $('#wlbDestination').value,
+      platform: fieldValue('wlbPlatform'),
+      medium: fieldValue('wlbMedium'),
+      campaign: $('#wlbCampaign').value,
+      variantId: $('#wlbVariantId').value,
+      sourcePostId: $('#wlbSourcePostId').value,
+    });
+    if(result.errors){
+      $('#wlbResult').hidden=true;
+      $('#wlbErrors').hidden=false;
+      $('#wlbErrors').innerHTML=Object.values(result.errors).map(m=>'<p>'+esc(m)+'</p>').join('');
+    } else {
+      $('#wlbErrors').hidden=true;
+      $('#wlbResult').hidden=false;
+      $('#wlbUrl').textContent=result.url;
+    }
+  } else if(e.target.closest?.('[data-link-builder-copy]')){
+    if(navigator.clipboard){
+      navigator.clipboard.writeText($('#wlbUrl').textContent).then(()=>flash('Link copied.')).catch(()=>flash('Could not copy. Select and copy the link text manually.'));
+    } else {
+      flash('Could not copy. Select and copy the link text manually.');
+    }
+  }
+});
+document.addEventListener('click', e=>{
+  const btn=e.target.closest?.('[data-link-builder-prefill]');
+  if(!btn) return;
+  const variantInput=$('#wlbVariantId'), sourceInput=$('#wlbSourcePostId');
+  if(variantInput){ variantInput.value=btn.getAttribute('data-variant-id')||''; variantInput.disabled=true; }
+  if(sourceInput){ sourceInput.value=btn.getAttribute('data-source-id')||''; sourceInput.disabled=true; }
+  setSignalsTab('overview');
+  $('.website-link-builder')?.scrollIntoView({behavior:'smooth',block:'start'});
+  flash('Variant and source-post IDs filled in from this experiment.');
+});
 const conversionTab=document.createElement('button');
 conversionTab.className='venture-stage';conversionTab.dataset.setVenPane='conversions';conversionTab.textContent='Reader destinations';
 $('#roomVenture .venture-stages').append(conversionTab);
@@ -6409,6 +6458,9 @@ function signalsHandoffMetaHtml(p, perf, interpretation){
     '<br><strong>Caveats:</strong> '+esc(caveats.length?caveats.join("; "):"none recorded")+
     '<br><strong>Lineage:</strong> source '+esc(sourceId)+' · variant '+esc(variantId)+' · experiment '+esc(experimentId)+
     (((p&&p.contentItemRefs)||[]).length?' · content '+((p.contentItemRefs||[]).map(esc).join(", ")):'')+
+    (sourceId!=="not recorded"&&variantId!=="not recorded"
+      ? '<br><button type="button" class="wlb-prefill" data-link-builder-prefill data-source-id="'+esc(sourceId)+'" data-variant-id="'+esc(variantId)+'">Build a tagged link for this</button>'
+      : '')+
     '</div>';
 }
 function experimentCanProposeVenture(perf, interpretation){
