@@ -6,4 +6,4 @@ Only `approve` rows are ready for Muxin to paste to Substack herself. Nothing po
 
 | id | type | file | status | notes |
 |----|------|------|--------|-------|
-| no-contingency-for-laughter | one-liner | posts/one-liners/no-contingency-for-laughter.md | pending | Terror of laughter: he slips that there is no plan for being laughed at, then insists there is one and refuses to discuss it. |
+| no-contingency-for-laughter | one-liner | posts/one-liners/no-contingency-for-laughter.md | discard | Terror of laughter: he slips that there is no plan for being laughed at, then insists there is one and refuses to discuss it. |
