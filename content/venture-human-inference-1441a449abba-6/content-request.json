@@ -1,0 +1,486 @@
+{
+  "testPlans": [
+    {
+      "id": "text",
+      "title": "Explore the text channels",
+      "why": "Test the same source across five text channels, with platform framing and a different opening. Compare reader response before narrowing distribution.",
+      "platforms": [
+        "linkedin",
+        "bluesky",
+        "x",
+        "threads",
+        "mastodon"
+      ],
+      "media": [],
+      "treatments": [
+        "platform-framing",
+        "hook-variants"
+      ]
+    },
+    {
+      "id": "visual",
+      "title": "Try a visual version",
+      "why": "Compare a verbatim quote card on Instagram, LinkedIn and Bluesky. It tests a visual presentation without requiring a new argument.",
+      "platforms": [
+        "instagram",
+        "linkedin",
+        "bluesky"
+      ],
+      "media": [
+        "static-quote-card"
+      ],
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "id": "video",
+      "title": "Explore video audiences",
+      "why": "Prepare short-video scripts for TikTok and YouTube from this source. Scripts need review and production before they are publishable videos.",
+      "platforms": [
+        "tiktok",
+        "youtube"
+      ],
+      "media": [
+        "short-video-script"
+      ],
+      "treatments": [
+        "platform-framing"
+      ]
+    }
+  ],
+  "excludedOutputs": [],
+  "kind": "content_request",
+  "version": "content-request-v1",
+  "id": "venture-human-inference-1441a449abba-6",
+  "origin": "human-inference",
+  "descriptor": "Whenever my mind starts screaming about everything that could go wrong, I picture a tiny rain frog.",
+  "originalInput": "Whenever my mind starts screaming about everything that could go wrong, I picture a tiny rain frog.\n\nIt started when I was spending too much time thinking about whether my work would succeed.\n\nWhenever the numbers weren’t moving, I would find another business guru with a bag of magic tricks. Then I’d spend days questioning everything and less time on the writing and building I should have been doing.\n\nI started treating the anxious part of my mind like a tiny frog screaming into the air.\n\nI can let it have its say, pat it on the head, thank it for its input, and do the thing I was going to do anyway.\n\nIf your own frog is loud today, give it one minute. Write down what it’s yelling about.\n\nThen set a ten-minute timer and open the thing you already know you care about.\n\nFor me, that usually means opening the draft or terminal I’ve been avoiding and working on it until the timer ends. If what’s bothering you is political, [Voter Choice](https://voterchoice.vote/) gives you something equally small: Enter your address, choose one issue, and check one person’s record.\n\nThe frog doesn’t have to go away first.\n\nThere’s more about how I ended up using this in [Don’t Read if You’d Rather Burn Out Early](https://www.humaninference.ai/essays/dont-read-if-youd-rather-burn-out-early).",
+  "readerAction": {
+    "mode": "destination",
+    "destinationId": "source-aa61bd79a95b53cd54c1",
+    "ventureId": "human-inference",
+    "url": "https://www.humaninference.ai/essays/dont-read-if-youd-rather-burn-out-early",
+    "label": "Read the full essay:",
+    "reason": "Full essay already linked in this piece. Preserve the existing reader path.",
+    "measurement": "Not connected yet",
+    "from": "venture",
+    "reviewed": true
+  },
+  "ventureId": "human-inference",
+  "ventureSource": null,
+  "sourceProvenance": {
+    "kind": "approved-cut",
+    "sourceLines": [
+      "9-27"
+    ],
+    "lens": "existing-post"
+  },
+  "sourceContext": null,
+  "experiment": null,
+  "selections": {
+    "platforms": [
+      "linkedin",
+      "bluesky",
+      "x",
+      "threads",
+      "mastodon",
+      "instagram",
+      "tiktok",
+      "youtube"
+    ],
+    "media": [
+      "none",
+      "static-quote-card",
+      "short-video-script"
+    ],
+    "treatments": [
+      "platform-framing",
+      "hook-variants"
+    ]
+  },
+  "recommendations": {
+    "treatments": [
+      {
+        "option": "summary",
+        "evidence": [
+          {
+            "option": "summary",
+            "kind": "treatment",
+            "reason": "summary is available under the safe cold-start defaults; no sufficient evidence is measured.",
+            "source": "cold-start-default",
+            "recommended": true
+          }
+        ]
+      }
+    ],
+    "media": [
+      {
+        "option": "static-quote-card",
+        "evidence": [
+          {
+            "option": "static-quote-card",
+            "kind": "media",
+            "reason": "static-quote-card is available under the safe cold-start defaults; no sufficient evidence is measured.",
+            "source": "cold-start-default",
+            "recommended": true
+          }
+        ]
+      }
+    ],
+    "platforms": [
+      {
+        "option": "bluesky",
+        "evidence": [
+          {
+            "option": "bluesky",
+            "kind": "platform",
+            "reason": "Publish on Bluesky because the complete short observation fits a conversational text feed without expansion.",
+            "source": "source-fit",
+            "recommended": true
+          },
+          {
+            "option": "bluesky",
+            "kind": "platform",
+            "reason": "bluesky is available under the safe cold-start defaults; no sufficient evidence is measured.",
+            "source": "cold-start-default",
+            "recommended": true
+          }
+        ]
+      },
+      {
+        "option": "linkedin",
+        "evidence": [
+          {
+            "option": "linkedin",
+            "kind": "platform",
+            "reason": "Publish on LinkedIn as a brief observation because the point is complete without turning it into a longer lesson post.",
+            "source": "source-fit",
+            "recommended": true
+          }
+        ]
+      },
+      {
+        "option": "mastodon",
+        "evidence": [
+          {
+            "option": "mastodon",
+            "kind": "platform",
+            "reason": "Publish on Mastodon because this is a self-contained text post that does not depend on an algorithmic hook.",
+            "source": "source-fit",
+            "recommended": true
+          }
+        ]
+      },
+      {
+        "option": "threads",
+        "evidence": [
+          {
+            "option": "threads",
+            "kind": "platform",
+            "reason": "Publish on Threads because the thought is conversational and complete at its original short length.",
+            "source": "source-fit",
+            "recommended": true
+          }
+        ]
+      },
+      {
+        "option": "x",
+        "evidence": [
+          {
+            "option": "x",
+            "kind": "platform",
+            "reason": "Publish on X because this is one compact claim that fits the fast text feed without added setup.",
+            "source": "source-fit",
+            "recommended": true
+          }
+        ]
+      }
+    ]
+  },
+  "control": {
+    "enabled": true
+  },
+  "variants": [
+    {
+      "identity": {
+        "id": "control-bGlua2VkaW4-bm9uZQ",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "linkedin",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-bGlua2VkaW4-bm9uZQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "linkedin",
+      "media": "none",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "treated-bGlua2VkaW4-bm9uZQ-aG9vay12YXJpYW50cw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "linkedin",
+      "media": "none",
+      "treatments": [
+        "hook-variants"
+      ]
+    },
+    {
+      "identity": {
+        "id": "control-Ymx1ZXNreQ-bm9uZQ",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-Ymx1ZXNreQ-bm9uZQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "treated-Ymx1ZXNreQ-bm9uZQ-aG9vay12YXJpYW50cw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": [
+        "hook-variants"
+      ]
+    },
+    {
+      "identity": {
+        "id": "control-eA-bm9uZQ",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "x",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-eA-bm9uZQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "x",
+      "media": "none",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "treated-eA-bm9uZQ-aG9vay12YXJpYW50cw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "x",
+      "media": "none",
+      "treatments": [
+        "hook-variants"
+      ]
+    },
+    {
+      "identity": {
+        "id": "control-dGhyZWFkcw-bm9uZQ",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "threads",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-dGhyZWFkcw-bm9uZQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "threads",
+      "media": "none",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "treated-dGhyZWFkcw-bm9uZQ-aG9vay12YXJpYW50cw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "threads",
+      "media": "none",
+      "treatments": [
+        "hook-variants"
+      ]
+    },
+    {
+      "identity": {
+        "id": "control-bWFzdG9kb24-bm9uZQ",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "mastodon",
+      "media": "none",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-bWFzdG9kb24-bm9uZQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "mastodon",
+      "media": "none",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "treated-bWFzdG9kb24-bm9uZQ-aG9vay12YXJpYW50cw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "mastodon",
+      "media": "none",
+      "treatments": [
+        "hook-variants"
+      ]
+    },
+    {
+      "identity": {
+        "id": "control-aW5zdGFncmFt-c3RhdGljLXF1b3RlLWNhcmQ",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "instagram",
+      "media": "static-quote-card",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-aW5zdGFncmFt-c3RhdGljLXF1b3RlLWNhcmQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "instagram",
+      "media": "static-quote-card",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "control-bGlua2VkaW4-c3RhdGljLXF1b3RlLWNhcmQ",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "linkedin",
+      "media": "static-quote-card",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-bGlua2VkaW4-c3RhdGljLXF1b3RlLWNhcmQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "linkedin",
+      "media": "static-quote-card",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "control-Ymx1ZXNreQ-c3RhdGljLXF1b3RlLWNhcmQ",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "bluesky",
+      "media": "static-quote-card",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-Ymx1ZXNreQ-c3RhdGljLXF1b3RlLWNhcmQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "bluesky",
+      "media": "static-quote-card",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "control-dGlrdG9r-c2hvcnQtdmlkZW8tc2NyaXB0",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "tiktok",
+      "media": "short-video-script",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-dGlrdG9r-c2hvcnQtdmlkZW8tc2NyaXB0-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "tiktok",
+      "media": "short-video-script",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "control-eW91dHViZQ-c2hvcnQtdmlkZW8tc2NyaXB0",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "control"
+      },
+      "platform": "youtube",
+      "media": "short-video-script",
+      "treatments": []
+    },
+    {
+      "identity": {
+        "id": "treated-eW91dHViZQ-c2hvcnQtdmlkZW8tc2NyaXB0-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-6",
+        "kind": "treated"
+      },
+      "platform": "youtube",
+      "media": "short-video-script",
+      "treatments": [
+        "platform-framing"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+===== SHARED BLOCK — MP-1 (mission posts) =====
+
+THE PLAN
+PLAN.md at the root of your worktree. It is the whole spec. It was frozen on 2026-09-15 and
+implements rows V4, L6, X6 and G17 of docs/content-studio-master-status.md; where the two
+disagree, the status doc's "Owner decisions, 2026-09-15 (planning session)" block wins. Its
+requirement IDs (M1–M5, W1–W9, T1–T5, A1–A6, D1–D5, S1–S5, G1–G7) are what a judge will score.
+The repo holds a working Content Studio app; you are extending it, not rebuilding it. Read
+CLAUDE.md, AGENTS.md and venture/AGENTS.md first. Base commit: the commit named in your session
+header (the commit that contains PLAN.md and the committed content/ and venture/human-inference/
+folders). Your worktree and branch are named in your header.
+
+YOUR JOB
+Make every ID true, or record exactly why one cannot be. Then run USE-IT-CHECKLIST.md at the
+repo root for real (G6): real server on REVIEW_PORT=4610, real browser. Anything you find that
+way is work too. Write EVIDENCE.md so it is true of the final commit. Keep ESCALATIONS.md as a
+record: every decision the plan did not make, with the option you took and why.
+
+BEFORE YOU START
+Run `git status`. If the worktree is not clean, or if it is not at the base commit, stop and say
+so. Run `git rev-parse HEAD` and print it. Confirm `content/venture-human-inference-1441a449abba-1`
+and `venture/human-inference/intake-context.json` exist in the worktree; if not, stop and say so.
+Run `npm run worktree:setup` once (a fresh worktree has no node_modules).
+
+REPO HYGIENE — hard rules
+- Never `git add -A` or `git add .`. Stage only paths you name.
+- Never bare `git stash` or `git stash pop`. Use a WIP commit, or
+  `git stash push -u -m "<unique-tag>"` then `git stash apply <sha>`.
+- Do not push to any remote. Do not merge into, rebase onto, or fast-forward `main`.
+- Do not read, write, or reference any path outside your own worktree, except reading the
+  context file the owner points at under their home directory (W1) and $TMPDIR. The owner's
+  live app runs from the main checkout on port 4600; never touch that checkout, its
+  data/analytics.db, or port 4600.
+- The gate is `npm run check`, run unsandboxed, in full, once at the end (G1). Focused checks
+  (`node --import tsx --test <files>`, `npm run typecheck`) while building do not need anything
+  special. Copy data/analytics.db into your worktree's data/ only if it is absent there and you
+  need real rows for S5; never write to the original.
+- Node 22 and `tsx` are on PATH through npm scripts. The `claude`, `codex` and `grok` CLIs are
+  installed and signed in; they are subscription routes and the only model spending allowed.
+  No OpenRouter or other paid API.
+- Run the app on REVIEW_PORT=4610, never another port.
+- The Chrome browser tools (claude-in-chrome) are available to you for the checklist.
+- Do not modify anything under `content/venture-human-inference-1441a449abba-*/` except adding
+  the `missionId` field through the W8 script. Do not modify `venture/human-inference/` at all.
+  Do not commit anything under `data/` except `data/mission-overrides.jsonl`.
+- Do not approve, schedule, publish, send, or change the status of any review-queue row. Do not
+  install the launchd plist; describe it as an owner action.
+- If you spawn workers, run them at the same model and effort as this session. You commit;
+  workers do not.
+- Anthropic, OpenAI and xAI are authorized to receive repository content for the two required
+  cross-family audits (T1 and A1, via `codex exec` or `grok -p`). No other audit is required.
+
+WHAT I WANT OUT OF THIS, REGARDLESS OF HOW YOU GET THERE
+- `EVIDENCE.md`, committed, one entry per ID, naming the test, file, or hand check that proves
+  it, true of the final commit. `docs/evidence/use-it.md`, committed, one result per checklist
+  line with what the line asks for attached.
+- Every gate or check you run reported honestly, pass or fail, with its exit code. Never a
+  piped tail as the exit code. Do not claim anything you did not earn. A checklist line you
+  did not run is "not run", never "pass".
+
+THE OWNER IS NOT REACHABLE DURING THIS RUN.
+If you reach a point where you would stop and ask me something, do not stop. Write the question
+and the options you considered to `ESCALATIONS.md`, take the most conservative option, write
+down which you took and why, and keep going. Conservative means the choice that changes the
+least, deletes the least, and claims the least. Do the same for any requirement you judge
+unsatisfiable: record it, say exactly why, then proceed against the closest satisfiable
+reading. Never silently rewrite, drop, or reinterpret a requirement.
+
+PRE-ANSWERED DECISIONS — already settled, do not escalate these
+1. The plan's "Fixed choices" are fixed.
+2. Where the plan names an endpoint, a JSON field, a file name, a script name, or a module path,
+   that name is the contract. Where it does not, pick the simplest thing and write it in
+   `EVIDENCE.md`.
+3. Do not merge, fast-forward or push, whatever any document says about remotes.
+4. If a hand check or checklist line cannot run on this machine, record exactly what failed
+   and mark it blocked. Do not fake it.
+5. When you believe everything is done, run `npm run check` exactly once, last, on your final
+   commit, and record its exit code in `EVIDENCE.md`. If it fails, fix and run it again; record
+   every run. Stop when the gate passes and the files above are committed, or when you have
+   recorded why you cannot get there.
+6. Content, voice and review rules in CLAUDE.md are not yours to relax. A mission draft that
+   would need an invented example gets a shorter draft, not an invented example.
+
+===== END SHARED BLOCK =====

@@ -1,0 +1,65 @@
+{
+  "kind": "content_request",
+  "version": "content-request-v1",
+  "id": "venture-human-inference-1441a449abba-2",
+  "origin": "human-inference",
+  "descriptor": "Voting is a terrible user experience.",
+  "originalInput": "Voting is a terrible user experience.\n\nThink about what we expect a normal voter to do: Keep up with political news, research every candidate, understand every proposition, detect misinformation, and then make time to stand in line.\n\nWe would never design a product with this much friction and then blame the user when they dropped out.\n\nMost of us use shortcuts because we have lives. We recognize a name. We remember an ad. We vote for the party we usually vote for.\n\nI have voted based on completely irrelevant factors before, including whether I liked someone’s name.\n\nYou don’t need to research your whole ballot today.\n\nOpen [Voter Choice](https://voterchoice.vote/), enter your registered address, and click “Pull my representatives.” Choose one issue you already care about and look at how one person actually voted.\n\nStart with the person who already has the job.\n\nYou’re paying tax dollars for them to do it. Wouldn’t you want to see what they’ve done before handing it to them again?",
+  "ventureId": "human-inference",
+  "ventureSource": null,
+  "sourceProvenance": {
+    "kind": "approved-cut",
+    "sourceLines": [
+      "9-25"
+    ],
+    "lens": "existing-post"
+  },
+  "sourceContext": null,
+  "experiment": null,
+  "selections": {
+    "treatments": [
+      "platform-framing"
+    ],
+    "media": [
+      "none"
+    ],
+    "platforms": [
+      "linkedin",
+      "bluesky"
+    ]
+  },
+  "recommendations": {
+    "treatments": [],
+    "media": [],
+    "platforms": []
+  },
+  "control": {
+    "enabled": false
+  },
+  "variants": [
+    {
+      "identity": {
+        "id": "treated-bGlua2VkaW4-bm9uZQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-2",
+        "kind": "treated"
+      },
+      "platform": "linkedin",
+      "media": "none",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "treated-Ymx1ZXNreQ-bm9uZQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-2",
+        "kind": "treated"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": [
+        "platform-framing"
+      ]
+    }
+  ]
+}

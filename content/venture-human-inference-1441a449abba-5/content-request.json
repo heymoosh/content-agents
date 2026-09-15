@@ -1,0 +1,65 @@
+{
+  "kind": "content_request",
+  "version": "content-request-v1",
+  "id": "venture-human-inference-1441a449abba-5",
+  "origin": "human-inference",
+  "descriptor": "People can use AI every day and still hate what it represents.",
+  "originalInput": "People can use AI every day and still hate what it represents.\n\nTech leaders often treat public anger about AI as fear of losing jobs. I don’t think that fully explains it.\n\nPeople can recognize that AI is useful while feeling furious about the future being built around it.\n\nA fellow writer looked into buying a small share of upcoming AI-company IPOs. He was blocked because he didn’t have at least $500,000 in investable assets.\n\nMost people are being told to adapt faster, work harder, and prepare for disruption while some of the biggest opportunities remain reserved for people who already have wealth.\n\nThat’s why I keep coming back to fairness.\n\nPeople don’t care that someone else has more. They care that the rules feel rigged and there is no longer a game everyone gets to participate in.\n\nThinking about the whole economic system doesn’t give me anything useful to do before lunch. Looking at one person with political power does.\n\nIf money in politics is part of what makes you angry, open [Voter Choice](https://voterchoice.vote/). Enter your registered address, choose one issue, and check how one representative voted and who funded them.\n\nDon’t research everyone. Check one person who currently has power over your life.\n\nI explored more of the fairness underneath the AI backlash in [Why Do Americans Hate AI?](https://www.humaninference.ai/essays/why-do-americans-hate-ai).",
+  "ventureId": "human-inference",
+  "ventureSource": null,
+  "sourceProvenance": {
+    "kind": "approved-cut",
+    "sourceLines": [
+      "9-29"
+    ],
+    "lens": "existing-post"
+  },
+  "sourceContext": null,
+  "experiment": null,
+  "selections": {
+    "treatments": [
+      "platform-framing"
+    ],
+    "media": [
+      "none"
+    ],
+    "platforms": [
+      "linkedin",
+      "bluesky"
+    ]
+  },
+  "recommendations": {
+    "treatments": [],
+    "media": [],
+    "platforms": []
+  },
+  "control": {
+    "enabled": false
+  },
+  "variants": [
+    {
+      "identity": {
+        "id": "treated-bGlua2VkaW4-bm9uZQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-5",
+        "kind": "treated"
+      },
+      "platform": "linkedin",
+      "media": "none",
+      "treatments": [
+        "platform-framing"
+      ]
+    },
+    {
+      "identity": {
+        "id": "treated-Ymx1ZXNreQ-bm9uZQ-cGxhdGZvcm0tZnJhbWluZw",
+        "requestId": "venture-human-inference-1441a449abba-5",
+        "kind": "treated"
+      },
+      "platform": "bluesky",
+      "media": "none",
+      "treatments": [
+        "platform-framing"
+      ]
+    }
+  ]
+}
