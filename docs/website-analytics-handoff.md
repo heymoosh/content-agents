@@ -1,6 +1,6 @@
 # Human Inference website analytics: current handoff
 
-Updated 2026-09-14. Implementation home: `/Users/Muxin/Documents/GitHub/landing-page`.
+Updated 2026-09-15. Implementation home: `/Users/Muxin/Documents/GitHub/landing-page`.
 Keep this as the running requirement/status list; update it in place as work ships.
 No paid analytics, paid upgrades, new billing, or production deployment authorized by this document.
 
@@ -99,11 +99,22 @@ signup rate → survey completions**. Add a separate panel for audience needs an
 with newsletter form starts/submits and survey starts clearly labeled as diagnostic client signals.
 Show total existing audience separately. Offer requests, sales and revenue can wait until an offer exists.
 
-Next action in the landing-page session: deploy after the owner reviews the measurement wording and
-sets `WEBSITE_ANALYTICS_REPORT_TOKEN`, verify imported subscriber provenance, then configure
-Content Studio's `WEBSITE_ANALYTICS_REPORT_URL` and matching token and run one isolated refresh.
-No deployment, account setup, import classification, or live endpoint refresh was performed by
-this session.
+Next action: run the first website-measurement refresh from Content Studio and confirm the report
+renders. Use the campaign link convention in `landing-page/docs/website-analytics.md` for future
+posts; a Studio link builder is specified in `docs/website-link-builder-handoff.md`. See the 2026-09-15 status below for what shipped.
+
+## Shipped — 2026-09-15
+
+- Owner approved the Terms & Privacy "Website Measurement" wording. No cookie banner: the collector
+  uses `sessionStorage` only, readers are mostly US-based, and no third-party tracker is involved.
+- Landing-page PR #94 merged and released as `v2026.09.15` (tag-triggered Vercel deploy). Live
+  checks: `/api/website-analytics` returns 401 without the token; the privacy section is live.
+- `WEBSITE_ANALYTICS_REPORT_TOKEN` is set in Vercel production. Content Studio's `.env` has
+  `WEBSITE_ANALYTICS_REPORT_URL` and the matching token.
+- Subscriber origin labeled in production with owner-confirmed provenance: 163 `import` (Substack)
+  and 3 `website` (owner's own site signups/test emails). No rows remain `unknown`.
+- Not yet done: first live Studio refresh. Website funnel rows start from the deploy date;
+  earlier traffic is not reconstructed.
 
 ## Landing-page implementation status — 2026-09-14
 
