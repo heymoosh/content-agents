@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { contentPlanIdeas, contentPlanOutputs, contentPlanSummaryHtml } from './content-plan.js';
+import { contentControlLengthCheck, contentPlanIdeas, contentPlanOutputs, contentPlanSummaryHtml } from './content-plan.js';
 import { buildContentRequest, mergeContentConfiguration, CONTENT_CONFIG_OPTIONS } from './content-request.js';
 import { renderPage } from './page.js';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -87,4 +87,20 @@ test('embedded controls add, remove and select all tests without replacing other
   run({planAll:''});
   assert.equal(contentPlanOutputs(cfg.testPlans,cfg.control).length,25);
   assert.deepEqual(cfg.readerAction,{mode:'none'});
+});
+
+test('a long original chains on thread platforms and blocks only platforms that cannot take it',()=>{
+  const max={x:280,bluesky:300,linkedin:3000};
+  const threads=['x','bluesky','threads','mastodon'];
+  const long='word '.repeat(700);
+  const cfg={control:true,platform:new Set(['x','linkedin','substack'])};
+  const r=contentControlLengthCheck(cfg,long,CONTENT_CONFIG_OPTIONS,max,threads);
+  assert.equal(r.threaded.length,1);
+  assert.equal(r.blocked.length,1);
+  assert.deepEqual(contentControlLengthCheck({...cfg,control:false},long,CONTENT_CONFIG_OPTIONS,max,threads),{blocked:[],threaded:[]});
+  const plans=[{id:'text',title:'Text',platforms:['linkedin','bluesky'],media:[],treatments:['hook-variants']}];
+  const excluded=new Set([JSON.stringify(['linkedin','none',null])]);
+  const planned=contentControlLengthCheck({control:true,testPlans:plans,excludedOutputs:excluded},long,CONTENT_CONFIG_OPTIONS,max,threads);
+  assert.deepEqual(planned.blocked,[],'an excluded control output is not checked');
+  assert.equal(planned.threaded.length,1);
 });

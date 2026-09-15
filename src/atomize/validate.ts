@@ -5,6 +5,7 @@ import { repoRoot } from "../db/db.js";
 import { loadPlatforms, type PlatformRule } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { resolveAngle } from "./spin.js";
+import { splitThread, THREAD_PLATFORMS } from "../publish/thread-split.js";
 import { summarizeThreadChecks } from "./thread-check.js";
 import { summarizeStorytelling } from "./storytelling.js";
 import { listCuts, cutDir } from "./cuts.js";
@@ -60,7 +61,7 @@ export function checkDerivative(
       violations.push(`${file}: angle "${angleKey}" does not match a configured spin angle for platform "${platform}"`);
     }
   }
-  violations.push(...checkPlatformLimits(file, platform, body, platforms));
+  violations.push(...checkPlatformLimits(file, platform, body, platforms, { thread: fm.posts_as_thread === true }));
   return violations;
 }
 
@@ -78,13 +79,20 @@ export function checkPlatformLimits(
   file: string,
   platform: string,
   body: string,
-  platforms: Record<string, PlatformRule>
+  platforms: Record<string, PlatformRule>,
+  // An untreated control may chain into an exact-text thread instead (src/publish/thread-split.ts);
+  // then only a word longer than one post is a violation.
+  options: { thread?: boolean } = {}
 ): string[] {
   const violations: string[] = [];
   const rule = platforms[platform];
   if (!rule) return violations;
   if (rule.max_chars && body.length > rule.max_chars) {
-    violations.push(`${file}: ${body.length} chars > ${platform} limit ${rule.max_chars}`);
+    if (!options.thread || !THREAD_PLATFORMS.includes(platform)) {
+      violations.push(`${file}: ${body.length} chars > ${platform} limit ${rule.max_chars}`);
+    } else if (!splitThread(body, rule.max_chars)) {
+      violations.push(`${file}: a single word is longer than the ${platform} limit ${rule.max_chars}, so it cannot be chained into a thread`);
+    }
   }
   if (rule.max_words) {
     const words = body.split(/\s+/).filter(Boolean).length;

@@ -19,6 +19,20 @@ export function contentPlanOutputs(plans: readonly ContentTestPlan[], control: b
   return [...outputs.values()];
 }
 
+/** Untreated controls keep the exact original. Where it is longer than one post, thread platforms
+ * chain it into several posts; any other platform cannot carry it, so the plan is blocked before
+ * anything is generated. Self-contained because the same function runs in the embedded browser. */
+export function contentControlLengthCheck(cfg: any, body: string, options: any, maxChars: Record<string, number>, threadPlatforms: readonly string[]) {
+  if (!cfg.control) return { blocked: [] as string[], threaded: [] as string[] };
+  const platforms: string[] = cfg.testPlans
+    ? contentPlanOutputs(cfg.testPlans, true).filter(x => x.treatment === null && !cfg.excludedOutputs?.has(x.key)).map(x => x.platform)
+    : [...cfg.platform];
+  const length = String(body || '').trim().length;
+  const label = (id: string) => options.platform.find((o: any) => o[0] === id)?.[1] || id;
+  const over = [...new Set(platforms)].filter(id => maxChars[id] && length > maxChars[id]);
+  return { blocked: over.filter(id => !threadPlatforms.includes(id)).map(label), threaded: over.filter(id => threadPlatforms.includes(id)).map(label) };
+}
+
 /** Small, source-based starting points, not model output or measured winner claims.
  * Self-contained because the same function runs in the embedded browser. */
 export function contentPlanIdeas(context: any, body: string) {

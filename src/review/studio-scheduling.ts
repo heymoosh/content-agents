@@ -2,6 +2,7 @@ import { basename, extname, join, isAbsolute, sep } from "node:path";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { appendBetPlacement, appendPublishLog, setStatus, type QueueRow } from "../publish/queue.js";
 import { buildPosts, loadPlatformMax, publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
+import { THREAD_PLATFORMS } from "../publish/thread-split.js";
 import { loadCanonicalUrl, loadContentTypesConfig, loadCtaConfig, loadSourceKind, resolveCtaLines, resolvePrimaryCtaDestination } from "../publish/cta.js";
 import { publishCards, isQuoteCardRow, cardTarget, basePlatform, cardCopy, isConfiguredMediaAsset, mediaFallbackTarget } from "../publish/cards.js";
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
@@ -307,7 +308,7 @@ function placeCtas(folder: string, destination: PostizDestination, fm: Record<st
   const { ctas } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
   const placement = cfg.placement[destination] ?? "inline";
   const max = loadPlatformMax()[destination] ?? POSTIZ_MAX_CHARS[destination] ?? Infinity;
-  const { posts, manualComment } = buildPosts(body, ctas, placement, max);
+  const { posts, manualComment } = buildPosts(body, ctas, placement, max, fm.posts_as_thread === true && THREAD_PLATFORMS.includes(destination));
   const followUps = [...posts.slice(1).map((p) => p.text), ...(manualComment ? [manualComment] : [])];
   const ctaDestination = resolvePrimaryCtaDestination(fm, canonicalUrl, cfg, sourceKind, ctCfg);
   return { content: posts[0]?.text ?? body, followUps, ctaDestination: ctaDestination === null ? null : String(ctaDestination), placement, ctaCount: ctas.length };

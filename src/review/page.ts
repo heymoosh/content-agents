@@ -15,7 +15,9 @@ import { INTAKE_QUESTIONS } from "../venture/intake.js";
 import { JOB_COLORS, jobRoom, type JobView } from "./studio-job-ui.js";
 import { CONTENT_CONFIG_OPTIONS } from "./content-request.js";
 import { contentReaderActionHtml, ventureConversionsHtml } from './page-conversions.js';
-import { contentPlanIdeas, contentPlanOutputs, contentPlanSummaryHtml } from './content-plan.js';
+import { contentControlLengthCheck, contentPlanIdeas, contentPlanOutputs, contentPlanSummaryHtml } from './content-plan.js';
+import { loadPlatforms } from "../config/platforms.js";
+import { THREAD_PLATFORMS } from "../publish/thread-split.js";
 import { SIGNALS_DASHBOARD_SCRIPT } from "./page-signals-dashboard.js";
 import { intakeProgress } from "./intake-progress.js";
 import { ventureProgressHtml, ventureResearchPlanHtml } from "./page-venture-progress.js";
@@ -3165,12 +3167,15 @@ const renderContentReaderAction = ${contentReaderActionHtml.toString()};
 const contentPlanIdeas = ${contentPlanIdeas.toString()};
 const contentPlanOutputs = ${contentPlanOutputs.toString()};
 const contentPlanSummaryHtml = ${contentPlanSummaryHtml.toString()};
+const contentControlLengthCheck = ${contentControlLengthCheck.toString()};
 const renderVentureConversions = ${ventureConversionsHtml.toString()};
 let contentInputText = "";
 try { contentInputText = sessionStorage.getItem("studio.contentInput") || ""; } catch(e) {}
 let contentInputSaving = false;
 const CW_TAGCLASS = { "SUBSTACK":"substack", "YOURS":"yours", "READ IN":"readin" };
 const CONTENT_CONFIG_OPTIONS = ${JSON.stringify(CONTENT_CONFIG_OPTIONS)};
+const CONTENT_PLATFORM_MAX_CHARS = ${JSON.stringify(Object.fromEntries(Object.entries(loadPlatforms().platforms).flatMap(([id, rule]) => rule.max_chars ? [[id, rule.max_chars]] : [])))};
+const THREAD_PLATFORMS = ${JSON.stringify(THREAD_PLATFORMS)};
 
 function contentRequestOrigin(s){
   const origin = String(s.origin||"").toLowerCase();
@@ -3427,12 +3432,36 @@ function cwStep2Html(){
     (cfg.testPlans?'<p>Run with '+engineSelectHtml('contentTreatmentEngine')+'</p>':'')+
     '<details style="margin-top:24px"><summary>Ask the AI advisor for more tailored ideas</summary>'+cwAdvisorHtml(s,true)+'</details>'+
     '<label style="display:flex;gap:9px;align-items:flex-start;margin-top:22px;padding:14px;background:#faf7f0;border:1px solid #efe7d6;border-radius:8px"><input type="checkbox" id="contentControlEnabled"'+(cfg.control?" checked":"")+'><span><b>Untreated control</b><span class="src" style="display:block">Create one source-preserving control for each selected platform and media combination. You can disable it explicitly.</span></span></label>'+
-    '<div class="cw-yesall"><button type="button" class="primary" id="contentConfigSave" data-config-save'+(cfg.saving?" disabled":"")+'>'+(cfg.saving?"Creating drafts…":cfg.saved?"Drafts created":"Use this plan and create drafts")+'</button>'+
-    '<span class="src">Saves this plan and creates the selected drafts for review. Nothing is approved, scheduled or published.</span></div>';
+    '<div id="contentControlLength">'+cwControlLengthHtml()+'</div>'+
+    '<div class="cw-yesall"><button type="button" class="primary" id="contentConfigSave" data-config-save'+(cfg.saving||cwControlLength().blocked.length?" disabled":"")+'>'+(cfg.saving?"Creating drafts…":cfg.saved?"Drafts created":"Use this plan and create drafts")+'</button>'+
+    '<span class="src">Saves this plan and creates the selected drafts for review. Nothing is approved, scheduled or published.</span></div>'+
+    (cfg.error?cwGenerateErrorHtml(cfg.error):'');
+}
+function cwOriginalInput(s){ return ((s.cuts||[]).find(c=>c.lens===CW.approvedLens)||{}).body||s.sourceBody||''; }
+function cwControlLength(){
+  const s=cwSession();
+  return contentControlLengthCheck(cwEnsureConfig(),s?cwOriginalInput(s):'',CONTENT_CONFIG_OPTIONS,CONTENT_PLATFORM_MAX_CHARS,THREAD_PLATFORMS);
+}
+// Checked before generating (G16): a thread platform chains a long original, anything else blocks the button.
+function cwControlLengthHtml(){
+  const r=cwControlLength();
+  const list=a=>a.length<3?a.join(' and '):a.slice(0,-1).join(', ')+', and '+a[a.length-1];
+  return (r.blocked.length?'<div class="fam-note t-amber" role="alert">Your original post is too long for unchanged controls on '+esc(list(r.blocked))+'. Turn off Untreated control or leave out '+(r.blocked.length>1?'those platforms':'that platform')+' to create drafts.</div>':'')+
+    (r.threaded.length?'<div class="fam-note">Your original is longer than one post on '+esc(list(r.threaded))+'. Its untreated control there will post as a short thread, keeping your exact words.</div>':'');
+}
+// A failed generation stays beside the button in plain English; the technical report sits under Details.
+function cwGenerateErrorHtml(raw){
+  const summary=/failed platform validation before any write/.test(raw)?'Some drafts did not fit their platform limits, so no drafts were saved. Change the plan and try again.'
+    :/^Configuration saved, but drafts were not created/.test(raw)?'Your plan was saved, but drafts were not created. No drafts were saved.'
+    :'Drafts were not created.';
+  return '<div class="fam-note t-amber" role="alert" id="contentGenerateError">'+esc(summary)+'<details><summary>Details</summary><pre style="white-space:pre-wrap">'+esc(raw)+'</pre></details></div>';
 }
 function cwRefreshPlanSummary(){
   const summary=$('#contentPlanSummary');
   if(summary){const open=summary.querySelector('details')?.open;summary.innerHTML=contentPlanSummaryHtml(cwEnsureConfig(),CONTENT_CONFIG_OPTIONS,CW.conversion,esc);if(open&&summary.querySelector('details'))summary.querySelector('details').open=true;}
+  const lengthNote=$('#contentControlLength'), save=$('#contentConfigSave');
+  if(lengthNote) lengthNote.innerHTML=cwControlLengthHtml();
+  if(save) save.disabled=!!cwEnsureConfig().saving||cwControlLength().blocked.length>0;
 }
 function cwStep3Html(){
   return '';
@@ -3491,8 +3520,9 @@ async function cwSaveConfig(){
   if(!s || !cfg || cfg.saving) return;
   if(cfg.testPlans){if(!contentPlanOutputs(cfg.testPlans,cfg.control).some(x=>!cfg.excludedOutputs?.has(x.key))){flash('Choose at least one output');return;}}
   else if(!cfg.platform.size){ flash("Choose at least one platform"); return; }
+  if(cwControlLength().blocked.length) return;
   const engine = $("#contentTreatmentEngine")?.value || "codex";
-  cfg.saving = true; renderContentWizard();
+  cfg.saving = true; cfg.error = null; renderContentWizard();
   const recommendedPlatforms = (CW.treat && CW.treat.channels || []).filter(c=>c.decision==="include").map(c=>c.channel);
   const signalEvidence = ["treatments","media","platforms"].flatMap(key=>(CW.signalDefaults&&CW.signalDefaults[key]||[]).filter(x=>x.recommended).map(x=>({
     option:x.option, kind:key==="treatments"?"treatment":key==="platforms"?"platform":"media",
@@ -3529,7 +3559,7 @@ async function cwSaveConfig(){
     const generated = await post("/api/content/generate", {slug:s.slug, engine});
     if(!generated.ok) throw new Error("Configuration saved, but drafts were not created: "+(generated.error||"generation failed"));
     cfg.saved = true; CW.step=3; CW.pane="review"; flash(generated.ids.length+" configured drafts created"); await load(); await loadContent();
-  }catch(e){ flash(e instanceof Error?e.message:String(e)); }
+  }catch(e){ cfg.error = e instanceof Error?e.message:String(e); }
   finally{ cfg.saving = false; renderContentWizard(); }
 }
 // Delegated: the wizard is rebuilt wholesale on every render.

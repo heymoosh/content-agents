@@ -19,6 +19,7 @@ import { checkReuseForRow } from "./reuse-guard.js";
 import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
 import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 import type { UnifiedPublishOptions } from "./unified-cli.js";
+import { splitThread, THREAD_PLATFORMS } from "./thread-split.js";
 
 // Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
 // Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish time
@@ -113,8 +114,16 @@ export function buildPosts(
   body: string,
   ctas: { url: string; label: string }[],
   placement: string,
-  max: number
+  max: number,
+  // `posts_as_thread: true` (a long untreated control, src/publish/thread-split.ts): chain the
+  // exact body across posts, then place the CTA(s) against the last one.
+  thread = false
 ): { posts: { text: string }[]; manualComment: string | null } {
+  const chain = thread && body.length > max ? splitThread(body, max) : null;
+  if (chain && chain.length > 1) {
+    const tail = buildPosts(chain[chain.length - 1]!, ctas, placement, max);
+    return { posts: [...chain.slice(0, -1).map((text) => ({ text })), ...tail.posts], manualComment: tail.manualComment };
+  }
   if (ctas.length === 0) return { posts: [{ text: body }], manualComment: null };
   const ctaBlock = ctas.map((c) => `${c.label} ${c.url}`.trim()).join("\n\n");
 
@@ -511,7 +520,7 @@ export async function publishText(
     const { ctas, usedFallback } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
     if (usedFallback) console.log(`  ↳ note: ${row.id} used the configured CTA fallback`);
     const placement = cfg.placement[row.platform] ?? "inline";
-    const { posts, manualComment } = buildPosts(body, ctas, placement, maxMap[row.platform] ?? Infinity);
+    const { posts, manualComment } = buildPosts(body, ctas, placement, maxMap[row.platform] ?? Infinity, fm.posts_as_thread === true && THREAD_PLATFORMS.includes(row.platform));
 
     // Attach a video/image if the derivative declares one (frontmatter `media:`), e.g. an animated
     // quote card → native video post. Uploaded once and attached to the first post.

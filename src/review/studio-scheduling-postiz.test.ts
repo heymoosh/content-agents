@@ -149,6 +149,22 @@ test("Postiz dispatch places the source CTA like the Typefully path: reply on X,
   rmSync(root, { recursive: true, force: true });
 });
 
+test("Postiz dispatch chains a long untreated control into exact-text follow-up posts", async () => {
+  const root = mkdtempSync(join(tmpdir(), "postiz-thread-"));
+  mkdirSync(join(root, "derivatives"));
+  const body = "An original sentence that Muxin wrote. ".repeat(20).trim();
+  writeFileSync(join(root, "derivatives", "bs-1.md"), `---\nplatform: "bluesky"\nposts_as_thread: true\n---\n${body}\n`);
+  const transport = { async request() { throw new Error("no network in this test"); } };
+  try {
+    const plan = await planPostizDispatch(root, row({ id: "bs-1", platform: "bluesky", asset: "derivatives/bs-1.md" }), "acct", "2026-09-20T17:00:00Z", transport);
+    const posts = [plan.input.content, ...(plan.input.followUps ?? [])];
+    assert.ok(posts.length > 1 && posts.every((p) => p.length <= 300));
+    assert.equal(posts.join(" "), body);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("Postiz uses its destination fallback cap when platforms.yaml has no max_chars override", async () => {
   const root = mkdtempSync(join(tmpdir(), "postiz-fallback-cap-"));
   mkdirSync(join(root, "derivatives"));

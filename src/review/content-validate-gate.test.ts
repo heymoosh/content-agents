@@ -74,16 +74,17 @@ test("SLICE-5B: an over-limit configured variant is rejected atomically — no d
   const slug = uniqueSlug("atomic");
   const folder = join(repoRoot, "content", slug);
   // A Venture control carries the author body verbatim and has no source_lines: it is the path
-  // with no other char gate, so it isolates this gate. The body far exceeds x's 280-char limit.
-  const longBody = "word ".repeat(80).trim();
-  assert.ok(longBody.length > 280, "fixture body must exceed the x limit");
+  // with no other char gate, so it isolates this gate. The body far exceeds LinkedIn's 3000-char
+  // limit, and LinkedIn cannot chain a long control into a thread the way x can (G16).
+  const longBody = "word ".repeat(700).trim();
+  assert.ok(longBody.length > 3000, "fixture body must exceed the linkedin limit");
   const configured = buildContentRequest({
     id: slug, origin: "venture", descriptor: "Atomic rejection",
-    originalInput: longBody, treatments: [], platforms: ["x"], media: [], includeUntreatedControl: true,
+    originalInput: longBody, treatments: [], platforms: ["linkedin"], media: [], includeUntreatedControl: true,
   });
   mkdirSync(folder, { recursive: true });
   writeFileSync(join(folder, "review-queue.md"), QUEUE_HEADER);
-  writeFileSync(join(folder, "routing.md"), "| x | include |\n");
+  writeFileSync(join(folder, "routing.md"), "| linkedin | include |\n");
   try {
     const before = readFileSync(join(folder, "review-queue.md"), "utf8");
     await assert.rejects(generateConfiguredContent(slug, configured), /failed platform validation before any write/);
@@ -97,7 +98,8 @@ test("SLICE-5B: an over-limit configured variant is rejected atomically — no d
 });
 
 test("SLICE-5B: the char gate reads the real config limit — the same body that overflows x passes under a higher-limit platform", async () => {
-  // 290 chars: over x's 280, under bluesky's 300. Routing includes only the platform whose real
+  // 290 chars in one unbreakable word (so x cannot chain it into a thread): over x's 280, under
+  // bluesky's 300. Routing includes only the platform whose real
   // config/platforms.yaml limit the body respects, proving the gate consults the config, not a
   // constant. (Two separate folders so each is a clean atomic assertion.)
   const body = "y".repeat(290);
@@ -134,7 +136,7 @@ test("SLICE-5B: the char gate reads the real config limit — the same body that
 test("SLICE-5B: one over-limit candidate aborts the WHOLE routed set atomically — the in-limit sibling is not written either", async () => {
   const slug = uniqueSlug("wholeset");
   const folder = join(repoRoot, "content", slug);
-  // 290 chars: within bluesky's config limit (300) but over x's (280). Both platforms are routed
+  // 290 chars in one unbreakable word: within bluesky's config limit (300) but over x's (280). Both platforms are routed
   // include, so both controls are generated candidates. The x candidate's violation must abort the
   // entire routed set before any write, so the in-limit bluesky candidate is never written either.
   const body = "z".repeat(290);
@@ -218,6 +220,32 @@ test("SLICE-5B: a valid traceable request retains its exact control and source_l
     assert.equal(fm.cta, "source");
     assert.match(file, /^cta_label: "Read the full essay:"$/m);
     assert.ok(readQueue(folder).rows.every((row) => row.status === "pending"));
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("G16: a long untreated control on thread platforms is written byte-exact and marked to post as a thread", async () => {
+  const slug = uniqueSlug("thread");
+  const folder = join(repoRoot, "content", slug);
+  const body = "First paragraph sentence one. Sentence two keeps going for a while.\n\n" + "More words here. ".repeat(40).trim();
+  assert.ok(body.length > 500, "fixture body must exceed every thread platform limit");
+  const configured = buildContentRequest({
+    id: slug, origin: "venture", descriptor: "Thread control",
+    originalInput: body, treatments: [], platforms: ["x", "bluesky"], media: [], includeUntreatedControl: true,
+  });
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, "review-queue.md"), QUEUE_HEADER);
+  writeFileSync(join(folder, "routing.md"), "| x | include |\n| bluesky | include |\n");
+  try {
+    const res = await generateConfiguredContent(slug, configured);
+    assert.equal(res.ids.length, 2);
+    for (const id of res.ids) {
+      const { fm, body: written } = splitFrontmatter(readFileSync(join(folder, "derivatives", `${id}.md`), "utf8"));
+      assert.equal(fm.posts_as_thread, true, `${id} is marked to post as a thread`);
+      assert.equal(written.trim(), body, `${id} keeps the original bytes`);
+      assert.deepEqual(checkDerivative(`${id}.md`, { ...fm, source_lines: [1] }, written, { x: { max_chars: 280 }, bluesky: { max_chars: 300 } }), []);
+    }
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }

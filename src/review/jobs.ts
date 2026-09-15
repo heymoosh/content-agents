@@ -19,6 +19,7 @@ import { appendRow, appendRows, readQueue, stampOrigin, type NewQueueRow } from 
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { resolveAngle, resolvePlatformSpin, type SpinAngle } from "../atomize/spin.js";
 import { checkPlatformLimits, checkSkeletonGate, checkCaseGate } from "../atomize/validate.js";
+import { THREAD_PLATFORMS } from "../publish/thread-split.js";
 import { readSourceClass, readCaseEvidence, classifyContentOriginClass, type SourceClass } from "../atomize/source-triage.js";
 import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
@@ -1380,9 +1381,15 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
       cardRenderNames.set(id, configuredCardRenderDerivative({ media: mediaById.get(id)!, definition, sourceLine: cardSourceLine }));
     }
     const gateViolations: string[] = [];
-    for (const candidate of gateCandidates) {
-      gateViolations.push(...checkPlatformLimits(candidate.file, candidate.platform, candidate.body, gatePlatforms));
-    }
+    // An untreated control longer than one post chains into an exact-text thread where the
+    // platform supports one (G16); treated copy is still written to fit a single post.
+    const threadedIds = new Set<string>();
+    gateCandidates.forEach((candidate, index) => {
+      const isControl = variants[index]!.identity.kind === "control";
+      gateViolations.push(...checkPlatformLimits(candidate.file, candidate.platform, candidate.body, gatePlatforms, { thread: isControl }));
+      const max = gatePlatforms[candidate.platform]?.max_chars;
+      if (isControl && max && candidate.body.length > max && THREAD_PLATFORMS.includes(candidate.platform)) threadedIds.add(variants[index]!.identity.id);
+    });
     // Gate each distinct card once: a shared definition is one file and one limit check, so a
     // sharing request cannot report the same overrun twice.
     const gatedCardQuotes = new Map<string, string>();
@@ -1419,7 +1426,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         const sourceCtaUrl = !request.readerAction && request.sourceProvenance?.canonicalUrl && configuredSourceSupportsCta(request.sourceProvenance.canonicalUrl, sourceKind)
           ? request.sourceProvenance.canonicalUrl
           : null;
-        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...configuredEditorFrontmatter(variant, editorStamp), ...(routing.get(variant.platform)?.confidence === "exploration" ? ["exploration_probe: true"] : []), ...triageFrontmatter, ...pillarFrontmatter, ...(spinById.get(id)?.spin ? ["spin: true", `angle: ${variant.platform}`] : []), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
+        const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...configuredExperimentFrontmatter(request, id), ...configuredEditorFrontmatter(variant, editorStamp), ...(routing.get(variant.platform)?.confidence === "exploration" ? ["exploration_probe: true"] : []), ...triageFrontmatter, ...pillarFrontmatter, ...(spinById.get(id)?.spin ? ["spin: true", `angle: ${variant.platform}`] : []), ...(threadedIds.has(id) ? ["posts_as_thread: true"] : []), ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(sourceCtaUrl ? ["cta: source", `cta_label: ${JSON.stringify(configuredSourceCtaLabel(sourceCtaUrl, sourceKind))}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
         const ctaFields = readerActionFrontmatter(request.readerAction);
         const withCta = ctaFields.length ? frontmatter.replace(/\n---\n$/, '\n' + ctaFields.join('\n') + '\n---\n') : frontmatter;
         writeFileSync(path, configuredDerivativeText(withCta, body, variant.identity.kind === "control"), { flag: "wx" }); created.push(path);
